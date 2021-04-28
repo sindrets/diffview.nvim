@@ -1,6 +1,6 @@
-local rev = require'difftool.rev'
-local view = require'difftool.view'
-local utils =  require'difftool.utils'
+local rev = require'diffview.rev'
+local view = require'diffview.view'
+local utils =  require'diffview.utils'
 
 local M = {}
 
@@ -52,24 +52,24 @@ function M.parse_revs(args)
       return
     end
 
-    left = rev.Rev:new(rev.RevType.LOCAL)
-    right = rev.Rev:new(rev.RevType.COMMIT, rev_string)
+    left = rev.Rev:new(rev.RevType.COMMIT, vim.trim(rev_string):gsub("^%^", ""))
+    right = rev.Rev:new(rev.RevType.LOCAL)
   else
-    local rev_strings = vim.fn.systemlist(base_cmd .. "rev-parse --no-flags" .. vim.fn.shellescape(rev_arg))
+    local rev_strings = vim.fn.systemlist(base_cmd .. "rev-parse --no-flags " .. vim.fn.shellescape(rev_arg))
     if utils.shell_error() then
       utils.err("Failed to parse rev '" .. rev_arg .. "'!")
-      utils.err("Git output:" .. vim.fn.join(rev_strings, "\n"))
+      utils.err("Git output: " .. vim.fn.join(rev_strings, "\n"))
       return
     end
 
     if #rev_strings > 1 then
       -- Diff COMMIT to COMMIT
-      left = rev.Rev:new(rev.RevType.COMMIT, rev_strings[2])
-      right = rev.Rev:new(rev.RevType.COMMIT, rev_strings[1])
+      left = rev.Rev:new(rev.RevType.COMMIT, rev_strings[1]:gsub("^%^", ""))
+      right = rev.Rev:new(rev.RevType.COMMIT, rev_strings[2]:gsub("^%^", ""))
     else
       -- Diff LOCAL and COMMIT
-      left = rev.Rev:new(rev.RevType.LOCAL)
-      right = rev.Rev:new(rev.RevType.COMMIT, rev_strings[1])
+      left = rev.Rev:new(rev.RevType.COMMIT, rev_strings[1]:gsub("^%^", ""))
+      right = rev.Rev:new(rev.RevType.LOCAL)
     end
   end
 
@@ -91,7 +91,7 @@ end
 function M.git_toplevel(path)
   local out = vim.fn.system("git -C " .. vim.fn.shellescape(path) .. " rev-parse --show-toplevel")
   if utils.shell_error() then return nil end
-  return out
+  return vim.trim(out)
 end
 
 return M

@@ -1,3 +1,4 @@
+local git = require'diffview.git'
 local a = vim.api
 local M = {}
 
@@ -17,7 +18,8 @@ function View:new(opt)
     git_root = opt.git_root,
     path_args = opt.paths,
     left = opt.left,
-    right = opt.right
+    right = opt.right,
+    files = git.diff_file_list(opt.git_root, opt.left, opt.right)
   }
   setmetatable(this, self)
   return this

@@ -1,7 +1,9 @@
-local utils = require'difftool.utils'
+local utils = require'diffview.utils'
 local M = {}
 
 ---@class RevType
+---@field LOCAL integer
+---@field COMMIT integer
 
 ---@type table<string, RevType>
 local RevType = utils.enum {

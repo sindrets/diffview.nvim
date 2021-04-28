@@ -4,19 +4,28 @@ local path_sep = package.config:sub(1,1)
 
 function M.info(msg)
   vim.cmd('echohl Directory')
-  vim.cmd("echom '[Difftool.nvim] "..msg:gsub("'", "''").."'")
+  msg = "[Diffview.nvim] " .. msg
+  for _, s in ipairs(vim.fn.split(msg, "\n")) do
+    vim.cmd("echom '" .. s:gsub("'", "''").."'")
+  end
   vim.cmd('echohl None')
 end
 
 function M.warn(msg)
   vim.cmd('echohl WarningMsg')
-  vim.cmd("echom '[Difftool.nvim] "..msg:gsub("'", "''").."'")
+  msg = "[Diffview.nvim] " .. msg
+  for _, s in ipairs(vim.fn.split(msg, "\n")) do
+    vim.cmd("echom '" .. s:gsub("'", "''").."'")
+  end
   vim.cmd('echohl None')
 end
 
 function M.err(msg)
   vim.cmd('echohl ErrorMsg')
-  vim.cmd("echom '[Difftool.nvim] "..msg:gsub("'", "''").."'")
+  msg = "[Diffview.nvim] " .. msg
+  for _, s in ipairs(vim.fn.split(msg, "\n")) do
+    vim.cmd("echom '" .. s:gsub("'", "''").."'")
+  end
   vim.cmd('echohl None')
 end
 

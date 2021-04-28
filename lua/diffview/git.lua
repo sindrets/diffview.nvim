@@ -1,8 +1,9 @@
-local utils = require'difftool.utils'
+local utils = require'diffview.utils'
 local M = {}
 
 ---@class FileEntry
 ---@field path string
+---@field oldpath string
 ---@field status string
 
 ---Get a list of files modified between two revs.
@@ -18,9 +19,14 @@ function M.diff_file_list(git_root, left, right)
 
   if not utils.shell_error() then
     for _, s in ipairs(names) do
-      local status = s:sub(1, 2)
-      local name = s:match("[%a%s][%a%s]%s+(.*)")
-      table.insert(files, { path = name, status = status })
+      local status = s:sub(1, 1):gsub("%s", " ")
+      local name = s:match("[%a%s][^%s]*\t(.*)")
+      local oldname
+      if name:match('\t') ~= nil then
+        oldname = name:match('(.*)\t')
+        name = name:gsub('^.*\t', '')
+      end
+      table.insert(files, { path = name, status = status, oldpath = oldname })
     end
   end
 
@@ -30,7 +36,7 @@ function M.diff_file_list(git_root, left, right)
 
     if not utils.shell_error() and #untracked > 0 then
       for _, s in ipairs(untracked) do
-        table.insert(files, { path = s, status = "??"})
+        table.insert(files, { path = s, status = "?"})
       end
 
       utils.merge_sort(files, function (a, b)
@@ -47,7 +53,7 @@ end
 ---@param right Rev
 ---@return string
 function M.rev_to_arg(left, right)
-  local rev = require'difftool.rev'
+  local rev = require'diffview.rev'
 
   assert(left.commit or right.commit, "Can't diff LOCAL against LOCAL!")
 
@@ -60,8 +66,12 @@ function M.rev_to_arg(left, right)
   end
 end
 
+---Check if any of the given revs are LOCAL.
+---@param left Rev
+---@param right Rev
+---@return boolean
 function M.has_local(left, right)
-  local rev = require'difftool.rev'
+  local rev = require'diffview.rev'
   return left.type == rev.RevType.LOCAL or right.type == rev.RevType.LOCAL
 end
 
