@@ -30,16 +30,12 @@ function M.parse_revs(args)
     rev_arg = args[1]
   end
 
-  if #paths == 0 then
-    table.insert(paths, vim.fn.fnamemodify(".", ":p"))
-  end
-
   ---@type Rev
   local left
   ---@type Rev
   local right
 
-  local git_root = M.git_toplevel(paths[1])
+  local git_root = M.git_toplevel(paths[1] or ".")
   if not git_root then
     utils.err("Path not a git repo (or any parent): '" .. paths[1] .. "'")
     return
@@ -79,7 +75,7 @@ function M.parse_revs(args)
 
   local v = view.View:new({
       git_root = git_root,
-      paths = paths,
+      path_args = paths,
       left = left,
       right = right
     })
@@ -89,6 +85,9 @@ function M.parse_revs(args)
   return v
 end
 
+---Get the git root path of a given path.
+---@param path string
+---@return string|nil
 function M.git_toplevel(path)
   local out = vim.fn.system("git -C " .. vim.fn.shellescape(path) .. " rev-parse --show-toplevel")
   if utils.shell_error() then return nil end

@@ -4,7 +4,7 @@ local M = {}
 ---@class View
 ---@field tabpage integer
 ---@field git_root string
----@field paths string[]
+---@field path_args string[]
 ---@field left Rev
 ---@field right Rev
 local View = {}
@@ -15,7 +15,7 @@ View.__index = View
 function View:new(opt)
   local this = {
     git_root = opt.git_root,
-    paths = opt.paths,
+    path_args = opt.paths,
     left = opt.left,
     right = opt.right
   }

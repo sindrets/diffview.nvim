@@ -68,34 +68,6 @@ function M.path_remove_trailing(path)
   return p
 end
 
----Get the output of a system command.
----@param cmd string
----@return string
-function M.system(cmd)
-  local pfile = io.popen(cmd)
-  if not pfile then return end
-  local data = pfile:read("*a")
-  io.close(pfile)
-
-  return data
-end
-
----Get the output of a system command as a list of lines.
----@param cmd string
----@return string[]
-function M.system_list(cmd)
-  local pfile = io.popen(cmd)
-  if not pfile then return end
-
-  local lines = {}
-  for line in pfile:lines() do
-    table.insert(lines, line)
-  end
-  io.close(pfile)
-
-  return lines
-end
-
 ---Enum creator
 ---@param t string[]
 ---@return table
@@ -104,6 +76,76 @@ function M.enum(t)
     t[v] = i
   end
   return t
+end
+
+---Create a shallow copy of a portion of a list.
+---@param t table
+---@param first integer First index, inclusive
+---@param last integer Last index, inclusive
+---@return table
+function M.tbl_slice(t, first, last)
+  local slice = {}
+  for i = first, last or #t, 1 do
+    table.insert(slice, t[i])
+  end
+
+  return slice
+end
+
+local function merge(t, first, mid, last, comparator)
+  local n1 = mid - first + 1
+  local n2 = last - mid
+  local ls = M.tbl_slice(t, first, mid)
+  local rs = M.tbl_slice(t, mid + 1, last)
+  local i = 1
+  local j = 1
+  local k = first
+
+  while (i <= n1 and j <= n2) do
+    if comparator(ls[i], rs[j]) then
+      t[k] = ls[i]
+      i = i + 1
+    else
+      t[k] = rs[j]
+      j = j + 1
+    end
+    k = k + 1
+  end
+
+  while i <= n1 do
+    t[k] = ls[i]
+    i = i + 1
+    k = k + 1
+  end
+
+  while j <= n2 do
+    t[k] = rs[j]
+    j = j + 1
+    k = k + 1
+  end
+end
+
+local function split_merge(t, first, last, comparator)
+  if (last - first) < 1 then return end
+
+  local mid = math.floor((first + last) / 2)
+
+  split_merge(t, first, mid, comparator)
+  split_merge(t, mid + 1, last, comparator)
+  merge(t, first, mid, last, comparator)
+end
+
+---Perform a merge sort on a given list.
+---@param t any[]
+---@param comparator function|nil
+function M.merge_sort(t, comparator)
+  if not comparator then
+    comparator = function (a, b)
+      return a < b
+    end
+  end
+
+  split_merge(t, 1, #t, comparator)
 end
 
 M.path_sep = path_sep

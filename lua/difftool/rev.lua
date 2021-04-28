@@ -10,6 +10,8 @@ local RevType = utils.enum {
 }
 
 ---@class Rev
+---@field type RevType
+---@field commit string
 local Rev = {}
 Rev.__index = Rev
 
