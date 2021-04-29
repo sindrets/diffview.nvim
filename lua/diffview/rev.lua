@@ -5,14 +5,14 @@ local M = {}
 ---@field LOCAL integer
 ---@field COMMIT integer
 
----@type table<string, RevType>
+---@type table<string, integer>
 local RevType = utils.enum {
   "LOCAL",
   "COMMIT"
 }
 
 ---@class Rev
----@field type RevType
+---@field type integer
 ---@field commit string
 local Rev = {}
 Rev.__index = Rev

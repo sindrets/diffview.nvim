@@ -1,6 +1,7 @@
 local rev = require'diffview.rev'
-local view = require'diffview.view'
 local utils =  require'diffview.utils'
+local View = require'diffview.view'.View
+local a = vim.api
 
 local M = {}
 
@@ -73,7 +74,7 @@ function M.parse_revs(args)
     end
   end
 
-  local v = view.View:new({
+  local v = View:new({
       git_root = git_root,
       path_args = paths,
       left = left,
@@ -92,6 +93,17 @@ function M.git_toplevel(path)
   local out = vim.fn.system("git -C " .. vim.fn.shellescape(path) .. " rev-parse --show-toplevel")
   if utils.shell_error() then return nil end
   return vim.trim(out)
+end
+
+function M.get_current_diffview()
+  local tabpage = a.nvim_get_current_tabpage()
+  for _, view in ipairs(M.views) do
+    if view.tabpage == tabpage then
+      return view
+    end
+  end
+
+  return nil
 end
 
 return M

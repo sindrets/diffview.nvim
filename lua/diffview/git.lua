@@ -1,10 +1,6 @@
 local utils = require'diffview.utils'
+local FileEntry = require'diffview.file-entry'.FileEntry
 local M = {}
-
----@class FileEntry
----@field path string
----@field oldpath string
----@field status string
 
 ---Get a list of files modified between two revs.
 ---@param git_root string
@@ -26,7 +22,13 @@ function M.diff_file_list(git_root, left, right)
         oldname = name:match('(.*)\t')
         name = name:gsub('^.*\t', '')
       end
-      table.insert(files, { path = name, status = status, oldpath = oldname })
+      table.insert(files, FileEntry:new({
+        path = name,
+        status = status,
+        oldpath = oldname,
+        left = left,
+        right = right
+      }))
     end
   end
 
@@ -36,7 +38,12 @@ function M.diff_file_list(git_root, left, right)
 
     if not utils.shell_error() and #untracked > 0 then
       for _, s in ipairs(untracked) do
-        table.insert(files, { path = s, status = "?"})
+        table.insert(files, FileEntry:new({
+          path = s,
+          status = "?",
+          left = left,
+          right = right
+        }))
       end
 
       utils.merge_sort(files, function (a, b)
