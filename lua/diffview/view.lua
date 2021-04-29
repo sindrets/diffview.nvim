@@ -40,8 +40,16 @@ function View:open()
 end
 
 function View:close()
-  if self.tabpage then
-    vim.cmd("tabclose " .. self.tabpage)
+  for _, file in ipairs(self.files) do
+    file:destroy()
+  end
+
+  if self.tabpage and a.nvim_tabpage_is_valid(self.tabpage) then
+    local ok = true
+    if a.nvim_get_current_tabpage() ~= self.tabpage then
+      ok = pcall(a.nvim_set_current_tabpage, self.tabpage)
+    end
+    if ok then vim.cmd("tabclose") end
   end
 end
 
@@ -51,8 +59,16 @@ function View:init_layout()
   self.right_winid = a.nvim_get_current_win()
 end
 
+function View:cur_file()
+  if #self.files > 0 then
+    return self.files[self.file_idx]
+  end
+  return nil
+end
+
 function View:next_file()
   if #self.files > 1 then
+    self.files[self.file_idx]:detach_buffers()
     self.file_idx = (self.file_idx) % #self.files + 1
     vim.cmd("diffoff!")
     self.files[self.file_idx]:load_buffers(self.git_root, self.left_winid, self.right_winid)
@@ -61,9 +77,24 @@ end
 
 function View:prev_file()
   if #self.files > 1 then
+    self.files[self.file_idx]:detach_buffers()
     self.file_idx = (self.file_idx - 2) % #self.files + 1
     vim.cmd("diffoff!")
     self.files[self.file_idx]:load_buffers(self.git_root, self.left_winid, self.right_winid)
+  end
+end
+
+function View:on_enter()
+  local file = self:cur_file()
+  if file then
+    file:attach_buffers()
+  end
+end
+
+function View:on_leave()
+  local file = self:cur_file()
+  if file then
+    file:detach_buffers()
   end
 end
 

@@ -86,6 +86,15 @@ function M.parse_revs(args)
   return v
 end
 
+function M.dispose_view(view)
+  for j, v in ipairs(M.views) do
+    if v == view then
+      table.remove(M.views, j)
+      return
+    end
+  end
+end
+
 ---Get the git root path of a given path.
 ---@param path string
 ---@return string|nil
@@ -104,6 +113,14 @@ function M.get_current_diffview()
   end
 
   return nil
+end
+
+function M.tabpage_to_view(tabpage)
+  for _, view in ipairs(M.views) do
+    if view.tabpage == tabpage then
+      return view
+    end
+  end
 end
 
 return M

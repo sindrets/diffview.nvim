@@ -6,9 +6,37 @@ end
 
 function M.open(args)
   -- print(vim.inspect(args))
-  local v = lib.parse_revs(args)
+  local view = lib.parse_revs(args)
   -- print(vim.inspect(v))
-  v:open()
+  view:open()
+end
+
+function M.close(tabpage)
+  local view
+  if tabpage then
+    view = lib.tabpage_to_view(tabpage)
+  else
+    view = lib.get_current_diffview()
+  end
+
+  if view then
+    view:close()
+    lib.dispose_view(view)
+  end
+end
+
+function M.on_tab_enter()
+  local view = lib.get_current_diffview()
+  if view then
+    view:on_enter()
+  end
+end
+
+function M.on_tab_leave()
+  local view = lib.get_current_diffview()
+  if view then
+    view:on_leave()
+  end
 end
 
 function M.on_keypress(event_name)

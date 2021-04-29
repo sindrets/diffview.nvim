@@ -12,6 +12,7 @@ local M = {}
 ---@field right Rev
 ---@field left_bufid integer
 ---@field right_bufid integer
+---@field created_bufs integer[]
 local FileEntry = {}
 FileEntry.__index = FileEntry
 
@@ -24,10 +25,18 @@ function FileEntry:new(opt)
     oldpath = opt.oldpath,
     status = opt.status,
     left = opt.left,
-    right = opt.right
+    right = opt.right,
+    created_bufs = {}
   }
   setmetatable(this, self)
   return this
+end
+
+function FileEntry:destroy()
+  self:detach_buffers()
+  for _, bn in ipairs(self.created_bufs) do
+    pcall(a.nvim_buf_delete, bn, {})
+  end
 end
 
 ---Load the buffers.
@@ -35,49 +44,50 @@ end
 ---@param left_winid integer
 ---@param right_winid integer
 function FileEntry:load_buffers(git_root, left_winid, right_winid)
-  a.nvim_set_current_win(left_winid)
-  if not (self.left_bufid and a.nvim_buf_is_loaded(self.left_bufid)) then
-    if self.left.type == RevType.LOCAL then
-      vim.cmd("e " .. vim.fn.fnameescape(self.path))
-      self.left_bufid = a.nvim_get_current_buf()
-    elseif self.left.type == RevType.COMMIT then
-      local bn
-      if self.oldpath then
-        bn = M._create_buffer(git_root, self.left, self.oldpath, false)
-      else
-        bn = M._create_buffer(git_root, self.left, self.path, self.status == "?")
+  local splits = {
+    { winid = left_winid, bufid = self.left_bufid, rev = self.left },
+    { winid = right_winid, bufid = self.right_bufid, rev = self.right }
+  }
+
+  for _, split in ipairs(splits) do
+    a.nvim_set_current_win(split.winid)
+    if not (split.bufid and a.nvim_buf_is_loaded(split.bufid)) then
+      if split.rev.type == RevType.LOCAL then
+        vim.cmd("e " .. vim.fn.fnameescape(self.path))
+        split.bufid = a.nvim_get_current_buf()
+      elseif split.rev.type == RevType.COMMIT then
+        local bn
+        if self.oldpath then
+          bn = M._create_buffer(git_root, split.rev, self.oldpath, false)
+        else
+          bn = M._create_buffer(git_root, split.rev, self.path, self.status == "?")
+        end
+        table.insert(self.created_bufs, bn)
+        a.nvim_win_set_buf(split.winid, bn)
+        split.bufid = bn
+        vim.cmd("filetype detect")
       end
-      a.nvim_win_set_buf(left_winid, bn)
-      self.left_bufid = bn
-      vim.cmd("filetype detect")
+      M._attach_buffer(split.bufid)
+    else
+      a.nvim_win_set_buf(split.winid, split.bufid)
+      M._attach_buffer(split.bufid)
     end
-    M._init_buffer(self.left_bufid)
-  else
-    a.nvim_win_set_buf(left_winid, self.left_bufid)
   end
 
-  a.nvim_set_current_win(right_winid)
-  if not (self.right_bufid and a.nvim_buf_is_loaded(self.right_bufid)) then
-    if self.right.type == RevType.LOCAL then
-      vim.cmd("e " .. vim.fn.fnameescape(self.path))
-      self.right_bufid = a.nvim_get_current_buf()
-    elseif self.right.type == RevType.COMMIT then
-      local bn
-      if self.oldpath then
-        bn = M._create_buffer(git_root, self.right, self.oldpath, false)
-      else
-        bn = M._create_buffer(git_root, self.right, self.path, self.status == "?")
-      end
-      a.nvim_win_set_buf(right_winid, bn)
-      self.right_bufid = bn
-      vim.cmd("filetype detect")
-    end
-    M._init_buffer(self.right_bufid)
-  else
-    a.nvim_win_set_buf(right_winid, self.right_bufid)
-  end
+  self.left_bufid = splits[1].bufid
+  self.right_bufid = splits[2].bufid
 
   M._update_windows(left_winid, right_winid)
+end
+
+function FileEntry:attach_buffers()
+  if self.left_bufid then M._attach_buffer(self.left_bufid) end
+  if self.right_bufid then M._attach_buffer(self.right_bufid) end
+end
+
+function FileEntry:detach_buffers()
+  if self.left_bufid then M._detach_buffer(self.left_bufid) end
+  if self.right_bufid then M._detach_buffer(self.right_bufid) end
 end
 
 function M._create_buffer(git_root, rev, path, null)
@@ -89,21 +99,22 @@ function M._create_buffer(git_root, rev, path, null)
     a.nvim_buf_set_lines(bn, 0, 0, false, lines)
   end
 
-  local basename = utils.path_basename(path)
-  local ext = basename:match(".*(%..*)") or ""
-  if ext ~= "" then basename = basename:match("(.*)%..*") end
   local commit_abbrev = rev.commit:sub(1,7)
-  a.nvim_buf_set_name(bn, basename .. "_" .. commit_abbrev .. ext)
+  local basename = utils.path_basename(path)
+  local bufname = commit_abbrev .. "_" .. basename
   a.nvim_buf_set_option(bn, "modified", false)
 
-  return bn
-end
-
-function M._init_buffer(bufid)
-  local conf = config.get_config()
-  for mapping, value in pairs(conf.key_bindings) do
-    a.nvim_buf_set_keymap(bufid, "n", mapping, value, { noremap = true, silent = true })
+  local ok = pcall(a.nvim_buf_set_name, bn, bufname)
+  if not ok then
+    -- Resolve name conflict
+    local i = 1
+    while not ok do
+      ok = pcall(a.nvim_buf_set_name, bn, i .. "_" .. bufname)
+      i = i + 1
+    end
   end
+
+  return bn
 end
 
 function M._update_windows(left_winid, right_winid)
@@ -113,6 +124,20 @@ function M._update_windows(left_winid, right_winid)
     a.nvim_win_set_option(id, "cursorbind", true)
     a.nvim_win_set_option(id, "foldmethod", "diff")
     a.nvim_win_set_option(id, "foldlevel", 0)
+  end
+end
+
+function M._attach_buffer(bufid)
+  local conf = config.get_config()
+  for lhs, rhs in pairs(conf.key_bindings) do
+    a.nvim_buf_set_keymap(bufid, "n", lhs, rhs, { noremap = true, silent = true })
+  end
+end
+
+function M._detach_buffer(bufid)
+  local conf = config.get_config()
+  for lhs, _ in pairs(conf.key_bindings) do
+    pcall(a.nvim_buf_del_keymap, bufid, "n", lhs)
   end
 end
 
