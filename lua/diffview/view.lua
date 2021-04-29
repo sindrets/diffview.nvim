@@ -1,4 +1,5 @@
 local git = require'diffview.git'
+local FilePanel = require'diffview.file-panel'.FilePanel
 local a = vim.api
 local M = {}
 
@@ -8,6 +9,7 @@ local M = {}
 ---@field path_args string[]
 ---@field left Rev
 ---@field right Rev
+---@field file_panel FilePanel
 ---@field left_winid integer
 ---@field right_winid integer
 ---@field files FileEntry[]
@@ -26,12 +28,13 @@ function View:new(opt)
     files = git.diff_file_list(opt.git_root, opt.left, opt.right),
     file_idx = 1
   }
+  this.file_panel = FilePanel:new(this.files)
   setmetatable(this, self)
   return this
 end
 
 function View:open()
-  vim.cmd("tabnew")
+  vim.cmd("tab split")
   self.tabpage = a.nvim_get_current_tabpage()
   self:init_layout()
   if #self.files > 0 then
@@ -57,6 +60,7 @@ function View:init_layout()
   self.left_winid = a.nvim_get_current_win()
   vim.cmd("belowright vsp")
   self.right_winid = a.nvim_get_current_win()
+  self.file_panel:open()
 end
 
 function View:cur_file()

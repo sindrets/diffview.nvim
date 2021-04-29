@@ -12,26 +12,37 @@ function M.diff_file_list(git_root, left, right)
   local rev_arg = M.rev_to_arg(left, right)
   local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " diff --name-status " .. rev_arg
   local names = vim.fn.systemlist(cmd)
+  cmd = "git -C " .. vim.fn.shellescape(git_root) .. " diff --numstat " .. rev_arg
+  local stat_data = vim.fn.systemlist(cmd)
 
   if not utils.shell_error() then
-    for _, s in ipairs(names) do
+    for i, s in ipairs(names) do
       local status = s:sub(1, 1):gsub("%s", " ")
       local name = s:match("[%a%s][^%s]*\t(.*)")
       local oldname
+
       if name:match('\t') ~= nil then
         oldname = name:match('(.*)\t')
         name = name:gsub('^.*\t', '')
       end
+
+      local stats = {
+        additions = tonumber(stat_data[i]:match("%d+")),
+        deletions = tonumber(stat_data[i]:match("%d+%s+(%d+)"))
+      }
+
       table.insert(files, FileEntry:new({
         path = name,
-        status = status,
         oldpath = oldname,
+        status = status,
+        stats = stats,
         left = left,
         right = right
       }))
     end
   end
 
+  -- If one of the revs are LOCAL, include untracked files.
   if M.has_local(left, right) then
     cmd = "git -C " .. vim.fn.shellescape(git_root) .. " ls-files --others --exclude-standard"
     local untracked = vim.fn.systemlist(cmd)
@@ -60,13 +71,13 @@ end
 ---@param right Rev
 ---@return string
 function M.rev_to_arg(left, right)
-  local rev = require'diffview.rev'
+  local RevType = require'diffview.rev'.RevType
 
   assert(left.commit or right.commit, "Can't diff LOCAL against LOCAL!")
 
-  if left.type == rev.RevType.COMMIT and right.type == rev.RevType.COMMIT then
+  if left.type == RevType.COMMIT and right.type == RevType.COMMIT then
     return right.commit .. ".." .. left.commit
-  elseif left.type == rev.RevType.LOCAL then
+  elseif left.type == RevType.LOCAL then
     return right.commit
   else
     return left.commit

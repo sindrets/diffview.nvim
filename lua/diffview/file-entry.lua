@@ -4,10 +4,16 @@ local RevType = require'diffview.rev'.RevType
 local a = vim.api
 local M = {}
 
+---@class GitStats
+---@field additions integer
+---@field deletions integer
+
 ---@class FileEntry
 ---@field path string
 ---@field oldpath string
+---@field basename string
 ---@field status string
+---@field stats GitStats
 ---@field left Rev
 ---@field right Rev
 ---@field left_bufid integer
@@ -16,6 +22,14 @@ local M = {}
 local FileEntry = {}
 FileEntry.__index = FileEntry
 
+FileEntry.winopts = {
+  diff = true,
+  scrollbind = true,
+  cursorbind = true,
+  foldmethod = "diff",
+  foldlevel = 0
+}
+
 ---FileEntry constructor
 ---@param opt table
 ---@return FileEntry
@@ -23,7 +37,9 @@ function FileEntry:new(opt)
   local this = {
     path = opt.path,
     oldpath = opt.oldpath,
+    basename = utils.path_basename(opt.path),
     status = opt.status,
+    stats = opt.stats,
     left = opt.left,
     right = opt.right,
     created_bufs = {}
@@ -118,12 +134,10 @@ function M._create_buffer(git_root, rev, path, null)
 end
 
 function M._update_windows(left_winid, right_winid)
-  for _, id in ipairs({left_winid, right_winid}) do
-    a.nvim_win_set_option(id, "diff", true)
-    a.nvim_win_set_option(id, "scrollbind", true)
-    a.nvim_win_set_option(id, "cursorbind", true)
-    a.nvim_win_set_option(id, "foldmethod", "diff")
-    a.nvim_win_set_option(id, "foldlevel", 0)
+  for _, id in ipairs({ left_winid, right_winid }) do
+    for k, v in pairs(FileEntry.winopts) do
+      a.nvim_win_set_option(id, k, v)
+    end
   end
 end
 

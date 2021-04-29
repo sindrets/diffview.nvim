@@ -5,6 +5,9 @@ function M.diffview_callback(cb_name)
 end
 
 M.defaults = {
+  file_panel = {
+    width = 30
+  },
   key_bindings = {
     ["<tab>"]   = M.diffview_callback("next_file"),
     ["<s-tab>"] = M.diffview_callback("prev_file")

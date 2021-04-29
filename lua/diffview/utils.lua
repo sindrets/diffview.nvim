@@ -1,31 +1,29 @@
+local api = vim.api
 local M = {}
 
 local path_sep = package.config:sub(1,1)
 
-function M.info(msg)
-  vim.cmd('echohl Directory')
-  msg = "[Diffview.nvim] " .. msg
+function M._echo_multiline(msg)
   for _, s in ipairs(vim.fn.split(msg, "\n")) do
     vim.cmd("echom '" .. s:gsub("'", "''").."'")
   end
+end
+
+function M.info(msg)
+  vim.cmd('echohl Directory')
+  M._echo_multiline("[Diffview.nvim] " .. msg)
   vim.cmd('echohl None')
 end
 
 function M.warn(msg)
   vim.cmd('echohl WarningMsg')
-  msg = "[Diffview.nvim] " .. msg
-  for _, s in ipairs(vim.fn.split(msg, "\n")) do
-    vim.cmd("echom '" .. s:gsub("'", "''").."'")
-  end
+  M._echo_multiline("[Diffview.nvim] " .. msg)
   vim.cmd('echohl None')
 end
 
 function M.err(msg)
   vim.cmd('echohl ErrorMsg')
-  msg = "[Diffview.nvim] " .. msg
-  for _, s in ipairs(vim.fn.split(msg, "\n")) do
-    vim.cmd("echom '" .. s:gsub("'", "''").."'")
-  end
+  M._echo_multiline("[Diffview.nvim] " .. msg)
   vim.cmd('echohl None')
 end
 
@@ -53,6 +51,17 @@ function M.path_basename(path)
   local i = path:match("^.*()" .. path_sep)
   if not i then return path end
   return path:sub(i + 1, #path)
+end
+
+---Get the path to the parent directory of the given path. Returns `nil` if the
+---path has no parent. The path is returned with a trailing separator.
+---@param path string
+---@return string|nil
+function M.path_parent(path)
+  path = " " .. M.path_remove_trailing(path)
+  local i = path:match("^.+()" .. path_sep)
+  if not i then return nil end
+  return path:sub(2, i)
 end
 
 ---Get a path relative to another path.
@@ -99,6 +108,32 @@ function M.tbl_slice(t, first, last)
   end
 
   return slice
+end
+
+function M.find_named_buffer(name)
+  for _, v in ipairs(api.nvim_list_bufs()) do
+    if vim.fn.bufname(v) == name then
+      return v
+    end
+  end
+  return nil
+end
+
+function M.wipe_named_buffer(name)
+  local bn = M.find_rogue_buffer(name)
+  if bn then
+    local win_ids = vim.fn.win_findbuf(bn)
+    for _, id in ipairs(win_ids) do
+      if vim.fn.win_gettype(id) ~= "autocmd" then
+        api.nvim_win_close(id, true)
+      end
+    end
+
+    api.nvim_buf_set_name(bn, "")
+    vim.schedule(function ()
+      pcall(api.nvim_buf_delete, bn, {})
+    end)
+  end
 end
 
 local function merge(t, first, mid, last, comparator)
