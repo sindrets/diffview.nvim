@@ -27,6 +27,12 @@ function M.err(msg)
   vim.cmd('echohl None')
 end
 
+function M.clamp(value, min, max)
+  if value < min then return min end
+  if value > max then return max end
+  return value
+end
+
 function M.shell_error()
   return vim.v.shell_error ~= 0
 end

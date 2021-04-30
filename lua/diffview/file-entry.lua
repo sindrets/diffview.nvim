@@ -143,18 +143,22 @@ function M._update_windows(left_winid, right_winid)
       a.nvim_win_set_option(id, k, v)
     end
   end
+
+  -- Scroll to trigger the scrollbind and sync the windows. This works more
+  -- consistently than calling `:syncbind`.
+  vim.cmd([[exec "normal! \<c-y>"]])
 end
 
 function M._attach_buffer(bufid)
   local conf = config.get_config()
-  for lhs, rhs in pairs(conf.key_bindings) do
+  for lhs, rhs in pairs(conf.key_bindings.view) do
     a.nvim_buf_set_keymap(bufid, "n", lhs, rhs, { noremap = true, silent = true })
   end
 end
 
 function M._detach_buffer(bufid)
   local conf = config.get_config()
-  for lhs, _ in pairs(conf.key_bindings) do
+  for lhs, _ in pairs(conf.key_bindings.view) do
     pcall(a.nvim_buf_del_keymap, bufid, "n", lhs)
   end
 end

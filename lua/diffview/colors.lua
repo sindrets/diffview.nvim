@@ -25,6 +25,7 @@ end
 
 function M.get_colors()
   return {
+    white    = M.get_fg('Normal') or 'White',
     red      = M.get_fg('Keyword') or 'Red',
     green    = M.get_fg('Character') or 'Green',
     yellow   = M.get_fg('PreProc') or 'Yellow',
@@ -41,6 +42,8 @@ function M.get_hl_groups()
 
   return {
     FilePanelTitle = { fg = M.get_fg("Directory") or colors.blue, gui = "bold" },
+    FilePanelCounter = { fg = M.get_fg("Identifier") or colors.purple, gui = "bold" },
+    FilePanelFileName = { fg = M.get_fg("Normal") or colors.white },
   }
 end
 

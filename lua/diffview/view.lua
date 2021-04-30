@@ -1,3 +1,4 @@
+local utils = require'diffview.utils'
 local git = require'diffview.git'
 local FilePanel = require'diffview.file-panel'.FilePanel
 local a = vim.api
@@ -34,12 +35,16 @@ function View:new(opt)
 end
 
 function View:open()
+  if #self.files == 0 then
+    utils.info("No changes to diff.")
+    return
+  end
+
   vim.cmd("tab split")
   self.tabpage = a.nvim_get_current_tabpage()
   self:init_layout()
-  if #self.files > 0 then
-    self.files[1]:load_buffers(self.git_root, self.left_winid, self.right_winid)
-  end
+  self.files[1]:load_buffers(self.git_root, self.left_winid, self.right_winid)
+  self.file_panel:highlight_file(self:cur_file())
 end
 
 function View:close()
@@ -76,6 +81,7 @@ function View:next_file()
     self.file_idx = (self.file_idx) % #self.files + 1
     vim.cmd("diffoff!")
     self.files[self.file_idx]:load_buffers(self.git_root, self.left_winid, self.right_winid)
+    self.file_panel:highlight_file(self:cur_file())
   end
 end
 
@@ -85,6 +91,21 @@ function View:prev_file()
     self.file_idx = (self.file_idx - 2) % #self.files + 1
     vim.cmd("diffoff!")
     self.files[self.file_idx]:load_buffers(self.git_root, self.left_winid, self.right_winid)
+    self.file_panel:highlight_file(self:cur_file())
+  end
+end
+
+function View:set_file(file)
+  if #self.files == 0 then return end
+
+  for i, f in ipairs(self.files) do
+    if f == file then
+      self.files[self.file_idx]:detach_buffers()
+      self.file_idx = i
+      vim.cmd("diffoff!")
+      self.files[self.file_idx]:load_buffers(self.git_root, self.left_winid, self.right_winid)
+      self.file_panel:highlight_file(self:cur_file())
+    end
   end
 end
 

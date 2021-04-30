@@ -84,6 +84,20 @@ function FilePanel:open()
   vim.cmd(":wincmd =")
 end
 
+function FilePanel:close()
+  if self:is_open() then
+    a.nvim_win_hide(self.winid)
+  end
+end
+
+function FilePanel:toggle()
+  if self:is_open() then
+    self:close()
+  else
+    self:open()
+  end
+end
+
 function FilePanel:buf_loaded()
   return self.bufid and a.nvim_buf_is_loaded(self.bufid)
 end
@@ -103,12 +117,59 @@ function FilePanel:init_buffer()
     a.nvim_buf_set_name(bn, bufname)
   end
 
+  local conf = config.get_config()
+  for lhs, rhs in pairs(conf.key_bindings.file_panel) do
+    a.nvim_buf_set_keymap(bn, "n", lhs, rhs, { noremap = true, silent = true })
+  end
+
   self.bufid = bn
   self.render_data = renderer.RenderData:new(bufname)
   self:render()
   self:redraw()
 
   return bn
+end
+
+function FilePanel:get_file_at_cursor()
+  if not (self:is_open() and self:buf_loaded()) then return end
+
+  local cursor = a.nvim_win_get_cursor(self.winid)
+  local line = cursor[1]
+  return self.files[utils.clamp(line - 1, 1, #self.files)]
+end
+
+function FilePanel:highlight_file(file)
+  if not (self:is_open() and self:buf_loaded()) then return end
+
+  for i, f in ipairs(self.files) do
+    if f == file then
+      pcall(a.nvim_win_set_cursor, self.winid, {i + 1, 0})
+    end
+  end
+end
+
+function FilePanel:highlight_prev_file()
+  if not (self:is_open() and self:buf_loaded()) or #self.files < 2 then return end
+
+  local cur = self:get_file_at_cursor()
+  for i, f in ipairs(self.files) do
+    if f == cur then
+      local line = utils.clamp(i, 2, #self.files + 1)
+      pcall(a.nvim_win_set_cursor, self.winid, {line, 0})
+    end
+  end
+end
+
+function FilePanel:highlight_next_file()
+  if not (self:is_open() and self:buf_loaded()) or #self.files < 2 then return end
+
+  local cur = self:get_file_at_cursor()
+  for i, f in ipairs(self.files) do
+    if f == cur then
+      local line = utils.clamp(i + 2, 2, #self.files + 1)
+      pcall(a.nvim_win_set_cursor, self.winid, {line, 0})
+    end
+  end
 end
 
 function FilePanel:render()
@@ -120,16 +181,19 @@ function FilePanel:render()
     self.render_data:add_hl(...)
   end
 
-  local title = "Changes"
-  add_hl("DiffviewFilePanelTitle", line_idx, 0, #title)
-  table.insert(lines, title)
+  local s = "Changes"
+  add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
+  local change_count = "("  .. #self.files .. ")"
+  add_hl("DiffviewFilePanelCounter", line_idx, #s + 1, #s + 1 + string.len(change_count))
+  s =  s .. " " .. change_count
+  table.insert(lines, s)
   line_idx = line_idx + 1
 
   for _, file in ipairs(self.files) do
     local offset = 0
 
     add_hl(renderer.get_git_hl(file.status), line_idx, 0, 1)
-    local s = file.status .. " "
+    s = file.status .. " "
     offset = #s
     local icon = renderer.get_file_icon(file.basename, file.extension, self.render_data, line_idx, offset)
     offset = offset + #icon

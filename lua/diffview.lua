@@ -61,6 +61,37 @@ M.keypress_event_cbs = {
     local view = lib.get_current_diffview()
     if view then view:prev_file() end
   end,
+  next_node = function ()
+    local view = lib.get_current_diffview()
+    if view and view.file_panel:is_open() then
+      view.file_panel:highlight_next_file()
+    end
+  end,
+  prev_node = function ()
+    local view = lib.get_current_diffview()
+    if view and view.file_panel:is_open() then
+      view.file_panel:highlight_prev_file()
+    end
+  end,
+  select_node = function ()
+    local view = lib.get_current_diffview()
+    if view and view.file_panel:is_open() then
+      local file = view.file_panel:get_file_at_cursor()
+      if file then view:set_file(file) end
+    end
+  end,
+  focus_files = function ()
+    local view = lib.get_current_diffview()
+    if view then
+      view.file_panel:focus(true)
+    end
+  end,
+  toggle_files = function ()
+    local view = lib.get_current_diffview()
+    if view then
+      view.file_panel:toggle()
+    end
+  end
 }
 
 M.init()

@@ -6,11 +6,26 @@ end
 
 M.defaults = {
   file_panel = {
-    width = 30
+    width = 35
   },
   key_bindings = {
-    ["<tab>"]   = M.diffview_callback("next_file"),
-    ["<s-tab>"] = M.diffview_callback("prev_file")
+    view = {
+      ["<tab>"]     = M.diffview_callback("next_file"),
+      ["<s-tab>"]   = M.diffview_callback("prev_file"),
+      ["<leader>e"] = M.diffview_callback("focus_files"),
+      ["<leader>b"] = M.diffview_callback("toggle_files"),
+    },
+    file_panel = {
+      ["j"]         = M.diffview_callback("next_node"),
+      ["<down>"]    = M.diffview_callback("next_node"),
+      ["k"]         = M.diffview_callback("prev_node"),
+      ["<up>"]      = M.diffview_callback("prev_node"),
+      ["<cr>"]      = M.diffview_callback("select_node"),
+      ["<tab>"]     = M.diffview_callback("next_file"),
+      ["<s-tab>"]   = M.diffview_callback("prev_file"),
+      ["<leader>e"] = M.diffview_callback("focus_files"),
+      ["<leader>b"] = M.diffview_callback("toggle_files"),
+    }
   }
 }
 
