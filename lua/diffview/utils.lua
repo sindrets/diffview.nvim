@@ -53,15 +53,25 @@ function M.path_basename(path)
   return path:sub(i + 1, #path)
 end
 
+function M.path_extension(path)
+  path = M.path_basename(path)
+  return path:match(".*%.(.*)")
+end
+
 ---Get the path to the parent directory of the given path. Returns `nil` if the
----path has no parent. The path is returned with a trailing separator.
+---path has no parent.
 ---@param path string
+---@param remove_trailing boolean
 ---@return string|nil
-function M.path_parent(path)
+function M.path_parent(path, remove_trailing)
   path = " " .. M.path_remove_trailing(path)
   local i = path:match("^.+()" .. path_sep)
   if not i then return nil end
-  return path:sub(2, i)
+  path = path:sub(2, i)
+  if remove_trailing then
+    path = M.path_remove_trailing(path)
+  end
+  return path
 end
 
 ---Get a path relative to another path.

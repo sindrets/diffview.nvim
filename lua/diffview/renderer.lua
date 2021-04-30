@@ -2,8 +2,8 @@ local a = vim.api
 local M = {}
 
 ---@class HlData
----@field line_idx integer
 ---@field group string
+---@field line_idx integer
 ---@field first integer
 ---@field last integer
 
@@ -26,6 +26,15 @@ function RenderData:new(ns_name)
   return this
 end
 
+function RenderData:add_hl(group, line_idx, first, last)
+  table.insert(self.hl, {
+      group = group,
+      line_idx = line_idx,
+      first = first,
+      last = last
+    })
+end
+
 ---Render the given render data to the given buffer.
 ---@param bufid integer
 ---@param data RenderData
@@ -45,20 +54,34 @@ function M.render(bufid, data)
 end
 
 local git_status_hl_map = {
-  ["A"] = "diffAdded",   -- Added
-  ["?"] = "diffAdded",   -- Untracked
-  ["M"] = "diffChanged", -- Modified
-  ["R"] = "diffChanged", -- Renamed
-  ["C"] = "diffChanged", -- Copied
-  ["T"] = "diffChanged", -- Type changed
-  ["U"] = "diffChanged", -- Unmerged
-  ["X"] = "diffChanged", -- Unknown
-  ["D"] = "diffRemoved", -- Deleted
-  ["B"] = "diffRemoved", -- Broken
+  ["A"] = "DiffviewStatusAdded",
+  ["?"] = "DiffviewStatusAdded",
+  ["M"] = "DiffviewStatusModified",
+  ["R"] = "DiffviewStatusRenamed",
+  ["C"] = "DiffviewStatusCopied",
+  ["T"] = "DiffviewStatusTypeChanged",
+  ["U"] = "DiffviewStatusUnmerged",
+  ["X"] = "DiffviewStatusUnknown",
+  ["D"] = "DiffviewStatusDeleted",
+  ["B"] = "DiffviewStatusBroken",
 }
 
 function M.get_git_hl(status)
   return git_status_hl_map[status]
+end
+
+function M.get_file_icon(name, ext, render_data, line_idx, offset)
+  local web_devicons = require'nvim-web-devicons'
+  local icon, hl = web_devicons.get_icon(name, ext)
+
+  if icon then
+    if hl then
+      render_data:add_hl(hl, line_idx, offset, offset + string.len(icon) + 1)
+    end
+    return icon .. " "
+  end
+
+  return ""
 end
 
 M.RenderData = RenderData

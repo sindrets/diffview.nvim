@@ -1,7 +1,9 @@
 local lib = require'diffview.lib'
+local colors = require'diffview.colors'
 local M = {}
 
 function M.init()
+  colors.setup()
 end
 
 function M.open(args)
@@ -37,6 +39,11 @@ function M.on_tab_leave()
   if view then
     view:on_leave()
   end
+end
+
+function M.update_colors()
+  colors.setup()
+  lib.update_colors()
 end
 
 function M.on_keypress(event_name)

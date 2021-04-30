@@ -12,6 +12,7 @@ augroup Diffview
     au TabEnter * lua require'diffview'.on_tab_enter()
     au TabLeave * lua require'diffview'.on_tab_leave()
     au TabClosed * lua require'diffview'.close(tonumber(vim.fn.expand("<afile>")))
+    au ColorScheme * lua require'diffview'.update_colors()
 augroup END
 
 let g:diffview_nvim_loaded = 1

@@ -123,4 +123,13 @@ function M.tabpage_to_view(tabpage)
   end
 end
 
+function M.update_colors()
+  for _, view in ipairs(M.views) do
+    if view.file_panel:buf_loaded() then
+      view.file_panel:render()
+      view.file_panel:redraw()
+    end
+  end
+end
+
 return M

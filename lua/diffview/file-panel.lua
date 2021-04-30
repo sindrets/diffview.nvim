@@ -23,6 +23,7 @@ FilePanel.winopts = {
   foldenable = false,
   spell = false,
   wrap = false,
+  cursorline = true,
   signcolumn = 'yes',
   foldmethod = 'manual',
   foldcolumn = '0',
@@ -115,11 +116,37 @@ function FilePanel:render()
 
   local line_idx = 0
   local lines = self.render_data.lines
+  local add_hl = function (...)
+    self.render_data:add_hl(...)
+  end
+
+  local title = "Changes"
+  add_hl("DiffviewFilePanelTitle", line_idx, 0, #title)
+  table.insert(lines, title)
+  line_idx = line_idx + 1
+
   for _, file in ipairs(self.files) do
-    local s = file.status .. " " .. file.basename
+    local offset = 0
+
+    add_hl(renderer.get_git_hl(file.status), line_idx, 0, 1)
+    local s = file.status .. " "
+    offset = #s
+    local icon = renderer.get_file_icon(file.basename, file.extension, self.render_data, line_idx, offset)
+    offset = offset + #icon
+    add_hl("DiffviewFilePanelFileName", line_idx, offset, offset + #file.basename)
+    s = s .. icon .. file.basename
+
     if file.stats then
-      s = s .. " +" .. file.stats.additions .. ", -" .. file.stats.deletions
+      offset = #s + 1
+      add_hl("DiffviewFilePanelInsertions", line_idx, offset, offset + string.len(file.stats.additions))
+      offset = offset + string.len(file.stats.additions) + 2
+      add_hl("DiffviewFilePanelDeletions", line_idx, offset, offset + string.len(file.stats.deletions))
+      s = s .. " " .. file.stats.additions .. ", " .. file.stats.deletions
     end
+
+    offset = #s + 1
+    add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #file.parent_path)
+    s = s .. " " .. file.parent_path
 
     table.insert(lines, s)
     line_idx = line_idx + 1

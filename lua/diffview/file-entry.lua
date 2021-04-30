@@ -11,7 +11,9 @@ local M = {}
 ---@class FileEntry
 ---@field path string
 ---@field oldpath string
+---@field parent_path string
 ---@field basename string
+---@field extension string
 ---@field status string
 ---@field stats GitStats
 ---@field left Rev
@@ -37,7 +39,9 @@ function FileEntry:new(opt)
   local this = {
     path = opt.path,
     oldpath = opt.oldpath,
+    parent_path = utils.path_parent(opt.path, true) or "",
     basename = utils.path_basename(opt.path),
+    extension = utils.path_extension(opt.path),
     status = opt.status,
     stats = opt.stats,
     left = opt.left,
