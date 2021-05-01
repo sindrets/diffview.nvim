@@ -21,6 +21,7 @@ M.defaults = {
       ["k"]         = M.diffview_callback("prev_node"),
       ["<up>"]      = M.diffview_callback("prev_node"),
       ["<cr>"]      = M.diffview_callback("select_node"),
+      ["R"]         = M.diffview_callback("refresh_files"),
       ["<tab>"]     = M.diffview_callback("next_file"),
       ["<s-tab>"]   = M.diffview_callback("prev_file"),
       ["<leader>e"] = M.diffview_callback("focus_files"),

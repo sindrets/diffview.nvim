@@ -1,3 +1,5 @@
+local Rev = require'diffview.rev'.Rev
+local RevType = require'diffview.rev'.RevType
 local utils = require'diffview.utils'
 local FileEntry = require'diffview.file-entry'.FileEntry
 local M = {}
@@ -71,8 +73,6 @@ end
 ---@param right Rev
 ---@return string
 function M.rev_to_arg(left, right)
-  local RevType = require'diffview.rev'.RevType
-
   assert(left.commit or right.commit, "Can't diff LOCAL against LOCAL!")
 
   if left.type == RevType.COMMIT and right.type == RevType.COMMIT then
@@ -84,13 +84,31 @@ function M.rev_to_arg(left, right)
   end
 end
 
+function M.head_rev(git_root)
+  local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " rev-parse HEAD"
+  local rev_string = vim.fn.system(cmd)
+  if utils.shell_error() then
+    return
+  end
+
+  return Rev:new(RevType.COMMIT, vim.trim(rev_string):gsub("^%^", ""), true)
+end
+
+---Get the git root path of a given path.
+---@param path string
+---@return string|nil
+function M.toplevel(path)
+  local out = vim.fn.system("git -C " .. vim.fn.shellescape(path) .. " rev-parse --show-toplevel")
+  if utils.shell_error() then return nil end
+  return vim.trim(out)
+end
+
 ---Check if any of the given revs are LOCAL.
 ---@param left Rev
 ---@param right Rev
 ---@return boolean
 function M.has_local(left, right)
-  local rev = require'diffview.rev'
-  return left.type == rev.RevType.LOCAL or right.type == rev.RevType.LOCAL
+  return left.type == RevType.LOCAL or right.type == RevType.LOCAL
 end
 
 return M

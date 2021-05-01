@@ -48,6 +48,13 @@ function M.get_hl_groups()
 end
 
 M.hl_links = {
+  Normal = "Normal",
+  CursorLine = "CursorLine",
+  VertSplit = "VertSplit",
+  SignColumn = "Normal",
+  StatusLine = "StatusLine",
+  StatusLineNC = "StatusLineNC",
+  EndOfBuffer = "EndOfBuffer",
   FilePanelFileName = "Normal",
   FilePanelPath = "Comment",
   FilePanelInsertions = "diffAdded",

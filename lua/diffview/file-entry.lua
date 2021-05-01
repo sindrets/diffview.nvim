@@ -4,6 +4,9 @@ local RevType = require'diffview.rev'.RevType
 local a = vim.api
 local M = {}
 
+---@type integer|nil
+M._null_buffer = nil
+
 ---@class GitStats
 ---@field additions integer
 ---@field deletions integer
@@ -71,22 +74,33 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
 
   for _, split in ipairs(splits) do
     a.nvim_set_current_win(split.winid)
+
     if not (split.bufid and a.nvim_buf_is_loaded(split.bufid)) then
       if split.rev.type == RevType.LOCAL then
-        vim.cmd("e " .. vim.fn.fnameescape(self.path))
-        split.bufid = a.nvim_get_current_buf()
+
+        if M.should_null(split.rev, self.status) then
+          local bn = M._create_buffer(git_root, split.rev, self.path, true)
+          table.insert(self.created_bufs, bn)
+          a.nvim_win_set_buf(split.winid, bn)
+          split.bufid = bn
+        else
+          vim.cmd("e " .. vim.fn.fnameescape(self.path))
+          split.bufid = a.nvim_get_current_buf()
+        end
+
       elseif split.rev.type == RevType.COMMIT then
         local bn
         if self.oldpath then
           bn = M._create_buffer(git_root, split.rev, self.oldpath, false)
         else
-          bn = M._create_buffer(git_root, split.rev, self.path, self.status == "?")
+          bn = M._create_buffer(git_root, split.rev, self.path, M.should_null(split.rev, self.status))
         end
         table.insert(self.created_bufs, bn)
         a.nvim_win_set_buf(split.winid, bn)
         split.bufid = bn
         vim.cmd("filetype detect")
       end
+
       M._attach_buffer(split.bufid)
     else
       a.nvim_win_set_buf(split.winid, split.bufid)
@@ -110,31 +124,97 @@ function FileEntry:detach_buffers()
   if self.right_bufid then M._detach_buffer(self.right_bufid) end
 end
 
-function M._create_buffer(git_root, rev, path, null)
-  local bn = a.nvim_create_buf(false, false)
-
-  if not null then
-    local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " show " .. rev.commit .. ":" .. vim.fn.shellescape(path)
-    local lines = vim.fn.systemlist(cmd)
-    a.nvim_buf_set_lines(bn, 0, 0, false, lines)
+---Compare against another FileEntry.
+---@param other FileEntry
+---@return boolean
+function FileEntry:compare(other)
+  if self.stats and not other.stats then return false end
+  if not self.stats and other.stats then return false end
+  if self.stats and other.stats then
+    if (self.stats.additions ~= other.stats.additions
+        or self.stats.deletions ~= other.stats.deletions) then
+      return false
+    end
   end
 
-  local commit_abbrev = rev.commit:sub(1,7)
-  local basename = utils.path_basename(path)
-  local bufname = commit_abbrev .. "_" .. basename
-  a.nvim_buf_set_option(bn, "modified", false)
+  return (
+    self.path == other.path
+    and self.status == other.status
+    )
+end
 
-  local ok = pcall(a.nvim_buf_set_name, bn, bufname)
+---Get the bufid of the null buffer. Create it if it's not loaded.
+---@return integer
+function M._get_null_buffer()
+  if not M._null_buffer or a.nvim_buf_is_loaded(M._null_buffer) then
+    local bn = a.nvim_create_buf(false, false)
+    local bufname = utils.path_join({"diffview", "null"})
+    a.nvim_buf_set_option(bn, "modified", false)
+    a.nvim_buf_set_option(bn, "modifiable", false)
+
+    local ok = pcall(a.nvim_buf_set_name, bn, bufname)
+    if not ok then
+      utils.wipe_named_buffer(bufname)
+      a.nvim_buf_set_name(bn, bufname)
+    end
+
+    M._null_buffer = bn
+  end
+
+  return M._null_buffer
+end
+
+function M._create_buffer(git_root, rev, path, null)
+  if null then return M._get_null_buffer() end
+
+  local bn = a.nvim_create_buf(false, false)
+  local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " show " .. rev.commit .. ":" .. vim.fn.shellescape(path)
+  local lines = vim.fn.systemlist(cmd)
+  a.nvim_buf_set_lines(bn, 0, -1, false, lines)
+
+  local basename = utils.path_basename(path)
+  local bufname = basename
+  if rev.type == RevType.COMMIT then
+    local commit_abbrev = rev.commit:sub(1,7)
+    bufname = commit_abbrev .. "_" .. basename
+  end
+  local fullname = utils.path_join({"diffview", bufname})
+  a.nvim_buf_set_option(bn, "modified", false)
+  a.nvim_buf_set_option(bn, "modifiable", false)
+
+  local ok = pcall(a.nvim_buf_set_name, bn, fullname)
   if not ok then
     -- Resolve name conflict
     local i = 1
     while not ok do
-      ok = pcall(a.nvim_buf_set_name, bn, i .. "_" .. bufname)
+      fullname = utils.path_join({"diffview", i .. "_" .. bufname})
+      ok = pcall(a.nvim_buf_set_name, bn, fullname)
       i = i + 1
     end
   end
 
   return bn
+end
+
+---Determine whether or not to create a "null buffer". Needed when the file
+---doesn't exist for a given rev.
+---@param rev Rev
+---@param status string
+---@return boolean
+function M.should_null(rev, status)
+  if rev.type == RevType.LOCAL then
+    return vim.tbl_contains({ "D" }, status)
+  elseif rev.type == RevType.COMMIT then
+    return vim.tbl_contains({
+        "?",
+        "A"
+      }, status)
+  end
+end
+
+function M.load_null_buffer(winid)
+  local bn = M._get_null_buffer()
+  a.nvim_win_set_buf(winid, bn)
 end
 
 function M._update_windows(left_winid, right_winid)

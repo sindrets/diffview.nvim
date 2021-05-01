@@ -1,4 +1,6 @@
-local rev = require'diffview.rev'
+local Rev = require'diffview.rev'.Rev
+local RevType = require'diffview.rev'.RevType
+local git = require'diffview.git'
 local utils =  require'diffview.utils'
 local View = require'diffview.view'.View
 local a = vim.api
@@ -36,9 +38,9 @@ function M.parse_revs(args)
   ---@type Rev
   local right
 
-  local git_root = M.git_toplevel(paths[1] or ".")
+  local git_root = git.toplevel(paths[1] or ".")
   if not git_root then
-    utils.err("Path not a git repo (or any parent): '" .. paths[1] .. "'")
+    utils.err("Path not a git repo (or any parent): '" .. (paths[1] or ".") .. "'")
     return
   end
 
@@ -47,16 +49,15 @@ function M.parse_revs(args)
 
   if not rev_arg then
     -- Diff LOCAL and HEAD
-    local rev_string = vim.fn.system(base_cmd .. "rev-parse HEAD")
-    if utils.shell_error() then
+    left = git.head_rev(git_root)
+    right = Rev:new(RevType.LOCAL)
+
+    if not left then
       utils.err("Git repo has no HEAD! Can't perform diff for '" .. git_root .. "'.")
       return
     end
-
-    left = rev.Rev:new(rev.RevType.COMMIT, vim.trim(rev_string):gsub("^%^", ""))
-    right = rev.Rev:new(rev.RevType.LOCAL)
   else
-    local rev_strings = vim.fn.systemlist(base_cmd .. "rev-parse --no-flags " .. vim.fn.shellescape(rev_arg))
+    local rev_strings = vim.fn.systemlist(base_cmd .. "rev-parse --revs-only " .. vim.fn.shellescape(rev_arg))
     if utils.shell_error() then
       utils.err("Failed to parse rev '" .. rev_arg .. "'!")
       utils.err("Git output: " .. vim.fn.join(rev_strings, "\n"))
@@ -65,12 +66,12 @@ function M.parse_revs(args)
 
     if #rev_strings > 1 then
       -- Diff COMMIT to COMMIT
-      left = rev.Rev:new(rev.RevType.COMMIT, rev_strings[1]:gsub("^%^", ""))
-      right = rev.Rev:new(rev.RevType.COMMIT, rev_strings[2]:gsub("^%^", ""))
+      left = Rev:new(RevType.COMMIT, rev_strings[1]:gsub("^%^", ""))
+      right = Rev:new(RevType.COMMIT, rev_strings[2]:gsub("^%^", ""))
     else
       -- Diff LOCAL and COMMIT
-      left = rev.Rev:new(rev.RevType.COMMIT, rev_strings[1]:gsub("^%^", ""))
-      right = rev.Rev:new(rev.RevType.LOCAL)
+      left = Rev:new(RevType.COMMIT, rev_strings[1]:gsub("^%^", ""))
+      right = Rev:new(RevType.LOCAL)
     end
   end
 
@@ -93,15 +94,6 @@ function M.dispose_view(view)
       return
     end
   end
-end
-
----Get the git root path of a given path.
----@param path string
----@return string|nil
-function M.git_toplevel(path)
-  local out = vim.fn.system("git -C " .. vim.fn.shellescape(path) .. " rev-parse --show-toplevel")
-  if utils.shell_error() then return nil end
-  return vim.trim(out)
 end
 
 function M.get_current_diffview()

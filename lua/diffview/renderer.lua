@@ -35,6 +35,11 @@ function RenderData:add_hl(group, line_idx, first, last)
     })
 end
 
+function RenderData:clear()
+  self.lines = {}
+  self.hl = {}
+end
+
 ---Render the given render data to the given buffer.
 ---@param bufid integer
 ---@param data RenderData

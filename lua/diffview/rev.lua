@@ -4,8 +4,6 @@ local M = {}
 ---@class RevType
 ---@field LOCAL integer
 ---@field COMMIT integer
-
----@type table<string, integer>
 local RevType = utils.enum {
   "LOCAL",
   "COMMIT"
@@ -14,6 +12,7 @@ local RevType = utils.enum {
 ---@class Rev
 ---@field type integer
 ---@field commit string
+---@field head boolean
 local Rev = {}
 Rev.__index = Rev
 
@@ -21,10 +20,11 @@ Rev.__index = Rev
 ---@param type RevType
 ---@param commit string
 ---@return Rev
-function Rev:new(type, commit)
+function Rev:new(type, commit, head)
   local this = {
     type = type,
-    commit = commit
+    commit = commit,
+    head = head or false
   }
   setmetatable(this, self)
   return this

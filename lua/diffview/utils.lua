@@ -104,7 +104,7 @@ end
 
 ---Enum creator
 ---@param t string[]
----@return table
+---@return table<string, integer>
 function M.enum(t)
   for i, v in ipairs(t) do
     t[v] = i
@@ -116,7 +116,7 @@ end
 ---@param t table
 ---@param first integer First index, inclusive
 ---@param last integer Last index, inclusive
----@return table
+---@return any[]
 function M.tbl_slice(t, first, last)
   local slice = {}
   for i = first, last or #t, 1 do

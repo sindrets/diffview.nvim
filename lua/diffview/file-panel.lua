@@ -27,6 +27,15 @@ FilePanel.winopts = {
   signcolumn = 'yes',
   foldmethod = 'manual',
   foldcolumn = '0',
+  winhl = table.concat({
+    'EndOfBuffer:DiffviewEndOfBuffer',
+    'Normal:DiffviewNormal',
+    'CursorLine:DiffviewCursorLine',
+    'VertSplit:DiffviewVertSplit',
+    'SignColumn:DiffviewNormal',
+    'StatusLine:DiffviewStatusLine',
+    'StatusLineNC:DiffviewStatuslineNC'
+  }, ',')
 }
 
 FilePanel.bufopts = {
@@ -175,6 +184,7 @@ end
 function FilePanel:render()
   if not self.render_data then return end
 
+  self.render_data:clear()
   local line_idx = 0
   local lines = self.render_data.lines
   local add_hl = function (...)

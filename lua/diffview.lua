@@ -7,10 +7,10 @@ function M.init()
 end
 
 function M.open(args)
-  -- print(vim.inspect(args))
   local view = lib.parse_revs(args)
-  -- print(vim.inspect(v))
-  view:open()
+  if view then
+    view:open()
+  end
 end
 
 function M.close(tabpage)
@@ -38,6 +38,12 @@ function M.on_tab_leave()
   local view = lib.get_current_diffview()
   if view then
     view:on_leave()
+  end
+end
+
+function M.on_bufwritepost()
+  for _, view in ipairs(lib.views) do
+    view:on_bufwritepost()
   end
 end
 
@@ -90,6 +96,12 @@ M.keypress_event_cbs = {
     local view = lib.get_current_diffview()
     if view then
       view.file_panel:toggle()
+    end
+  end,
+  refresh_files = function ()
+    local view = lib.get_current_diffview()
+    if view then
+      view:update_files()
     end
   end
 }
