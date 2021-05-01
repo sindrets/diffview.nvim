@@ -43,6 +43,10 @@ function M.diff_file_list(git_root, left, right, path_args)
         deletions = tonumber(stat_data[i]:match("%d+%s+(%d+)"))
       }
 
+      if not stats.additions or not stats.deletions then
+        stats = nil
+      end
+
       table.insert(files, FileEntry:new({
         path = name,
         oldpath = oldname,
@@ -86,7 +90,7 @@ function M.rev_to_arg(left, right)
   assert(left.commit or right.commit, "Can't diff LOCAL against LOCAL!")
 
   if left.type == RevType.COMMIT and right.type == RevType.COMMIT then
-    return right.commit .. ".." .. left.commit
+    return left.commit .. ".." .. right.commit
   elseif left.type == RevType.LOCAL then
     return right.commit
   else
@@ -134,6 +138,22 @@ end
 ---@return boolean
 function M.has_local(left, right)
   return left.type == RevType.LOCAL or right.type == RevType.LOCAL
+end
+
+---Strange trick to check if a file is binary using only git.
+---@param git_root string
+---@param path string
+---@param rev Rev
+---@return boolean -- True if the file was binary for the given rev, or it didn't exist.
+function M.is_binary(git_root, path, rev)
+  local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " grep -I --name-only -e . "
+  if rev.type == RevType.LOCAL then
+    cmd = cmd .. "--untracked"
+  else
+    cmd = cmd .. rev.commit
+  end
+  vim.fn.system(cmd .. " -- " .. vim.fn.shellescape(path))
+  return vim.v.shell_error ~= 0
 end
 
 return M

@@ -19,6 +19,8 @@ M._null_buffer = nil
 ---@field extension string
 ---@field status string
 ---@field stats GitStats
+---@field left_binary boolean|nil
+---@field right_binary boolean|nil
 ---@field left Rev
 ---@field right Rev
 ---@field left_bufid integer
@@ -67,9 +69,23 @@ end
 ---@param left_winid integer
 ---@param right_winid integer
 function FileEntry:load_buffers(git_root, left_winid, right_winid)
+  if not config.get_config().diff_binaries then
+    if self.left_binary == nil then
+      local git = require'diffview.git'
+      self.left_binary = git.is_binary(git_root, self.path, self.left)
+      self.right_binary = git.is_binary(git_root, self.path, self.right)
+    end
+  end
+
   local splits = {
-    { winid = left_winid, bufid = self.left_bufid, rev = self.left },
-    { winid = right_winid, bufid = self.right_bufid, rev = self.right }
+    {
+      winid = left_winid, bufid = self.left_bufid,
+      rev = self.left, pos = "left", binary = self.left_binary == true
+    },
+    {
+      winid = right_winid, bufid = self.right_bufid,
+      rev = self.right, pos = "right", binary = self.right_binary == true
+    }
   }
 
   local last_winid = a.nvim_get_current_win()
@@ -80,7 +96,7 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
     if not (split.bufid and a.nvim_buf_is_loaded(split.bufid)) then
       if split.rev.type == RevType.LOCAL then
 
-        if M.should_null(split.rev, self.status) then
+        if split.binary or M.should_null(split.rev, self.status, split.pos) then
           local bn = M._create_buffer(git_root, split.rev, self.path, true)
           table.insert(self.created_bufs, bn)
           a.nvim_win_set_buf(split.winid, bn)
@@ -95,7 +111,10 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
         if self.oldpath then
           bn = M._create_buffer(git_root, split.rev, self.oldpath, false)
         else
-          bn = M._create_buffer(git_root, split.rev, self.path, M.should_null(split.rev, self.status))
+          bn = M._create_buffer(
+            git_root, split.rev, self.path,
+            split.binary or M.should_null(split.rev, self.status, split.pos)
+          )
         end
         table.insert(self.created_bufs, bn)
         a.nvim_win_set_buf(split.winid, bn)
@@ -203,15 +222,16 @@ end
 ---doesn't exist for a given rev.
 ---@param rev Rev
 ---@param status string
+---@param pos string
 ---@return boolean
-function M.should_null(rev, status)
+function M.should_null(rev, status, pos)
   if rev.type == RevType.LOCAL then
-    return vim.tbl_contains({ "D" }, status)
+    return status == "D"
   elseif rev.type == RevType.COMMIT then
-    return vim.tbl_contains({
-        "?",
-        "A"
-      }, status)
+    return (
+      vim.tbl_contains({ "?", "A" }, status)
+      and pos == "left"
+    )
   end
 end
 

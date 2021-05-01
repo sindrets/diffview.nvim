@@ -5,6 +5,7 @@ function M.diffview_callback(cb_name)
 end
 
 M.defaults = {
+  diff_binaries = false,
   file_panel = {
     width = 35,
     use_icons = true

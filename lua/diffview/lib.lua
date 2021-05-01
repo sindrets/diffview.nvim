@@ -66,8 +66,8 @@ function M.parse_revs(args)
 
     if #rev_strings > 1 then
       -- Diff COMMIT to COMMIT
-      local left_hash = rev_strings[1]:gsub("^%^", "")
-      local right_hash = rev_strings[2]:gsub("^%^", "")
+      local left_hash = rev_strings[2]:gsub("^%^", "")
+      local right_hash = rev_strings[1]:gsub("^%^", "")
       left = Rev:new(RevType.COMMIT, left_hash)
       right = Rev:new(RevType.COMMIT, right_hash)
     else
