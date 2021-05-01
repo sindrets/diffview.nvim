@@ -39,8 +39,8 @@ function M.diff_file_list(git_root, left, right, path_args)
       end
 
       local stats = {
-        additions = tonumber(stat_data[i]:match("%d+")),
-        deletions = tonumber(stat_data[i]:match("%d+%s+(%d+)"))
+        additions = tonumber(stat_data[i]:match("^%d+")),
+        deletions = tonumber(stat_data[i]:match("^%d+%s+(%d+)"))
       }
 
       if not stats.additions or not stats.deletions then

@@ -145,6 +145,21 @@ function M.tbl_concat(a, b)
   return result
 end
 
+function M.tbl_deep_clone(t)
+  if not t then return end
+  local clone = {}
+
+  for k, v in pairs(t) do
+    if type(v) == "table" then
+      clone[k] = M.tbl_deep_clone(v)
+    else
+      clone[k] = v
+    end
+  end
+
+  return clone
+end
+
 function M.find_named_buffer(name)
   for _, v in ipairs(api.nvim_list_bufs()) do
     if vim.fn.bufname(v) == name then

@@ -1,0 +1,135 @@
+*diffview.nvim*  Diffview.nvim
+
+Single tabpage interface to easily cycle through diffs for all modified files
+for any git rev.
+
+Author: Sindre T. Strøm
+
+==============================================================================
+
+INTRODUCTION                                       *diffview-nvim-introduction*
+
+Vim's diff mode is pretty good, but there is no convenient way to quickly bring
+up all modified files in a diffsplit. This plugin aims to provide a simple,
+unified, single tabpage, interface that lets you easily review all changed files
+for any git rev.
+
+USAGE                                                   *diffview-nvim-usage*
+
+Quick-start: `:DiffviewOpen` to open a Diffview that compares against `HEAD`.
+
+You can have multiple Diffviews open, tracking different git revs. Each Diffview
+opens in its own tabpage. To close and dispose of a Diffview, call either
+`:DiffviewClose` or `:tabclose` while a Diffview is the current tabpage.
+Diffviews are automatically updated:
+
+        - Every time you enter a Diffview
+        - On |BufWritePost|
+        - On |FugitiveChanged|
+
+Updates are not run unless the current tabpage is a Diffview.
+
+CONFIGURATION                                   *diffview-nvim-configuration*
+
+Example configuration with default settings:
+>
+    -- Lua
+    local cb = require'diffview.config'.diffview_callback
+    require'diffview'.setup {
+      diff_binaries = false,    -- Show diffs for binaries
+      file_panel = {
+        width = 35,
+        use_icons = true
+      },
+      key_bindings = {
+        -- The `view` bindings are active in the diff buffers, only when the current
+        -- tabpage is a Diffview.
+        view = {
+          ["<tab>"]     = cb("select_next_entry"),  -- Open the diff for the next file 
+          ["<s-tab>"]   = cb("select_prev_entry"),  -- Open the diff for the previous file
+          ["<leader>e"] = cb("focus_files"),        -- Bring focus to the files panel
+          ["<leader>b"] = cb("toggle_files"),       -- Toggle the files panel.
+        },
+        file_panel = {
+          ["j"]         = cb("next_entry"),         -- Bring the cursor to the next file entry
+          ["<down>"]    = cb("next_entry"),
+          ["k"]         = cb("prev_entry"),         -- Bring the cursor to the previous file entry.
+          ["<up>"]      = cb("prev_entry"),
+          ["<cr>"]      = cb("select_entry"),       -- Open the diff for the selected entry.
+          ["o"]         = cb("select_entry"),
+          ["R"]         = cb("refresh_files"),      -- Update stats and entries in the file list.
+          ["<tab>"]     = cb("select_next_entry"),
+          ["<s-tab>"]   = cb("select_prev_entry"),
+          ["<leader>e"] = cb("focus_files"),
+          ["<leader>b"] = cb("toggle_files"),
+        }
+      }
+    }
+<
+
+COMMANDS                                            *diffview-nvim-commands*
+
+                                                        *:DiffviewOpen*
+:DiffviewOpen [git-rev] [ -- {paths...}]
+                        Opens a new Diffview that compares against [git-rev]. If
+                        no [git-rev] is given, defaults to `HEAD`. Additional
+                        {paths...} can be provided to narrow down what files are
+                        shown. Examples:
+>
+        :DiffviewOpen
+        :DiffviewOpen HEAD~2
+        :DiffviewOpen HEAD~4..HEAD~2
+        :DiffviewOpen d4a7b0d`
+        :DiffviewOpen d4a7b0d..519b30e
+        :DiffviewOpen HEAD~2 -- lua/diffview plugin
+<
+                                                        *:DiffviewClose*
+:DiffviewClose          Close the active Diffview.
+
+                                                        *:DiffviewToggleFiles*
+:DiffviewToggleFiles    Toggles the files panel.
+
+                                                        *:DiffviewFocusFiles*
+:DiffviewFocusFiles     Brings focus to the file panel. Opens it if it's closed.
+
+MAPS                                                    *diffview-nvim-maps*
+
+All listed maps are the defaults, but all mappings can be configured.
+
+                                                      *diffview-nvim-maps-view*
+View maps~
+
+These maps are available in the diff buffers while a Diffview is the current
+tabpage.
+
+<Tab>                   Open the diff for the next file.
+
+<S-Tab>                 Open the diff for the previous file.
+
+<leader>b               Toggle the file panel.
+
+<leader>e               Bring focus to the file panel.
+
+                                               *diffview-nvim-maps-file-panel*
+File panel maps~
+
+These maps are available in the file panel buffer.
+
+j                       Bring the cursor to the next file entry
+<Down>
+
+k                       Bring the cursor to the previous file entry
+<Up>
+
+o                       Open the diff for the selected file entry.
+<CR>
+
+R                       Update the stats and entries in the file list.
+
+<Tab>                   Open the diff for the next file.
+
+<S-Tab>                 Open the diff for the previous file.
+
+<leader>b               Toggle the file panel.
+
+<leader>e               Bring focus to the file panel.
