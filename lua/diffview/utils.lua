@@ -102,6 +102,13 @@ function M.path_remove_trailing(path)
   return p
 end
 
+function M.str_shorten(s, new_length)
+  if string.len(s) > new_length - 1 then
+    return "…" .. s:sub(string.len(s) - new_length + 1, string.len(s))
+  end
+  return s
+end
+
 ---Enum creator
 ---@param t string[]
 ---@return table<string, integer>
@@ -124,6 +131,18 @@ function M.tbl_slice(t, first, last)
   end
 
   return slice
+end
+
+function M.tbl_concat(a, b)
+  local result = {}
+  for i, v in ipairs(a) do
+    result[i] = v
+  end
+  for i, v in ipairs(b) do
+    result[#a + i] = v
+  end
+
+  return result
 end
 
 function M.find_named_buffer(name)

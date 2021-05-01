@@ -19,6 +19,8 @@ local M = {}
 ---@field right_winid integer
 ---@field files FileEntry[]
 ---@field file_idx integer
+---@field nulled boolean
+---@field ready boolean
 local View = {}
 View.__index = View
 
@@ -27,28 +29,35 @@ View.__index = View
 function View:new(opt)
   local this = {
     git_root = opt.git_root,
-    path_args = opt.paths,
+    path_args = opt.path_args,
     left = opt.left,
     right = opt.right,
-    files = git.diff_file_list(opt.git_root, opt.left, opt.right),
-    file_idx = 1
+    files = git.diff_file_list(opt.git_root, opt.left, opt.right, opt.path_args),
+    file_idx = 1,
+    nulled = false,
+    ready = false
   }
-  this.file_panel = FilePanel:new(this.files)
+  this.file_panel = FilePanel:new(
+    this.git_root,
+    this.files,
+    this.path_args,
+    git.rev_to_pretty_string(this.left, this.right)
+  )
   setmetatable(this, self)
   return this
 end
 
 function View:open()
-  if #self.files == 0 then
-    utils.info("No changes to diff.")
-    return
-  end
-
   vim.cmd("tab split")
   self.tabpage = a.nvim_get_current_tabpage()
   self:init_layout()
-  self.files[1]:load_buffers(self.git_root, self.left_winid, self.right_winid)
-  self.file_panel:highlight_file(self:cur_file())
+  local file = self:cur_file()
+  if file then
+    self:set_file(file)
+  else
+    self:file_safeguard()
+  end
+  self.ready = true
 end
 
 function View:close()
@@ -74,7 +83,7 @@ end
 
 function View:cur_file()
   if #self.files > 0 then
-    return self.files[self.file_idx]
+    return self.files[utils.clamp(self.file_idx, 1, #self.files)]
   end
   return nil
 end
@@ -83,12 +92,14 @@ function View:next_file()
   self:ensure_layout()
   if self:file_safeguard() then return end
 
-  if #self.files > 1 then
-    self.files[self.file_idx]:detach_buffers()
+  if #self.files > 1 or self.nulled then
+    local cur = self:cur_file()
+    if cur then cur:detach_buffers() end
     self.file_idx = (self.file_idx) % #self.files + 1
     vim.cmd("diffoff!")
     self.files[self.file_idx]:load_buffers(self.git_root, self.left_winid, self.right_winid)
     self.file_panel:highlight_file(self:cur_file())
+    self.nulled = false
   end
 end
 
@@ -96,26 +107,34 @@ function View:prev_file()
   self:ensure_layout()
   if self:file_safeguard() then return end
 
-  if #self.files > 1 then
-    self.files[self.file_idx]:detach_buffers()
+  if #self.files > 1 or self.nulled then
+    local cur = self:cur_file()
+    if cur then cur:detach_buffers() end
     self.file_idx = (self.file_idx - 2) % #self.files + 1
     vim.cmd("diffoff!")
     self.files[self.file_idx]:load_buffers(self.git_root, self.left_winid, self.right_winid)
     self.file_panel:highlight_file(self:cur_file())
+    self.nulled = false
   end
 end
 
-function View:set_file(file)
+function View:set_file(file, focus)
   self:ensure_layout()
-  if self:file_safeguard() then return end
+  if self:file_safeguard() or not file then return end
 
   for i, f in ipairs(self.files) do
     if f == file then
-      self.files[self.file_idx]:detach_buffers()
+      local cur = self:cur_file()
+      if cur then cur:detach_buffers() end
       self.file_idx = i
       vim.cmd("diffoff!")
       self.files[self.file_idx]:load_buffers(self.git_root, self.left_winid, self.right_winid)
       self.file_panel:highlight_file(self:cur_file())
+      self.nulled = false
+
+      if focus then
+        a.nvim_set_current_win(self.right_winid)
+      end
     end
   end
 end
@@ -130,7 +149,7 @@ function View:update_files()
     end
   end
 
-  local new_files = git.diff_file_list(self.git_root, self.left, self.right)
+  local new_files = git.diff_file_list(self.git_root, self.left, self.right, self.path_args)
   local diff = Diff:new(self.files, new_files, function (aa, bb)
     return aa.path == bb.path
   end)
@@ -164,9 +183,10 @@ function View:update_files()
     end
   end
 
-  self.file_idx = utils.clamp(self.file_idx, 1, #self.files)
   self.file_panel:render()
   self.file_panel:redraw()
+  self.file_idx = utils.clamp(self.file_idx, 1, #self.files)
+  self:set_file(self:cur_file())
 
   self.update_needed = false
 end
@@ -186,11 +206,14 @@ end
 ---Recover the layout after the user has messed it up.
 ---@param state table
 function View:recover_layout(state)
+  self.ready = false
+
   if not state.tabpage then
     vim.cmd("tab split")
     self.tabpage = a.nvim_get_current_tabpage()
     self.file_panel:close()
     self:init_layout()
+    self.ready = true
     return
   end
 
@@ -214,6 +237,8 @@ function View:recover_layout(state)
     self.file_panel:open()
     self:set_file(self:cur_file())
   end
+
+  self.ready = true
 end
 
 ---Ensure both left and right windows exist in the view's tabpage.
@@ -228,15 +253,18 @@ end
 ---@return boolean
 function View:file_safeguard()
   if #self.files == 0 then
+    local cur = self:cur_file()
+    if cur then cur:detach_buffers() end
     file_entry.load_null_buffer(self.left_winid)
     file_entry.load_null_buffer(self.right_winid)
+    self.nulled = true
     return true
   end
   return false
 end
 
 function View:on_enter()
-  if self.update_needed then
+  if self.ready then
     self:update_files()
   end
 
@@ -258,6 +286,18 @@ function View:on_bufwritepost()
     self.update_needed = true
     if a.nvim_get_current_tabpage() == self.tabpage then
       self:update_files()
+    end
+  end
+end
+
+function View:on_buf_win_enter()
+  if self.ready then
+    local winid = a.nvim_get_current_win()
+    if not (
+        winid == self.file_panel.winid
+        or winid == self.left_winid
+        or winid == self.right_winid) then
+      vim.cmd("set nodiff nocursorbind noscrollbind")
     end
   end
 end

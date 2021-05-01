@@ -8,13 +8,23 @@ local M = {}
 ---@param git_root string
 ---@param left Rev
 ---@param right Rev
+---@param path_args string[]|nil
 ---@return FileEntry[]
-function M.diff_file_list(git_root, left, right)
+function M.diff_file_list(git_root, left, right, path_args)
   local files = {}
+
+  local p_args = ""
+  if path_args and #path_args > 0 then
+    p_args = " --"
+    for _, arg in ipairs(path_args) do
+      p_args = p_args .. " " .. vim.fn.shellescape(arg)
+    end
+  end
+
   local rev_arg = M.rev_to_arg(left, right)
-  local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " diff --name-status " .. rev_arg
+  local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " diff --name-status " .. rev_arg .. p_args
   local names = vim.fn.systemlist(cmd)
-  cmd = "git -C " .. vim.fn.shellescape(git_root) .. " diff --numstat " .. rev_arg
+  cmd = "git -C " .. vim.fn.shellescape(git_root) .. " diff --numstat " .. rev_arg .. p_args
   local stat_data = vim.fn.systemlist(cmd)
 
   if not utils.shell_error() then
@@ -84,6 +94,20 @@ function M.rev_to_arg(left, right)
   end
 end
 
+---Convert revs to string representation.
+---@param left Rev
+---@param right Rev
+function M.rev_to_pretty_string(left, right)
+  if left.head and right.type == RevType.LOCAL then
+    return nil
+  elseif left.commit and right.type == RevType.LOCAL then
+    return left:abbrev()
+  elseif left.commit and right.commit then
+    return left:abbrev() .. ".." .. right:abbrev()
+  end
+  return nil
+end
+
 function M.head_rev(git_root)
   local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " rev-parse HEAD"
   local rev_string = vim.fn.system(cmd)
@@ -91,7 +115,8 @@ function M.head_rev(git_root)
     return
   end
 
-  return Rev:new(RevType.COMMIT, vim.trim(rev_string):gsub("^%^", ""), true)
+  local s = vim.trim(rev_string):gsub("^%^", "")
+  return Rev:new(RevType.COMMIT, s, true)
 end
 
 ---Get the git root path of a given path.

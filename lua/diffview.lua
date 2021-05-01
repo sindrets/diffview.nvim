@@ -47,6 +47,13 @@ function M.on_bufwritepost()
   end
 end
 
+function M.on_buf_win_enter()
+  local view = lib.get_current_diffview()
+  if view then
+    view:on_buf_win_enter()
+  end
+end
+
 function M.update_colors()
   colors.setup()
   lib.update_colors()
@@ -83,7 +90,7 @@ M.keypress_event_cbs = {
     local view = lib.get_current_diffview()
     if view and view.file_panel:is_open() then
       local file = view.file_panel:get_file_at_cursor()
-      if file then view:set_file(file) end
+      if file then view:set_file(file, true) end
     end
   end,
   focus_files = function ()

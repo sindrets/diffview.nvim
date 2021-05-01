@@ -41,6 +41,7 @@ function M.get_hl_groups()
   local colors = M.get_colors()
 
   return {
+    FilePanelRootPath = { fg = M.get_fg("String") or colors.green, gui = "bold" },
     FilePanelTitle = { fg = M.get_fg("Directory") or colors.blue, gui = "bold" },
     FilePanelCounter = { fg = M.get_fg("Identifier") or colors.purple, gui = "bold" },
     FilePanelFileName = { fg = M.get_fg("Normal") or colors.white },

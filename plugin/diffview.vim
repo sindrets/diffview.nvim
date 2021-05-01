@@ -15,6 +15,8 @@ augroup Diffview
     au TabLeave * lua require'diffview'.on_tab_leave()
     au TabClosed * lua require'diffview'.close(tonumber(vim.fn.expand("<afile>")))
     au BufWritePost * lua require'diffview'.on_bufwritepost()
+    au BufWinEnter * lua require'diffview'.on_buf_win_enter()
+    au User FugitiveChanged lua require'diffview'.on_keypress("refresh_files")
     au ColorScheme * lua require'diffview'.update_colors()
 augroup END
 

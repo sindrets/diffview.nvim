@@ -30,6 +30,13 @@ function Rev:new(type, commit, head)
   return this
 end
 
+function Rev:abbrev()
+  if self.commit then
+    return self.commit:sub(1, 7)
+  end
+  return nil
+end
+
 M.RevType = RevType
 M.Rev = Rev
 

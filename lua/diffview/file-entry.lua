@@ -72,6 +72,8 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
     { winid = right_winid, bufid = self.right_bufid, rev = self.right }
   }
 
+  local last_winid = a.nvim_get_current_win()
+
   for _, split in ipairs(splits) do
     a.nvim_set_current_win(split.winid)
 
@@ -112,6 +114,7 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
   self.right_bufid = splits[2].bufid
 
   M._update_windows(left_winid, right_winid)
+  a.nvim_set_current_win(last_winid)
 end
 
 function FileEntry:attach_buffers()
@@ -146,7 +149,7 @@ end
 ---Get the bufid of the null buffer. Create it if it's not loaded.
 ---@return integer
 function M._get_null_buffer()
-  if not M._null_buffer or a.nvim_buf_is_loaded(M._null_buffer) then
+  if not (M._null_buffer and a.nvim_buf_is_loaded(M._null_buffer)) then
     local bn = a.nvim_create_buf(false, false)
     local bufname = utils.path_join({"diffview", "null"})
     a.nvim_buf_set_option(bn, "modified", false)
@@ -215,6 +218,7 @@ end
 function M.load_null_buffer(winid)
   local bn = M._get_null_buffer()
   a.nvim_win_set_buf(winid, bn)
+  M._attach_buffer(bn)
 end
 
 function M._update_windows(left_winid, right_winid)

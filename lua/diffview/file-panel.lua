@@ -5,9 +5,14 @@ local a = vim.api
 local M = {}
 
 local name_counter = 1
+local header_size = 2
 
 ---@class FilePanel
+---@field git_root string
 ---@field files FileEntry[]
+---@field path_args string[]
+---@field rev_pretty_name string|nil
+---@field width integer
 ---@field bufid integer
 ---@field winid integer
 ---@field render_data RenderData
@@ -27,6 +32,9 @@ FilePanel.winopts = {
   signcolumn = 'yes',
   foldmethod = 'manual',
   foldcolumn = '0',
+  scrollbind = false,
+  cursorbind = false,
+  diff = false,
   winhl = table.concat({
     'EndOfBuffer:DiffviewEndOfBuffer',
     'Normal:DiffviewNormal',
@@ -47,11 +55,18 @@ FilePanel.bufopts = {
 }
 
 ---FilePanel constructor.
+---@param git_root string
 ---@param files FileEntry[]
+---@param path_args string[]
 ---@return FilePanel
-function FilePanel:new(files)
+function FilePanel:new(git_root, files, path_args, rev_pretty_name)
+  local conf = config.get_config()
   local this = {
+    git_root = git_root,
     files = files,
+    path_args = path_args,
+    rev_pretty_name = rev_pretty_name,
+    width = conf.file_panel.width
   }
   setmetatable(this, self)
   return this
@@ -80,9 +95,10 @@ function FilePanel:open()
   if self:is_open() then return end
 
   local conf = config.get_config()
+  self.width = conf.file_panel.width
   vim.cmd("vsp")
   vim.cmd("wincmd H")
-  vim.cmd("vertical resize " .. conf.file_panel.width)
+  vim.cmd("vertical resize " .. self.width)
   self.winid = a.nvim_get_current_win()
 
   for k, v in pairs(FilePanel.winopts) do
@@ -144,7 +160,7 @@ function FilePanel:get_file_at_cursor()
 
   local cursor = a.nvim_win_get_cursor(self.winid)
   local line = cursor[1]
-  return self.files[utils.clamp(line - 1, 1, #self.files)]
+  return self.files[utils.clamp(line - header_size, 1, #self.files)]
 end
 
 function FilePanel:highlight_file(file)
@@ -152,30 +168,30 @@ function FilePanel:highlight_file(file)
 
   for i, f in ipairs(self.files) do
     if f == file then
-      pcall(a.nvim_win_set_cursor, self.winid, {i + 1, 0})
+      pcall(a.nvim_win_set_cursor, self.winid, {i + header_size, 0})
     end
   end
 end
 
 function FilePanel:highlight_prev_file()
-  if not (self:is_open() and self:buf_loaded()) or #self.files < 2 then return end
+  if not (self:is_open() and self:buf_loaded()) or #self.files == 0 then return end
 
   local cur = self:get_file_at_cursor()
   for i, f in ipairs(self.files) do
     if f == cur then
-      local line = utils.clamp(i, 2, #self.files + 1)
+      local line = utils.clamp(i + header_size - 1, header_size + 1, #self.files + header_size)
       pcall(a.nvim_win_set_cursor, self.winid, {line, 0})
     end
   end
 end
 
 function FilePanel:highlight_next_file()
-  if not (self:is_open() and self:buf_loaded()) or #self.files < 2 then return end
+  if not (self:is_open() and self:buf_loaded()) or #self.files == 0 then return end
 
   local cur = self:get_file_at_cursor()
   for i, f in ipairs(self.files) do
     if f == cur then
-      local line = utils.clamp(i + 2, 2, #self.files + 1)
+      local line = utils.clamp(i + header_size + 1, header_size, #self.files + header_size)
       pcall(a.nvim_win_set_cursor, self.winid, {line, 0})
     end
   end
@@ -191,7 +207,12 @@ function FilePanel:render()
     self.render_data:add_hl(...)
   end
 
-  local s = "Changes"
+  local s = utils.str_shorten(self.git_root, self.width - 6)
+  add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
+  table.insert(lines, s)
+  line_idx = line_idx + 1
+
+  s = "Changes"
   add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
   local change_count = "("  .. #self.files .. ")"
   add_hl("DiffviewFilePanelCounter", line_idx, #s + 1, #s + 1 + string.len(change_count))
@@ -224,6 +245,28 @@ function FilePanel:render()
 
     table.insert(lines, s)
     line_idx = line_idx + 1
+  end
+
+  if self.rev_pretty_name or (self.path_args and #self.path_args > 0) then
+    local extra_info = utils.tbl_concat(
+      { self.rev_pretty_name and ("commit " .. self.rev_pretty_name) or nil },
+      self.path_args or {}
+    )
+    table.insert(lines, "")
+    line_idx = line_idx + 1
+
+    s = "Showing changes for:"
+    add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
+    table.insert(lines, s)
+    line_idx = line_idx + 1
+
+    for _, arg in ipairs(extra_info) do
+      local relpath = utils.path_relative(arg, self.git_root)
+      s = utils.str_shorten(relpath, self.width - 5)
+      add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
+      table.insert(lines, s)
+      line_idx = line_idx + 1
+    end
   end
 end
 
