@@ -65,12 +65,11 @@ function View:close()
     file:destroy()
   end
 
+  self.file_panel:destroy()
+
   if self.tabpage and a.nvim_tabpage_is_valid(self.tabpage) then
-    local ok = true
-    if a.nvim_get_current_tabpage() ~= self.tabpage then
-      ok = pcall(a.nvim_set_current_tabpage, self.tabpage)
-    end
-    if ok then vim.cmd("tabclose") end
+    local pagenr = a.nvim_tabpage_get_number(self.tabpage)
+    vim.cmd("tabclose " .. pagenr)
   end
 end
 
@@ -281,7 +280,7 @@ function View:on_leave()
   end
 end
 
-function View:on_bufwritepost()
+function View:on_buf_write_post()
   if git.has_local(self.left, self.right) then
     self.update_needed = true
     if a.nvim_get_current_tabpage() == self.tabpage then

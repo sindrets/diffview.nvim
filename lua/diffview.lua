@@ -19,13 +19,14 @@ function M.open(args)
 end
 
 function M.close(tabpage)
-  local view
   if tabpage then
-    view = lib.tabpage_to_view(tabpage)
-  else
-    view = lib.get_current_diffview()
+    vim.schedule(function ()
+      lib.dispose_stray_views()
+    end)
+    return
   end
 
+  local view = lib.get_current_diffview()
   if view then
     view:close()
     lib.dispose_view(view)
@@ -46,9 +47,9 @@ function M.on_tab_leave()
   end
 end
 
-function M.on_bufwritepost()
+function M.on_buf_write_post()
   for _, view in ipairs(lib.views) do
-    view:on_bufwritepost()
+    view:on_buf_write_post()
   end
 end
 

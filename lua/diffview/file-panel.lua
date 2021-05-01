@@ -115,6 +115,15 @@ function FilePanel:close()
   end
 end
 
+function FilePanel:destroy()
+  if self:buf_loaded() then
+    self:close()
+    a.nvim_buf_delete(self.bufid, { force = true })
+  else
+    self:close()
+  end
+end
+
 function FilePanel:toggle()
   if self:is_open() then
     self:close()

@@ -60,7 +60,9 @@ end
 function FileEntry:destroy()
   self:detach_buffers()
   for _, bn in ipairs(self.created_bufs) do
-    pcall(a.nvim_buf_delete, bn, {})
+    if bn ~= M._null_buffer then
+      pcall(a.nvim_buf_delete, bn, {})
+    end
   end
 end
 
@@ -98,7 +100,6 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
 
         if split.binary or M.should_null(split.rev, self.status, split.pos) then
           local bn = M._create_buffer(git_root, split.rev, self.path, true)
-          table.insert(self.created_bufs, bn)
           a.nvim_win_set_buf(split.winid, bn)
           split.bufid = bn
         else

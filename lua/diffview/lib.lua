@@ -99,6 +99,29 @@ function M.dispose_view(view)
   end
 end
 
+---Close and dispose of views that have no tabpage.
+function M.dispose_stray_views()
+  local tabpage_map = {}
+  for _, id in ipairs(a.nvim_list_tabpages()) do
+    tabpage_map[id] = true
+  end
+
+  local dispose = {}
+  for _, view in ipairs(M.views) do
+    if not tabpage_map[view.tabpage] then
+      -- Need to schedule here because the tabnr's don't update fast enough.
+      vim.schedule(function ()
+        view:close()
+      end)
+      table.insert(dispose, view)
+    end
+  end
+
+  for _, view in ipairs(dispose) do
+    M.dispose_view(view)
+  end
+end
+
 function M.get_current_diffview()
   local tabpage = a.nvim_get_current_tabpage()
   for _, view in ipairs(M.views) do
