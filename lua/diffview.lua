@@ -1,6 +1,11 @@
 local lib = require'diffview.lib'
+local config = require'diffview.config'
 local colors = require'diffview.colors'
 local M = {}
+
+function M.setup(user_config)
+  config.setup(user_config or {})
+end
 
 function M.init()
   colors.setup()
@@ -66,27 +71,27 @@ function M.on_keypress(event_name)
 end
 
 M.keypress_event_cbs = {
-  next_file = function ()
+  select_next_entry = function ()
     local view = lib.get_current_diffview()
     if view then view:next_file() end
   end,
-  prev_file = function ()
+  select_prev_entry = function ()
     local view = lib.get_current_diffview()
     if view then view:prev_file() end
   end,
-  next_node = function ()
+  next_entry = function ()
     local view = lib.get_current_diffview()
     if view and view.file_panel:is_open() then
       view.file_panel:highlight_next_file()
     end
   end,
-  prev_node = function ()
+  prev_entry = function ()
     local view = lib.get_current_diffview()
     if view and view.file_panel:is_open() then
       view.file_panel:highlight_prev_file()
     end
   end,
-  select_node = function ()
+  select_entry = function ()
     local view = lib.get_current_diffview()
     if view and view.file_panel:is_open() then
       local file = view.file_panel:get_file_at_cursor()

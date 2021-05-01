@@ -1,5 +1,7 @@
+local config = require'diffview.config'
 local a = vim.api
 local M = {}
+local web_devicons
 
 ---@class HlData
 ---@field group string
@@ -76,7 +78,9 @@ function M.get_git_hl(status)
 end
 
 function M.get_file_icon(name, ext, render_data, line_idx, offset)
-  local web_devicons = require'nvim-web-devicons'
+  if not config.get_config().file_panel.use_icons then return " " end
+  if not web_devicons then web_devicons = require'nvim-web-devicons' end
+
   local icon, hl = web_devicons.get_icon(name, ext)
 
   if icon then

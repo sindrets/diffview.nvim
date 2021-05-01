@@ -208,7 +208,7 @@ function FilePanel:render()
   end
 
   local s = utils.str_shorten(self.git_root, self.width - 6)
-  add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
+  add_hl("DiffviewFilePanelRootPath", line_idx, 0, #s)
   table.insert(lines, s)
   line_idx = line_idx + 1
 
