@@ -8,6 +8,12 @@ local FilePanel = require'diffview.file-panel'.FilePanel
 local a = vim.api
 local M = {}
 
+local win_reset_opts = {
+  diff = false,
+  cursorbind = false,
+  scrollbind = false
+}
+
 ---@class View
 ---@field tabpage integer
 ---@field git_root string
@@ -289,14 +295,23 @@ function View:on_buf_write_post()
   end
 end
 
-function View:on_buf_win_enter()
-  if self.ready then
-    local winid = a.nvim_get_current_win()
+function View:on_win_leave()
+  if self.ready and a.nvim_tabpage_is_valid(self.tabpage) then
+    self:fix_foreign_windows()
+  end
+end
+
+---Disable unwanted options in all windows not part of the view.
+function View:fix_foreign_windows()
+  local win_ids = a.nvim_tabpage_list_wins(self.tabpage)
+  for _, id in ipairs(win_ids) do
     if not (
-        winid == self.file_panel.winid
-        or winid == self.left_winid
-        or winid == self.right_winid) then
-      vim.cmd("set nodiff nocursorbind noscrollbind")
+        id == self.file_panel.winid
+        or id == self.left_winid
+        or id == self.right_winid) then
+      for k, v in pairs(win_reset_opts) do
+        a.nvim_win_set_option(id, k, v)
+      end
     end
   end
 end

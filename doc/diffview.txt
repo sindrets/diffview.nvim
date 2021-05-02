@@ -79,7 +79,7 @@ COMMANDS                                            *diffview-nvim-commands*
         :DiffviewOpen
         :DiffviewOpen HEAD~2
         :DiffviewOpen HEAD~4..HEAD~2
-        :DiffviewOpen d4a7b0d`
+        :DiffviewOpen d4a7b0d
         :DiffviewOpen d4a7b0d..519b30e
         :DiffviewOpen HEAD~2 -- lua/diffview plugin
 <
@@ -133,3 +133,6 @@ R                       Update the stats and entries in the file list.
 <leader>b               Toggle the file panel.
 
 <leader>e               Bring focus to the file panel.
+
+
+ vim:tw=78:ts=8:ft=help:norl:

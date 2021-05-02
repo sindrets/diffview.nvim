@@ -53,10 +53,10 @@ function M.on_buf_write_post()
   end
 end
 
-function M.on_buf_win_enter()
+function M.on_win_leave()
   local view = lib.get_current_diffview()
   if view then
-    view:on_buf_win_enter()
+    view:on_win_leave()
   end
 end
 
