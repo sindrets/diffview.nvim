@@ -14,6 +14,7 @@ M._null_buffer = nil
 ---@class FileEntry
 ---@field path string
 ---@field oldpath string
+---@field absolute_path string
 ---@field parent_path string
 ---@field basename string
 ---@field extension string
@@ -44,6 +45,7 @@ function FileEntry:new(opt)
   local this = {
     path = opt.path,
     oldpath = opt.oldpath,
+    absolute_path = opt.absolute_path,
     parent_path = utils.path_parent(opt.path, true) or "",
     basename = utils.path_basename(opt.path),
     extension = utils.path_extension(opt.path),
@@ -103,7 +105,7 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
           a.nvim_win_set_buf(split.winid, bn)
           split.bufid = bn
         else
-          vim.cmd("e " .. vim.fn.fnameescape(self.path))
+          vim.cmd("e " .. vim.fn.fnameescape(self.absolute_path))
           split.bufid = a.nvim_get_current_buf()
         end
 
