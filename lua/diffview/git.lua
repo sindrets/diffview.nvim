@@ -58,8 +58,9 @@ function M.diff_file_list(git_root, left, right, path_args)
     end
   end
 
-  -- If one of the revs are LOCAL, include untracked files.
-  if M.has_local(left, right) then
+  -- If one of the revs are LOCAL and `status.showUntrackedFiles` is not set to
+  -- `false`, include untracked files.
+  if M.has_local(left, right) and M.show_untracked(git_root) then
     cmd = "git -C " .. vim.fn.shellescape(git_root) .. " ls-files --others --exclude-standard"
     local untracked = vim.fn.systemlist(cmd)
 
@@ -154,6 +155,14 @@ function M.is_binary(git_root, path, rev)
   end
   vim.fn.system(cmd .. " -- " .. vim.fn.shellescape(path))
   return vim.v.shell_error ~= 0
+end
+
+---Check if status for untracked files is disabled for a given git repo.
+---@param git_root string
+---@return boolean
+function M.show_untracked(git_root)
+  local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " config --type=bool status.showUntrackedFiles"
+  return vim.trim(vim.fn.system(cmd)) ~= "false"
 end
 
 return M
