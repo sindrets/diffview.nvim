@@ -50,6 +50,7 @@ function M.diff_file_list(git_root, left, right, path_args)
       table.insert(files, FileEntry:new({
         path = name,
         oldpath = oldname,
+        absolute_path = utils.path_join({git_root, name}),
         status = status,
         stats = stats,
         left = left,
@@ -68,6 +69,7 @@ function M.diff_file_list(git_root, left, right, path_args)
       for _, s in ipairs(untracked) do
         table.insert(files, FileEntry:new({
           path = s,
+          absolute_path = utils.path_join({git_root, s}),
           status = "?",
           left = left,
           right = right
