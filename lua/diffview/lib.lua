@@ -1,5 +1,6 @@
 local Rev = require'diffview.rev'.Rev
 local RevType = require'diffview.rev'.RevType
+local arg_parser = require'diffview.arg-parser'
 local git = require'diffview.git'
 local utils =  require'diffview.utils'
 local View = require'diffview.view'.View
@@ -11,26 +12,12 @@ local M = {}
 M.views = {}
 
 function M.parse_revs(args)
+  local argo = arg_parser.parse(args)
+  local rev_arg = argo.args[1]
   local paths = {}
-  local rev_arg
-  local divider_idx
 
-  for i, v in ipairs(args) do
-    if v == "--" then
-      divider_idx = i
-      for j = i + 1, #args do
-        table.insert(paths, vim.fn.fnamemodify(args[j], ":p"))
-      end
-      break
-    end
-  end
-
-  if #paths > 0 then
-    if divider_idx > 1 then
-      rev_arg = args[1]
-    end
-  elseif #args >= 1 then
-    rev_arg = args[1]
+  for _, path in ipairs(argo.post_args) do
+    table.insert(paths, vim.fn.fnamemodify(path, ":p"))
   end
 
   ---@type Rev
@@ -78,11 +65,22 @@ function M.parse_revs(args)
     end
   end
 
+  ---@type ViewOptions
+  local options = {
+    show_untracked = arg_parser.ambiguous_bool(
+      argo:get_flag("u", "untracked-files"),
+      nil,
+      {"all", "normal", "true"},
+      {"no", "false"}
+    )
+  }
+
   local v = View:new({
       git_root = git_root,
       path_args = paths,
       left = left,
-      right = right
+      right = right,
+      options = options
     })
 
   table.insert(M.views, v)

@@ -14,12 +14,16 @@ local win_reset_opts = {
   scrollbind = false
 }
 
+---@class ViewOptions
+---@field show_untracked boolean|nil
+
 ---@class View
 ---@field tabpage integer
 ---@field git_root string
 ---@field path_args string[]
 ---@field left Rev
 ---@field right Rev
+---@field options ViewOptions
 ---@field file_panel FilePanel
 ---@field left_winid integer
 ---@field right_winid integer
@@ -38,7 +42,8 @@ function View:new(opt)
     path_args = opt.path_args,
     left = opt.left,
     right = opt.right,
-    files = git.diff_file_list(opt.git_root, opt.left, opt.right, opt.path_args),
+    options = opt.options,
+    files = git.diff_file_list(opt.git_root, opt.left, opt.right, opt.path_args, opt.options),
     file_idx = 1,
     nulled = false,
     ready = false
@@ -154,7 +159,9 @@ function View:update_files()
     end
   end
 
-  local new_files = git.diff_file_list(self.git_root, self.left, self.right, self.path_args)
+  local new_files = git.diff_file_list(
+    self.git_root, self.left, self.right, self.path_args, self.options
+  )
   local diff = Diff:new(self.files, new_files, function (aa, bb)
     return aa.path == bb.path
   end)
