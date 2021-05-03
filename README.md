@@ -66,7 +66,7 @@ require'diffview'.setup {
 
 ## Usage
 
-### `:DiffviewOpen [git rev] [ -- {paths...}]`
+### `:DiffviewOpen [git rev] [args] [ -- {paths...}]`
 
 Calling `:DiffviewOpen` with no args opens a new Diffview that compares against
 `HEAD`. You can also provide any valid git rev to view only changes for that
@@ -82,11 +82,15 @@ You can also provide additional paths to narrow down what files are shown:
 
 - `:DiffviewOpen HEAD~2 -- lua/diffview plugin`
 
+For information about additional `[args]`, visit the [documentation](https://github.com/sindrets/diffview.nvim/blob/main/doc/diffview.txt).
+
 Additional commands for convenience:
 
 - `:DiffviewClose`: Close the current diffview. You can also use `:tabclose`.
 - `:DiffviewToggleFiles`: Toggle the files panel.
 - `:DiffviewFocusFiles`: Bring focus to the files panel.
+- `:DiffviewRefresh`: Update stats and entries in the file list of the current
+  Diffview.
 
 With a Diffview open and the default key bindings, you can cycle through changed
 files with `<tab>` and `<s-tab>` (see configuration to change the key bindings).

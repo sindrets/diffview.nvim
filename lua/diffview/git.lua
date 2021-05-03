@@ -9,8 +9,9 @@ local M = {}
 ---@param left Rev
 ---@param right Rev
 ---@param path_args string[]|nil
+---@param options ViewOptions
 ---@return FileEntry[]
-function M.diff_file_list(git_root, left, right, path_args)
+function M.diff_file_list(git_root, left, right, path_args, options)
   local files = {}
 
   local p_args = ""
@@ -59,9 +60,10 @@ function M.diff_file_list(git_root, left, right, path_args)
     end
   end
 
-  -- If one of the revs are LOCAL and `status.showUntrackedFiles` is not set to
-  -- `false`, include untracked files.
-  if M.has_local(left, right) and M.show_untracked(git_root) then
+  local show_untracked = options.show_untracked
+  if show_untracked == nil then show_untracked = M.show_untracked(git_root) end
+
+  if show_untracked and M.has_local(left, right) then
     cmd = "git -C " .. vim.fn.shellescape(git_root) .. " ls-files --others --exclude-standard"
     local untracked = vim.fn.systemlist(cmd)
 

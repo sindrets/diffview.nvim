@@ -70,7 +70,7 @@ Example configuration with default settings:
 COMMANDS                                            *diffview-nvim-commands*
 
                                                         *:DiffviewOpen*
-:DiffviewOpen [git-rev] [ -- {paths...}]
+:DiffviewOpen [git-rev] [args] [ -- {paths...}]
                         Opens a new Diffview that compares against [git-rev]. If
                         no [git-rev] is given, defaults to `HEAD`. Additional
                         {paths...} can be provided to narrow down what files are
@@ -82,7 +82,16 @@ COMMANDS                                            *diffview-nvim-commands*
         :DiffviewOpen d4a7b0d
         :DiffviewOpen d4a7b0d..519b30e
         :DiffviewOpen HEAD~2 -- lua/diffview plugin
+        :DiffviewOpen d4a7b0d -uno
 <
+    Args:
+        -u[value], --untracked-files[={value}]
+                        Specify whether or not to show untracked files. If
+                        flag is given without value; defaults to `true`.
+                        {value} can be one of:
+                          - `true`, `normal`, `all` Show untracked.
+                          - `false`, `no` Don't show untracked.
+
                                                         *:DiffviewClose*
 :DiffviewClose          Close the active Diffview.
 
