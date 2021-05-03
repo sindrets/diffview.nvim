@@ -4,6 +4,7 @@ command! -nargs=* DiffviewOpen call s:diffview_open(<f-args>)
 command! -nargs=0 DiffviewClose lua require'diffview'.close()
 command! -nargs=0 DiffviewFocusFiles lua require'diffview'.on_keypress("focus_files")
 command! -nargs=0 DiffviewToggleFiles lua require'diffview'.on_keypress("toggle_files")
+command! -nargs=0 DiffviewRefresh lua require'diffview'.on_keypress("refresh_files")
 
 function s:diffview_open(...)
     lua require'diffview'.open(vim.fn.eval("a:000"))

@@ -92,6 +92,10 @@ COMMANDS                                            *diffview-nvim-commands*
                                                         *:DiffviewFocusFiles*
 :DiffviewFocusFiles     Brings focus to the file panel. Opens it if it's closed.
 
+                                                        *:DiffviewRefresh*
+:DiffviewRefresh        Update stats and entries in the file list of the
+                        current Diffview.
+
 MAPS                                                    *diffview-nvim-maps*
 
 All listed maps are the defaults, but all mappings can be configured.
