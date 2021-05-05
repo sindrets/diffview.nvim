@@ -25,9 +25,14 @@ function M.parse_revs(args)
   ---@type Rev
   local right
 
-  local git_root = git.toplevel(paths[1] or ".")
+  local p = paths[1] or "."
+  if vim.fn.isdirectory(p) ~= 1 then
+    p = vim.fn.fnamemodify(p, ":h")
+  end
+
+  local git_root = git.toplevel(p)
   if not git_root then
-    utils.err("Path not a git repo (or any parent): '" .. (paths[1] or ".") .. "'")
+    utils.err("Path not a git repo (or any parent): '" .. p .. "'")
     return
   end
 

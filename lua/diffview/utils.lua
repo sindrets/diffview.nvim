@@ -102,6 +102,19 @@ function M.path_remove_trailing(path)
   return p
 end
 
+function M.path_shorten(path, max_length)
+  if string.len(path) > max_length - 1 then
+    path = path:sub(string.len(path) - max_length + 1, string.len(path))
+    local i = path:match("()" .. path_sep)
+    if not i then
+      return "…" .. path
+    end
+    return "…" .. path:sub(i, -1)
+  else
+    return path
+  end
+end
+
 function M.str_shorten(s, new_length)
   if string.len(s) > new_length - 1 then
     return "…" .. s:sub(string.len(s) - new_length + 1, string.len(s))

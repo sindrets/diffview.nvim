@@ -216,7 +216,7 @@ function FilePanel:render()
     self.render_data:add_hl(...)
   end
 
-  local s = utils.str_shorten(self.git_root, self.width - 6)
+  local s = utils.path_shorten(self.git_root, self.width - 6)
   add_hl("DiffviewFilePanelRootPath", line_idx, 0, #s)
   table.insert(lines, s)
   line_idx = line_idx + 1
@@ -271,7 +271,8 @@ function FilePanel:render()
 
     for _, arg in ipairs(extra_info) do
       local relpath = utils.path_relative(arg, self.git_root)
-      s = utils.str_shorten(relpath, self.width - 5)
+      if relpath == "" then relpath = "." end
+      s = utils.path_shorten(relpath, self.width - 5)
       add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
       table.insert(lines, s)
       line_idx = line_idx + 1
