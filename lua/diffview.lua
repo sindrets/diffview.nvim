@@ -1,7 +1,11 @@
+local arg_parser = require'diffview.arg-parser'
 local lib = require'diffview.lib'
 local config = require'diffview.config'
 local colors = require'diffview.colors'
 local M = {}
+
+local flag_value_completion = arg_parser.FlagValueMap:new()
+flag_value_completion:put({"u", "untracked-files"}, {"true", "normal", "all", "false", "no"})
 
 function M.setup(user_config)
   config.setup(user_config or {})
@@ -31,6 +35,32 @@ function M.close(tabpage)
     view:close()
     lib.dispose_view(view)
   end
+end
+
+function M.completion(arg_lead, cmd_line, cur_pos)
+  print(vim.inspect(arg_lead), vim.inspect(cmd_line), cur_pos)
+  local args, argidx, divideridx = arg_parser.scan_ex_args(cmd_line, cur_pos)
+
+  print(vim.inspect(args), argidx, divideridx)
+
+  if argidx >= divideridx then
+    return vim.fn.getcompletion(arg_lead, "file", 0)
+  elseif argidx == 2 then
+    local commits = vim.fn.systemlist("git rev-list --max-count=30 --abbrev-commit HEAD")
+    if arg_lead:match(".*%.%..*") then
+      arg_lead = arg_lead:gsub("(.*%.%.)(.*)", "%1")
+      for k, v in pairs(commits) do
+        commits[k] = arg_lead .. v
+      end
+    end
+    return commits
+  else
+    local flag_completion = flag_value_completion:get_completion(arg_lead)
+    if flag_completion then return flag_completion end
+
+    return flag_value_completion:get_all_names()
+  end
+  return args
 end
 
 function M.on_tab_enter()
