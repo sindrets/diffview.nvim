@@ -6,10 +6,6 @@ command! -nargs=0 DiffviewFocusFiles lua require'diffview'.on_keypress("focus_fi
 command! -nargs=0 DiffviewToggleFiles lua require'diffview'.on_keypress("toggle_files")
 command! -nargs=0 DiffviewRefresh lua require'diffview'.on_keypress("refresh_files")
 
-function s:diffview_open(...)
-    lua require'diffview'.open(vim.fn.eval("a:000"))
-endfunction
-
 function s:completion(argLead, cmdLine, curPos)
     return luaeval("require'diffview'.completion("
                 \ . "vim.fn.eval('a:argLead'),"

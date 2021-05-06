@@ -86,7 +86,7 @@ function FlagValueMap:get_all_names()
 end
 
 function FlagValueMap:get_completion(flag_name)
-  local is_short = flag_name:match(short_flag_pat)
+  local is_short = flag_name:match(short_flag_pat) ~= nil
   if is_short then
     flag_name = flag_name:sub(1,2)
   else
