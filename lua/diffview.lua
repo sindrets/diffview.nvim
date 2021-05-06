@@ -39,10 +39,7 @@ function M.close(tabpage)
 end
 
 function M.completion(arg_lead, cmd_line, cur_pos)
-  print(vim.inspect(arg_lead), vim.inspect(cmd_line), cur_pos)
   local args, argidx, divideridx = arg_parser.scan_ex_args(cmd_line, cur_pos)
-
-  print(vim.inspect(args), argidx, divideridx)
 
   if argidx >= divideridx then
     return vim.fn.getcompletion(arg_lead, "file", 0)
