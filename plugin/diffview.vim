@@ -1,13 +1,16 @@
 if !has('nvim-0.5') || exists('g:diffview_nvim_loaded') | finish | endif
 
-command! -nargs=* DiffviewOpen call s:diffview_open(<f-args>)
+command! -complete=customlist,s:completion -nargs=* DiffviewOpen lua require'diffview'.open(<f-args>)
 command! -nargs=0 DiffviewClose lua require'diffview'.close()
 command! -nargs=0 DiffviewFocusFiles lua require'diffview'.on_keypress("focus_files")
 command! -nargs=0 DiffviewToggleFiles lua require'diffview'.on_keypress("toggle_files")
 command! -nargs=0 DiffviewRefresh lua require'diffview'.on_keypress("refresh_files")
 
-function s:diffview_open(...)
-    lua require'diffview'.open(vim.fn.eval("a:000"))
+function s:completion(argLead, cmdLine, curPos)
+    return luaeval("require'diffview'.completion("
+                \ . "vim.fn.eval('a:argLead'),"
+                \ . "vim.fn.eval('a:cmdLine'),"
+                \ . "vim.fn.eval('a:curPos'))")
 endfunction
 
 augroup Diffview
