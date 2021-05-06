@@ -173,6 +173,14 @@ function M.tbl_deep_clone(t)
   return clone
 end
 
+function M.tbl_pack(...)
+  return {n=select('#',...); ...}
+end
+
+function M.tbl_unpack(t, i, j)
+  return unpack(t, i or 1, j or t.n or #t)
+end
+
 function M.find_named_buffer(name)
   for _, v in ipairs(api.nvim_list_bufs()) do
     if vim.fn.bufname(v) == name then

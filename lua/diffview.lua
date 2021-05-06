@@ -2,6 +2,7 @@ local arg_parser = require'diffview.arg-parser'
 local lib = require'diffview.lib'
 local config = require'diffview.config'
 local colors = require'diffview.colors'
+local utils = require "diffview.utils"
 local M = {}
 
 local flag_value_completion = arg_parser.FlagValueMap:new()
@@ -15,8 +16,8 @@ function M.init()
   colors.setup()
 end
 
-function M.open(args)
-  local view = lib.parse_revs(args)
+function M.open(...)
+  local view = lib.parse_revs(utils.tbl_pack(...))
   if view then
     view:open()
   end
