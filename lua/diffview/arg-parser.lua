@@ -158,7 +158,7 @@ function M.scan_ex_args(cmd_line, cur_pos)
   local i = 1
   while i < #cmd_line do
     if not argidx and i > cur_pos then
-      argidx = #args
+      argidx = #args + 1
     end
 
     local char = cmd_line:sub(i, i)
