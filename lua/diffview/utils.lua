@@ -191,7 +191,7 @@ function M.find_named_buffer(name)
 end
 
 function M.wipe_named_buffer(name)
-  local bn = M.find_rogue_buffer(name)
+  local bn = M.find_named_buffer(name)
   if bn then
     local win_ids = vim.fn.win_findbuf(bn)
     for _, id in ipairs(win_ids) do
