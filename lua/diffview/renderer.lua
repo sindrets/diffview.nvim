@@ -1,3 +1,4 @@
+local utils = require'diffview.utils'
 local config = require'diffview.config'
 local a = vim.api
 local M = {}
@@ -79,7 +80,16 @@ end
 
 function M.get_file_icon(name, ext, render_data, line_idx, offset)
   if not config.get_config().file_panel.use_icons then return " " end
-  if not web_devicons then web_devicons = require'nvim-web-devicons' end
+  if not web_devicons then
+    local ok
+    ok, web_devicons = pcall(require, 'nvim-web-devicons')
+    if not ok then
+      config.get_config().file_panel.use_icons = false
+      utils.warn("nvim-web-devicons is required to use file icons! "
+        .. "Set `use_icons = false` in your config to not see this message.")
+      return " "
+    end
+  end
 
   local icon, hl = web_devicons.get_icon(name, ext)
 
