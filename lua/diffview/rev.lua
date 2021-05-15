@@ -13,8 +13,7 @@ local RevType = utils.enum {
 ---@field type integer
 ---@field commit string
 ---@field head boolean
-local Rev = {}
-Rev.__index = Rev
+local Rev = utils.class()
 
 ---Rev constructor
 ---@param type RevType

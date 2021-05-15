@@ -27,8 +27,7 @@ M._null_buffer = nil
 ---@field left_bufid integer
 ---@field right_bufid integer
 ---@field created_bufs integer[]
-local FileEntry = {}
-FileEntry.__index = FileEntry
+local FileEntry = utils.class()
 
 FileEntry.winopts = {
   diff = true,

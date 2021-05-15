@@ -25,9 +25,13 @@ local EditToken = utils.enum {
 ---@field up table<integer, integer>
 ---@field down table<integer, integer>
 ---@field eql_fn function
-local Diff = {}
-Diff.__index = Diff
+local Diff = utils.class()
 
+---Diff constructor.
+---@param a any[]
+---@param b any[]
+---@param eql_fn function|nil
+---@return Diff
 function Diff:new(a, b, eql_fn)
   local this = {
     a = a,

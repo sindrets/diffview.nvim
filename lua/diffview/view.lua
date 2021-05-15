@@ -31,8 +31,7 @@ local win_reset_opts = {
 ---@field file_idx integer
 ---@field nulled boolean
 ---@field ready boolean
-local View = {}
-View.__index = View
+local View = utils.class()
 
 ---View constructor
 ---@return View
