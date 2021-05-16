@@ -93,6 +93,10 @@ function M.parse_revs(args)
   return v
 end
 
+function M.add_view(view)
+  table.insert(M.views, view)
+end
+
 function M.dispose_view(view)
   for j, v in ipairs(M.views) do
     if v == view then
