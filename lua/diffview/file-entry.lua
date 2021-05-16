@@ -4,9 +4,6 @@ local RevType = require'diffview.rev'.RevType
 local a = vim.api
 local M = {}
 
----@type integer|nil
-M._null_buffer = nil
-
 ---@class GitStats
 ---@field additions integer
 ---@field deletions integer
@@ -27,9 +24,22 @@ M._null_buffer = nil
 ---@field left_bufid integer
 ---@field right_bufid integer
 ---@field created_bufs integer[]
-local FileEntry = {}
-FileEntry.__index = FileEntry
+---STATIC-INTERFACE:
+---@field _null_buffer integer|nil
+---@field _get_null_buffer function
+---@field _create_buffer function
+---@field should_null function
+---@field load_null_buffer function
+---@field _update_windows function
+---@field _attach_buffer function
+---@field _detach_buffer function
+local FileEntry = utils.class()
 
+---@static
+---@type integer|nil
+FileEntry._null_buffer = nil
+
+---@static
 FileEntry.winopts = {
   diff = true,
   scrollbind = true,
@@ -62,7 +72,7 @@ end
 function FileEntry:destroy()
   self:detach_buffers()
   for _, bn in ipairs(self.created_bufs) do
-    if bn ~= M._null_buffer then
+    if bn ~= FileEntry._null_buffer then
       pcall(a.nvim_buf_delete, bn, {})
     end
   end
@@ -100,8 +110,8 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
     if not (split.bufid and a.nvim_buf_is_loaded(split.bufid)) then
       if split.rev.type == RevType.LOCAL then
 
-        if split.binary or M.should_null(split.rev, self.status, split.pos) then
-          local bn = M._create_buffer(git_root, split.rev, self.path, true)
+        if split.binary or FileEntry.should_null(split.rev, self.status, split.pos) then
+          local bn = FileEntry._create_buffer(git_root, split.rev, self.path, true)
           a.nvim_win_set_buf(split.winid, bn)
           split.bufid = bn
         else
@@ -112,11 +122,11 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
       elseif split.rev.type == RevType.COMMIT then
         local bn
         if self.oldpath then
-          bn = M._create_buffer(git_root, split.rev, self.oldpath, false)
+          bn = FileEntry._create_buffer(git_root, split.rev, self.oldpath, false)
         else
-          bn = M._create_buffer(
+          bn = FileEntry._create_buffer(
             git_root, split.rev, self.path,
-            split.binary or M.should_null(split.rev, self.status, split.pos)
+            split.binary or FileEntry.should_null(split.rev, self.status, split.pos)
           )
         end
         table.insert(self.created_bufs, bn)
@@ -125,28 +135,28 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
         vim.cmd("filetype detect")
       end
 
-      M._attach_buffer(split.bufid)
+      FileEntry._attach_buffer(split.bufid)
     else
       a.nvim_win_set_buf(split.winid, split.bufid)
-      M._attach_buffer(split.bufid)
+      FileEntry._attach_buffer(split.bufid)
     end
   end
 
   self.left_bufid = splits[1].bufid
   self.right_bufid = splits[2].bufid
 
-  M._update_windows(left_winid, right_winid)
+  FileEntry._update_windows(left_winid, right_winid)
   a.nvim_set_current_win(last_winid)
 end
 
 function FileEntry:attach_buffers()
-  if self.left_bufid then M._attach_buffer(self.left_bufid) end
-  if self.right_bufid then M._attach_buffer(self.right_bufid) end
+  if self.left_bufid then FileEntry._attach_buffer(self.left_bufid) end
+  if self.right_bufid then FileEntry._attach_buffer(self.right_bufid) end
 end
 
 function FileEntry:detach_buffers()
-  if self.left_bufid then M._detach_buffer(self.left_bufid) end
-  if self.right_bufid then M._detach_buffer(self.right_bufid) end
+  if self.left_bufid then FileEntry._detach_buffer(self.left_bufid) end
+  if self.right_bufid then FileEntry._detach_buffer(self.right_bufid) end
 end
 
 ---Compare against another FileEntry.
@@ -168,10 +178,10 @@ function FileEntry:compare(other)
     )
 end
 
----Get the bufid of the null buffer. Create it if it's not loaded.
+---@static Get the bufid of the null buffer. Create it if it's not loaded.
 ---@return integer
-function M._get_null_buffer()
-  if not (M._null_buffer and a.nvim_buf_is_loaded(M._null_buffer)) then
+function FileEntry._get_null_buffer()
+  if not (FileEntry._null_buffer and a.nvim_buf_is_loaded(FileEntry._null_buffer)) then
     local bn = a.nvim_create_buf(false, false)
     local bufname = utils.path_join({"diffview", "null"})
     a.nvim_buf_set_option(bn, "modified", false)
@@ -183,14 +193,19 @@ function M._get_null_buffer()
       a.nvim_buf_set_name(bn, bufname)
     end
 
-    M._null_buffer = bn
+    FileEntry._null_buffer = bn
   end
 
-  return M._null_buffer
+  return FileEntry._null_buffer
 end
 
-function M._create_buffer(git_root, rev, path, null)
-  if null then return M._get_null_buffer() end
+---@static
+---@param git_root string
+---@param rev Rev
+---@param path string
+---@param null boolean
+function FileEntry._create_buffer(git_root, rev, path, null)
+  if null then return FileEntry._get_null_buffer() end
 
   local bn = a.nvim_create_buf(false, false)
   local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " show " .. rev.commit .. ":" .. vim.fn.shellescape(path)
@@ -200,8 +215,7 @@ function M._create_buffer(git_root, rev, path, null)
   local basename = utils.path_basename(path)
   local bufname = basename
   if rev.type == RevType.COMMIT then
-    local commit_abbrev = rev.commit:sub(1,7)
-    bufname = commit_abbrev .. "_" .. basename
+    bufname = rev:abbrev() .. "_" .. basename
   end
   local fullname = utils.path_join({"diffview", bufname})
   a.nvim_buf_set_option(bn, "modified", false)
@@ -221,13 +235,13 @@ function M._create_buffer(git_root, rev, path, null)
   return bn
 end
 
----Determine whether or not to create a "null buffer". Needed when the file
+---@static Determine whether or not to create a "null buffer". Needed when the file
 ---doesn't exist for a given rev.
 ---@param rev Rev
 ---@param status string
 ---@param pos string
 ---@return boolean
-function M.should_null(rev, status, pos)
+function FileEntry.should_null(rev, status, pos)
   if rev.type == RevType.LOCAL then
     return status == "D"
   elseif rev.type == RevType.COMMIT then
@@ -238,13 +252,15 @@ function M.should_null(rev, status, pos)
   end
 end
 
-function M.load_null_buffer(winid)
-  local bn = M._get_null_buffer()
+---@static
+function FileEntry.load_null_buffer(winid)
+  local bn = FileEntry._get_null_buffer()
   a.nvim_win_set_buf(winid, bn)
-  M._attach_buffer(bn)
+  FileEntry._attach_buffer(bn)
 end
 
-function M._update_windows(left_winid, right_winid)
+---@static
+function FileEntry._update_windows(left_winid, right_winid)
   for _, id in ipairs({ left_winid, right_winid }) do
     for k, v in pairs(FileEntry.winopts) do
       a.nvim_win_set_option(id, k, v)
@@ -256,14 +272,16 @@ function M._update_windows(left_winid, right_winid)
   vim.cmd([[exec "normal! \<c-y>"]])
 end
 
-function M._attach_buffer(bufid)
+---@static
+function FileEntry._attach_buffer(bufid)
   local conf = config.get_config()
   for lhs, rhs in pairs(conf.key_bindings.view) do
     a.nvim_buf_set_keymap(bufid, "n", lhs, rhs, { noremap = true, silent = true })
   end
 end
 
-function M._detach_buffer(bufid)
+---@static
+function FileEntry._detach_buffer(bufid)
   local conf = config.get_config()
   for lhs, _ in pairs(conf.key_bindings.view) do
     pcall(a.nvim_buf_del_keymap, bufid, "n", lhs)

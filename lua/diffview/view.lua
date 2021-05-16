@@ -1,6 +1,6 @@
 local utils = require'diffview.utils'
 local git = require'diffview.git'
-local file_entry = require'diffview.file-entry'
+local FileEntry = require'diffview.file-entry'.FileEntry
 local RevType = require'diffview.rev'.RevType
 local Diff = require'diffview.diff'.Diff
 local EditToken = require'diffview.diff'.EditToken
@@ -31,8 +31,7 @@ local win_reset_opts = {
 ---@field file_idx integer
 ---@field nulled boolean
 ---@field ready boolean
-local View = {}
-View.__index = View
+local View = utils.class()
 
 ---View constructor
 ---@return View
@@ -149,6 +148,26 @@ function View:set_file(file, focus)
   end
 end
 
+function View:set_file_by_path(path, focus)
+  local file
+  for _, f in ipairs(self.files) do
+    if f.path == path then
+      file = f
+      break
+    end
+  end
+
+  self:set_file(file, focus)
+end
+
+---Get an updated list of files.
+---@return FileEntry[]
+function View:get_updated_files()
+  return git.diff_file_list(
+    self.git_root, self.left, self.right, self.path_args, self.options
+  )
+end
+
 ---Update the file list, including stats and status for all files.
 function View:update_files()
   -- If left is tracking HEAD and right is LOCAL: Update HEAD rev.
@@ -159,9 +178,7 @@ function View:update_files()
     end
   end
 
-  local new_files = git.diff_file_list(
-    self.git_root, self.left, self.right, self.path_args, self.options
-  )
+  local new_files = self:get_updated_files()
   local diff = Diff:new(self.files, new_files, function (aa, bb)
     return aa.path == bb.path
   end)
@@ -267,8 +284,8 @@ function View:file_safeguard()
   if #self.files == 0 then
     local cur = self:cur_file()
     if cur then cur:detach_buffers() end
-    file_entry.load_null_buffer(self.left_winid)
-    file_entry.load_null_buffer(self.right_winid)
+    FileEntry.load_null_buffer(self.left_winid)
+    FileEntry.load_null_buffer(self.right_winid)
     self.nulled = true
     return true
   end

@@ -1,3 +1,5 @@
+local utils = require'diffview.utils'
+
 local M = {}
 
 local short_flag_pat = "^%-(%a)=?(.*)"
@@ -7,8 +9,7 @@ local long_flag_pat = "^%-%-(%a[%a%d-]*)=?(.*)"
 ---@field flags table<string, string>
 ---@field args string[]
 ---@field post_args string[]
-local ArgObject = {}
-ArgObject.__index = ArgObject
+local ArgObject = utils.class()
 
 ---ArgObject constructor.
 ---@param flags table<string, string>
@@ -35,8 +36,7 @@ end
 
 ---@class FlagValueMap
 ---@field map table<string, string[]>
-local FlagValueMap = {}
-FlagValueMap.__index = FlagValueMap
+local FlagValueMap = utils.class()
 
 ---FlagValueMap constructor
 ---@return FlagValueMap

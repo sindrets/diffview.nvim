@@ -16,8 +16,7 @@ local header_size = 2
 ---@field bufid integer
 ---@field winid integer
 ---@field render_data RenderData
-local FilePanel = {}
-FilePanel.__index = FilePanel
+local FilePanel = utils.class()
 
 FilePanel.winopts = {
   relativenumber = false,

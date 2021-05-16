@@ -4,21 +4,23 @@ local M = {}
 ---@class RevType
 ---@field LOCAL integer
 ---@field COMMIT integer
+---@field CUSTOM integer
 local RevType = utils.enum {
   "LOCAL",
-  "COMMIT"
+  "COMMIT",
+  "CUSTOM"
 }
 
 ---@class Rev
 ---@field type integer
----@field commit string
----@field head boolean
-local Rev = {}
-Rev.__index = Rev
+---@field commit string A commit SHA.
+---@field head boolean If true, indicates that the rev should be updated when HEAD changes.
+local Rev = utils.class()
 
 ---Rev constructor
 ---@param type RevType
 ---@param commit string
+---@param head boolean
 ---@return Rev
 function Rev:new(type, commit, head)
   local this = {
@@ -30,6 +32,8 @@ function Rev:new(type, commit, head)
   return this
 end
 
+---Get an abbreviated commit SHA. Returns `nil` if this Rev is not a commit.
+---@return string|nil
 function Rev:abbrev()
   if self.commit then
     return self.commit:sub(1, 7)

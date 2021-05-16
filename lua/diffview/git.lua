@@ -106,6 +106,7 @@ end
 ---Convert revs to string representation.
 ---@param left Rev
 ---@param right Rev
+---@return string|nil
 function M.rev_to_pretty_string(left, right)
   if left.head and right.type == RevType.LOCAL then
     return nil

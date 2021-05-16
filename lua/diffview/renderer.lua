@@ -14,8 +14,7 @@ local web_devicons
 ---@field lines string[]
 ---@field hl HlData[]
 ---@field namespace integer
-local RenderData = {}
-RenderData.__index = RenderData
+local RenderData = utils.class()
 
 ---RenderData constructor.
 ---@return RenderData
