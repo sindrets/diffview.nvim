@@ -147,5 +147,75 @@ R                       Update the stats and entries in the file list.
 
 <leader>e               Bring focus to the file panel.
 
+API                                              *diffview-api*
+
+Diffview provides an API that lets plugins supply custom file data to create
+custom diffviews.
+
+Example usage:
+https://gist.github.com/sindrets/b750723f5f23182904f70a6274106304
+
+CView                                             *diffview.api.c-view.CView*
+
+    Class that represents a custom Diffview.
+
+    CView:new({opt})
+
+        Parameters: ~
+            {opt}   (table)   Table containing the args passed to the view
+                              constructor.
+
+        Fields: ~
+            {git_root} (string)         Absolute path to the toplevel git
+                                        directory.
+            {left} (Rev)                The git rev representing the left
+                                        window in the diffview.
+            {right} (Rev)               The git rev representing the right
+                                        window in the diffview.
+            {files} (FileData[])        List of file data used to create the
+                                        file entries in the view.
+            {update_files} (function)   This function should return an updated
+                                        list of `FileData`, and is called from
+                                        `View:update_files`.
+                Parameters: ~
+                    {view} (CView)  The CView object that called the function.
+
+            {get_file_data} (function)  This should return a list of lines that
+                                        make up the buffer indicated by `path`
+                                        and `split`.
+                Parameters: ~
+                    {path} (string)           Path to the file, relative to
+                                              git root.
+                    {split} ("left"|"right")
+
+FileData                                         *diffview.api.c-view.FileData*
+
+    Table that contains the metadata used to create file entries.
+
+    Fields: ~
+        {path} (string)         Path relative to git root.
+        {oldpath} (string|nil)  If the file has been renamed, this should be
+                                the old path, otherwise nil.
+        {status} (string)       Git status symbol. Can be one of:
+                                `A`, `?`, `M`, `R`, `C`, `T`, `U`, `X`, `D`, `B`
+                                See `man git-diff` for the definition of the
+                                different symbols.
+        {stats} (GitStats|nil)  Table describing number of additions and
+                                deletions in the file.
+        {left_null} (boolean)   If true, indicates that the left diff buffer
+                                should be represented by the null buffer.
+        {right_null} (boolean)  If true, indicates that the right diff buffer
+                                should be represented by the null buffer.
+        {selected} (boolean)    If true, indicates that this should be the
+                                initially selected file.
+
+GitStats                                        *diffview.file-entry.GitStats*
+
+    Table describing number of additions and deletions in a file.
+
+    Fields: ~
+        {additions} (integer)   Number of additons in the file.
+        {deletions} (integer)   Number of deletions in the file.
+
 
  vim:tw=78:ts=8:ft=help:norl:
