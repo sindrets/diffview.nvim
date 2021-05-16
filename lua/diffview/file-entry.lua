@@ -206,7 +206,7 @@ function FileEntry._create_buffer(git_root, rev, path, null)
 
   local bn = a.nvim_create_buf(false, false)
   local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " show " .. rev.commit .. ":" .. vim.fn.shellescape(path)
-  local lines = utils.system_list(cmd)
+  local lines = vim.fn.systemlist(cmd)
   a.nvim_buf_set_lines(bn, 0, -1, false, lines)
 
   local basename = utils.path_basename(path)
