@@ -7,10 +7,9 @@ local a = vim.api
 local M = {}
 
 ---@class CFileEntry
----@field left_data string[]
----@field right_data string[]
 ---@field left_null boolean
 ---@field right_null boolean
+---@field get_file_data function
 ---INHERITED:
 ---@field path string
 ---@field oldpath string
@@ -57,8 +56,7 @@ function CFileEntry:new(opt)
     right_binary = opt.right_binary,
     left_null = opt.left_null,
     right_null = opt.right_null,
-    left_data = opt.left_data,
-    right_data = opt.right_data,
+    get_file_data = opt.get_file_data,
     created_bufs = {}
   }
   setmetatable(this, self)
@@ -69,12 +67,12 @@ end
 function CFileEntry:load_buffers(_, left_winid, right_winid)
   local splits = {
     {
-      winid = left_winid, bufid = self.left_bufid, lines = self.left_data,
-      rev = self.left, pos = "left", null = self.left_null == true
+      winid = left_winid, bufid = self.left_bufid, rev = self.left, pos = "left",
+      lines = self.get_file_data(self.path, "left"), null = self.left_null == true
     },
     {
-      winid = right_winid, bufid = self.right_bufid, lines = self.right_data,
-      rev = self.right, pos = "right", null = self.right_null == true
+      winid = right_winid, bufid = self.right_bufid, rev = self.right, pos = "right",
+      lines = self.get_file_data(self.path, "right"), null = self.right_null == true
     }
   }
 

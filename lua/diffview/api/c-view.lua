@@ -13,12 +13,12 @@ local M = {}
 ---@field stats GitStats|nil
 ---@field left_null boolean Indicates that the left buffer should be represented by the null buffer.
 ---@field right_null boolean Indicates that the right buffer should be represented by the null buffer.
----@field left_data string[]|nil List of lines that make up the left buffer. If nil, the null buffer is loaded.
----@field right_data string[]|nil List of lines that make up the right buffer. If nil, the null buffer is loaded.
+---@field selected boolean|nil Indicates that this should be the initially selected file.
 
 ---@class CView
 ---@field files CFileEntry[]
 ---@field update_files function A function that should return an updated list of files.
+---@field get_file_data function A function that is called with parameters `path: string` and `split: string`, and should return a list of lines that should make up the buffer.
 ---INHERITED:
 ---@field tabpage integer
 ---@field git_root string
@@ -48,11 +48,12 @@ function CView:new(opt)
     file_idx = 1,
     nulled = false,
     ready = false,
-    update_files = opt.update_files
+    update_files = opt.update_files,
+    get_file_data = opt.get_file_data
   }
 
   ---@type FileData
-  for _, file_data in ipairs(opt.files) do
+  for i, file_data in ipairs(opt.files) do
     table.insert(this.files, CFileEntry:new({
       path = file_data.path,
       oldpath = file_data.oldpath,
@@ -63,15 +64,17 @@ function CView:new(opt)
       right = this.right,
       left_null = file_data.left_null,
       right_null = file_data.right_null,
-      left_data = file_data.left_data,
-      right_data = file_data.right_data
+      get_file_data = this.get_file_data
     }))
+    if file_data.selected == true then
+      this.file_idx = i
+    end
   end
 
   this.file_panel = FilePanel:new(
     this.git_root,
     this.files,
-    nil,
+    this.path_args,
     git.rev_to_pretty_string(this.left, this.right)
   )
 

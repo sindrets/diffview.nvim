@@ -148,6 +148,18 @@ function View:set_file(file, focus)
   end
 end
 
+function View:set_file_by_path(path, focus)
+  local file
+  for _, f in ipairs(self.files) do
+    if f.path == path then
+      file = f
+      break
+    end
+  end
+
+  self:set_file(file, focus)
+end
+
 ---Get an updated list of files.
 ---@return FileEntry[]
 function View:get_updated_files()
