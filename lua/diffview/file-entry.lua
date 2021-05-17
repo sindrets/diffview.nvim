@@ -102,10 +102,8 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
     }
   }
 
-  local last_winid = a.nvim_get_current_win()
-
   for _, split in ipairs(splits) do
-    a.nvim_set_current_win(split.winid)
+    local winnr = vim.fn.win_id2win(split.winid)
 
     if not (split.bufid and a.nvim_buf_is_loaded(split.bufid)) then
       if split.rev.type == RevType.LOCAL then
@@ -115,7 +113,7 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
           a.nvim_win_set_buf(split.winid, bn)
           split.bufid = bn
         else
-          vim.cmd("e " .. vim.fn.fnameescape(self.absolute_path))
+          vim.cmd(winnr .. "windo edit " .. vim.fn.fnameescape(self.absolute_path))
           split.bufid = a.nvim_get_current_buf()
         end
 
@@ -132,7 +130,7 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
         table.insert(self.created_bufs, bn)
         a.nvim_win_set_buf(split.winid, bn)
         split.bufid = bn
-        vim.cmd("filetype detect")
+        vim.cmd(winnr .. "windo filetype detect")
       end
 
       FileEntry._attach_buffer(split.bufid)
@@ -146,7 +144,6 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
   self.right_bufid = splits[2].bufid
 
   FileEntry._update_windows(left_winid, right_winid)
-  a.nvim_set_current_win(last_winid)
 end
 
 function FileEntry:attach_buffers()

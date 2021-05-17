@@ -115,11 +115,80 @@ function M.path_shorten(path, max_length)
   end
 end
 
+function M.str_right_pad(s, min_size, fill)
+  local result = s
+  if not fill then fill = " " end
+
+  while #result < min_size do
+    result = result .. fill
+  end
+
+  return result
+end
+
+function M.str_left_pad(s, min_size, fill)
+  local result = s
+  if not fill then fill = " " end
+
+  while #result < min_size do
+    result = fill .. result
+  end
+
+  return result
+end
+
+function M.str_center_pad(s, min_size, fill)
+  local result = s
+  if not fill then fill = " " end
+
+  while #result < min_size do
+    if #result % 2 == 0 then
+      result = result .. fill
+    else
+      result = fill .. result
+    end
+  end
+
+  return result
+end
+
 function M.str_shorten(s, new_length)
   if string.len(s) > new_length - 1 then
     return "…" .. s:sub(string.len(s) - new_length + 1, string.len(s))
   end
   return s
+end
+
+---Get the output of a system command.
+---WARN: As of NVIM v0.5.0-dev+1320-gba04b3d83, `io.popen` causes rendering
+---artifacts if the command fails.
+---@param cmd string
+---@return string
+function M.system(cmd)
+  local pfile = io.popen(cmd)
+  if not pfile then return end
+  local data = pfile:read("*a")
+  io.close(pfile)
+
+  return data
+end
+
+---Get the output of a system command as a list of lines.
+---WARN: As of NVIM v0.5.0-dev+1320-gba04b3d83, `io.popen` causes rendering
+---artifacts if the command fails.
+---@param cmd string
+---@return string[]
+function M.system_list(cmd)
+  local pfile = io.popen(cmd)
+  if not pfile then return end
+
+  local lines = {}
+  for line in pfile:lines() do
+    table.insert(lines, line)
+  end
+  io.close(pfile)
+
+  return lines
 end
 
 ---Enum creator
