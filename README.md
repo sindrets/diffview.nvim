@@ -64,6 +64,9 @@ require'diffview'.setup {
 }
 ```
 
+The diff windows can be aligned either horizontally or vertically. To change
+the alignment add either `horizontal` or `vertical` to your `'diffopt'`.
+
 ## Usage
 
 ### `:DiffviewOpen [git rev] [args] [ -- {paths...}]`

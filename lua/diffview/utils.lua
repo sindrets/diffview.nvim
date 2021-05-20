@@ -159,6 +159,22 @@ function M.str_shorten(s, new_length)
   return s
 end
 
+function M.str_split(s, sep)
+  sep = sep or "%s+"
+  local iter = s:gmatch("()" .. sep .. "()")
+  local result = {}
+  local sep_start, sep_end
+
+  local i = 1
+  while i ~= nil do
+    sep_start, sep_end = iter()
+    table.insert(result, s:sub(i, (sep_start or 0) - 1))
+    i = sep_end
+  end
+
+  return result
+end
+
 ---Get the output of a system command.
 ---WARN: As of NVIM v0.5.0-dev+1320-gba04b3d83, `io.popen` causes rendering
 ---artifacts if the command fails.
@@ -195,10 +211,11 @@ end
 ---@param t string[]
 ---@return table<string, integer>
 function M.enum(t)
+  local enum = {}
   for i, v in ipairs(t) do
-    t[v] = i
+    enum[v] = i
   end
-  return t
+  return enum
 end
 
 ---@class Object -- Base class

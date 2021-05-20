@@ -2,9 +2,11 @@ local utils = require'diffview.utils'
 local M = {}
 
 ---@class RevType
----@field LOCAL integer
----@field COMMIT integer
----@field CUSTOM integer
+
+---@class ERevType
+---@field LOCAL RevType
+---@field COMMIT RevType
+---@field CUSTOM RevType
 local RevType = utils.enum {
   "LOCAL",
   "COMMIT",

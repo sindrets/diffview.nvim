@@ -14,6 +14,16 @@ local win_reset_opts = {
   scrollbind = false
 }
 
+---@class LayoutMode
+
+---@class ELayoutMode
+---@field HORIZONTAL LayoutMode
+---@field VERTICAL LayoutMode
+local LayoutMode = utils.enum {
+  "HORIZONTAL",
+  "VERTICAL"
+}
+
 ---@class ViewOptions
 ---@field show_untracked boolean|nil
 
@@ -24,6 +34,7 @@ local win_reset_opts = {
 ---@field left Rev
 ---@field right Rev
 ---@field options ViewOptions
+---@field layout_mode LayoutMode
 ---@field file_panel FilePanel
 ---@field left_winid integer
 ---@field right_winid integer
@@ -42,6 +53,7 @@ function View:new(opt)
     left = opt.left,
     right = opt.right,
     options = opt.options,
+    layout_mode = View.get_layout_mode(),
     files = git.diff_file_list(opt.git_root, opt.left, opt.right, opt.path_args, opt.options),
     file_idx = 1,
     nulled = false,
@@ -84,8 +96,9 @@ function View:close()
 end
 
 function View:init_layout()
+  local split_cmd = self.layout_mode == LayoutMode.VERTICAL and "sp" or "vsp"
   self.left_winid = a.nvim_get_current_win()
-  vim.cmd("belowright vsp")
+  vim.cmd("belowright " .. split_cmd)
   self.right_winid = a.nvim_get_current_win()
   self.file_panel:open()
 end
@@ -149,15 +162,12 @@ function View:set_file(file, focus)
 end
 
 function View:set_file_by_path(path, focus)
-  local file
-  for _, f in ipairs(self.files) do
-    if f.path == path then
-      file = f
-      break
+  for _, file in ipairs(self.files) do
+    if file.path == path then
+      self:set_file(file, focus)
+      return
     end
   end
-
-  self:set_file(file, focus)
 end
 
 ---Get an updated list of files.
@@ -248,20 +258,21 @@ function View:recover_layout(state)
 
   a.nvim_set_current_tabpage(self.tabpage)
   self.file_panel:close()
+  local split_cmd = self.layout_mode == LayoutMode.VERTICAL and "sp" or "vsp"
 
   if not state.left_win and not state.right_win then
     self:init_layout()
 
   elseif not state.left_win then
     a.nvim_set_current_win(self.right_winid)
-    vim.cmd("aboveleft vsp")
+    vim.cmd("aboveleft " .. split_cmd)
     self.left_winid = a.nvim_get_current_win()
     self.file_panel:open()
     self:set_file(self:cur_file())
 
   elseif not state.right_win then
     a.nvim_set_current_win(self.left_winid)
-    vim.cmd("belowright vsp")
+    vim.cmd("belowright " .. split_cmd)
     self.right_winid = a.nvim_get_current_win()
     self.file_panel:open()
     self:set_file(self:cur_file())
@@ -340,6 +351,16 @@ function View:fix_foreign_windows()
   end
 end
 
+function View.get_layout_mode()
+  local diffopts = utils.str_split(vim.o.diffopt, ",")
+  if vim.tbl_contains(diffopts, "vertical") then
+    return LayoutMode.VERTICAL
+  else
+    return LayoutMode.HORIZONTAL
+  end
+end
+
+M.LayoutMode = LayoutMode
 M.View = View
 
 return M

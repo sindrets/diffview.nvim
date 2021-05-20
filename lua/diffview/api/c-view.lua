@@ -26,12 +26,15 @@ local M = {}
 ---@field left Rev
 ---@field right Rev
 ---@field options ViewOptions
+---@field layout_mode LayoutMode
 ---@field file_panel FilePanel
 ---@field left_winid integer
 ---@field right_winid integer
 ---@field file_idx integer
 ---@field nulled boolean
 ---@field ready boolean
+---STATIC-MEMBERS:
+---@field get_layout_mode function
 local CView = utils.class(View)
 
 ---CView constructor.
@@ -44,6 +47,7 @@ function CView:new(opt)
     left = opt.left,
     right = opt.right,
     options = opt.options,
+    layout_mode = CView.get_layout_mode(),
     files = {},
     file_idx = 1,
     nulled = false,
