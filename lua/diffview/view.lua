@@ -353,7 +353,7 @@ end
 
 function View.get_layout_mode()
   local diffopts = utils.str_split(vim.o.diffopt, ",")
-  if vim.tbl_contains(diffopts, "vertical") then
+  if vim.tbl_contains(diffopts, "horizontal") then
     return LayoutMode.VERTICAL
   else
     return LayoutMode.HORIZONTAL
