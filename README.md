@@ -3,7 +3,7 @@
 Single tabpage interface to easily cycle through diffs for all modified files
 for any git rev.
 
-![preview](.github/media/screenshot_1.png)
+![preview](.github/media/screenshot_2.png)
 
 ## Introduction
 

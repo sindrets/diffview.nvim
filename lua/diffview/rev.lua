@@ -6,10 +6,12 @@ local M = {}
 ---@class ERevType
 ---@field LOCAL RevType
 ---@field COMMIT RevType
+---@field INDEX RevType
 ---@field CUSTOM RevType
 local RevType = utils.enum {
   "LOCAL",
   "COMMIT",
+  "INDEX",
   "CUSTOM"
 }
 

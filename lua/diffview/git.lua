@@ -4,28 +4,66 @@ local utils = require'diffview.utils'
 local FileEntry = require'diffview.file-entry'.FileEntry
 local M = {}
 
----Get a list of files modified between two revs.
----@param git_root string
----@param left Rev
----@param right Rev
----@param path_args string[]|nil
----@param options ViewOptions
----@return FileEntry[]
-function M.diff_file_list(git_root, left, right, path_args, options)
-  local files = {}
+---@class FileDict
+---@field working FileEntry[]
+---@field staged FileEntry[]
+local FileDict = utils.class()
 
-  local p_args = ""
-  if path_args and #path_args > 0 then
-    p_args = " --"
-    for _, arg in ipairs(path_args) do
-      p_args = p_args .. " " .. vim.fn.shellescape(arg)
+---FileDict constructor.
+---@return FileDict
+function FileDict:new()
+  local this = {
+    working = {},
+    staged = {}
+  }
+  setmetatable(this, self)
+  local mt = getmetatable(this)
+  mt.__index = function (t, k)
+    if type(k) == "number" then
+      if k > #t.working then
+        return t.staged[k - #t.working]
+      else
+        return t.working[k]
+      end
+    else
+      return FileDict[k]
     end
   end
+  return this
+end
 
-  local rev_arg = M.rev_to_arg(left, right)
-  local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " diff --name-status " .. rev_arg .. p_args
+function FileDict:size()
+  return #self.working + #self.staged
+end
+
+function FileDict:iter()
+  local i = 0
+  local n = #self.working + #self.staged
+  return function ()
+    i = i + 1
+    if i <= n then
+      return self[i]
+    end
+  end
+end
+
+function FileDict:ipairs()
+  local i = 0
+  local n = #self.working + #self.staged
+  return function ()
+    i = i + 1
+    if i <= n then
+      ---@type integer, FileEntry
+      return i, self[i]
+    end
+  end
+end
+
+local function tracked_files(git_root, left, right, args)
+  local files = {}
+  local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " diff --name-status " .. args
   local names = vim.fn.systemlist(cmd)
-  cmd = "git -C " .. vim.fn.shellescape(git_root) .. " diff --numstat " .. rev_arg .. p_args
+  cmd = "git -C " .. vim.fn.shellescape(git_root) .. " diff --numstat " .. args
   local stat_data = vim.fn.systemlist(cmd)
 
   if not utils.shell_error() then
@@ -60,28 +98,70 @@ function M.diff_file_list(git_root, left, right, path_args, options)
     end
   end
 
+  return files
+end
+
+local function untracked_files(git_root, left, right)
+  local files = {}
+  local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " ls-files --others --exclude-standard"
+  local untracked = vim.fn.systemlist(cmd)
+
+  if not utils.shell_error() and #untracked > 0 then
+    for _, s in ipairs(untracked) do
+      table.insert(files, FileEntry:new({
+            path = s,
+            absolute_path = utils.path_join({git_root, s}),
+            status = "?",
+            left = left,
+            right = right
+        }))
+    end
+  end
+
+  return files
+end
+
+---Get a list of files modified between two revs.
+---@param git_root string
+---@param left Rev
+---@param right Rev
+---@param path_args string[]|nil
+---@param options ViewOptions
+---@return FileDict
+function M.diff_file_list(git_root, left, right, path_args, options)
+  ---@type FileDict
+  local files = FileDict:new()
+
+  local p_args = ""
+  if path_args and #path_args > 0 then
+    p_args = " --"
+    for _, arg in ipairs(path_args) do
+      p_args = p_args .. " " .. vim.fn.shellescape(arg)
+    end
+  end
+
+  local rev_arg = M.rev_to_arg(left, right)
+  files.working = tracked_files(git_root, left, right, rev_arg .. p_args)
+
   local show_untracked = options.show_untracked
   if show_untracked == nil then show_untracked = M.show_untracked(git_root) end
 
   if show_untracked and M.has_local(left, right) then
-    cmd = "git -C " .. vim.fn.shellescape(git_root) .. " ls-files --others --exclude-standard"
-    local untracked = vim.fn.systemlist(cmd)
+    local untracked = untracked_files(git_root, left, right)
 
-    if not utils.shell_error() and #untracked > 0 then
-      for _, s in ipairs(untracked) do
-        table.insert(files, FileEntry:new({
-          path = s,
-          absolute_path = utils.path_join({git_root, s}),
-          status = "?",
-          left = left,
-          right = right
-        }))
-      end
+    if #untracked > 0 then
+      files.working = utils.tbl_concat(files.working, untracked)
 
-      utils.merge_sort(files, function (a, b)
+      utils.merge_sort(files.working, function (a, b)
         return a.path:lower() < b.path:lower()
       end)
     end
+  end
+
+  if left.type == RevType.INDEX and right.type == RevType.LOCAL then
+    local left_rev = M.head_rev(git_root)
+    local right_rev = Rev:new(RevType.INDEX)
+    files.staged = tracked_files(git_root, left_rev, right_rev, "--cached HEAD" .. p_args)
   end
 
   return files
@@ -92,12 +172,17 @@ end
 ---@param right Rev
 ---@return string
 function M.rev_to_arg(left, right)
-  assert(left.commit or right.commit, "Can't diff LOCAL against LOCAL!")
+  assert(
+    not (left.type == RevType.LOCAL and right.type == RevType.LOCAL),
+    "Can't diff LOCAL against LOCAL!"
+  )
 
   if left.type == RevType.COMMIT and right.type == RevType.COMMIT then
     return left.commit .. ".." .. right.commit
-  elseif left.type == RevType.LOCAL then
-    return right.commit
+  elseif left.type == RevType.INDEX and right.type == RevType.LOCAL then
+    return ""
+  elseif left.type == RevType.COMMIT and right.type == RevType.INDEX then
+    return "--cached " .. left.commit
   else
     return left.commit
   end
@@ -155,6 +240,8 @@ function M.is_binary(git_root, path, rev)
   local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " grep -I --name-only -e . "
   if rev.type == RevType.LOCAL then
     cmd = cmd .. "--untracked"
+  elseif rev.type == RevType.INDEX then
+    cmd = cmd .. "--cached"
   else
     cmd = cmd .. rev.commit
   end

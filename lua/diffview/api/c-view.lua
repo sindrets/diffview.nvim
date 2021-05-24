@@ -16,7 +16,7 @@ local M = {}
 ---@field selected boolean|nil Indicates that this should be the initially selected file.
 
 ---@class CView
----@field files CFileEntry[]
+---@field files any
 ---@field update_files function A function that should return an updated list of files.
 ---@field get_file_data function A function that is called with parameters `path: string` and `split: string`, and should return a list of lines that should make up the buffer.
 ---INHERITED:
@@ -48,7 +48,10 @@ function CView:new(opt)
     right = opt.right,
     options = opt.options,
     layout_mode = CView.get_layout_mode(),
-    files = {},
+    files = {
+      working = {},
+      staged = {}
+    },
     file_idx = 1,
     nulled = false,
     ready = false,
@@ -56,22 +59,29 @@ function CView:new(opt)
     get_file_data = opt.get_file_data
   }
 
-  ---@type FileData
-  for i, file_data in ipairs(opt.files) do
-    table.insert(this.files, CFileEntry:new({
-      path = file_data.path,
-      oldpath = file_data.oldpath,
-      absolute_path = utils.path_join({ this.git_root, file_data.path }),
-      status = file_data.status,
-      stats = file_data.stats,
-      left = this.left,
-      right = this.right,
-      left_null = file_data.left_null,
-      right_null = file_data.right_null,
-      get_file_data = this.get_file_data
-    }))
-    if file_data.selected == true then
-      this.file_idx = i
+  local files = {
+    { this_files = this.files.working, opt_files = opt.files.working },
+    { this_files = this.files.staged, opt_files = opt.files.staged }
+  }
+
+  for _, v in ipairs(files) do
+    ---@type FileData
+    for i, file_data in ipairs(v.opt_files) do
+      table.insert(v.this_files, CFileEntry:new({
+          path = file_data.path,
+          oldpath = file_data.oldpath,
+          absolute_path = utils.path_join({ this.git_root, file_data.path }),
+          status = file_data.status,
+          stats = file_data.stats,
+          left = this.left,
+          right = this.right,
+          left_null = file_data.left_null,
+          right_null = file_data.right_null,
+          get_file_data = this.get_file_data
+        }))
+      if file_data.selected == true then
+        this.file_idx = i
+      end
     end
   end
 

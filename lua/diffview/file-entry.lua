@@ -117,7 +117,7 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
           split.bufid = a.nvim_get_current_buf()
         end
 
-      elseif split.rev.type == RevType.COMMIT then
+      elseif split.rev.type == RevType.COMMIT or split.rev.type == RevType.INDEX then
         local bn
         if self.oldpath then
           bn = FileEntry._create_buffer(git_root, split.rev, self.oldpath, false)
@@ -205,7 +205,7 @@ function FileEntry._create_buffer(git_root, rev, path, null)
   if null then return FileEntry._get_null_buffer() end
 
   local bn = a.nvim_create_buf(false, false)
-  local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " show " .. rev.commit .. ":" .. vim.fn.shellescape(path)
+  local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " show " .. (rev.commit or "") .. ":" .. vim.fn.shellescape(path)
   local lines = vim.fn.systemlist(cmd)
   a.nvim_buf_set_lines(bn, 0, -1, false, lines)
 
@@ -213,6 +213,8 @@ function FileEntry._create_buffer(git_root, rev, path, null)
   local bufname = basename
   if rev.type == RevType.COMMIT then
     bufname = rev:abbrev() .. "_" .. basename
+  elseif rev.type == RevType.INDEX then
+    bufname = "[index]_" .. basename
   end
   local fullname = utils.path_join({"diffview", bufname})
   a.nvim_buf_set_option(bn, "modified", false)

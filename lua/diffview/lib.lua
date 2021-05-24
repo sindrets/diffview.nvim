@@ -40,19 +40,17 @@ function M.parse_revs(args)
   local base_cmd = "git -C " .. e_git_root .. " "
 
   if not rev_arg then
-    -- Diff LOCAL and HEAD
-    left = git.head_rev(git_root)
+    -- Diff INDEX and LOCAL
+    left = Rev:new(RevType.INDEX)
     right = Rev:new(RevType.LOCAL)
-
-    if not left then
-      utils.err("Git repo has no HEAD! Can't perform diff for '" .. git_root .. "'.")
-      return
-    end
   else
     local rev_strings = vim.fn.systemlist(base_cmd .. "rev-parse --revs-only " .. vim.fn.shellescape(rev_arg))
     if utils.shell_error() then
       utils.err("Failed to parse rev '" .. rev_arg .. "'!")
       utils.err("Git output: " .. vim.fn.join(rev_strings, "\n"))
+      return
+    elseif #rev_strings == 0 then
+      utils.err("Not a git rev: '" .. rev_arg .. "'.")
       return
     end
 

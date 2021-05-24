@@ -251,13 +251,13 @@ function M.class(super_class)
   end
 
   ---Get the class object.
-  ---@return table
+  ---@return Object
   function new_class:class()
     return new_class
   end
 
   ---Get the super class.
-  ---@return table
+  ---@return Object
   function new_class:super()
     return super_class
   end
@@ -290,13 +290,15 @@ function M.tbl_slice(t, first, last)
   return slice
 end
 
-function M.tbl_concat(a, b)
+function M.tbl_concat(...)
   local result = {}
-  for i, v in ipairs(a) do
-    result[i] = v
-  end
-  for i, v in ipairs(b) do
-    result[#a + i] = v
+  local n = 0
+
+  for _, t in ipairs({...}) do
+    for i, v in ipairs(t) do
+      result[n + i] = v
+    end
+    n = n + #t
   end
 
   return result

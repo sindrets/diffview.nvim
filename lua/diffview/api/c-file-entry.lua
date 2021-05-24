@@ -91,7 +91,7 @@ function CFileEntry:load_buffers(_, left_winid, right_winid)
           split.bufid = a.nvim_get_current_buf()
         end
 
-      elseif split.rev.type == RevType.COMMIT or split.rev.type == RevType.CUSTOM then
+      elseif vim.tbl_contains({ RevType.COMMIT, RevType.INDEX, RevType.CUSTOM }, split.rev.type) then
         local bn
         if self.oldpath then
           bn = CFileEntry._create_buffer(nil, split.rev, self.oldpath, split.lines, false)
@@ -132,6 +132,8 @@ function CFileEntry._create_buffer(_, rev, path, lines, null)
   local bufname = basename
   if rev.type == RevType.COMMIT then
     bufname = rev:abbrev() .. "_" .. basename
+  elseif rev.type == RevType.INDEX then
+    bufname = "[index]_" .. basename
   elseif rev.type == RevType.CUSTOM then
     bufname = "[diff]_" .. basename
   end
