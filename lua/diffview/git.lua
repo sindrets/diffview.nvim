@@ -59,7 +59,7 @@ function FileDict:ipairs()
   end
 end
 
-local function tracked_files(git_root, left, right, args)
+local function tracked_files(git_root, left, right, args, kind)
   local files = {}
   local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " diff --name-status " .. args
   local names = vim.fn.systemlist(cmd)
@@ -92,6 +92,7 @@ local function tracked_files(git_root, left, right, args)
         absolute_path = utils.path_join({git_root, name}),
         status = status,
         stats = stats,
+        kind = kind,
         left = left,
         right = right
       }))
@@ -112,6 +113,7 @@ local function untracked_files(git_root, left, right)
             path = s,
             absolute_path = utils.path_join({git_root, s}),
             status = "?",
+            kind = "working",
             left = left,
             right = right
         }))
@@ -141,7 +143,7 @@ function M.diff_file_list(git_root, left, right, path_args, options)
   end
 
   local rev_arg = M.rev_to_arg(left, right)
-  files.working = tracked_files(git_root, left, right, rev_arg .. p_args)
+  files.working = tracked_files(git_root, left, right, rev_arg .. p_args, "working")
 
   local show_untracked = options.show_untracked
   if show_untracked == nil then show_untracked = M.show_untracked(git_root) end
@@ -161,7 +163,7 @@ function M.diff_file_list(git_root, left, right, path_args, options)
   if left.type == RevType.INDEX and right.type == RevType.LOCAL then
     local left_rev = M.head_rev(git_root)
     local right_rev = Rev:new(RevType.INDEX)
-    files.staged = tracked_files(git_root, left_rev, right_rev, "--cached HEAD" .. p_args)
+    files.staged = tracked_files(git_root, left_rev, right_rev, "--cached HEAD" .. p_args, "staged")
   end
 
   return files
@@ -257,4 +259,5 @@ function M.show_untracked(git_root)
   return vim.trim(vim.fn.system(cmd)) ~= "false"
 end
 
+M.FileDict = FileDict
 return M

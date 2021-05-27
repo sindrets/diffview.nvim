@@ -17,6 +17,7 @@ local M = {}
 ---@field extension string
 ---@field status string
 ---@field stats GitStats
+---@field kind "working"|"staged"
 ---@field left_binary boolean|nil
 ---@field right_binary boolean|nil
 ---@field left Rev
@@ -61,6 +62,7 @@ function FileEntry:new(opt)
     extension = utils.path_extension(opt.path),
     status = opt.status,
     stats = opt.stats,
+    kind = opt.kind,
     left = opt.left,
     right = opt.right,
     created_bufs = {}
@@ -91,6 +93,7 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
     end
   end
 
+  local last_winid = a.nvim_get_current_win()
   local splits = {
     {
       winid = left_winid, bufid = self.left_bufid,
@@ -144,6 +147,7 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
   self.right_bufid = splits[2].bufid
 
   FileEntry._update_windows(left_winid, right_winid)
+  a.nvim_set_current_win(last_winid)
 end
 
 function FileEntry:attach_buffers()
@@ -154,6 +158,25 @@ end
 function FileEntry:detach_buffers()
   if self.left_bufid then FileEntry._detach_buffer(self.left_bufid) end
   if self.right_bufid then FileEntry._detach_buffer(self.right_bufid) end
+end
+
+function FileEntry:dispose_buffer(split)
+  if vim.tbl_contains({ "left", "right" }, split) then
+    local bufid = self[split .. "_bufid"]
+    if bufid and a.nvim_buf_is_loaded(bufid) then
+      FileEntry._detach_buffer(bufid)
+      a.nvim_buf_delete(bufid, {})
+      self[split .. "_bufid"] = nil
+    end
+  end
+end
+
+function FileEntry:dispose_index_buffers()
+  for _, split in ipairs({ "left", "right" }) do
+    if self[split].type == RevType.INDEX then
+      self:dispose_buffer(split)
+    end
+  end
 end
 
 ---Compare against another FileEntry.

@@ -2,6 +2,9 @@ local utils = require'diffview.utils'
 local View = require'diffview.view'.View
 local CFileEntry = require'diffview.api.c-file-entry'.CFileEntry
 local FilePanel = require'diffview.file-panel'.FilePanel
+local FileDict = require'diffview.git'.FileDict
+local Rev = require'diffview.rev'.Rev
+local RevType = require'diffview.rev'.RevType
 local git = require'diffview.git'
 
 local M = {}
@@ -48,10 +51,7 @@ function CView:new(opt)
     right = opt.right,
     options = opt.options,
     layout_mode = CView.get_layout_mode(),
-    files = {
-      working = {},
-      staged = {}
-    },
+    files = FileDict:new(),
     file_idx = 1,
     nulled = false,
     ready = false,
@@ -60,8 +60,14 @@ function CView:new(opt)
   }
 
   local files = {
-    { this_files = this.files.working, opt_files = opt.files.working },
-    { this_files = this.files.staged, opt_files = opt.files.staged }
+    {
+      this_files = this.files.working, opt_files = opt.files.working or {},
+      kind = "working", left = this.left, right = this.right
+    },
+    {
+      this_files = this.files.staged, opt_files = opt.files.staged or {},
+      kind = "staged", left = git.head_rev(this.git_root), right = Rev:new(RevType.INDEX)
+    }
   }
 
   for _, v in ipairs(files) do
@@ -73,8 +79,9 @@ function CView:new(opt)
           absolute_path = utils.path_join({ this.git_root, file_data.path }),
           status = file_data.status,
           stats = file_data.stats,
-          left = this.left,
-          right = this.right,
+          kind = v.kind,
+          left = v.left,
+          right = v.right,
           left_null = file_data.left_null,
           right_null = file_data.right_null,
           get_file_data = this.get_file_data

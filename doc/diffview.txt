@@ -51,17 +51,18 @@ Example configuration with default settings:
           ["<leader>b"] = cb("toggle_files"),       -- Toggle the files panel.
         },
         file_panel = {
-          ["j"]         = cb("next_entry"),         -- Bring the cursor to the next file entry
-          ["<down>"]    = cb("next_entry"),
-          ["k"]         = cb("prev_entry"),         -- Bring the cursor to the previous file entry.
-          ["<up>"]      = cb("prev_entry"),
-          ["<cr>"]      = cb("select_entry"),       -- Open the diff for the selected entry.
-          ["o"]         = cb("select_entry"),
-          ["R"]         = cb("refresh_files"),      -- Update stats and entries in the file list.
-          ["<tab>"]     = cb("select_next_entry"),
-          ["<s-tab>"]   = cb("select_prev_entry"),
-          ["<leader>e"] = cb("focus_files"),
-          ["<leader>b"] = cb("toggle_files"),
+          ["j"]             = cb("next_entry"),         -- Bring the cursor to the next file entry
+          ["<down>"]        = cb("next_entry"),
+          ["k"]             = cb("prev_entry"),         -- Bring the cursor to the previous file entry.
+          ["<up>"]          = cb("prev_entry"),
+          ["<cr>"]          = cb("select_entry"),       -- Open the diff for the selected entry.
+          ["o"]             = cb("select_entry"),
+          ["<2-LeftMouse>"] = cb("select_entry"),
+          ["R"]             = cb("refresh_files"),      -- Update stats and entries in the file list.
+          ["<tab>"]         = cb("select_next_entry"),
+          ["<s-tab>"]       = cb("select_prev_entry"),
+          ["<leader>e"]     = cb("focus_files"),
+          ["<leader>b"]     = cb("toggle_files"),
         }
       }
     }
@@ -141,6 +142,7 @@ k                       Bring the cursor to the previous file entry
 
 o                       Open the diff for the selected file entry.
 <CR>
+<2-LeftMouse>
 
 R                       Update the stats and entries in the file list.
 
@@ -177,7 +179,7 @@ CView                                             *diffview.api.c-view.CView*
                                         window in the diffview.
             {right} (Rev)               The git rev representing the right
                                         window in the diffview.
-            {files} (FileData[])        List of file data used to create the
+            {files} (FileDict)          List of file data used to create the
                                         file entries in the view.
             {update_files} (function)   This function should return an updated
                                         list of `FileData`, and is called from
@@ -189,9 +191,16 @@ CView                                             *diffview.api.c-view.CView*
                                         make up the buffer indicated by `path`
                                         and `split`.
                 Parameters: ~
-                    {path} (string)           Path to the file, relative to
-                                              git root.
+                    {kind} ("working"|"staged")
+                    {path} (string)             Path to the file, relative to
+                                                git root.
                     {split} ("left"|"right")
+
+FileDict                                                *diffview.git.FileDict*
+
+    Fields:~
+        {working} (FileData[])
+        {staged}  (FileData[])
 
 FileData                                         *diffview.api.c-view.FileData*
 

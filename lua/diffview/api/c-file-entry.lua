@@ -19,6 +19,7 @@ local M = {}
 ---@field extension string
 ---@field status string
 ---@field stats GitStats
+---@field kind "working"|"staged"
 ---@field left_binary boolean|nil
 ---@field right_binary boolean|nil
 ---@field left Rev
@@ -50,6 +51,7 @@ function CFileEntry:new(opt)
     extension = utils.path_extension(opt.path),
     status = opt.status,
     stats = opt.stats,
+    kind = opt.kind,
     left = opt.left,
     right = opt.right,
     left_binary = opt.left_binary,
@@ -65,14 +67,15 @@ end
 
 ---@override
 function CFileEntry:load_buffers(_, left_winid, right_winid)
+  local last_winid = a.nvim_get_current_win()
   local splits = {
     {
       winid = left_winid, bufid = self.left_bufid, rev = self.left, pos = "left",
-      lines = self.get_file_data(self.path, "left"), null = self.left_null == true
+      lines = self.get_file_data(self.kind, self.path, "left"), null = self.left_null == true
     },
     {
       winid = right_winid, bufid = self.right_bufid, rev = self.right, pos = "right",
-      lines = self.get_file_data(self.path, "right"), null = self.right_null == true
+      lines = self.get_file_data(self.kind, self.path, "right"), null = self.right_null == true
     }
   }
 
@@ -118,6 +121,7 @@ function CFileEntry:load_buffers(_, left_winid, right_winid)
   self.right_bufid = splits[2].bufid
 
   CFileEntry._update_windows(left_winid, right_winid)
+  a.nvim_set_current_win(last_winid)
 end
 
 ---@static

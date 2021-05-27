@@ -221,45 +221,39 @@ end
 function FilePanel:highlight_prev_file()
   if not (self:is_open() and self:buf_loaded()) or self.files:size() == 0 then return end
 
-  local cur = self:get_file_at_cursor()
-  for i, f in self.files:ipairs() do
-    if f == cur then
-      i = i - 1
-      local offset, files
-      if i > #self.files.working then
-        i = i - #self.files.working
-        offset = self.components.staged.files.comp.lstart
-        files = self.files.staged
-      else
-        offset = self.components.working.files.comp.lstart
-        files = self.files.working
-      end
-      local line = utils.clamp(i + offset, offset + 1, #files + offset)
-      pcall(a.nvim_win_set_cursor, self.winid, {line, 0})
-    end
+  local cursor = a.nvim_win_get_cursor(self.winid)
+  local line = cursor[1]
+  local min, max
+
+  if line - 1 > self.components.staged.files.comp.lstart then
+    min = self.components.staged.files.comp.lstart + 1
+    max = self.components.staged.files.comp.lend
+  else
+    min = self.components.working.files.comp.lstart + 1
+    max = self.components.working.files.comp.lend
   end
+
+  line = utils.clamp(line - 1, min, max)
+  pcall(a.nvim_win_set_cursor, self.winid, {line, 0})
 end
 
 function FilePanel:highlight_next_file()
   if not (self:is_open() and self:buf_loaded()) or self.files:size() == 0 then return end
 
-  local cur = self:get_file_at_cursor()
-  for i, f in self.files:ipairs() do
-    if f == cur then
-      i = i + 1
-      local offset, files
-      if i > #self.files.working then
-        i = i - #self.files.working
-        offset = self.components.staged.files.comp.lstart
-        files = self.files.staged
-      else
-        offset = self.components.working.files.comp.lstart
-        files = self.files.working
-      end
-      local line = utils.clamp(i + offset, offset, #files + offset)
-      pcall(a.nvim_win_set_cursor, self.winid, {line, 0})
-    end
+  local cursor = a.nvim_win_get_cursor(self.winid)
+  local line = cursor[1]
+  local min, max
+
+  if line + 1 > self.components.working.files.comp.lend then
+    min = self.components.staged.files.comp.lstart + 1
+    max = self.components.staged.files.comp.lend
+  else
+    min = self.components.working.files.comp.lstart + 1
+    max = self.components.working.files.comp.lend
   end
+
+  line = utils.clamp(line + 1, min, max)
+  pcall(a.nvim_win_set_cursor, self.winid, {line, 0})
 end
 
 ---@param comp RenderComponent

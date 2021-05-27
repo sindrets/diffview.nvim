@@ -164,6 +164,7 @@ function View:set_file(file, focus)
 end
 
 function View:set_file_by_path(path, focus)
+  ---@type FileEntry
   for _, file in self.files:ipairs() do
     if file.path == path then
       self:set_file(file, focus)
@@ -210,10 +211,18 @@ function View:update_files()
         -- Update status and stats
         v.cur_files[ai].status = v.new_files[bi].status
         v.cur_files[ai].stats = v.new_files[bi].stats
+        v.cur_files[ai]:dispose_index_buffers()
         ai = ai + 1
         bi = bi + 1
       elseif opr == EditToken.DELETE then
-        if cur_file == v.cur_files[ai] then self:prev_file() end
+        if cur_file == v.cur_files[ai] then
+          if #v.cur_files == 1 then
+            FileEntry.load_null_buffer(self.left_winid)
+            FileEntry.load_null_buffer(self.right_winid)
+          else
+            self:prev_file()
+          end
+        end
         v.cur_files[ai]:destroy()
         table.remove(v.cur_files, ai)
       elseif opr == EditToken.INSERT then
@@ -221,7 +230,14 @@ function View:update_files()
         ai = ai + 1
         bi = bi + 1
       elseif opr == EditToken.REPLACE then
-        if cur_file == v.cur_files[ai] then self:prev_file() end
+        if cur_file == v.cur_files[ai] then
+          if #v.cur_files == 1 then
+            FileEntry.load_null_buffer(self.left_winid)
+            FileEntry.load_null_buffer(self.right_winid)
+          else
+            self:prev_file()
+          end
+        end
         v.cur_files[ai]:destroy()
         table.remove(v.cur_files, ai)
         table.insert(v.cur_files, ai, v.new_files[bi])
