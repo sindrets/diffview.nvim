@@ -183,6 +183,8 @@ end
 
 ---Update the file list, including stats and status for all files.
 function View:update_files()
+  self:ensure_layout()
+
   -- If left is tracking HEAD and right is LOCAL: Update HEAD rev.
   if self.left.head and self.right.type == RevType.LOCAL then
     local new_head = git.head_rev(self.git_root)
@@ -191,6 +193,7 @@ function View:update_files()
     end
   end
 
+  local last_winid = a.nvim_get_current_win()
   local new_files = self:get_updated_files()
   local files = {
     { cur_files = self.files.working, new_files = new_files.working },
@@ -217,6 +220,7 @@ function View:update_files()
       elseif opr == EditToken.DELETE then
         if cur_file == v.cur_files[ai] then
           if #v.cur_files == 1 then
+            cur_file:detach_buffers()
             FileEntry.load_null_buffer(self.left_winid)
             FileEntry.load_null_buffer(self.right_winid)
           else
@@ -232,6 +236,7 @@ function View:update_files()
       elseif opr == EditToken.REPLACE then
         if cur_file == v.cur_files[ai] then
           if #v.cur_files == 1 then
+            cur_file:detach_buffers()
             FileEntry.load_null_buffer(self.left_winid)
             FileEntry.load_null_buffer(self.right_winid)
           else
@@ -251,6 +256,7 @@ function View:update_files()
   self.file_panel:redraw()
   self.file_idx = utils.clamp(self.file_idx, 1, self.files:size())
   self:set_file(self:cur_file())
+  a.nvim_set_current_win(last_winid)
 
   self.update_needed = false
 end
