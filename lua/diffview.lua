@@ -7,6 +7,7 @@ local M = {}
 
 local flag_value_completion = arg_parser.FlagValueMap:new()
 flag_value_completion:put({"u", "untracked-files"}, {"true", "normal", "all", "false", "no"})
+flag_value_completion:put({"cached", "staged"}, {"true", "false"})
 
 function M.setup(user_config)
   config.setup(user_config or {})
@@ -43,7 +44,7 @@ function M.completion(arg_lead, cmd_line, cur_pos)
 
   if argidx >= divideridx then
     return vim.fn.getcompletion(arg_lead, "file", 0)
-  elseif argidx == 2 then
+  elseif argidx == 2 and arg_lead:sub(1, 1) ~= "-" then
     local commits = vim.fn.systemlist("git rev-list --max-count=30 --abbrev-commit HEAD")
     if arg_lead:match(".*%.%..*") then
       arg_lead = arg_lead:gsub("(.*%.%.)(.*)", "%1")

@@ -38,11 +38,16 @@ function M.parse_revs(args)
 
   local e_git_root = vim.fn.shellescape(git_root)
   local base_cmd = "git -C " .. e_git_root .. " "
+  local cached = argo:get_flag("cached", "staged") == "true"
 
   if not rev_arg then
-    -- Diff INDEX and LOCAL
-    left = Rev:new(RevType.INDEX)
-    right = Rev:new(RevType.LOCAL)
+    if cached then
+      left = git.head_rev(git_root)
+      right = Rev:new(RevType.INDEX)
+    else
+      left = Rev:new(RevType.INDEX)
+      right = Rev:new(RevType.LOCAL)
+    end
   else
     local rev_strings = vim.fn.systemlist(base_cmd .. "rev-parse --revs-only " .. vim.fn.shellescape(rev_arg))
     if utils.shell_error() then
@@ -55,16 +60,18 @@ function M.parse_revs(args)
     end
 
     if #rev_strings > 1 then
-      -- Diff COMMIT to COMMIT
       local left_hash = rev_strings[2]:gsub("^%^", "")
       local right_hash = rev_strings[1]:gsub("^%^", "")
       left = Rev:new(RevType.COMMIT, left_hash)
       right = Rev:new(RevType.COMMIT, right_hash)
     else
-      -- Diff LOCAL and COMMIT
       local hash = rev_strings[1]:gsub("^%^", "")
       left = Rev:new(RevType.COMMIT, hash)
-      right = Rev:new(RevType.LOCAL)
+      if cached then
+        right = Rev:new(RevType.INDEX)
+      else
+        right = Rev:new(RevType.LOCAL)
+      end
     end
   end
 

@@ -16,7 +16,8 @@ for any git rev.
 
 USAGE                                                   *diffview-nvim-usage*
 
-Quick-start: `:DiffviewOpen` to open a Diffview that compares against `HEAD`.
+Quick-start: `:DiffviewOpen` to open a Diffview that compares against the
+index.
 
 You can have multiple Diffviews open, tracking different git revs. Each Diffview
 opens in its own tabpage. To close and dispose of a Diffview, call either
@@ -77,10 +78,11 @@ COMMANDS                                            *diffview-nvim-commands*
 
                                                         *:DiffviewOpen*
 :DiffviewOpen [git-rev] [args] [ -- {paths...}]
-                        Opens a new Diffview that compares against [git-rev]. If
-                        no [git-rev] is given, defaults to `HEAD`. Additional
-                        {paths...} can be provided to narrow down what files are
-                        shown. Examples:
+                        Opens a new Diffview that compares against [git-rev].
+                        If no [git-rev] is given, defaults to comparing
+                        against the index. Additional {paths...} can be
+                        provided to narrow down what files are shown.
+                        Examples:
 >
         :DiffviewOpen
         :DiffviewOpen HEAD~2
@@ -97,6 +99,9 @@ COMMANDS                                            *diffview-nvim-commands*
                         {value} can be one of:
                           - `true`, `normal`, `all` Show untracked.
                           - `false`, `no` Don't show untracked.
+        --cached, --staged
+                        Diff staged changes against [git-rev]. If not
+                        [git-rev] is given, defaults to `HEAD`.
 
                                                         *:DiffviewClose*
 :DiffviewClose          Close the active Diffview.
