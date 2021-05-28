@@ -6,6 +6,7 @@ local Diff = require'diffview.diff'.Diff
 local EditToken = require'diffview.diff'.EditToken
 local FilePanel = require'diffview.file-panel'.FilePanel
 local a = vim.api
+
 local M = {}
 
 local win_reset_opts = {
@@ -65,6 +66,7 @@ function View:new(opt)
     this.path_args,
     git.rev_to_pretty_string(this.left, this.right)
   )
+  FileEntry.update_index_stat(this.git_root)
   setmetatable(this, self)
   return this
 end
@@ -193,6 +195,7 @@ function View:update_files()
     end
   end
 
+  local index_stat = vim.loop.fs_stat(utils.path_join({self.git_root, ".git", "index"}))
   local last_winid = a.nvim_get_current_win()
   local new_files = self:get_updated_files()
   local files = {
@@ -214,7 +217,7 @@ function View:update_files()
         -- Update status and stats
         v.cur_files[ai].status = v.new_files[bi].status
         v.cur_files[ai].stats = v.new_files[bi].stats
-        v.cur_files[ai]:dispose_index_buffers()
+        v.cur_files[ai]:validate_index_buffers(self.git_root, index_stat)
         ai = ai + 1
         bi = bi + 1
       elseif opr == EditToken.DELETE then
@@ -251,12 +254,15 @@ function View:update_files()
       end
     end
   end
-
+  FileEntry.update_index_stat(self.git_root, index_stat)
   self.file_panel:render()
   self.file_panel:redraw()
   self.file_idx = utils.clamp(self.file_idx, 1, self.files:size())
   self:set_file(self:cur_file())
-  a.nvim_set_current_win(last_winid)
+
+  if a.nvim_win_is_valid(last_winid) then
+    a.nvim_set_current_win(last_winid)
+  end
 
   self.update_needed = false
 end

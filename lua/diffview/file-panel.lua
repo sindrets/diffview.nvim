@@ -191,13 +191,9 @@ function FilePanel:get_file_at_cursor()
   local line = cursor[1]
 
   if line > self.components.working.files.comp.lend then
-    return self.files.staged[utils.clamp(
-      line - self.components.staged.files.comp.lstart, 1, #self.files.staged
-    )]
+    return self.files.staged[line - self.components.staged.files.comp.lstart]
   else
-    return self.files.working[utils.clamp(
-      line - self.components.working.files.comp.lstart, 1, #self.files.working
-    )]
+    return self.files.working[line - self.components.working.files.comp.lstart]
   end
 end
 

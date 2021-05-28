@@ -4,6 +4,8 @@ local RevType = require'diffview.rev'.RevType
 local a = vim.api
 local M = {}
 
+local fstat_cache = {}
+
 ---@class GitStats
 ---@field additions integer
 ---@field deletions integer
@@ -179,6 +181,20 @@ function FileEntry:dispose_index_buffers()
   end
 end
 
+function FileEntry:validate_index_buffers(git_root, stat)
+  stat = stat or vim.loop.fs_stat(utils.path_join({git_root, ".git", "index"}))
+  local cached_stat
+  if fstat_cache[git_root] then
+    cached_stat = fstat_cache[git_root].index
+  end
+
+  if stat then
+    if not cached_stat or cached_stat.mtime < stat.mtime.sec then
+      self:dispose_index_buffers()
+    end
+  end
+end
+
 ---Compare against another FileEntry.
 ---@param other FileEntry
 ---@return boolean
@@ -307,6 +323,17 @@ function FileEntry._detach_buffer(bufid)
   local conf = config.get_config()
   for lhs, _ in pairs(conf.key_bindings.view) do
     pcall(a.nvim_buf_del_keymap, bufid, "n", lhs)
+  end
+end
+
+---@static
+function FileEntry.update_index_stat(git_root, stat)
+  stat = stat or vim.loop.fs_stat(utils.path_join({git_root, ".git", "index"}))
+  if stat then
+    if not fstat_cache[git_root] then fstat_cache[git_root] = {} end
+    fstat_cache[git_root].index = {
+      mtime = stat.mtime.sec
+    }
   end
 end
 
