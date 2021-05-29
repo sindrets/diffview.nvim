@@ -1,3 +1,4 @@
+local oop = require'diffview.oop'
 local utils = require'diffview.utils'
 local git = require'diffview.git'
 local FileEntry = require'diffview.file-entry'.FileEntry
@@ -20,7 +21,7 @@ local win_reset_opts = {
 ---@class ELayoutMode
 ---@field HORIZONTAL LayoutMode
 ---@field VERTICAL LayoutMode
-local LayoutMode = utils.enum {
+local LayoutMode = oop.enum {
   "HORIZONTAL",
   "VERTICAL"
 }
@@ -43,7 +44,7 @@ local LayoutMode = utils.enum {
 ---@field file_idx integer
 ---@field nulled boolean
 ---@field ready boolean
-local View = utils.class()
+local View = oop.class()
 
 ---View constructor
 ---@return View
@@ -123,9 +124,12 @@ function View:next_file()
     if cur then cur:detach_buffers() end
     self.file_idx = (self.file_idx) % self.files:size() + 1
     vim.cmd("diffoff!")
-    self.files[self.file_idx]:load_buffers(self.git_root, self.left_winid, self.right_winid)
+    cur = self.files[self.file_idx]
+    cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
     self.file_panel:highlight_file(self:cur_file())
     self.nulled = false
+
+    return cur
   end
 end
 
@@ -138,9 +142,12 @@ function View:prev_file()
     if cur then cur:detach_buffers() end
     self.file_idx = (self.file_idx - 2) % self.files:size() + 1
     vim.cmd("diffoff!")
-    self.files[self.file_idx]:load_buffers(self.git_root, self.left_winid, self.right_winid)
+    cur = self.files[self.file_idx]
+    cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
     self.file_panel:highlight_file(self:cur_file())
     self.nulled = false
+
+    return cur
   end
 end
 
@@ -222,28 +229,29 @@ function View:update_files()
         bi = bi + 1
       elseif opr == EditToken.DELETE then
         if cur_file == v.cur_files[ai] then
-          if #v.cur_files == 1 then
+          if self.files:size() == 1 then
             cur_file:detach_buffers()
             FileEntry.load_null_buffer(self.left_winid)
             FileEntry.load_null_buffer(self.right_winid)
           else
-            self:prev_file()
+            cur_file = self:prev_file()
           end
         end
         v.cur_files[ai]:destroy()
         table.remove(v.cur_files, ai)
       elseif opr == EditToken.INSERT then
         table.insert(v.cur_files, ai, v.new_files[bi])
+        if ai <= self.file_idx then self.file_idx = self.file_idx + 1 end
         ai = ai + 1
         bi = bi + 1
       elseif opr == EditToken.REPLACE then
         if cur_file == v.cur_files[ai] then
-          if #v.cur_files == 1 then
+          if self.files:size() == 1 then
             cur_file:detach_buffers()
             FileEntry.load_null_buffer(self.left_winid)
             FileEntry.load_null_buffer(self.right_winid)
           else
-            self:prev_file()
+            cur_file = self:prev_file()
           end
         end
         v.cur_files[ai]:destroy()

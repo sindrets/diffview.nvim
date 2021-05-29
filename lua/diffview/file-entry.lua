@@ -1,3 +1,4 @@
+local oop = require'diffview.oop'
 local utils = require'diffview.utils'
 local config = require'diffview.config'
 local RevType = require'diffview.rev'.RevType
@@ -36,7 +37,7 @@ local fstat_cache = {}
 ---@field _update_windows function
 ---@field _attach_buffer function
 ---@field _detach_buffer function
-local FileEntry = utils.class()
+local FileEntry = oop.class()
 
 ---@static
 ---@type integer|nil

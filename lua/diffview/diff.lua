@@ -2,7 +2,7 @@
 -- An implementation of Myers' diff algorithm
 -- Derived from: https://github.com/Swatinem/diff
 --]]
-local utils = require'diffview.utils'
+local oop = require'diffview.oop'
 local M = {}
 
 ---@class EditToken
@@ -10,7 +10,7 @@ local M = {}
 ---@field DELETE integer
 ---@field INSERT integer
 ---@field REPLACE integer
-local EditToken = utils.enum {
+local EditToken = oop.enum {
   "NOOP",
   "DELETE",
   "INSERT",
@@ -25,7 +25,7 @@ local EditToken = utils.enum {
 ---@field up table<integer, integer>
 ---@field down table<integer, integer>
 ---@field eql_fn function
-local Diff = utils.class()
+local Diff = oop.class()
 
 ---Diff constructor.
 ---@param a any[]

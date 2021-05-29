@@ -1,4 +1,5 @@
 local config = require'diffview.config'
+local oop = require'diffview.oop'
 local utils = require'diffview.utils'
 local renderer = require'diffview.renderer'
 local a = vim.api
@@ -16,7 +17,7 @@ local name_counter = 1
 ---@field winid integer
 ---@field render_data RenderData
 ---@field components any
-local FilePanel = utils.class()
+local FilePanel = oop.class()
 
 FilePanel.winopts = {
   relativenumber = false,
@@ -184,6 +185,8 @@ function FilePanel:init_buffer()
   return bn
 end
 
+---Get the file entry under the cursor.
+---@return FileEntry|nil
 function FilePanel:get_file_at_cursor()
   if not (self:is_open() and self:buf_loaded()) then return end
 
@@ -221,7 +224,7 @@ function FilePanel:highlight_prev_file()
   local line = cursor[1]
   local min, max
 
-  if line - 1 > self.components.staged.files.comp.lstart then
+  if #self.files.working == 0 or line - 1 > self.components.staged.files.comp.lstart then
     min = self.components.staged.files.comp.lstart + 1
     max = self.components.staged.files.comp.lend
   else
@@ -240,7 +243,7 @@ function FilePanel:highlight_next_file()
   local line = cursor[1]
   local min, max
 
-  if line + 1 > self.components.working.files.comp.lend then
+  if #self.files.working == 0 or line + 1 > self.components.working.files.comp.lend then
     min = self.components.staged.files.comp.lstart + 1
     max = self.components.staged.files.comp.lend
   else

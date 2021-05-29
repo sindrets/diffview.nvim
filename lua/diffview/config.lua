@@ -26,6 +26,7 @@ M.defaults = {
       ["<cr>"]          = M.diffview_callback("select_entry"),
       ["o"]             = M.diffview_callback("select_entry"),
       ["<2-LeftMouse>"] = M.diffview_callback("select_entry"),
+      ["-"]             = M.diffview_callback("stage_entry"),
       ["R"]             = M.diffview_callback("refresh_files"),
       ["<tab>"]         = M.diffview_callback("select_next_entry"),
       ["<s-tab>"]       = M.diffview_callback("select_prev_entry"),

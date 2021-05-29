@@ -1,4 +1,4 @@
-local utils = require'diffview.utils'
+local oop = require'diffview.oop'
 
 local M = {}
 
@@ -9,7 +9,7 @@ local long_flag_pat = "^%-%-(%a[%a%d-]*)=?(.*)"
 ---@field flags table<string, string>
 ---@field args string[]
 ---@field post_args string[]
-local ArgObject = utils.class()
+local ArgObject = oop.class()
 
 ---ArgObject constructor.
 ---@param flags table<string, string>
@@ -36,7 +36,7 @@ end
 
 ---@class FlagValueMap
 ---@field map table<string, string[]>
-local FlagValueMap = utils.class()
+local FlagValueMap = oop.class()
 
 ---FlagValueMap constructor
 ---@return FlagValueMap

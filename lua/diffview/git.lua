@@ -1,13 +1,14 @@
+local oop = require'diffview.oop'
+local utils = require'diffview.utils'
 local Rev = require'diffview.rev'.Rev
 local RevType = require'diffview.rev'.RevType
-local utils = require'diffview.utils'
 local FileEntry = require'diffview.file-entry'.FileEntry
 local M = {}
 
 ---@class FileDict
 ---@field working FileEntry[]
 ---@field staged FileEntry[]
-local FileDict = utils.class()
+local FileDict = oop.class()
 
 ---FileDict constructor.
 ---@return FileDict

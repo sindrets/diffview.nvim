@@ -1,3 +1,4 @@
+local oop = require'diffview.oop'
 local utils = require'diffview.utils'
 local config = require'diffview.config'
 local a = vim.api
@@ -17,7 +18,7 @@ local web_devicons
 ---@field lstart integer
 ---@field lend integer
 ---@field height integer
-local RenderComponent = utils.class()
+local RenderComponent = oop.class()
 
 ---RenderComponent constructor.
 ---@return RenderComponent
@@ -109,7 +110,7 @@ end
 ---@field hl HlData[]
 ---@field components RenderComponent[]
 ---@field namespace integer
-local RenderData = utils.class()
+local RenderData = oop.class()
 
 ---RenderData constructor.
 ---@return RenderData

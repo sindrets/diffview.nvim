@@ -59,6 +59,7 @@ Example configuration with default settings:
           ["<cr>"]          = cb("select_entry"),       -- Open the diff for the selected entry.
           ["o"]             = cb("select_entry"),
           ["<2-LeftMouse>"] = cb("select_entry"),
+          ["-"]             = cb("stage_entry"),        -- Stage/unstage the selected entry
           ["R"]             = cb("refresh_files"),      -- Update stats and entries in the file list.
           ["<tab>"]         = cb("select_next_entry"),
           ["<s-tab>"]       = cb("select_prev_entry"),
@@ -148,6 +149,8 @@ k                       Bring the cursor to the previous file entry
 o                       Open the diff for the selected file entry.
 <CR>
 <2-LeftMouse>
+
+-                       Stage/unstage the selected file entry.
 
 R                       Update the stats and entries in the file list.
 
