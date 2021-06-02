@@ -1,6 +1,8 @@
 local oop = require'diffview.oop'
 local utils = require'diffview.utils'
 local git = require'diffview.git'
+local Event = require'diffview.events'.Event
+local EventEmitter = require'diffview.events'.EventEmitter
 local FileEntry = require'diffview.file-entry'.FileEntry
 local RevType = require'diffview.rev'.RevType
 local Diff = require'diffview.diff'.Diff
@@ -36,6 +38,7 @@ local LayoutMode = oop.enum {
 ---@field left Rev
 ---@field right Rev
 ---@field options ViewOptions
+---@field emitter EventEmitter
 ---@field layout_mode LayoutMode
 ---@field file_panel FilePanel
 ---@field left_winid integer
@@ -55,6 +58,7 @@ function View:new(opt)
     left = opt.left,
     right = opt.right,
     options = opt.options,
+    emitter = EventEmitter:new(),
     layout_mode = View.get_layout_mode(),
     files = git.diff_file_list(opt.git_root, opt.left, opt.right, opt.path_args, opt.options),
     file_idx = 1,
@@ -195,10 +199,13 @@ function View:update_files()
   self:ensure_layout()
 
   -- If left is tracking HEAD and right is LOCAL: Update HEAD rev.
+  local new_head
   if self.left.head and self.right.type == RevType.LOCAL then
-    local new_head = git.head_rev(self.git_root)
+    new_head = git.head_rev(self.git_root)
     if new_head and self.left.commit ~= new_head.commit then
       self.left = new_head
+    else
+      new_head = nil
     end
   end
 
@@ -225,17 +232,15 @@ function View:update_files()
         v.cur_files[ai].status = v.new_files[bi].status
         v.cur_files[ai].stats = v.new_files[bi].stats
         v.cur_files[ai]:validate_index_buffers(self.git_root, index_stat)
+        if new_head and v.cur_files[ai].left.head then
+          v.cur_files[ai].left = new_head
+          v.cur_files[ai]:dispose_buffer("left")
+        end
         ai = ai + 1
         bi = bi + 1
       elseif opr == EditToken.DELETE then
         if cur_file == v.cur_files[ai] then
-          if self.files:size() == 1 then
-            cur_file:detach_buffers()
-            FileEntry.load_null_buffer(self.left_winid)
-            FileEntry.load_null_buffer(self.right_winid)
-          else
-            cur_file = self:prev_file()
-          end
+          cur_file = self:prev_file()
         end
         v.cur_files[ai]:destroy()
         table.remove(v.cur_files, ai)
@@ -246,13 +251,7 @@ function View:update_files()
         bi = bi + 1
       elseif opr == EditToken.REPLACE then
         if cur_file == v.cur_files[ai] then
-          if self.files:size() == 1 then
-            cur_file:detach_buffers()
-            FileEntry.load_null_buffer(self.left_winid)
-            FileEntry.load_null_buffer(self.right_winid)
-          else
-            cur_file = self:prev_file()
-          end
+          cur_file = self:prev_file()
         end
         v.cur_files[ai]:destroy()
         table.remove(v.cur_files, ai)
@@ -262,6 +261,7 @@ function View:update_files()
       end
     end
   end
+
   FileEntry.update_index_stat(self.git_root, index_stat)
   self.file_panel:render()
   self.file_panel:redraw()
@@ -399,6 +399,10 @@ function View:fix_foreign_windows()
       end
     end
   end
+end
+
+function View:on_files_staged(callback)
+  self.emitter:on(Event.FILES_STAGED, callback)
 end
 
 function View.get_layout_mode()

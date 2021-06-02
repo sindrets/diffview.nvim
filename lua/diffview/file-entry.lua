@@ -77,9 +77,7 @@ end
 function FileEntry:destroy()
   self:detach_buffers()
   for _, bn in ipairs(self.created_bufs) do
-    if bn ~= FileEntry._null_buffer then
-      pcall(a.nvim_buf_delete, bn, {})
-    end
+    FileEntry.safe_delete_buf(bn)
   end
 end
 
@@ -163,12 +161,13 @@ function FileEntry:detach_buffers()
   if self.right_bufid then FileEntry._detach_buffer(self.right_bufid) end
 end
 
+---@param split "left"|"right"
 function FileEntry:dispose_buffer(split)
   if vim.tbl_contains({ "left", "right" }, split) then
     local bufid = self[split .. "_bufid"]
     if bufid and a.nvim_buf_is_loaded(bufid) then
       FileEntry._detach_buffer(bufid)
-      a.nvim_buf_delete(bufid, {})
+      FileEntry.safe_delete_buf(bufid)
       self[split .. "_bufid"] = nil
     end
   end
@@ -296,6 +295,15 @@ function FileEntry.load_null_buffer(winid)
   local bn = FileEntry._get_null_buffer()
   a.nvim_win_set_buf(winid, bn)
   FileEntry._attach_buffer(bn)
+end
+
+---@static
+function FileEntry.safe_delete_buf(bufid)
+  if bufid == FileEntry._null_buffer then return end
+  for _, winid in ipairs(utils.tabpage_win_find_buf(0, bufid)) do
+    FileEntry.load_null_buffer(winid)
+  end
+  pcall(a.nvim_buf_delete, bufid, { force = true })
 end
 
 ---@static

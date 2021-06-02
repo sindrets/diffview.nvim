@@ -1,5 +1,6 @@
 local arg_parser = require'diffview.arg-parser'
 local lib = require'diffview.lib'
+local Event = require'diffview.events'.Event
 local RevType = require'diffview.rev'.RevType
 local config = require'diffview.config'
 local colors = require'diffview.colors'
@@ -129,7 +130,7 @@ M.keypress_event_cbs = {
       if file then view:set_file(file, true) end
     end
   end,
-  stage_entry = function ()
+  toggle_stage_entry = function ()
     local view = lib.get_current_diffview()
     if view and view.file_panel:is_open() then
       if not (view.left.type == RevType.INDEX and view.right.type == RevType.LOCAL) then
@@ -150,7 +151,35 @@ M.keypress_event_cbs = {
         end
 
         view:update_files()
+        view.emitter:emit(Event.FILES_STAGED, { view })
       end
+    end
+  end,
+  stage_all = function ()
+    local view = lib.get_current_diffview()
+    if view then
+      local args = ""
+      for _, file in ipairs(view.files.working) do
+        args = args .. " " .. vim.fn.shellescape(file.absolute_path)
+      end
+      if #args > 0 then
+        vim.fn.system(
+          "git -C " .. vim.fn.shellescape(view.git_root)
+          .. " add" .. args
+        )
+
+        view:update_files()
+        view.emitter:emit(Event.FILES_STAGED, { view })
+      end
+    end
+  end,
+  unstage_all = function ()
+    local view = lib.get_current_diffview()
+    if view then
+      vim.fn.system("git -C " .. vim.fn.shellescape(view.git_root) .. " reset")
+
+      view:update_files()
+      view.emitter:emit(Event.FILES_STAGED, { view })
     end
   end,
   focus_files = function ()

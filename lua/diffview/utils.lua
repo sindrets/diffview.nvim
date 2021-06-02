@@ -284,6 +284,40 @@ function M.wipe_named_buffer(name)
   end
 end
 
+---Get a list of all windows that contain the given buffer.
+---@param bufid integer
+---@return integer[]
+function M.win_find_buf(bufid)
+  local result = {}
+  local wins = api.nvim_list_wins()
+
+  for _, id in ipairs(wins) do
+    if api.nvim_win_get_buf(id) == bufid then
+      table.insert(result, id)
+    end
+  end
+
+  return result
+end
+
+---Get a list of all windows in the given tabpage that contains the given
+---buffer.
+---@param tabpage integer
+---@param bufid integer
+---@return integer[]
+function M.tabpage_win_find_buf(tabpage, bufid)
+  local result = {}
+  local wins = api.nvim_tabpage_list_wins(tabpage)
+
+  for _, id in ipairs(wins) do
+    if api.nvim_win_get_buf(id) == bufid then
+      table.insert(result, id)
+    end
+  end
+
+  return result
+end
+
 local function merge(t, first, mid, last, comparator)
   local n1 = mid - first + 1
   local n2 = last - mid

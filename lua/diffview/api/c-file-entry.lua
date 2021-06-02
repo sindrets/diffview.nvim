@@ -1,3 +1,4 @@
+local oop = require'diffview.oop'
 local utils = require'diffview.utils'
 local FileEntry = require'diffview.file-entry'.FileEntry
 local RevType = require'diffview.rev'.RevType
@@ -36,7 +37,7 @@ local M = {}
 ---@field _update_windows function
 ---@field _attach_buffer function
 ---@field _detach_buffer function
-local CFileEntry = utils.class(FileEntry)
+local CFileEntry = oop.class(FileEntry)
 
 ---CFileEntry constructor.
 ---@param opt any

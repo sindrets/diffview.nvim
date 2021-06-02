@@ -23,7 +23,13 @@ for any git rev.
 Install the plugin with your package manager of choice.
 
 ```vim
+" Plug 
 Plug 'sindrets/diffview.nvim'
+```
+
+```lua
+-- Packer
+use { 'sindrets/diffview.nvim' }
 ```
 
 ## Configuration
@@ -48,17 +54,21 @@ require'diffview'.setup {
       ["<leader>b"] = cb("toggle_files"),       -- Toggle the files panel.
     },
     file_panel = {
-      ["j"]         = cb("next_entry"),         -- Bring the cursor to the next file entry
-      ["<down>"]    = cb("next_entry"),
-      ["k"]         = cb("prev_entry"),         -- Bring the cursor to the previous file entry.
-      ["<up>"]      = cb("prev_entry"),
-      ["<cr>"]      = cb("select_entry"),       -- Open the diff for the selected entry.
-      ["o"]         = cb("select_entry"),
-      ["R"]         = cb("refresh_files"),      -- Update stats and entries in the file list.
-      ["<tab>"]     = cb("select_next_entry"),
-      ["<s-tab>"]   = cb("select_prev_entry"),
-      ["<leader>e"] = cb("focus_files"),
-      ["<leader>b"] = cb("toggle_files"),
+      ["j"]             = cb("next_entry"),         -- Bring the cursor to the next file entry
+      ["<down>"]        = cb("next_entry"),
+      ["k"]             = cb("prev_entry"),         -- Bring the cursor to the previous file entry.
+      ["<up>"]          = cb("prev_entry"),
+      ["<cr>"]          = cb("select_entry"),       -- Open the diff for the selected entry.
+      ["o"]             = cb("select_entry"),
+      ["<2-LeftMouse>"] = cb("select_entry"),
+      ["-"]             = cb("toggle_stage_entry"), -- Stage / unstage the selected entry.
+      ["S"]             = cb("stage_all"),          -- Stage all entries.
+      ["U"]             = cb("unstage_all"),        -- Unstage all entries.
+      ["R"]             = cb("refresh_files"),      -- Update stats and entries in the file list.
+      ["<tab>"]         = cb("select_next_entry"),
+      ["<s-tab>"]       = cb("select_prev_entry"),
+      ["<leader>e"]     = cb("focus_files"),
+      ["<leader>b"]     = cb("toggle_files"),
     }
   }
 }
@@ -72,8 +82,8 @@ the alignment add either `horizontal` or `vertical` to your `'diffopt'`.
 ### `:DiffviewOpen [git rev] [args] [ -- {paths...}]`
 
 Calling `:DiffviewOpen` with no args opens a new Diffview that compares against
-`HEAD`. You can also provide any valid git rev to view only changes for that
-rev. Examples:
+the current index. You can also provide any valid git rev to view only changes
+for that rev. Examples:
 
 - `:DiffviewOpen`
 - `:DiffviewOpen HEAD~2`
