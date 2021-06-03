@@ -1,5 +1,7 @@
 local arg_parser = require'diffview.arg-parser'
 local lib = require'diffview.lib'
+local Event = require'diffview.events'.Event
+local RevType = require'diffview.rev'.RevType
 local config = require'diffview.config'
 local colors = require'diffview.colors'
 local utils = require "diffview.utils"
@@ -7,6 +9,7 @@ local M = {}
 
 local flag_value_completion = arg_parser.FlagValueMap:new()
 flag_value_completion:put({"u", "untracked-files"}, {"true", "normal", "all", "false", "no"})
+flag_value_completion:put({"cached", "staged"}, {"true", "false"})
 
 function M.setup(user_config)
   config.setup(user_config or {})
@@ -43,7 +46,7 @@ function M.completion(arg_lead, cmd_line, cur_pos)
 
   if argidx >= divideridx then
     return vim.fn.getcompletion(arg_lead, "file", 0)
-  elseif argidx == 2 then
+  elseif argidx == 2 and arg_lead:sub(1, 1) ~= "-" then
     local commits = vim.fn.systemlist("git rev-list --max-count=30 --abbrev-commit HEAD")
     if arg_lead:match(".*%.%..*") then
       arg_lead = arg_lead:gsub("(.*%.%.)(.*)", "%1")
@@ -125,6 +128,58 @@ M.keypress_event_cbs = {
     if view and view.file_panel:is_open() then
       local file = view.file_panel:get_file_at_cursor()
       if file then view:set_file(file, true) end
+    end
+  end,
+  toggle_stage_entry = function ()
+    local view = lib.get_current_diffview()
+    if view and view.file_panel:is_open() then
+      if not (view.left.type == RevType.INDEX and view.right.type == RevType.LOCAL) then
+        return
+      end
+      local file = view.file_panel:get_file_at_cursor()
+      if file then
+        if file.kind == "working" then
+          vim.fn.system(
+            "git -C " .. vim.fn.shellescape(view.git_root)
+            .. " add " .. vim.fn.shellescape(file.absolute_path)
+          )
+        elseif file.kind == "staged" then
+          vim.fn.system(
+            "git -C " .. vim.fn.shellescape(view.git_root)
+            .. " reset " .. vim.fn.shellescape(file.absolute_path)
+          )
+        end
+
+        view:update_files()
+        view.emitter:emit(Event.FILES_STAGED, { view })
+      end
+    end
+  end,
+  stage_all = function ()
+    local view = lib.get_current_diffview()
+    if view then
+      local args = ""
+      for _, file in ipairs(view.files.working) do
+        args = args .. " " .. vim.fn.shellescape(file.absolute_path)
+      end
+      if #args > 0 then
+        vim.fn.system(
+          "git -C " .. vim.fn.shellescape(view.git_root)
+          .. " add" .. args
+        )
+
+        view:update_files()
+        view.emitter:emit(Event.FILES_STAGED, { view })
+      end
+    end
+  end,
+  unstage_all = function ()
+    local view = lib.get_current_diffview()
+    if view then
+      vim.fn.system("git -C " .. vim.fn.shellescape(view.git_root) .. " reset")
+
+      view:update_files()
+      view.emitter:emit(Event.FILES_STAGED, { view })
     end
   end,
   focus_files = function ()

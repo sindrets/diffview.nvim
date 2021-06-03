@@ -1,11 +1,15 @@
+local oop = require'diffview.oop'
 local utils = require'diffview.utils'
 local git = require'diffview.git'
+local Event = require'diffview.events'.Event
+local EventEmitter = require'diffview.events'.EventEmitter
 local FileEntry = require'diffview.file-entry'.FileEntry
 local RevType = require'diffview.rev'.RevType
 local Diff = require'diffview.diff'.Diff
 local EditToken = require'diffview.diff'.EditToken
 local FilePanel = require'diffview.file-panel'.FilePanel
 local a = vim.api
+
 local M = {}
 
 local win_reset_opts = {
@@ -19,7 +23,7 @@ local win_reset_opts = {
 ---@class ELayoutMode
 ---@field HORIZONTAL LayoutMode
 ---@field VERTICAL LayoutMode
-local LayoutMode = utils.enum {
+local LayoutMode = oop.enum {
   "HORIZONTAL",
   "VERTICAL"
 }
@@ -34,15 +38,16 @@ local LayoutMode = utils.enum {
 ---@field left Rev
 ---@field right Rev
 ---@field options ViewOptions
+---@field emitter EventEmitter
 ---@field layout_mode LayoutMode
 ---@field file_panel FilePanel
 ---@field left_winid integer
 ---@field right_winid integer
----@field files FileEntry[]
+---@field files FileDict
 ---@field file_idx integer
 ---@field nulled boolean
 ---@field ready boolean
-local View = utils.class()
+local View = oop.class()
 
 ---View constructor
 ---@return View
@@ -53,6 +58,7 @@ function View:new(opt)
     left = opt.left,
     right = opt.right,
     options = opt.options,
+    emitter = EventEmitter:new(),
     layout_mode = View.get_layout_mode(),
     files = git.diff_file_list(opt.git_root, opt.left, opt.right, opt.path_args, opt.options),
     file_idx = 1,
@@ -65,6 +71,7 @@ function View:new(opt)
     this.path_args,
     git.rev_to_pretty_string(this.left, this.right)
   )
+  FileEntry.update_index_stat(this.git_root)
   setmetatable(this, self)
   return this
 end
@@ -83,7 +90,7 @@ function View:open()
 end
 
 function View:close()
-  for _, file in ipairs(self.files) do
+  for _, file in self.files:ipairs() do
     file:destroy()
   end
 
@@ -103,9 +110,11 @@ function View:init_layout()
   self.file_panel:open()
 end
 
+---Get the current file.
+---@return FileEntry
 function View:cur_file()
-  if #self.files > 0 then
-    return self.files[utils.clamp(self.file_idx, 1, #self.files)]
+  if self.files:size() > 0 then
+    return self.files[utils.clamp(self.file_idx, 1, self.files:size())]
   end
   return nil
 end
@@ -114,14 +123,17 @@ function View:next_file()
   self:ensure_layout()
   if self:file_safeguard() then return end
 
-  if #self.files > 1 or self.nulled then
+  if self.files:size() > 1 or self.nulled then
     local cur = self:cur_file()
     if cur then cur:detach_buffers() end
-    self.file_idx = (self.file_idx) % #self.files + 1
+    self.file_idx = (self.file_idx) % self.files:size() + 1
     vim.cmd("diffoff!")
-    self.files[self.file_idx]:load_buffers(self.git_root, self.left_winid, self.right_winid)
+    cur = self.files[self.file_idx]
+    cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
     self.file_panel:highlight_file(self:cur_file())
     self.nulled = false
+
+    return cur
   end
 end
 
@@ -129,14 +141,17 @@ function View:prev_file()
   self:ensure_layout()
   if self:file_safeguard() then return end
 
-  if #self.files > 1 or self.nulled then
+  if self.files:size() > 1 or self.nulled then
     local cur = self:cur_file()
     if cur then cur:detach_buffers() end
-    self.file_idx = (self.file_idx - 2) % #self.files + 1
+    self.file_idx = (self.file_idx - 2) % self.files:size() + 1
     vim.cmd("diffoff!")
-    self.files[self.file_idx]:load_buffers(self.git_root, self.left_winid, self.right_winid)
+    cur = self.files[self.file_idx]
+    cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
     self.file_panel:highlight_file(self:cur_file())
     self.nulled = false
+
+    return cur
   end
 end
 
@@ -144,7 +159,7 @@ function View:set_file(file, focus)
   self:ensure_layout()
   if self:file_safeguard() or not file then return end
 
-  for i, f in ipairs(self.files) do
+  for i, f in self.files:ipairs() do
     if f == file then
       local cur = self:cur_file()
       if cur then cur:detach_buffers() end
@@ -162,7 +177,8 @@ function View:set_file(file, focus)
 end
 
 function View:set_file_by_path(path, focus)
-  for _, file in ipairs(self.files) do
+  ---@type FileEntry
+  for _, file in self.files:ipairs() do
     if file.path == path then
       self:set_file(file, focus)
       return
@@ -171,7 +187,7 @@ function View:set_file_by_path(path, focus)
 end
 
 ---Get an updated list of files.
----@return FileEntry[]
+---@return FileDict
 function View:get_updated_files()
   return git.diff_file_list(
     self.git_root, self.left, self.right, self.path_args, self.options
@@ -180,59 +196,93 @@ end
 
 ---Update the file list, including stats and status for all files.
 function View:update_files()
+  self:ensure_layout()
+
   -- If left is tracking HEAD and right is LOCAL: Update HEAD rev.
+  local new_head
   if self.left.head and self.right.type == RevType.LOCAL then
-    local new_head = git.head_rev(self.git_root)
+    new_head = git.head_rev(self.git_root)
     if new_head and self.left.commit ~= new_head.commit then
       self.left = new_head
+    else
+      new_head = nil
     end
   end
 
+  local index_stat = vim.loop.fs_stat(utils.path_join({self.git_root, ".git", "index"}))
+  local last_winid = a.nvim_get_current_win()
   local new_files = self:get_updated_files()
-  local diff = Diff:new(self.files, new_files, function (aa, bb)
-    return aa.path == bb.path
-  end)
-  local script = diff:create_edit_script()
-  local cur_file = self:cur_file()
+  local files = {
+    { cur_files = self.files.working, new_files = new_files.working },
+    { cur_files = self.files.staged, new_files = new_files.staged }
+  }
 
-  local ai = 1
-  local bi = 1
-  for _, opr in ipairs(script) do
-    if opr == EditToken.NOOP then
-      -- Update status and stats
-      self.files[ai].status = new_files[bi].status
-      self.files[ai].stats = new_files[bi].stats
-      ai = ai + 1
-      bi = bi + 1
-    elseif opr == EditToken.DELETE then
-      if cur_file == self.files[ai] then self:prev_file() end
-      self.files[ai]:destroy()
-      table.remove(self.files, ai)
-    elseif opr == EditToken.INSERT then
-      table.insert(self.files, ai, new_files[bi])
-      ai = ai + 1
-      bi = bi + 1
-    elseif opr == EditToken.REPLACE then
-      if cur_file == self.files[ai] then self:prev_file() end
-      self.files[ai]:destroy()
-      table.remove(self.files, ai)
-      table.insert(self.files, ai, new_files[bi])
-      ai = ai + 1
-      bi = bi + 1
+  for _, v in ipairs(files) do
+    local diff = Diff:new(v.cur_files, v.new_files, function (aa, bb)
+      return aa.path == bb.path
+    end)
+    local script = diff:create_edit_script()
+    local cur_file = self:cur_file()
+
+    local ai = 1
+    local bi = 1
+    for _, opr in ipairs(script) do
+      if opr == EditToken.NOOP then
+        -- Update status and stats
+        v.cur_files[ai].status = v.new_files[bi].status
+        v.cur_files[ai].stats = v.new_files[bi].stats
+        v.cur_files[ai]:validate_index_buffers(self.git_root, index_stat)
+        if new_head and v.cur_files[ai].left.head then
+          v.cur_files[ai].left = new_head
+          v.cur_files[ai]:dispose_buffer("left")
+        end
+        ai = ai + 1
+        bi = bi + 1
+      elseif opr == EditToken.DELETE then
+        if cur_file == v.cur_files[ai] then
+          cur_file = self:prev_file()
+        end
+        v.cur_files[ai]:destroy()
+        table.remove(v.cur_files, ai)
+      elseif opr == EditToken.INSERT then
+        table.insert(v.cur_files, ai, v.new_files[bi])
+        if ai <= self.file_idx then self.file_idx = self.file_idx + 1 end
+        ai = ai + 1
+        bi = bi + 1
+      elseif opr == EditToken.REPLACE then
+        if cur_file == v.cur_files[ai] then
+          cur_file = self:prev_file()
+        end
+        v.cur_files[ai]:destroy()
+        table.remove(v.cur_files, ai)
+        table.insert(v.cur_files, ai, v.new_files[bi])
+        ai = ai + 1
+        bi = bi + 1
+      end
     end
   end
 
+  FileEntry.update_index_stat(self.git_root, index_stat)
   self.file_panel:render()
   self.file_panel:redraw()
-  self.file_idx = utils.clamp(self.file_idx, 1, #self.files)
+  self.file_idx = utils.clamp(self.file_idx, 1, self.files:size())
   self:set_file(self:cur_file())
+
+  if a.nvim_win_is_valid(last_winid) then
+    a.nvim_set_current_win(last_winid)
+  end
 
   self.update_needed = false
 end
 
 ---Checks the state of the view layout.
----@return table
+---@return LayoutState
 function View:validate_layout()
+  ---@class LayoutState
+  ---@field tabpage boolean
+  ---@field left_win boolean
+  ---@field right_win boolean
+  ---@field valid boolean
   local state = {
     tabpage = a.nvim_tabpage_is_valid(self.tabpage),
     left_win = a.nvim_win_is_valid(self.left_winid),
@@ -243,7 +293,7 @@ function View:validate_layout()
 end
 
 ---Recover the layout after the user has messed it up.
----@param state table
+---@param state LayoutState
 function View:recover_layout(state)
   self.ready = false
 
@@ -292,7 +342,7 @@ end
 ---Ensures there are files to load, and loads the null buffer otherwise.
 ---@return boolean
 function View:file_safeguard()
-  if #self.files == 0 then
+  if self.files:size() == 0 then
     local cur = self:cur_file()
     if cur then cur:detach_buffers() end
     FileEntry.load_null_buffer(self.left_winid)
@@ -349,6 +399,10 @@ function View:fix_foreign_windows()
       end
     end
   end
+end
+
+function View:on_files_staged(callback)
+  self.emitter:on(Event.FILES_STAGED, callback)
 end
 
 function View.get_layout_mode()

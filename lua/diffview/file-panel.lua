@@ -1,22 +1,23 @@
 local config = require'diffview.config'
+local oop = require'diffview.oop'
 local utils = require'diffview.utils'
 local renderer = require'diffview.renderer'
 local a = vim.api
 local M = {}
 
 local name_counter = 1
-local header_size = 2
 
 ---@class FilePanel
 ---@field git_root string
----@field files FileEntry[]
+---@field files FileDict
 ---@field path_args string[]
 ---@field rev_pretty_name string|nil
 ---@field width integer
 ---@field bufid integer
 ---@field winid integer
 ---@field render_data RenderData
-local FilePanel = utils.class()
+---@field components any
+local FilePanel = oop.class()
 
 FilePanel.winopts = {
   relativenumber = false,
@@ -157,51 +158,133 @@ function FilePanel:init_buffer()
 
   self.bufid = bn
   self.render_data = renderer.RenderData:new(bufname)
+
+  self.components = {
+    ---@type any
+    path = self.render_data:create_component({}),
+    ---@type any
+    working = self.render_data:create_component({
+      { name = "title" },
+      { name = "files" }
+    }),
+    ---@type any
+    staged = self.render_data:create_component({
+      { name = "title" },
+      { name = "files" }
+    }),
+    ---@type any
+    info = self.render_data:create_component({
+      { name = "title" },
+      { name = "entries" }
+    })
+  }
+
   self:render()
   self:redraw()
 
   return bn
 end
 
+---Get the file entry under the cursor.
+---@return FileEntry|nil
 function FilePanel:get_file_at_cursor()
   if not (self:is_open() and self:buf_loaded()) then return end
 
   local cursor = a.nvim_win_get_cursor(self.winid)
   local line = cursor[1]
-  return self.files[utils.clamp(line - header_size, 1, #self.files)]
+
+  if line > self.components.working.files.comp.lend then
+    return self.files.staged[line - self.components.staged.files.comp.lstart]
+  else
+    return self.files.working[line - self.components.working.files.comp.lstart]
+  end
 end
 
 function FilePanel:highlight_file(file)
   if not (self:is_open() and self:buf_loaded()) then return end
 
-  for i, f in ipairs(self.files) do
+  for i, f in self.files:ipairs() do
     if f == file then
-      pcall(a.nvim_win_set_cursor, self.winid, {i + header_size, 0})
+      local offset
+      if i > #self.files.working then
+        i = i - #self.files.working
+        offset = self.components.staged.files.comp.lstart
+      else
+        offset = self.components.working.files.comp.lstart
+      end
+      pcall(a.nvim_win_set_cursor, self.winid, {i + offset, 0})
     end
   end
 end
 
 function FilePanel:highlight_prev_file()
-  if not (self:is_open() and self:buf_loaded()) or #self.files == 0 then return end
+  if not (self:is_open() and self:buf_loaded()) or self.files:size() == 0 then return end
 
-  local cur = self:get_file_at_cursor()
-  for i, f in ipairs(self.files) do
-    if f == cur then
-      local line = utils.clamp(i + header_size - 1, header_size + 1, #self.files + header_size)
-      pcall(a.nvim_win_set_cursor, self.winid, {line, 0})
-    end
+  local cursor = a.nvim_win_get_cursor(self.winid)
+  local line = cursor[1]
+  local min, max
+
+  if #self.files.working == 0 or line - 1 > self.components.staged.files.comp.lstart then
+    min = self.components.staged.files.comp.lstart + 1
+    max = self.components.staged.files.comp.lend
+  else
+    min = self.components.working.files.comp.lstart + 1
+    max = self.components.working.files.comp.lend
   end
+
+  line = utils.clamp(line - 1, min, max)
+  pcall(a.nvim_win_set_cursor, self.winid, {line, 0})
 end
 
 function FilePanel:highlight_next_file()
-  if not (self:is_open() and self:buf_loaded()) or #self.files == 0 then return end
+  if not (self:is_open() and self:buf_loaded()) or self.files:size() == 0 then return end
 
-  local cur = self:get_file_at_cursor()
-  for i, f in ipairs(self.files) do
-    if f == cur then
-      local line = utils.clamp(i + header_size + 1, header_size, #self.files + header_size)
-      pcall(a.nvim_win_set_cursor, self.winid, {line, 0})
+  local cursor = a.nvim_win_get_cursor(self.winid)
+  local line = cursor[1]
+  local min, max
+
+  if #self.files.working == 0 or line + 1 > self.components.working.files.comp.lend then
+    min = self.components.staged.files.comp.lstart + 1
+    max = self.components.staged.files.comp.lend
+  else
+    min = self.components.working.files.comp.lstart + 1
+    max = self.components.working.files.comp.lend
+  end
+
+  line = utils.clamp(line + 1, min, max)
+  pcall(a.nvim_win_set_cursor, self.winid, {line, 0})
+end
+
+---@param comp RenderComponent
+---@param files FileEntry[]
+local function render_files(comp, files)
+  local line_idx = 0
+
+  for _, file in ipairs(files) do
+    local offset = 0
+
+    comp:add_hl(renderer.get_git_hl(file.status), line_idx, 0, 1)
+    local s = file.status .. " "
+    offset = #s
+    local icon = renderer.get_file_icon(file.basename, file.extension, comp, line_idx, offset)
+    offset = offset + #icon
+    comp:add_hl("DiffviewFilePanelFileName", line_idx, offset, offset + #file.basename)
+    s = s .. icon .. file.basename
+
+    if file.stats then
+      offset = #s + 1
+      comp:add_hl("DiffviewFilePanelInsertions", line_idx, offset, offset + string.len(file.stats.additions))
+      offset = offset + string.len(file.stats.additions) + 2
+      comp:add_hl("DiffviewFilePanelDeletions", line_idx, offset, offset + string.len(file.stats.deletions))
+      s = s .. " " .. file.stats.additions .. ", " .. file.stats.deletions
     end
+
+    offset = #s + 1
+    comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #file.parent_path)
+    s = s .. " " .. file.parent_path
+
+    comp:add_line(s)
+    line_idx = line_idx + 1
   end
 end
 
@@ -209,50 +292,38 @@ function FilePanel:render()
   if not self.render_data then return end
 
   self.render_data:clear()
+
+  ---@type RenderComponent
+  local comp = self.components.path.comp
   local line_idx = 0
-  local lines = self.render_data.lines
-  local add_hl = function (...)
-    self.render_data:add_hl(...)
-  end
-
   local s = utils.path_shorten(self.git_root, self.width - 6)
-  add_hl("DiffviewFilePanelRootPath", line_idx, 0, #s)
-  table.insert(lines, s)
-  line_idx = line_idx + 1
+  comp:add_hl("DiffviewFilePanelRootPath", line_idx, 0, #s)
+  comp:add_line(s)
 
+  comp = self.components.working.title.comp
+  line_idx = 0
   s = "Changes"
-  add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
-  local change_count = "("  .. #self.files .. ")"
-  add_hl("DiffviewFilePanelCounter", line_idx, #s + 1, #s + 1 + string.len(change_count))
+  comp:add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
+  local change_count = "("  .. #self.files.working .. ")"
+  comp:add_hl("DiffviewFilePanelCounter", line_idx, #s + 1, #s + 1 + string.len(change_count))
   s =  s .. " " .. change_count
-  table.insert(lines, s)
-  line_idx = line_idx + 1
+  comp:add_line(s)
 
-  for _, file in ipairs(self.files) do
-    local offset = 0
+  render_files(self.components.working.files.comp, self.files.working)
 
-    add_hl(renderer.get_git_hl(file.status), line_idx, 0, 1)
-    s = file.status .. " "
-    offset = #s
-    local icon = renderer.get_file_icon(file.basename, file.extension, self.render_data, line_idx, offset)
-    offset = offset + #icon
-    add_hl("DiffviewFilePanelFileName", line_idx, offset, offset + #file.basename)
-    s = s .. icon .. file.basename
-
-    if file.stats then
-      offset = #s + 1
-      add_hl("DiffviewFilePanelInsertions", line_idx, offset, offset + string.len(file.stats.additions))
-      offset = offset + string.len(file.stats.additions) + 2
-      add_hl("DiffviewFilePanelDeletions", line_idx, offset, offset + string.len(file.stats.deletions))
-      s = s .. " " .. file.stats.additions .. ", " .. file.stats.deletions
-    end
-
-    offset = #s + 1
-    add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #file.parent_path)
-    s = s .. " " .. file.parent_path
-
-    table.insert(lines, s)
+  if #self.files.staged > 0 then
+    comp = self.components.staged.title.comp
+    line_idx = 0
+    comp:add_line("")
     line_idx = line_idx + 1
+    s = "Staged changes"
+    comp:add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
+    change_count = "(" .. #self.files.staged .. ")"
+    comp:add_hl("DiffviewFilePanelCounter", line_idx, #s + 1, #s + 1 + string.len(change_count))
+    s = s .. " " .. change_count
+    comp:add_line(s)
+
+    render_files(self.components.staged.files.comp, self.files.staged)
   end
 
   if self.rev_pretty_name or (self.path_args and #self.path_args > 0) then
@@ -260,20 +331,24 @@ function FilePanel:render()
       { self.rev_pretty_name and ("commit " .. self.rev_pretty_name) or nil },
       self.path_args or {}
     )
-    table.insert(lines, "")
+
+    comp = self.components.info.title.comp
+    line_idx = 0
+    comp:add_line("")
     line_idx = line_idx + 1
 
     s = "Showing changes for:"
-    add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
-    table.insert(lines, s)
-    line_idx = line_idx + 1
+    comp:add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
+    comp:add_line(s)
 
+    comp = self.components.info.entries.comp
+    line_idx = 0
     for _, arg in ipairs(extra_info) do
       local relpath = utils.path_relative(arg, self.git_root)
       if relpath == "" then relpath = "." end
       s = utils.path_shorten(relpath, self.width - 5)
-      add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
-      table.insert(lines, s)
+      comp:add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
+      comp:add_line(s)
       line_idx = line_idx + 1
     end
   end

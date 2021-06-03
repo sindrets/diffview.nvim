@@ -1,3 +1,4 @@
+local oop = require'diffview.oop'
 local utils = require'diffview.utils'
 local FileEntry = require'diffview.file-entry'.FileEntry
 local RevType = require'diffview.rev'.RevType
@@ -19,6 +20,7 @@ local M = {}
 ---@field extension string
 ---@field status string
 ---@field stats GitStats
+---@field kind "working"|"staged"
 ---@field left_binary boolean|nil
 ---@field right_binary boolean|nil
 ---@field left Rev
@@ -35,7 +37,7 @@ local M = {}
 ---@field _update_windows function
 ---@field _attach_buffer function
 ---@field _detach_buffer function
-local CFileEntry = utils.class(FileEntry)
+local CFileEntry = oop.class(FileEntry)
 
 ---CFileEntry constructor.
 ---@param opt any
@@ -50,6 +52,7 @@ function CFileEntry:new(opt)
     extension = utils.path_extension(opt.path),
     status = opt.status,
     stats = opt.stats,
+    kind = opt.kind,
     left = opt.left,
     right = opt.right,
     left_binary = opt.left_binary,
@@ -65,14 +68,15 @@ end
 
 ---@override
 function CFileEntry:load_buffers(_, left_winid, right_winid)
+  local last_winid = a.nvim_get_current_win()
   local splits = {
     {
       winid = left_winid, bufid = self.left_bufid, rev = self.left, pos = "left",
-      lines = self.get_file_data(self.path, "left"), null = self.left_null == true
+      lines = self.get_file_data(self.kind, self.path, "left"), null = self.left_null == true
     },
     {
       winid = right_winid, bufid = self.right_bufid, rev = self.right, pos = "right",
-      lines = self.get_file_data(self.path, "right"), null = self.right_null == true
+      lines = self.get_file_data(self.kind, self.path, "right"), null = self.right_null == true
     }
   }
 
@@ -91,7 +95,7 @@ function CFileEntry:load_buffers(_, left_winid, right_winid)
           split.bufid = a.nvim_get_current_buf()
         end
 
-      elseif split.rev.type == RevType.COMMIT or split.rev.type == RevType.CUSTOM then
+      elseif vim.tbl_contains({ RevType.COMMIT, RevType.INDEX, RevType.CUSTOM }, split.rev.type) then
         local bn
         if self.oldpath then
           bn = CFileEntry._create_buffer(nil, split.rev, self.oldpath, split.lines, false)
@@ -118,6 +122,7 @@ function CFileEntry:load_buffers(_, left_winid, right_winid)
   self.right_bufid = splits[2].bufid
 
   CFileEntry._update_windows(left_winid, right_winid)
+  a.nvim_set_current_win(last_winid)
 end
 
 ---@static
@@ -132,6 +137,8 @@ function CFileEntry._create_buffer(_, rev, path, lines, null)
   local bufname = basename
   if rev.type == RevType.COMMIT then
     bufname = rev:abbrev() .. "_" .. basename
+  elseif rev.type == RevType.INDEX then
+    bufname = "[index]_" .. basename
   elseif rev.type == RevType.CUSTOM then
     bufname = "[diff]_" .. basename
   end

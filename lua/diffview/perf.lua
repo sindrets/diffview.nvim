@@ -1,4 +1,5 @@
 ---@diagnostic disable: redefined-local
+local oop = require'diffview.oop'
 local utils = require'diffview.utils'
 local luv = vim.loop
 local M = {}
@@ -9,7 +10,7 @@ local M = {}
 ---@field last integer Stop time (ns)
 ---@field final_time number Final time (ms)
 ---@field laps number[] List of lap times (ms)
-local PerfTimer = utils.class()
+local PerfTimer = oop.class()
 
 ---PerfTimer constructor.
 ---@param subject string|nil

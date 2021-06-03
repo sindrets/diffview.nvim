@@ -207,75 +207,6 @@ function M.system_list(cmd)
   return lines
 end
 
----Enum creator
----@param t string[]
----@return table<string, integer>
-function M.enum(t)
-  local enum = {}
-  for i, v in ipairs(t) do
-    enum[v] = i
-  end
-  return enum
-end
-
----@class Object -- Base class
-local Object = {}
-Object.__index = Object
-
-function Object:new()
-  return setmetatable({}, self)
-end
-
-function Object:class()
-  return Object
-end
-
-function Object:super()
-  return nil
-end
-
-function Object:instanceof(other)
-  return other == Object
-end
-
-function M.class(super_class)
-  super_class = super_class or Object
-  local new_class = {}
-  local class_mt = { __index = new_class }
-  new_class.__index = new_class
-
-  setmetatable(new_class, super_class)
-
-  function new_class:new()
-    return setmetatable({}, class_mt)
-  end
-
-  ---Get the class object.
-  ---@return table
-  function new_class:class()
-    return new_class
-  end
-
-  ---Get the super class.
-  ---@return table
-  function new_class:super()
-    return super_class
-  end
-
-  function new_class:instanceof(other)
-    local cur = new_class
-    while cur do
-      if cur == other then
-        return true
-      end
-      cur = cur:super()
-    end
-    return false
-  end
-
-  return new_class
-end
-
 ---Create a shallow copy of a portion of a list.
 ---@param t table
 ---@param first integer First index, inclusive
@@ -290,13 +221,15 @@ function M.tbl_slice(t, first, last)
   return slice
 end
 
-function M.tbl_concat(a, b)
+function M.tbl_concat(...)
   local result = {}
-  for i, v in ipairs(a) do
-    result[i] = v
-  end
-  for i, v in ipairs(b) do
-    result[#a + i] = v
+  local n = 0
+
+  for _, t in ipairs({...}) do
+    for i, v in ipairs(t) do
+      result[n + i] = v
+    end
+    n = n + #t
   end
 
   return result
@@ -349,6 +282,40 @@ function M.wipe_named_buffer(name)
       pcall(api.nvim_buf_delete, bn, {})
     end)
   end
+end
+
+---Get a list of all windows that contain the given buffer.
+---@param bufid integer
+---@return integer[]
+function M.win_find_buf(bufid)
+  local result = {}
+  local wins = api.nvim_list_wins()
+
+  for _, id in ipairs(wins) do
+    if api.nvim_win_get_buf(id) == bufid then
+      table.insert(result, id)
+    end
+  end
+
+  return result
+end
+
+---Get a list of all windows in the given tabpage that contains the given
+---buffer.
+---@param tabpage integer
+---@param bufid integer
+---@return integer[]
+function M.tabpage_win_find_buf(tabpage, bufid)
+  local result = {}
+  local wins = api.nvim_tabpage_list_wins(tabpage)
+
+  for _, id in ipairs(wins) do
+    if api.nvim_win_get_buf(id) == bufid then
+      table.insert(result, id)
+    end
+  end
+
+  return result
 end
 
 local function merge(t, first, mid, last, comparator)

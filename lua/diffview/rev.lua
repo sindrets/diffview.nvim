@@ -1,4 +1,4 @@
-local utils = require'diffview.utils'
+local oop = require'diffview.oop'
 local M = {}
 
 ---@class RevType
@@ -6,10 +6,12 @@ local M = {}
 ---@class ERevType
 ---@field LOCAL RevType
 ---@field COMMIT RevType
+---@field INDEX RevType
 ---@field CUSTOM RevType
-local RevType = utils.enum {
+local RevType = oop.enum {
   "LOCAL",
   "COMMIT",
+  "INDEX",
   "CUSTOM"
 }
 
@@ -17,7 +19,7 @@ local RevType = utils.enum {
 ---@field type integer
 ---@field commit string A commit SHA.
 ---@field head boolean If true, indicates that the rev should be updated when HEAD changes.
-local Rev = utils.class()
+local Rev = oop.class()
 
 ---Rev constructor
 ---@param type RevType
