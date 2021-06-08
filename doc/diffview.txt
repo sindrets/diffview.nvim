@@ -43,6 +43,7 @@ Example configuration with default settings:
         use_icons = true
       },
       key_bindings = {
+        disable_defaults = false,                   -- Disable the default key bindings
         -- The `view` bindings are active in the diff buffers, only when the current
         -- tabpage is a Diffview.
         view = {
@@ -153,6 +154,10 @@ o                       Open the diff for the selected file entry.
 <2-LeftMouse>
 
 -                       Stage/unstage the selected file entry.
+
+S                       Stage all entries.
+
+U                       Unstage all entries.
 
 R                       Update the stats and entries in the file list.
 
