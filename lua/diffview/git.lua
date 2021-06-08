@@ -226,6 +226,17 @@ function M.toplevel(path)
   return vim.trim(out)
 end
 
+---Get the path to the .git directory.
+---@param path string
+---@return string|nil
+function M.git_dir(path)
+  local out = vim.fn.system(
+    "git -C " .. vim.fn.shellescape(path) .. " rev-parse --path-format=absolute --git-dir"
+  )
+  if utils.shell_error()  then return nil end
+  return vim.trim(out)
+end
+
 ---Check if any of the given revs are LOCAL.
 ---@param left Rev
 ---@param right Rev

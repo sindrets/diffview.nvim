@@ -181,8 +181,8 @@ function FileEntry:dispose_index_buffers()
   end
 end
 
-function FileEntry:validate_index_buffers(git_root, stat)
-  stat = stat or vim.loop.fs_stat(utils.path_join({git_root, ".git", "index"}))
+function FileEntry:validate_index_buffers(git_root, git_dir, stat)
+  stat = stat or vim.loop.fs_stat(utils.path_join({ git_dir, "index" }))
   local cached_stat
   if fstat_cache[git_root] then
     cached_stat = fstat_cache[git_root].index
@@ -336,8 +336,8 @@ function FileEntry._detach_buffer(bufid)
 end
 
 ---@static
-function FileEntry.update_index_stat(git_root, stat)
-  stat = stat or vim.loop.fs_stat(utils.path_join({git_root, ".git", "index"}))
+function FileEntry.update_index_stat(git_root, git_dir, stat)
+  stat = stat or vim.loop.fs_stat(utils.path_join({ git_dir, "index" }))
   if stat then
     if not fstat_cache[git_root] then fstat_cache[git_root] = {} end
     fstat_cache[git_root].index = {

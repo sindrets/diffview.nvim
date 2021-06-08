@@ -26,7 +26,8 @@ local M = {}
 ---@field get_file_data function A function that is called with parameters `path: string` and `split: string`, and should return a list of lines that should make up the buffer.
 ---INHERITED:
 ---@field tabpage integer
----@field git_root string
+---@field git_root string Absolute path the root of the git directory.
+---@field git_dir string Absolute path to the '.git' directory.
 ---@field path_args string[]
 ---@field left Rev
 ---@field right Rev
@@ -49,6 +50,7 @@ local CView = oop.class(View)
 function CView:new(opt)
   local this = {
     git_root = opt.git_root,
+    git_dir = git.git_dir(opt.git_root),
     path_args = opt.path_args,
     left = opt.left,
     right = opt.right,

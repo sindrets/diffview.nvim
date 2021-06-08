@@ -33,7 +33,8 @@ local LayoutMode = oop.enum {
 
 ---@class View
 ---@field tabpage integer
----@field git_root string
+---@field git_root string Absolute path the root of the git directory.
+---@field git_dir string Absolute path to the '.git' directory.
 ---@field path_args string[]
 ---@field left Rev
 ---@field right Rev
@@ -54,6 +55,7 @@ local View = oop.class()
 function View:new(opt)
   local this = {
     git_root = opt.git_root,
+    git_dir = git.git_dir(opt.git_root),
     path_args = opt.path_args,
     left = opt.left,
     right = opt.right,
@@ -71,7 +73,7 @@ function View:new(opt)
     this.path_args,
     git.rev_to_pretty_string(this.left, this.right)
   )
-  FileEntry.update_index_stat(this.git_root)
+  FileEntry.update_index_stat(this.git_root, this.git_dir)
   setmetatable(this, self)
   return this
 end
@@ -80,13 +82,15 @@ function View:open()
   vim.cmd("tab split")
   self.tabpage = a.nvim_get_current_tabpage()
   self:init_layout()
-  local file = self:cur_file()
-  if file then
-    self:set_file(file)
-  else
-    self:file_safeguard()
-  end
-  self.ready = true
+  vim.schedule(function ()
+    local file = self:cur_file()
+    if file then
+      self:set_file(file)
+    else
+      self:file_safeguard()
+    end
+    self.ready = true
+  end)
 end
 
 function View:close()
@@ -105,8 +109,10 @@ end
 function View:init_layout()
   local split_cmd = self.layout_mode == LayoutMode.VERTICAL and "sp" or "vsp"
   self.left_winid = a.nvim_get_current_win()
+  FileEntry.load_null_buffer(self.left_winid)
   vim.cmd("belowright " .. split_cmd)
   self.right_winid = a.nvim_get_current_win()
+  FileEntry.load_null_buffer(self.right_winid)
   self.file_panel:open()
 end
 
@@ -209,7 +215,7 @@ function View:update_files()
     end
   end
 
-  local index_stat = vim.loop.fs_stat(utils.path_join({self.git_root, ".git", "index"}))
+  local index_stat = vim.loop.fs_stat(utils.path_join({ self.git_dir, "index" }))
   local last_winid = a.nvim_get_current_win()
   local new_files = self:get_updated_files()
   local files = {
@@ -231,7 +237,7 @@ function View:update_files()
         -- Update status and stats
         v.cur_files[ai].status = v.new_files[bi].status
         v.cur_files[ai].stats = v.new_files[bi].stats
-        v.cur_files[ai]:validate_index_buffers(self.git_root, index_stat)
+        v.cur_files[ai]:validate_index_buffers(self.git_root, self.git_dir, index_stat)
         if new_head and v.cur_files[ai].left.head then
           v.cur_files[ai].left = new_head
           v.cur_files[ai]:dispose_buffer("left")
@@ -262,7 +268,7 @@ function View:update_files()
     end
   end
 
-  FileEntry.update_index_stat(self.git_root, index_stat)
+  FileEntry.update_index_stat(self.git_root, self.git_dir, index_stat)
   self.file_panel:render()
   self.file_panel:redraw()
   self.file_idx = utils.clamp(self.file_idx, 1, self.files:size())
