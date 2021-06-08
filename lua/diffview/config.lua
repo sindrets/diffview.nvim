@@ -12,6 +12,7 @@ M.defaults = {
     use_icons = true
   },
   key_bindings = {
+    disable_defaults = false,
     view = {
       ["<tab>"]     = M.diffview_callback("select_next_entry"),
       ["<s-tab>"]   = M.diffview_callback("select_prev_entry"),
@@ -44,33 +45,16 @@ function M.get_config()
   return M._config
 end
 
-function M.tbl_soft_extend(a, b)
-  for k, v in pairs(a) do
-    if type(v) ~= "table" then
-      if b[k] ~= nil then
-        a[k] = b[k]
-      end
-    end
-  end
-end
-
 function M.setup(user_config)
   user_config = user_config or {}
   M._config = utils.tbl_deep_clone(M.defaults)
-  M.tbl_soft_extend(M._config, user_config)
+  M._config = vim.tbl_deep_extend("force", M._config, user_config)
 
-  M._config.file_panel = vim.tbl_deep_extend(
-    "force", M.defaults.file_panel, user_config.file_panel or {}
-  )
-
-  -- If the user provides key bindings: use only the user bindings.
-  if user_config.key_bindings then
-    M._config.key_bindings.view = (
-      user_config.key_bindings.view or M._config.key_bindings.view
-    )
-    M._config.key_bindings.file_panel = (
-      user_config.key_bindings.file_panel or M._config.key_bindings.file_panel
-    )
+  if M._config.key_bindings.disable_defaults then
+    M._config.key_bindings.view =
+      (user_config.key_bindings and user_config.key_bindings.view) or {}
+    M._config.key_bindings.file_panel =
+      (user_config.key_bindings and user_config.key_bindings.file_panel) or {}
   end
 end
 
