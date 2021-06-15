@@ -17,7 +17,7 @@ function M.parse_revs(args)
   local paths = {}
 
   for _, path in ipairs(argo.post_args) do
-    table.insert(paths, vim.fn.fnamemodify(path, ":p"))
+    table.insert(paths, path)
   end
 
   ---@type Rev
@@ -25,7 +25,8 @@ function M.parse_revs(args)
   ---@type Rev
   local right
 
-  local p = paths[1] or "."
+  local cpath = argo:get_flag("C")
+  local p = not vim.tbl_contains({"true", "", nil}, cpath) and cpath or "."
   if vim.fn.isdirectory(p) ~= 1 then
     p = vim.fn.fnamemodify(p, ":h")
   end

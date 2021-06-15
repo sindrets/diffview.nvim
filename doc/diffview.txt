@@ -104,8 +104,11 @@ COMMANDS                                            *diffview-nvim-commands*
                           - `true`, `normal`, `all` Show untracked.
                           - `false`, `no` Don't show untracked.
         --cached, --staged
-                        Diff staged changes against [git-rev]. If not
-                        [git-rev] is given, defaults to `HEAD`.
+                        Diff staged changes against [git-rev]. If no [git-rev]
+                        is given, defaults to `HEAD`.
+
+        -C{path}        Run as if git was started in {path} instead of the
+                        current working directory.
 
                                                         *:DiffviewClose*
 :DiffviewClose          Close the active Diffview.

@@ -1,6 +1,6 @@
 # Diffview.nvim
 
-Single tabpage interface to easily cycle through diffs for all modified files
+Single tabpage interface for easily cycling through diffs for all modified files
 for any git rev.
 
 ![preview](.github/media/screenshot_2.png)
@@ -29,7 +29,7 @@ Plug 'sindrets/diffview.nvim'
 
 ```lua
 -- Packer
-use { 'sindrets/diffview.nvim' }
+use 'sindrets/diffview.nvim'
 ```
 
 ## Configuration
@@ -108,3 +108,15 @@ Additional commands for convenience:
 
 With a Diffview open and the default key bindings, you can cycle through changed
 files with `<tab>` and `<s-tab>` (see configuration to change the key bindings).
+
+## Tips
+
+- **Hide untracked files:**
+  - `DiffviewOpen -uno`
+- **Exclude certain paths:**
+  - `DiffviewOpen -- :!exclude/this :!and/this`
+- **Run as if git was started in a specific directory:**
+  - `DiffviewOpen -C/foo/bar/baz`
+- **Diff the index against a git rev:**
+  - `DiffviewOpen HEAD~2 --cached`
+  - Defaults to `HEAD` if no rev is given.
