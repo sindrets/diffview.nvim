@@ -26,7 +26,13 @@ function M.parse_revs(args)
   local right
 
   local cpath = argo:get_flag("C")
-  local p = not vim.tbl_contains({"true", "", nil}, cpath) and cpath or "."
+  local fpath = (
+    vim.bo.buftype == ""
+    and vim.fn.filereadable(vim.fn.expand("%f"))
+    and vim.fn.expand("%f:p:h")
+    or "."
+  )
+  local p = not vim.tbl_contains({"true", "", nil}, cpath) and cpath or fpath
   if vim.fn.isdirectory(p) ~= 1 then
     p = vim.fn.fnamemodify(p, ":h")
   end

@@ -85,7 +85,10 @@ COMMANDS                                            *diffview-nvim-commands*
                         Opens a new Diffview that compares against [git-rev].
                         If no [git-rev] is given, defaults to comparing
                         against the index. Additional {paths...} can be
-                        provided to narrow down what files are shown.
+                        provided to narrow down what files are shown. If the
+                        `-C` flag is not defined, the git root is determined
+                        from the current buffer when possible. Otherwise it's
+                        determined from the cwd.
                         Examples:
 >
         :DiffviewOpen
