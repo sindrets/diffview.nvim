@@ -2,7 +2,7 @@ local utils = require'diffview.utils'
 local M = {}
 
 function M.diffview_callback(cb_name)
-  return string.format(":lua require'diffview'.on_keypress('%s')<CR>", cb_name)
+  return string.format("<Cmd>lua require'diffview'.on_keypress('%s')<CR>", cb_name)
 end
 
 M.defaults = {

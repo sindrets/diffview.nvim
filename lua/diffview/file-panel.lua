@@ -106,7 +106,7 @@ function FilePanel:open()
   end
 
   vim.cmd("buffer " .. self.bufid)
-  vim.cmd(":wincmd =")
+  vim.cmd("wincmd =")
 end
 
 function FilePanel:close()
