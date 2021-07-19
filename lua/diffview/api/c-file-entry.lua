@@ -97,8 +97,8 @@ function CFileEntry:load_buffers(_, left_winid, right_winid)
 
       elseif vim.tbl_contains({ RevType.COMMIT, RevType.INDEX, RevType.CUSTOM }, split.rev.type) then
         local bn
-        if self.oldpath then
-          bn = CFileEntry._create_buffer(nil, split.rev, self.oldpath, split.lines, false)
+        if self.oldpath and split.pos == "left" then
+          bn = CFileEntry._create_buffer(nil, split.rev, self.oldpath, split.lines, split.null)
         else
           bn = CFileEntry._create_buffer(
             nil, split.rev, self.path, split.lines,

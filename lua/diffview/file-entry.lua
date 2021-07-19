@@ -89,7 +89,7 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
   if not config.get_config().diff_binaries then
     if self.left_binary == nil then
       local git = require'diffview.git'
-      self.left_binary = git.is_binary(git_root, self.path, self.left)
+      self.left_binary = git.is_binary(git_root, self.oldpath or self.path, self.left)
       self.right_binary = git.is_binary(git_root, self.path, self.right)
     end
   end
@@ -123,8 +123,8 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
 
       elseif split.rev.type == RevType.COMMIT or split.rev.type == RevType.INDEX then
         local bn
-        if self.oldpath then
-          bn = FileEntry._create_buffer(git_root, split.rev, self.oldpath, false)
+        if self.oldpath and split.pos == "left" then
+          bn = FileEntry._create_buffer(git_root, split.rev, self.oldpath, split.binary)
         else
           bn = FileEntry._create_buffer(
             git_root, split.rev, self.path,
