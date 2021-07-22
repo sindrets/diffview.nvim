@@ -217,6 +217,39 @@ function M.head_rev(git_root)
   return Rev:new(RevType.COMMIT, s, true)
 end
 
+---Parse two endpoint, commit revs from a symmetric difference notated rev arg.
+---@param git_root string
+---@param rev_arg string
+---@return Rev left The left rev.
+---@return Rev right The right rev.
+function M.symmetric_diff_revs(git_root, rev_arg)
+  local r1 = rev_arg:match("(.+)%.%.%.") or "HEAD"
+  local r2 = rev_arg:match("%.%.%.(.+)") or "HEAD"
+  local base_cmd = "git -C " .. vim.fn.shellescape(git_root) .. " "
+  local out
+
+  local function err()
+    utils.err("Failed to parse rev '" .. rev_arg .. "'!")
+    utils.err("Git output: " .. vim.fn.join(out, "\n"))
+  end
+
+  out = vim.fn.systemlist(
+    base_cmd .. "merge-base "
+    .. vim.fn.shellescape(r1) .. " "
+    .. vim.fn.shellescape(r2)
+  )
+  if utils.shell_error() then return err() end
+  local left_hash = out[1]:gsub("^%^", "")
+
+  out = vim.fn.systemlist(
+    base_cmd .. "rev-parse --revs-only " .. vim.fn.shellescape(r2)
+  )
+  if utils.shell_error() then return err() end
+  local right_hash = out[1]:gsub("^%^", "")
+
+  return Rev:new(RevType.COMMIT, left_hash), Rev:new(RevType.COMMIT, right_hash)
+end
+
 ---Get the git root path of a given path.
 ---@param path string
 ---@return string|nil

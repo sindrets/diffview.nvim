@@ -328,7 +328,7 @@ function FilePanel:render()
 
   if self.rev_pretty_name or (self.path_args and #self.path_args > 0) then
     local extra_info = utils.tbl_concat(
-      { self.rev_pretty_name and ("commit " .. self.rev_pretty_name) or nil },
+      { self.rev_pretty_name },
       self.path_args or {}
     )
 
