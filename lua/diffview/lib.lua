@@ -55,8 +55,13 @@ function M.parse_revs(args)
       left = Rev:new(RevType.INDEX)
       right = Rev:new(RevType.LOCAL)
     end
+  elseif rev_arg:match("%.%.%.") then
+    left, right = git.symmetric_diff_revs(git_root, rev_arg)
+    if not (left or right) then return end
   else
-    local rev_strings = vim.fn.systemlist(base_cmd .. "rev-parse --revs-only " .. vim.fn.shellescape(rev_arg))
+    local rev_strings = vim.fn.systemlist(
+      base_cmd .. "rev-parse --revs-only " .. vim.fn.shellescape(rev_arg)
+    )
     if utils.shell_error() then
       utils.err("Failed to parse rev '" .. rev_arg .. "'!")
       utils.err("Git output: " .. vim.fn.join(rev_strings, "\n"))
@@ -94,6 +99,7 @@ function M.parse_revs(args)
 
   local v = View:new({
       git_root = git_root,
+      rev_arg = rev_arg,
       path_args = paths,
       left = left,
       right = right,

@@ -28,6 +28,7 @@ local M = {}
 ---@field tabpage integer
 ---@field git_root string Absolute path the root of the git directory.
 ---@field git_dir string Absolute path to the '.git' directory.
+---@field rev_arg string
 ---@field path_args string[]
 ---@field left Rev
 ---@field right Rev
@@ -51,6 +52,7 @@ function CView:new(opt)
   local this = {
     git_root = opt.git_root,
     git_dir = git.git_dir(opt.git_root),
+    rev_arg = opt.rev_arg,
     path_args = opt.path_args,
     left = opt.left,
     right = opt.right,
@@ -69,7 +71,7 @@ function CView:new(opt)
     this.git_root,
     this.files,
     this.path_args,
-    git.rev_to_pretty_string(this.left, this.right)
+    this.rev_arg or git.rev_to_pretty_string(this.left, this.right)
   )
 
   setmetatable(this, self)
