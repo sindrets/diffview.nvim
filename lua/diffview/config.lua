@@ -30,6 +30,7 @@ M.defaults = {
       ["-"]             = M.diffview_callback("toggle_stage_entry"),
       ["S"]             = M.diffview_callback("stage_all"),
       ["U"]             = M.diffview_callback("unstage_all"),
+      ["X"]             = M.diffview_callback("restore_entry"),
       ["R"]             = M.diffview_callback("refresh_files"),
       ["<tab>"]         = M.diffview_callback("select_next_entry"),
       ["<s-tab>"]       = M.diffview_callback("select_prev_entry"),
