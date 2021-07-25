@@ -11,7 +11,7 @@ INTRODUCTION                                       *diffview-nvim-introduction*
 
 Vim's diff mode is pretty good, but there is no convenient way to quickly bring
 up all modified files in a diffsplit. This plugin aims to provide a simple,
-unified, single tabpage, interface that lets you easily review all changed files
+unified, single tabpage interface that lets you easily review all changed files
 for any git rev.
 
 USAGE                                                   *diffview-nvim-usage*
@@ -130,7 +130,14 @@ COMMANDS                                            *diffview-nvim-commands*
 
 MAPS                                                    *diffview-nvim-maps*
 
-All listed maps are the defaults, but all mappings can be configured.
+All listed maps are the defaults, but all mappings can be configured. Most of
+the file panel mappings should also work from the view if they are added to
+the view bindings (and vice versa). The exception is for mappings that only
+really make sense specifically in the file panel, such as `next_entry`,
+`prev_entry`, and `select_entry`. Functions such as `toggle_stage_entry` and
+`restore_entry` work just fine from the view. When invoked from the view,
+these will target the file currently open in the view rather than the file
+under the cursor in the file panel.
 
                                                       *diffview-nvim-maps-view*
 View maps~
@@ -138,12 +145,16 @@ View maps~
 These maps are available in the diff buffers while a Diffview is the current
 tabpage.
 
+                                         *diffview-nvim-maps-select_next_entry*
 <Tab>                   Open the diff for the next file.
 
+                                         *diffview-nvim-maps-select_prev_entry*
 <S-Tab>                 Open the diff for the previous file.
 
+                                              *diffview-nvim-maps-toggle_files*
 <leader>b               Toggle the file panel.
 
+                                               *diffview-nvim-maps-focus_files*
 <leader>e               Bring focus to the file panel.
 
                                                *diffview-nvim-maps-file-panel*
@@ -151,28 +162,36 @@ File panel maps~
 
 These maps are available in the file panel buffer.
 
+                                                *diffview-nvim-maps-next_entry*
 j                       Bring the cursor to the next file entry
 <Down>
 
+                                                *diffview-nvim-maps-prev_entry*
 k                       Bring the cursor to the previous file entry
 <Up>
 
+                                              *diffview-nvim-maps-select_entry*
 o                       Open the diff for the selected file entry.
 <CR>
 <2-LeftMouse>
 
+                                        *diffview-nvim-maps-toggle_stage_entry*
 -                       Stage/unstage the selected file entry.
 
+                                                 *diffview-nvim-maps-stage_all*
 S                       Stage all entries.
 
+                                               *diffview-nvim-maps-unstage_all*
 U                       Unstage all entries.
 
+                                             *diffview-nvim-maps-restore_entry*
 X                       Revert the selected file entry to the state from the
                         left side of the diff. This only works if the right
                         side of the diff is showing the local state of the
                         file. A command is echoed that shows how to undo the
                         change. Check `:messages` to see it again.
 
+                                             *diffview-nvim-maps-refresh_files*
 R                       Update the stats and entries in the file list.
 
 <Tab>                   Open the diff for the next file.

@@ -133,11 +133,11 @@ M.keypress_event_cbs = {
   end,
   toggle_stage_entry = function ()
     local view = lib.get_current_diffview()
-    if view and view.file_panel:is_open() then
+    if view then
       if not (view.left.type == RevType.INDEX and view.right.type == RevType.LOCAL) then
         return
       end
-      local file = view.file_panel:get_file_at_cursor()
+      local file = lib.infer_cur_file(view)
       if file then
         if file.kind == "working" then
           vim.fn.system(
@@ -194,7 +194,7 @@ M.keypress_event_cbs = {
       if not (view.left.type == RevType.INDEX) then
         commit = view.left.commit
       end
-      local file = view.file_panel:get_file_at_cursor()
+      local file = lib.infer_cur_file(view)
       if file then
         local bufid = utils.find_file_buffer(file.path)
         if bufid and vim.bo[bufid].modified then

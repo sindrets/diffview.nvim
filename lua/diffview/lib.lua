@@ -166,6 +166,25 @@ function M.tabpage_to_view(tabpage)
   end
 end
 
+---Infer the current selected file from the current diffview. If the file panel
+---is focused: return the file entry under the cursor. Otherwise return the
+---file open in the view. Returns nil if the current tabpage is not a diffview,
+---no file is open in the view, or there is no entry under the cursor in the
+---file panel.
+---@param view View|nil Use the given view rather than looking up the current
+---   one.
+---@return FileEntry|nil
+function M.infer_cur_file(view)
+  view = view or M.get_current_diffview()
+  if view then
+    if view.file_panel:is_focused() then
+      return view.file_panel:get_file_at_cursor()
+    else
+      return view:cur_file()
+    end
+  end
+end
+
 function M.update_colors()
   for _, view in ipairs(M.views) do
     if view.file_panel:buf_loaded() then
