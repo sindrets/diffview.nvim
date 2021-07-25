@@ -188,7 +188,7 @@ M.keypress_event_cbs = {
     if view then
       local commit
       if not (view.right.type == RevType.LOCAL) then
-        utils.err("Neither side of the diff are local! Aborting file restoration.")
+        utils.err("The right side of the diff is not local! Aborting file restoration.")
         return
       end
       if not (view.left.type == RevType.INDEX) then
@@ -196,6 +196,11 @@ M.keypress_event_cbs = {
       end
       local file = view.file_panel:get_file_at_cursor()
       if file then
+        local bufid = utils.find_file_buffer(file.path)
+        if bufid and vim.bo[bufid].modified then
+          utils.err("The file is open with unsaved changes! Aborting file restoration.")
+          return
+        end
         require'diffview.git'.restore_file(view.git_root, file.path, file.kind, commit)
         view:update_files()
       end
