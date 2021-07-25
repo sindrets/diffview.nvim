@@ -304,5 +304,47 @@ function M.show_untracked(git_root)
   return vim.trim(vim.fn.system(cmd)) ~= "false"
 end
 
+---Restore a file to the state it was in, in a given commit / rev. If no commit
+---is given, unstaged files are restored to the state in index, and staged files
+---are restored to the state in HEAD. The file will also be written into the
+---object database such that the action can be undone.
+---@param git_root string
+---@param path string
+---@param kind "staged"|"working"
+---@param commit string
+function M.restore_file(git_root, path, kind, commit)
+  local base_cmd = "git -C " .. vim.fn.shellescape(git_root) .. " "
+
+  -- Wite file blob into db
+  local out = vim.fn.system(base_cmd .. "hash-object -w -- " .. vim.fn.shellescape(path))
+  if utils.shell_error() then
+    utils.err("Failed to write file blob into the object database. Aborting file restoration.")
+    utils.err("Git output: " .. out)
+    return
+  end
+
+  local undo = (":sp %s | %%!git show %s"):format(
+    vim.fn.fnameescape(path),
+    out:sub(1, 11)
+  )
+
+  -- Revert file
+  local cmd = ("%s checkout %s -- %s"):format(
+    base_cmd,
+    commit or (kind == "staged" and "HEAD" or ""),
+    vim.fn.shellescape(path)
+  )
+
+  out = vim.fn.system(cmd)
+  if utils.shell_error() then
+    utils.err("Failed to revert file!")
+    utils.err("Git output: " .. out)
+    return
+  end
+
+  local rev_name = (commit and commit:sub(1, 11)) or (kind == "staged" and "HEAD" or "index")
+  utils.info(("File restored from %s. Undo with %s"):format(rev_name, undo))
+end
+
 M.FileDict = FileDict
 return M

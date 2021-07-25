@@ -284,6 +284,15 @@ function M.wipe_named_buffer(name)
   end
 end
 
+function M.find_file_buffer(path)
+  local p = vim.fn.fnamemodify(path, ":p")
+  for _, id in ipairs(vim.api.nvim_list_bufs()) do
+    if p == vim.api.nvim_buf_get_name(id) then
+      return id
+    end
+  end
+end
+
 ---Get a list of all windows that contain the given buffer.
 ---@param bufid integer
 ---@return integer[]

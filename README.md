@@ -65,6 +65,7 @@ require'diffview'.setup {
       ["-"]             = cb("toggle_stage_entry"), -- Stage / unstage the selected entry.
       ["S"]             = cb("stage_all"),          -- Stage all entries.
       ["U"]             = cb("unstage_all"),        -- Unstage all entries.
+      ["X"]             = cb("restore_entry"),      -- Restore entry to the state on the left side.
       ["R"]             = cb("refresh_files"),      -- Update stats and entries in the file list.
       ["<tab>"]         = cb("select_next_entry"),
       ["<s-tab>"]       = cb("select_prev_entry"),
@@ -75,8 +76,9 @@ require'diffview'.setup {
 }
 ```
 
-The diff windows can be aligned either horizontally or vertically. To change
-the alignment add either `horizontal` or `vertical` to your `'diffopt'`.
+The diff windows can be aligned either with a horizontal split or a vertical
+split. To change the alignment add either `horizontal` or `vertical` to your
+`'diffopt'`.
 
 ## Usage
 
@@ -120,3 +122,10 @@ files with `<tab>` and `<s-tab>` (see configuration to change the key bindings).
 - **Diff the index against a git rev:**
   - `DiffviewOpen HEAD~2 --cached`
   - Defaults to `HEAD` if no rev is given.
+
+## Restoring Files
+
+If the right side of the diff is showing the local state of a file, you can
+restore the file to the state from the left side of the diff (key binding `X`
+from the file panel by default). The current state of the file is stored in the
+git object database, and a command is echoed that shows how to undo the change.
