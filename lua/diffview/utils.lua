@@ -37,8 +37,24 @@ function M.shell_error()
   return vim.v.shell_error ~= 0
 end
 
-function M.path_to_matching_str(path)
-  return path:gsub('(%-)', '(%%-)'):gsub('(%.)', '(%%.)'):gsub('(%_)', '(%%_)')
+---Escape a string for use as a pattern.
+---@param s string
+---@return string
+function M.pattern_esc(s)
+  return (
+    s:gsub('%%', '%%%%')
+      :gsub('%^', '%%^')
+      :gsub('%$', '%%$')
+      :gsub('%(', '%%(')
+      :gsub('%)', '%%)')
+      :gsub('%.', '%%.')
+      :gsub('%[', '%%[')
+      :gsub('%]', '%%]')
+      :gsub('%*', '%%*')
+      :gsub('%+', '%%+')
+      :gsub('%-', '%%-')
+      :gsub('%?', '%%?')
+  )
 end
 
 function M.path_join(paths)
@@ -85,7 +101,7 @@ end
 ---@param relative_to string
 ---@return string
 function M.path_relative(path, relative_to)
-  local p, _ = path:gsub("^" .. M.path_to_matching_str(M.path_add_trailing(relative_to)), "")
+  local p, _ = path:gsub("^" .. M.pattern_esc(M.path_add_trailing(relative_to)), "")
   return p
 end
 
