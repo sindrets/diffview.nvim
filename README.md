@@ -9,7 +9,7 @@ for any git rev.
 
 Vim's diff mode is pretty good, but there is no convenient way to quickly bring
 up all modified files in a diffsplit. This plugin aims to provide a simple,
-unified, single tabpage, interface that lets you easily review all changed files
+unified, single tabpage interface that lets you easily review all changed files
 for any git rev.
 
 ## Requirements
@@ -79,6 +79,14 @@ require'diffview'.setup {
 The diff windows can be aligned either with a horizontal split or a vertical
 split. To change the alignment add either `horizontal` or `vertical` to your
 `'diffopt'`.
+
+Most of the file panel mappings should also work from the view if they are
+added to the view bindings (and vice versa). The exception is for mappings
+that only really make sense specifically in the file panel, such as
+`next_entry`, `prev_entry`, and `select_entry`. Functions such as
+`toggle_stage_entry` and `restore_entry` work just fine from the view. When
+invoked from the view, these will target the file currently open in the view
+rather than the file under the cursor in the file panel.
 
 ## Usage
 
