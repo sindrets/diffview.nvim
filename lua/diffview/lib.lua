@@ -50,10 +50,10 @@ function M.parse_revs(args)
   if not rev_arg then
     if cached then
       left = git.head_rev(git_root)
-      right = Rev:new(RevType.INDEX)
+      right = Rev.new(RevType.INDEX)
     else
-      left = Rev:new(RevType.INDEX)
-      right = Rev:new(RevType.LOCAL)
+      left = Rev.new(RevType.INDEX)
+      right = Rev.new(RevType.LOCAL)
     end
   elseif rev_arg:match("%.%.%.") then
     left, right = git.symmetric_diff_revs(git_root, rev_arg)
@@ -74,15 +74,15 @@ function M.parse_revs(args)
     if #rev_strings > 1 then
       local left_hash = rev_strings[2]:gsub("^%^", "")
       local right_hash = rev_strings[1]:gsub("^%^", "")
-      left = Rev:new(RevType.COMMIT, left_hash)
-      right = Rev:new(RevType.COMMIT, right_hash)
+      left = Rev.new(RevType.COMMIT, left_hash)
+      right = Rev.new(RevType.COMMIT, right_hash)
     else
       local hash = rev_strings[1]:gsub("^%^", "")
-      left = Rev:new(RevType.COMMIT, hash)
+      left = Rev.new(RevType.COMMIT, hash)
       if cached then
-        right = Rev:new(RevType.INDEX)
+        right = Rev.new(RevType.INDEX)
       else
-        right = Rev:new(RevType.LOCAL)
+        right = Rev.new(RevType.LOCAL)
       end
     end
   end
@@ -97,7 +97,7 @@ function M.parse_revs(args)
     )
   }
 
-  local v = View:new({
+  local v = View.new({
       git_root = git_root,
       rev_arg = rev_arg,
       path_args = paths,

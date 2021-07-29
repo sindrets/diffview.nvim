@@ -53,7 +53,7 @@ local View = oop.class()
 
 ---View constructor
 ---@return View
-function View:new(opt)
+function View.new(opt)
   local this = {
     git_root = opt.git_root,
     git_dir = git.git_dir(opt.git_root),
@@ -62,21 +62,21 @@ function View:new(opt)
     left = opt.left,
     right = opt.right,
     options = opt.options,
-    emitter = EventEmitter:new(),
+    emitter = EventEmitter.new(),
     layout_mode = View.get_layout_mode(),
     files = git.diff_file_list(opt.git_root, opt.left, opt.right, opt.path_args, opt.options),
     file_idx = 1,
     nulled = false,
     ready = false
   }
-  this.file_panel = FilePanel:new(
+  this.file_panel = FilePanel.new(
     this.git_root,
     this.files,
     this.path_args,
     this.rev_arg or git.rev_to_pretty_string(this.left, this.right)
   )
   FileEntry.update_index_stat(this.git_root, this.git_dir)
-  setmetatable(this, self)
+  setmetatable(this, View)
   return this
 end
 
@@ -226,7 +226,7 @@ function View:update_files()
   }
 
   for _, v in ipairs(files) do
-    local diff = Diff:new(v.cur_files, v.new_files, function (aa, bb)
+    local diff = Diff.new(v.cur_files, v.new_files, function (aa, bb)
       return aa.path == bb.path
     end)
     local script = diff:create_edit_script()

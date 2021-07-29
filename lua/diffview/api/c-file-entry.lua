@@ -42,7 +42,7 @@ local CFileEntry = oop.class(FileEntry)
 ---CFileEntry constructor.
 ---@param opt any
 ---@return CFileEntry
-function CFileEntry:new(opt)
+function CFileEntry.new(opt)
   local this = {
     path = opt.path,
     oldpath = opt.oldpath,
@@ -62,7 +62,7 @@ function CFileEntry:new(opt)
     get_file_data = opt.get_file_data,
     created_bufs = {}
   }
-  setmetatable(this, self)
+  setmetatable(this, CFileEntry)
   return this
 end
 

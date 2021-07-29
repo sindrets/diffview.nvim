@@ -16,11 +16,11 @@ local EventEmitter = oop.class()
 
 ---EventEmitter constructor.
 ---@return EventEmitter
-function EventEmitter:new()
+function EventEmitter.new()
   local this = {
     listeners = {}
   }
-  setmetatable(this, self)
+  setmetatable(this, EventEmitter)
   return this
 end
 

@@ -22,7 +22,7 @@ local RenderComponent = oop.class()
 
 ---RenderComponent constructor.
 ---@return RenderComponent
-function RenderComponent:new()
+function RenderComponent.new()
   local this = {
     lines = {},
     hl = {},
@@ -31,7 +31,7 @@ function RenderComponent:new()
     lend = -1,
     height = 0
   }
-  setmetatable(this, self)
+  setmetatable(this, RenderComponent)
   return this
 end
 
@@ -55,7 +55,7 @@ end
 ---@return RenderComponent|any
 function RenderComponent:create_component(schema)
   local comp_struct
-  local new_comp = RenderComponent:new()
+  local new_comp = RenderComponent.new()
   table.insert(self.components, new_comp)
 
   if schema then
@@ -114,14 +114,14 @@ local RenderData = oop.class()
 
 ---RenderData constructor.
 ---@return RenderData
-function RenderData:new(ns_name)
+function RenderData.new(ns_name)
   local this = {
     lines = {},
     hl = {},
     components = {},
     namespace = a.nvim_create_namespace(ns_name)
   }
-  setmetatable(this, self)
+  setmetatable(this, RenderData)
   return this
 end
 
@@ -130,7 +130,7 @@ end
 ---@return RenderComponent|any
 function RenderData:create_component(schema)
   local comp_struct
-  local new_comp = RenderComponent:new()
+  local new_comp = RenderComponent.new()
   table.insert(self.components, new_comp)
 
   if schema then

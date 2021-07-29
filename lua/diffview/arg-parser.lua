@@ -15,13 +15,13 @@ local ArgObject = oop.class()
 ---@param flags table<string, string>
 ---@param args string[]
 ---@return ArgObject
-function ArgObject:new(flags, args, post_args)
+function ArgObject.new(flags, args, post_args)
   local this = {
     flags = flags,
     args = args,
     post_args = post_args
   }
-  setmetatable(this, self)
+  setmetatable(this, ArgObject)
   return this
 end
 
@@ -40,11 +40,11 @@ local FlagValueMap = oop.class()
 
 ---FlagValueMap constructor
 ---@return FlagValueMap
-function FlagValueMap:new()
+function FlagValueMap.new()
   local this = {
     map = {}
   }
-  setmetatable(this, self)
+  setmetatable(this, FlagValueMap)
   return this
 end
 
@@ -140,7 +140,7 @@ function M.parse(args)
     ::continue::
   end
 
-  return ArgObject:new(flags, pre_args, post_args)
+  return ArgObject.new(flags, pre_args, post_args)
 end
 
 ---Scan an EX arg string and split into individual args.

@@ -7,7 +7,7 @@ local colors = require'diffview.colors'
 local utils = require "diffview.utils"
 local M = {}
 
-local flag_value_completion = arg_parser.FlagValueMap:new()
+local flag_value_completion = arg_parser.FlagValueMap.new()
 flag_value_completion:put({"u", "untracked-files"}, {"true", "normal", "all", "false", "no"})
 flag_value_completion:put({"cached", "staged"}, {"true", "false"})
 flag_value_completion:put({"C"}, {})

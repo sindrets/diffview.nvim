@@ -78,7 +78,7 @@ LAYOUT                                                *diffview-nvim-layout*
 
 The diff windows can be aligned either with a horizontal split or a vertical
 split. To change the alignment add either `horizontal` or `vertical` to your
-*'diffopt'* .
+'diffopt'.
 
 COMMANDS                                            *diffview-nvim-commands*
 
@@ -214,7 +214,7 @@ CView                                             *diffview.api.c-view.CView*
 
     Class that represents a custom Diffview.
 
-    CView:new({opt})
+    CView.new({opt})
 
         Parameters: ~
             {opt}   (table)   Table containing the args passed to the view

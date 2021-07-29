@@ -32,7 +32,7 @@ local Diff = oop.class()
 ---@param b any[]
 ---@param eql_fn function|nil
 ---@return Diff
-function Diff:new(a, b, eql_fn)
+function Diff.new(a, b, eql_fn)
   local this = {
     a = a,
     b = b,
@@ -52,7 +52,7 @@ function Diff:new(a, b, eql_fn)
     this.modb[i] = false
   end
 
-  setmetatable(this, self)
+  setmetatable(this, Diff)
 
   this:lcs(1, #this.a + 1, 1, #this.b + 1)
   return this
@@ -230,7 +230,7 @@ function M._test_exec(a, b, script)
 end
 
 function M._test_diff(a, b)
-  local diff = Diff:new(a,b)
+  local diff = Diff.new(a,b)
   local script = diff:create_edit_script()
   print("a", vim.inspect(a))
   print("b", vim.inspect(b))

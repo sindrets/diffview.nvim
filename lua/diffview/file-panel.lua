@@ -59,7 +59,7 @@ FilePanel.bufopts = {
 ---@param files FileEntry[]
 ---@param path_args string[]
 ---@return FilePanel
-function FilePanel:new(git_root, files, path_args, rev_pretty_name)
+function FilePanel.new(git_root, files, path_args, rev_pretty_name)
   local conf = config.get_config()
   local this = {
     git_root = git_root,
@@ -68,7 +68,7 @@ function FilePanel:new(git_root, files, path_args, rev_pretty_name)
     rev_pretty_name = rev_pretty_name,
     width = conf.file_panel.width
   }
-  setmetatable(this, self)
+  setmetatable(this, FilePanel)
   return this
 end
 
@@ -157,7 +157,7 @@ function FilePanel:init_buffer()
   end
 
   self.bufid = bn
-  self.render_data = renderer.RenderData:new(bufname)
+  self.render_data = renderer.RenderData.new(bufname)
 
   self.components = {
     ---@type any

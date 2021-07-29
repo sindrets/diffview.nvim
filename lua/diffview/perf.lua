@@ -15,13 +15,13 @@ local PerfTimer = oop.class()
 ---PerfTimer constructor.
 ---@param subject string|nil
 ---@return PerfTimer
-function PerfTimer:new(subject)
+function PerfTimer.new(subject)
   local this = {
     subject = subject,
     first = luv.hrtime(),
     laps = {}
   }
-  setmetatable(this, self)
+  setmetatable(this, PerfTimer)
   return this
 end
 

@@ -26,13 +26,13 @@ local Rev = oop.class()
 ---@param commit string
 ---@param head boolean
 ---@return Rev
-function Rev:new(type, commit, head)
+function Rev.new(type, commit, head)
   local this = {
     type = type,
     commit = commit,
     head = head or false
   }
-  setmetatable(this, self)
+  setmetatable(this, Rev)
   return this
 end
 

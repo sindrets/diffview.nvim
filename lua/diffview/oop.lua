@@ -15,8 +15,8 @@ end
 local Object = {}
 Object.__index = Object
 
-function Object:new()
-  return setmetatable({}, self)
+function Object.new()
+  return setmetatable({}, Object)
 end
 
 function Object:class()
@@ -28,19 +28,25 @@ function Object:super()
 end
 
 function Object:instanceof(other)
-  return other == Object
+  local cur = self:class()
+  while cur do
+    if cur == other then
+      return true
+    end
+    cur = cur:super()
+  end
+  return false
 end
 
 function M.class(super_class)
   super_class = super_class or Object
   local new_class = {}
-  local class_mt = { __index = new_class }
   new_class.__index = new_class
 
   setmetatable(new_class, super_class)
 
-  function new_class:new()
-    return setmetatable({}, class_mt)
+  function new_class.new()
+    return setmetatable({}, new_class)
   end
 
   ---Get the class object.
@@ -53,17 +59,6 @@ function M.class(super_class)
   ---@return Object
   function new_class:super()
     return super_class
-  end
-
-  function new_class:instanceof(other)
-    local cur = new_class
-    while cur do
-      if cur == other then
-        return true
-      end
-      cur = cur:super()
-    end
-    return false
   end
 
   return new_class

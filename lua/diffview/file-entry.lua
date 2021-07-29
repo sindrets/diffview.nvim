@@ -55,7 +55,7 @@ FileEntry.winopts = {
 ---FileEntry constructor
 ---@param opt table
 ---@return FileEntry
-function FileEntry:new(opt)
+function FileEntry.new(opt)
   local this = {
     path = opt.path,
     oldpath = opt.oldpath,
@@ -70,7 +70,7 @@ function FileEntry:new(opt)
     right = opt.right,
     created_bufs = {}
   }
-  setmetatable(this, self)
+  setmetatable(this, FileEntry)
   return this
 end
 
