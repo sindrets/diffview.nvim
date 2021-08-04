@@ -25,37 +25,32 @@ local EditToken = oop.enum {
 ---@field up table<integer, integer>
 ---@field down table<integer, integer>
 ---@field eql_fn function
-local Diff = oop.class()
+local Diff = oop.create_class("Diff")
 
 ---Diff constructor.
 ---@param a any[]
 ---@param b any[]
 ---@param eql_fn function|nil
 ---@return Diff
-function Diff.new(a, b, eql_fn)
-  local this = {
-    a = a,
-    b = b,
-    moda = {},
-    modb = {},
-    up = {},
-    down = {},
-    eql_fn = eql_fn or function (aa, bb)
-      return aa == bb
-    end
-  }
+function Diff:init(a, b, eql_fn)
+  self.a = a
+  self.b = b
+  self.moda = {}
+  self.modb = {}
+  self.up = {}
+  self.down = {}
+  self.eql_fn = eql_fn or function (aa, bb)
+    return aa == bb
+  end
 
   for i = 1, #a do
-    this.moda[i] = false
+    self.moda[i] = false
   end
   for i = 1, #b do
-    this.modb[i] = false
+    self.modb[i] = false
   end
 
-  setmetatable(this, Diff)
-
-  this:lcs(1, #this.a + 1, 1, #this.b + 1)
-  return this
+  self:lcs(1, #self.a + 1, 1, #self.b + 1)
 end
 
 function Diff:create_edit_script()
@@ -230,7 +225,7 @@ function M._test_exec(a, b, script)
 end
 
 function M._test_diff(a, b)
-  local diff = Diff.new(a,b)
+  local diff = Diff(a,b)
   local script = diff:create_edit_script()
   print("a", vim.inspect(a))
   print("b", vim.inspect(b))

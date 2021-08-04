@@ -8,17 +8,16 @@ local M = {}
 ---@class FileDict
 ---@field working FileEntry[]
 ---@field staged FileEntry[]
-local FileDict = oop.class()
+local FileDict = oop.create_class("FileDict")
 
 ---FileDict constructor.
 ---@return FileDict
-function FileDict.new()
-  local this = {
-    working = {},
-    staged = {}
-  }
-  setmetatable(this, FileDict)
-  local mt = getmetatable(this)
+function FileDict:init()
+  self.working = {}
+  self.staged = {}
+
+  local mt = getmetatable(self)
+  local old_index = mt.__index
   mt.__index = function (t, k)
     if type(k) == "number" then
       if k > #t.working then
@@ -27,10 +26,9 @@ function FileDict.new()
         return t.working[k]
       end
     else
-      return FileDict[k]
+      return old_index(t, k)
     end
   end
-  return this
 end
 
 function FileDict:size()
@@ -87,7 +85,7 @@ local function tracked_files(git_root, left, right, args, kind)
         stats = nil
       end
 
-      table.insert(files, FileEntry.new({
+      table.insert(files, FileEntry({
         path = name,
         oldpath = oldname,
         absolute_path = utils.path_join({git_root, name}),
@@ -110,7 +108,7 @@ local function untracked_files(git_root, left, right)
 
   if not utils.shell_error() and #untracked > 0 then
     for _, s in ipairs(untracked) do
-      table.insert(files, FileEntry.new({
+      table.insert(files, FileEntry({
             path = s,
             absolute_path = utils.path_join({git_root, s}),
             status = "?",
@@ -133,7 +131,7 @@ end
 ---@return FileDict
 function M.diff_file_list(git_root, left, right, path_args, options)
   ---@type FileDict
-  local files = FileDict.new()
+  local files = FileDict()
 
   local p_args = ""
   if path_args and #path_args > 0 then
@@ -163,7 +161,7 @@ function M.diff_file_list(git_root, left, right, path_args, options)
 
   if left.type == RevType.INDEX and right.type == RevType.LOCAL then
     local left_rev = M.head_rev(git_root)
-    local right_rev = Rev.new(RevType.INDEX)
+    local right_rev = Rev(RevType.INDEX)
     files.staged = tracked_files(git_root, left_rev, right_rev, "--cached HEAD" .. p_args, "staged")
   end
 
@@ -214,7 +212,7 @@ function M.head_rev(git_root)
   end
 
   local s = vim.trim(rev_string):gsub("^%^", "")
-  return Rev.new(RevType.COMMIT, s, true)
+  return Rev(RevType.COMMIT, s, true)
 end
 
 ---Parse two endpoint, commit revs from a symmetric difference notated rev arg.
@@ -247,7 +245,7 @@ function M.symmetric_diff_revs(git_root, rev_arg)
   if utils.shell_error() then return err() end
   local right_hash = out[1]:gsub("^%^", "")
 
-  return Rev.new(RevType.COMMIT, left_hash), Rev.new(RevType.COMMIT, right_hash)
+  return Rev(RevType.COMMIT, left_hash), Rev(RevType.COMMIT, right_hash)
 end
 
 ---Get the git root path of a given path.

@@ -19,21 +19,17 @@ local RevType = oop.enum {
 ---@field type integer
 ---@field commit string A commit SHA.
 ---@field head boolean If true, indicates that the rev should be updated when HEAD changes.
-local Rev = oop.class()
+local Rev = oop.create_class("Rev")
 
 ---Rev constructor
 ---@param type RevType
 ---@param commit string
 ---@param head boolean
 ---@return Rev
-function Rev.new(type, commit, head)
-  local this = {
-    type = type,
-    commit = commit,
-    head = head or false
-  }
-  setmetatable(this, Rev)
-  return this
+function Rev:init(type, commit, head)
+  self.type = type
+  self.commit = commit
+  self.head = head or false
 end
 
 ---Get an abbreviated commit SHA. Returns `nil` if this Rev is not a commit.

@@ -10,19 +10,15 @@ local M = {}
 ---@field last integer Stop time (ns)
 ---@field final_time number Final time (ms)
 ---@field laps number[] List of lap times (ms)
-local PerfTimer = oop.class()
+local PerfTimer = oop.create_class("PerfTimer")
 
 ---PerfTimer constructor.
 ---@param subject string|nil
 ---@return PerfTimer
-function PerfTimer.new(subject)
-  local this = {
-    subject = subject,
-    first = luv.hrtime(),
-    laps = {}
-  }
-  setmetatable(this, PerfTimer)
-  return this
+function PerfTimer:init(subject)
+  self.subject = subject
+  self.first = luv.hrtime()
+  self.laps = {}
 end
 
 ---Record a lap time.

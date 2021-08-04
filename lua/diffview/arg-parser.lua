@@ -9,20 +9,16 @@ local long_flag_pat = "^%-%-(%a[%a%d-]*)=?(.*)"
 ---@field flags table<string, string>
 ---@field args string[]
 ---@field post_args string[]
-local ArgObject = oop.class()
+local ArgObject = oop.create_class("ArgObject")
 
 ---ArgObject constructor.
 ---@param flags table<string, string>
 ---@param args string[]
 ---@return ArgObject
-function ArgObject.new(flags, args, post_args)
-  local this = {
-    flags = flags,
-    args = args,
-    post_args = post_args
-  }
-  setmetatable(this, ArgObject)
-  return this
+function ArgObject:init(flags, args, post_args)
+  self.flags = flags
+  self.args = args
+  self.post_args = post_args
 end
 
 ---Get a flag value.
@@ -36,16 +32,12 @@ end
 
 ---@class FlagValueMap
 ---@field map table<string, string[]>
-local FlagValueMap = oop.class()
+local FlagValueMap = oop.create_class("FlagValueMap")
 
 ---FlagValueMap constructor
 ---@return FlagValueMap
-function FlagValueMap.new()
-  local this = {
-    map = {}
-  }
-  setmetatable(this, FlagValueMap)
-  return this
+function FlagValueMap:init()
+  self.map = {}
 end
 
 function FlagValueMap:put(flag_synonyms, values)
@@ -140,7 +132,7 @@ function M.parse(args)
     ::continue::
   end
 
-  return ArgObject.new(flags, pre_args, post_args)
+  return ArgObject(flags, pre_args, post_args)
 end
 
 ---Scan an EX arg string and split into individual args.

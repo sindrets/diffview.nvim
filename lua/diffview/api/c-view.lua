@@ -43,49 +43,43 @@ local M = {}
 ---@field ready boolean
 ---STATIC-MEMBERS:
 ---@field get_layout_mode function
-local CView = oop.class(View)
+local CView = oop.create_class("CView", View)
 
 ---CView constructor.
 ---@param opt any
 ---@return CView
-function CView.new(opt)
-  local this = {
-    git_root = opt.git_root,
-    git_dir = git.git_dir(opt.git_root),
-    rev_arg = opt.rev_arg,
-    path_args = opt.path_args,
-    left = opt.left,
-    right = opt.right,
-    options = opt.options,
-    emitter = EventEmitter.new(),
-    layout_mode = CView.get_layout_mode(),
-    files = FileDict.new(),
-    file_idx = 1,
-    nulled = false,
-    ready = false,
-    fetch_files = opt.update_files,
-    get_file_data = opt.get_file_data
-  }
+function CView:init(opt)
+  self.git_root = opt.git_root
+  self.git_dir = git.git_dir(opt.git_root)
+  self.rev_arg = opt.rev_arg
+  self.path_args = opt.path_args
+  self.left = opt.left
+  self.right = opt.right
+  self.options = opt.options
+  self.emitter = EventEmitter()
+  self.layout_mode = CView.get_layout_mode()
+  self.files = FileDict()
+  self.file_idx = 1
+  self.nulled = false
+  self.ready = false
+  self.fetch_files = opt.update_files
+  self.get_file_data = opt.get_file_data
 
-  this.file_panel = FilePanel.new(
-    this.git_root,
-    this.files,
-    this.path_args,
-    this.rev_arg or git.rev_to_pretty_string(this.left, this.right)
+  self.file_panel = FilePanel(
+    self.git_root,
+    self.files,
+    self.path_args,
+    self.rev_arg or git.rev_to_pretty_string(self.left, self.right)
   )
 
-  setmetatable(this, CView)
-
-  local files, selected = this:create_file_entries(opt.files)
-  this.file_idx = selected
+  local files, selected = self:create_file_entries(opt.files)
+  self.file_idx = selected
 
   for kind, entries in pairs(files) do
     for _, entry in ipairs(entries) do
-      table.insert(this.files[kind], entry)
+      table.insert(self.files[kind], entry)
     end
   end
-
-  return this
 end
 
 ---@override
@@ -101,14 +95,14 @@ function CView:create_file_entries(files)
     { kind = "working", files = files.working, left = self.left, right = self.right },
     {
       kind = "staged", files = files.staged, left = git.head_rev(self.git_root),
-      right = Rev.new(RevType.INDEX)
+      right = Rev(RevType.INDEX)
     }
   }
 
   for _, v in ipairs(sections) do
     entries[v.kind] = {}
     for _, file_data in ipairs(v.files) do
-      table.insert(entries[v.kind], CFileEntry.new({
+      table.insert(entries[v.kind], CFileEntry({
           path = file_data.path,
           oldpath = file_data.oldpath,
           absolute_path = utils.path_join({ self.git_root, file_data.path }),

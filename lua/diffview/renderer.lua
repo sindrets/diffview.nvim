@@ -18,21 +18,17 @@ local web_devicons
 ---@field lstart integer
 ---@field lend integer
 ---@field height integer
-local RenderComponent = oop.class()
+local RenderComponent = oop.create_class("RenderComponent")
 
 ---RenderComponent constructor.
 ---@return RenderComponent
-function RenderComponent.new()
-  local this = {
-    lines = {},
-    hl = {},
-    components = {},
-    lstart = -1,
-    lend = -1,
-    height = 0
-  }
-  setmetatable(this, RenderComponent)
-  return this
+function RenderComponent:init()
+  self.lines = {}
+  self.hl = {}
+  self.components = {}
+  self.lstart = -1
+  self.lend = -1
+  self.height = 0
 end
 
 local function create_subcomponents(component, comp_struct, schema)
@@ -55,7 +51,7 @@ end
 ---@return RenderComponent|any
 function RenderComponent:create_component(schema)
   local comp_struct
-  local new_comp = RenderComponent.new()
+  local new_comp = RenderComponent()
   table.insert(self.components, new_comp)
 
   if schema then
@@ -110,19 +106,15 @@ end
 ---@field hl HlData[]
 ---@field components RenderComponent[]
 ---@field namespace integer
-local RenderData = oop.class()
+local RenderData = oop.create_class("RenderData")
 
 ---RenderData constructor.
 ---@return RenderData
-function RenderData.new(ns_name)
-  local this = {
-    lines = {},
-    hl = {},
-    components = {},
-    namespace = a.nvim_create_namespace(ns_name)
-  }
-  setmetatable(this, RenderData)
-  return this
+function RenderData:init(ns_name)
+  self.lines = {}
+  self.hl = {}
+  self.components = {}
+  self.namespace = a.nvim_create_namespace(ns_name)
 end
 
 ---Create and add a new component.
@@ -130,7 +122,7 @@ end
 ---@return RenderComponent|any
 function RenderData:create_component(schema)
   local comp_struct
-  local new_comp = RenderComponent.new()
+  local new_comp = RenderComponent()
   table.insert(self.components, new_comp)
 
   if schema then

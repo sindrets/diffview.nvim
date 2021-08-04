@@ -49,35 +49,31 @@ local LayoutMode = oop.enum {
 ---@field file_idx integer
 ---@field nulled boolean
 ---@field ready boolean
-local View = oop.class()
+local View = oop.create_class("View")
 
 ---View constructor
 ---@return View
-function View.new(opt)
-  local this = {
-    git_root = opt.git_root,
-    git_dir = git.git_dir(opt.git_root),
-    rev_arg = opt.rev_arg,
-    path_args = opt.path_args,
-    left = opt.left,
-    right = opt.right,
-    options = opt.options,
-    emitter = EventEmitter.new(),
-    layout_mode = View.get_layout_mode(),
-    files = git.diff_file_list(opt.git_root, opt.left, opt.right, opt.path_args, opt.options),
-    file_idx = 1,
-    nulled = false,
-    ready = false
-  }
-  this.file_panel = FilePanel.new(
-    this.git_root,
-    this.files,
-    this.path_args,
-    this.rev_arg or git.rev_to_pretty_string(this.left, this.right)
+function View:init(opt)
+  self.git_root = opt.git_root
+  self.git_dir = git.git_dir(opt.git_root)
+  self.rev_arg = opt.rev_arg
+  self.path_args = opt.path_args
+  self.left = opt.left
+  self.right = opt.right
+  self.options = opt.options
+  self.emitter = EventEmitter()
+  self.layout_mode = View.get_layout_mode()
+  self.files = git.diff_file_list(opt.git_root, opt.left, opt.right, opt.path_args, opt.options)
+  self.file_idx = 1
+  self.nulled = false
+  self.ready = false
+  self.file_panel = FilePanel(
+    self.git_root,
+    self.files,
+    self.path_args,
+    self.rev_arg or git.rev_to_pretty_string(self.left, self.right)
   )
-  FileEntry.update_index_stat(this.git_root, this.git_dir)
-  setmetatable(this, View)
-  return this
+  FileEntry.update_index_stat(self.git_root, self.git_dir)
 end
 
 function View:open()
@@ -226,7 +222,7 @@ function View:update_files()
   }
 
   for _, v in ipairs(files) do
-    local diff = Diff.new(v.cur_files, v.new_files, function (aa, bb)
+    local diff = Diff(v.cur_files, v.new_files, function (aa, bb)
       return aa.path == bb.path
     end)
     local script = diff:create_edit_script()

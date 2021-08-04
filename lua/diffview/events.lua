@@ -12,16 +12,12 @@ local Event = oop.enum {
 
 ---@class EventEmitter
 ---@field listeners table<Event, function[]>
-local EventEmitter = oop.class()
+local EventEmitter = oop.create_class("EventEmitter")
 
 ---EventEmitter constructor.
 ---@return EventEmitter
-function EventEmitter.new()
-  local this = {
-    listeners = {}
-  }
-  setmetatable(this, EventEmitter)
-  return this
+function EventEmitter:init()
+  self.listeners = {}
 end
 
 function EventEmitter:on(event, callback)

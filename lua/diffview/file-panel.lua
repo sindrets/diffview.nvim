@@ -17,7 +17,7 @@ local name_counter = 1
 ---@field winid integer
 ---@field render_data RenderData
 ---@field components any
-local FilePanel = oop.class()
+local FilePanel = oop.create_class("FilePanel")
 
 FilePanel.winopts = {
   relativenumber = false,
@@ -59,17 +59,13 @@ FilePanel.bufopts = {
 ---@param files FileEntry[]
 ---@param path_args string[]
 ---@return FilePanel
-function FilePanel.new(git_root, files, path_args, rev_pretty_name)
+function FilePanel:init(git_root, files, path_args, rev_pretty_name)
   local conf = config.get_config()
-  local this = {
-    git_root = git_root,
-    files = files,
-    path_args = path_args,
-    rev_pretty_name = rev_pretty_name,
-    width = conf.file_panel.width
-  }
-  setmetatable(this, FilePanel)
-  return this
+  self.git_root = git_root
+  self.files = files
+  self.path_args = path_args
+  self.rev_pretty_name = rev_pretty_name
+  self.width = conf.file_panel.width
 end
 
 function FilePanel:is_open()
@@ -157,7 +153,7 @@ function FilePanel:init_buffer()
   end
 
   self.bufid = bn
-  self.render_data = renderer.RenderData.new(bufname)
+  self.render_data = renderer.RenderData(bufname)
 
   self.components = {
     ---@type any

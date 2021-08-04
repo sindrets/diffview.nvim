@@ -214,7 +214,7 @@ CView                                             *diffview.api.c-view.CView*
 
     Class that represents a custom Diffview.
 
-    CView.new({opt})
+    CView({opt})
 
         Parameters: ~
             {opt}   (table)   Table containing the args passed to the view

@@ -37,7 +37,7 @@ local fstat_cache = {}
 ---@field _update_windows function
 ---@field _attach_buffer function
 ---@field _detach_buffer function
-local FileEntry = oop.class()
+local FileEntry = oop.create_class("FileEntry")
 
 ---@static
 ---@type integer|nil
@@ -55,23 +55,19 @@ FileEntry.winopts = {
 ---FileEntry constructor
 ---@param opt table
 ---@return FileEntry
-function FileEntry.new(opt)
-  local this = {
-    path = opt.path,
-    oldpath = opt.oldpath,
-    absolute_path = opt.absolute_path,
-    parent_path = utils.path_parent(opt.path, true) or "",
-    basename = utils.path_basename(opt.path),
-    extension = utils.path_extension(opt.path),
-    status = opt.status,
-    stats = opt.stats,
-    kind = opt.kind,
-    left = opt.left,
-    right = opt.right,
-    created_bufs = {}
-  }
-  setmetatable(this, FileEntry)
-  return this
+function FileEntry:init(opt)
+  self.path = opt.path
+  self.oldpath = opt.oldpath
+  self.absolute_path = opt.absolute_path
+  self.parent_path = utils.path_parent(opt.path, true) or ""
+  self.basename = utils.path_basename(opt.path)
+  self.extension = utils.path_extension(opt.path)
+  self.status = opt.status
+  self.stats = opt.stats
+  self.kind = opt.kind
+  self.left = opt.left
+  self.right = opt.right
+  self.created_bufs = {}
 end
 
 function FileEntry:destroy()
