@@ -49,7 +49,8 @@ local LayoutMode = oop.enum {
 ---@field file_idx integer
 ---@field nulled boolean
 ---@field ready boolean
-local View = oop.create_class("View")
+local View = oop.Object
+View = oop.create_class("View")
 
 ---View constructor
 ---@return View

@@ -1,6 +1,6 @@
 --[[
--- Code derived from: http://lua-users.org/wiki/YetAnotherClassImplementation
--- Original author: Julien Patte [julien.patte@gmail.com]
+  Code derived from: https://github.com/jpatte/yaci.lua
+  Original author: Julien Patte [julien.patte@gmail.com]
 --]]
 
 local M = {}
@@ -114,6 +114,7 @@ end
 local function subclass(base_class, name)
   if type(name) ~= "string" then name = "Unnamed" end
 
+  ---@type Object
   local the_class = {}
 
   -- need to copy everything here because events can't be found through metatables
@@ -180,6 +181,10 @@ local function subclass(base_class, name)
   return the_class
 end
 
+---@class Object
+---@field init function
+---@field class function
+---@field virtual function
 local Object = {}
 
 local function obj_newitem()
@@ -191,7 +196,7 @@ function obj_inst_internals.init() end
 obj_inst_internals.__index = obj_inst_internals
 obj_inst_internals.__newindex = obj_newitem
 function obj_inst_internals.class() return Object end
-function obj_inst_internals.__tostring(inst) return ("a " .. inst:class():name()) end
+function obj_inst_internals.__tostring(inst) return "a " .. inst:class():name() end
 
 local obj_class_internals = {
   static = obj_inst_internals, new = new_instance, subclass = subclass,
@@ -208,6 +213,9 @@ setmetatable(Object, {
     __call = new_instance
 })
 
+---Create a new class.
+---@param name string
+---@param super_class Object
 function M.create_class(name, super_class)
  super_class = super_class or Object
  return super_class:subclass(name)

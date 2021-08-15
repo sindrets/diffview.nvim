@@ -8,7 +8,8 @@ local M = {}
 ---@class FileDict
 ---@field working FileEntry[]
 ---@field staged FileEntry[]
-local FileDict = oop.create_class("FileDict")
+local FileDict = oop.Object
+FileDict = oop.create_class("FileDict")
 
 ---FileDict constructor.
 ---@return FileDict

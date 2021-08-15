@@ -9,7 +9,8 @@ local long_flag_pat = "^%-%-(%a[%a%d-]*)=?(.*)"
 ---@field flags table<string, string>
 ---@field args string[]
 ---@field post_args string[]
-local ArgObject = oop.create_class("ArgObject")
+local ArgObject = oop.Object
+ArgObject = oop.create_class("ArgObject")
 
 ---ArgObject constructor.
 ---@param flags table<string, string>
@@ -32,7 +33,8 @@ end
 
 ---@class FlagValueMap
 ---@field map table<string, string[]>
-local FlagValueMap = oop.create_class("FlagValueMap")
+local FlagValueMap = oop.Object
+FlagValueMap = oop.create_class("FlagValueMap")
 
 ---FlagValueMap constructor
 ---@return FlagValueMap

@@ -18,7 +18,8 @@ local web_devicons
 ---@field lstart integer
 ---@field lend integer
 ---@field height integer
-local RenderComponent = oop.create_class("RenderComponent")
+local RenderComponent = oop.Object
+RenderComponent = oop.create_class("RenderComponent")
 
 ---RenderComponent constructor.
 ---@return RenderComponent
@@ -106,7 +107,8 @@ end
 ---@field hl HlData[]
 ---@field components RenderComponent[]
 ---@field namespace integer
-local RenderData = oop.create_class("RenderData")
+local RenderData = oop.Object
+RenderData = oop.create_class("RenderData")
 
 ---RenderData constructor.
 ---@return RenderData

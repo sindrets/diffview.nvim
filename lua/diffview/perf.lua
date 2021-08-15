@@ -10,7 +10,8 @@ local M = {}
 ---@field last integer Stop time (ns)
 ---@field final_time number Final time (ms)
 ---@field laps number[] List of lap times (ms)
-local PerfTimer = oop.create_class("PerfTimer")
+local PerfTimer = oop.Object
+PerfTimer = oop.create_class("PerfTimer")
 
 ---PerfTimer constructor.
 ---@param subject string|nil

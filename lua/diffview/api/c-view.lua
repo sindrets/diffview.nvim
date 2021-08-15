@@ -24,30 +24,11 @@ local M = {}
 ---@field files any
 ---@field fetch_files function A function that should return an updated list of files.
 ---@field get_file_data function A function that is called with parameters `path: string` and `split: string`, and should return a list of lines that should make up the buffer.
----INHERITED:
----@field tabpage integer
----@field git_root string Absolute path the root of the git directory.
----@field git_dir string Absolute path to the '.git' directory.
----@field rev_arg string
----@field path_args string[]
----@field left Rev
----@field right Rev
----@field options ViewOptions
----@field emitter EventEmitter
----@field layout_mode LayoutMode
----@field file_panel FilePanel
----@field left_winid integer
----@field right_winid integer
----@field file_idx integer
----@field nulled boolean
----@field ready boolean
----STATIC-MEMBERS:
----@field get_layout_mode function
-local CView = oop.create_class("CView", View)
+local CView = View
+CView = oop.create_class("CView", View)
 
 ---CView constructor.
 ---@param opt any
----@return CView
 function CView:init(opt)
   self.git_root = opt.git_root
   self.git_dir = git.git_dir(opt.git_root)
@@ -64,7 +45,6 @@ function CView:init(opt)
   self.ready = false
   self.fetch_files = opt.update_files
   self.get_file_data = opt.get_file_data
-
   self.file_panel = FilePanel(
     self.git_root,
     self.files,

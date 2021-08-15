@@ -41,24 +41,32 @@ end
 ---@param s string
 ---@return string
 function M.pattern_esc(s)
-  return (
-    s:gsub('%%', '%%%%')
-      :gsub('%^', '%%^')
-      :gsub('%$', '%%$')
-      :gsub('%(', '%%(')
-      :gsub('%)', '%%)')
-      :gsub('%.', '%%.')
-      :gsub('%[', '%%[')
-      :gsub('%]', '%%]')
-      :gsub('%*', '%%*')
-      :gsub('%+', '%%+')
-      :gsub('%-', '%%-')
-      :gsub('%?', '%%?')
-  )
+  return string.gsub(s, "[%(|%)|%%|%[|%]|%-|%.|%?|%+|%*|%^|%$]", {
+    ["%"] = "%%",
+    ["-"] = "%-",
+    ["("] = "%(",
+    [")"] = "%)",
+    ["."] = "%.",
+    ["["] = "%[",
+    ["]"] = "%]",
+    ["?"] = "%?",
+    ["+"] = "%+",
+    ["*"] = "%*",
+    ["^"] = "%^",
+    ["$"] = "%$",
+  })
 end
 
 function M.path_join(paths)
-  return table.concat(paths, path_sep)
+  local result = paths[1]
+  for i = 2, #paths do
+    if tostring(paths[i]):sub(1, 1) == path_sep then
+      result = result .. paths[i]
+    else
+      result = result .. path_sep .. paths[i]
+    end
+  end
+  return result
 end
 
 function M.path_split(path)

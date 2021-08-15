@@ -8,7 +8,9 @@ end
 M.defaults = {
   diff_binaries = false,
   file_panel = {
+    position = "left",
     width = 35,
+    height = 10,
     use_icons = true
   },
   key_bindings = {

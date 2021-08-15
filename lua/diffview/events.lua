@@ -12,7 +12,8 @@ local Event = oop.enum {
 
 ---@class EventEmitter
 ---@field listeners table<Event, function[]>
-local EventEmitter = oop.create_class("EventEmitter")
+local EventEmitter = oop.Object
+EventEmitter = oop.create_class("EventEmitter")
 
 ---EventEmitter constructor.
 ---@return EventEmitter

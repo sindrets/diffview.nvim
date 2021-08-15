@@ -28,16 +28,8 @@ local fstat_cache = {}
 ---@field left_bufid integer
 ---@field right_bufid integer
 ---@field created_bufs integer[]
----STATIC-INTERFACE:
----@field _null_buffer integer|nil
----@field _get_null_buffer function
----@field _create_buffer function
----@field should_null function
----@field load_null_buffer function
----@field _update_windows function
----@field _attach_buffer function
----@field _detach_buffer function
-local FileEntry = oop.create_class("FileEntry")
+local FileEntry = oop.Object
+FileEntry = oop.create_class("FileEntry")
 
 ---@static
 ---@type integer|nil
@@ -215,7 +207,7 @@ end
 function FileEntry._get_null_buffer()
   if not (FileEntry._null_buffer and a.nvim_buf_is_loaded(FileEntry._null_buffer)) then
     local bn = a.nvim_create_buf(false, false)
-    local bufname = utils.path_join({"diffview", "null"})
+    local bufname = utils.path_join({"diffview://", "null"})
     a.nvim_buf_set_option(bn, "modified", false)
     a.nvim_buf_set_option(bn, "modifiable", false)
 
@@ -240,18 +232,21 @@ function FileEntry._create_buffer(git_root, rev, path, null)
   if null then return FileEntry._get_null_buffer() end
 
   local bn = a.nvim_create_buf(false, false)
-  local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " show " .. (rev.commit or "") .. ":" .. vim.fn.shellescape(path)
+  local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " show "
+    .. (rev.commit or "") .. ":" .. vim.fn.shellescape(path)
   local lines = vim.fn.systemlist(cmd)
   a.nvim_buf_set_lines(bn, 0, -1, false, lines)
 
-  local basename = utils.path_basename(path)
-  local bufname = basename
+  local context
   if rev.type == RevType.COMMIT then
-    bufname = rev:abbrev() .. "_" .. basename
+    context = rev:abbrev()
   elseif rev.type == RevType.INDEX then
-    bufname = "[index]_" .. basename
+    context = ":0:"
   end
-  local fullname = utils.path_join({"diffview", bufname})
+
+  local fullname = utils.path_join({
+    "diffview://", git_root, context, path
+  })
   a.nvim_buf_set_option(bn, "modified", false)
   a.nvim_buf_set_option(bn, "modifiable", false)
 
@@ -260,7 +255,9 @@ function FileEntry._create_buffer(git_root, rev, path, null)
     -- Resolve name conflict
     local i = 1
     while not ok do
-      fullname = utils.path_join({"diffview", i .. "_" .. bufname})
+      fullname = utils.path_join({
+        "diffview://", git_root, context, i, path
+      })
       ok = pcall(a.nvim_buf_set_name, bn, fullname)
       i = i + 1
     end

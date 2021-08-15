@@ -19,7 +19,8 @@ local RevType = oop.enum {
 ---@field type integer
 ---@field commit string A commit SHA.
 ---@field head boolean If true, indicates that the rev should be updated when HEAD changes.
-local Rev = oop.create_class("Rev")
+local Rev = oop.Object
+Rev = oop.create_class("Rev")
 
 ---Rev constructor
 ---@param type RevType

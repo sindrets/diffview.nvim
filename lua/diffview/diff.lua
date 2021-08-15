@@ -25,7 +25,8 @@ local EditToken = oop.enum {
 ---@field up table<integer, integer>
 ---@field down table<integer, integer>
 ---@field eql_fn function
-local Diff = oop.create_class("Diff")
+local Diff = oop.Object
+Diff = oop.create_class("Diff")
 
 ---Diff constructor.
 ---@param a any[]
