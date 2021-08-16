@@ -1,9 +1,9 @@
 local Rev = require'diffview.rev'.Rev
 local RevType = require'diffview.rev'.RevType
-local arg_parser = require'diffview.arg-parser'
+local arg_parser = require'diffview.arg_parser'
 local git = require'diffview.git'
 local utils =  require'diffview.utils'
-local View = require'diffview.view'.View
+local View = require'diffview.scene.view'.View
 local a = vim.api
 
 local M = {}

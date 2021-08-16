@@ -3,11 +3,11 @@ local utils = require'diffview.utils'
 local git = require'diffview.git'
 local Event = require'diffview.events'.Event
 local EventEmitter = require'diffview.events'.EventEmitter
-local FileEntry = require'diffview.file-entry'.FileEntry
+local FileEntry = require'diffview.scene.file_entry'.FileEntry
 local RevType = require'diffview.rev'.RevType
 local Diff = require'diffview.diff'.Diff
 local EditToken = require'diffview.diff'.EditToken
-local FilePanel = require'diffview.file-panel'.FilePanel
+local FilePanel = require'diffview.scene.file_panel'.FilePanel
 local a = vim.api
 
 local M = {}

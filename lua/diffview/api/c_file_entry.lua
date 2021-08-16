@@ -1,6 +1,6 @@
 local oop = require'diffview.oop'
 local utils = require'diffview.utils'
-local FileEntry = require'diffview.file-entry'.FileEntry
+local FileEntry = require'diffview.scene.file_entry'.FileEntry
 local RevType = require'diffview.rev'.RevType
 
 local a = vim.api

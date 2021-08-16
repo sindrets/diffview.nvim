@@ -210,7 +210,7 @@ custom diffviews.
 Example usage:
 https://gist.github.com/sindrets/b750723f5f23182904f70a6274106304
 
-CView                                             *diffview.api.c-view.CView*
+CView                                             *diffview.api.c_view.CView*
 
     Class that represents a custom Diffview.
 
@@ -250,7 +250,7 @@ FileDict                                                *diffview.git.FileDict*
         {working} (FileData[])
         {staged}  (FileData[])
 
-FileData                                         *diffview.api.c-view.FileData*
+FileData                                         *diffview.api.c_view.FileData*
 
     Table that contains the metadata used to create file entries.
 

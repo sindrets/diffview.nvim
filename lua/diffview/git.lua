@@ -2,7 +2,7 @@ local oop = require'diffview.oop'
 local utils = require'diffview.utils'
 local Rev = require'diffview.rev'.Rev
 local RevType = require'diffview.rev'.RevType
-local FileEntry = require'diffview.file-entry'.FileEntry
+local FileEntry = require'diffview.scene.file_entry'.FileEntry
 local M = {}
 
 ---@class FileDict

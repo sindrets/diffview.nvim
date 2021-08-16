@@ -1,4 +1,4 @@
-local arg_parser = require'diffview.arg-parser'
+local arg_parser = require'diffview.arg_parser'
 local lib = require'diffview.lib'
 local Event = require'diffview.events'.Event
 local RevType = require'diffview.rev'.RevType
