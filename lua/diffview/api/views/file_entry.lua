@@ -1,6 +1,6 @@
 local oop = require'diffview.oop'
 local utils = require'diffview.utils'
-local FileEntry = require'diffview.scene.file_entry'.FileEntry
+local FileEntry = require'diffview.views.file_entry'.FileEntry
 local RevType = require'diffview.rev'.RevType
 
 local a = vim.api
@@ -26,7 +26,7 @@ function CFileEntry:init(opt)
   self.get_file_data = opt.get_file_data
 end
 
----@override
+---@Override
 function CFileEntry:load_buffers(git_root, left_winid, right_winid)
   local last_winid = a.nvim_get_current_win()
   local splits = {
@@ -86,7 +86,7 @@ function CFileEntry:load_buffers(git_root, left_winid, right_winid)
 end
 
 ---@static
----@override
+---@Override
 function CFileEntry._create_buffer(git_root, rev, path, lines, null)
   if null or not lines then return CFileEntry._get_null_buffer() end
 

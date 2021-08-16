@@ -21,7 +21,7 @@ function M.init()
 end
 
 function M.open(...)
-  local view = lib.parse_revs(utils.tbl_pack(...))
+  local view = lib.process_args(utils.tbl_pack(...))
   if view then
     view:open()
   end
@@ -65,30 +65,30 @@ function M.completion(arg_lead, cmd_line, cur_pos)
   return args
 end
 
-function M.on_tab_enter()
+function M.trigger_tab_enter()
   local view = lib.get_current_diffview()
   if view then
-    view:on_enter()
+    view:trigger_enter()
   end
 end
 
-function M.on_tab_leave()
+function M.trigger_tab_leave()
   local view = lib.get_current_diffview()
   if view then
-    view:on_leave()
+    view:trigger_leave()
   end
 end
 
-function M.on_buf_write_post()
+function M.trigger_buf_write_post()
   for _, view in ipairs(lib.views) do
-    view:on_buf_write_post()
+    view:trigger_buf_write_post()
   end
 end
 
-function M.on_win_leave()
+function M.trigger_win_leave()
   local view = lib.get_current_diffview()
   if view then
-    view:on_win_leave()
+    view:trigger_win_leave()
   end
 end
 
@@ -97,7 +97,7 @@ function M.update_colors()
   lib.update_colors()
 end
 
-function M.on_keypress(event_name)
+function M.trigger_event(event_name)
   if M.keypress_event_cbs[event_name] then
     M.keypress_event_cbs[event_name]()
   end

@@ -3,15 +3,15 @@ local RevType = require'diffview.rev'.RevType
 local arg_parser = require'diffview.arg_parser'
 local git = require'diffview.git'
 local utils =  require'diffview.utils'
-local View = require'diffview.scene.view'.View
+local WorktreeView = require'diffview.views.worktree.worktree_view'.WorktreeView
 local a = vim.api
 
 local M = {}
 
----@type View[]
+---@type WorktreeView[]
 M.views = {}
 
-function M.parse_revs(args)
+function M.process_args(args)
   local argo = arg_parser.parse(args)
   local rev_arg = argo.args[1]
   local paths = {}
@@ -20,18 +20,13 @@ function M.parse_revs(args)
     table.insert(paths, path)
   end
 
-  ---@type Rev
-  local left
-  ---@type Rev
-  local right
-
-  local cpath = argo:get_flag("C")
   local fpath = (
     vim.bo.buftype == ""
     and vim.fn.filereadable(vim.fn.expand("%f"))
     and vim.fn.expand("%f:p:h")
     or "."
   )
+  local cpath = argo:get_flag("C")
   local p = not vim.tbl_contains({"true", "", nil}, cpath) and cpath or fpath
   if vim.fn.isdirectory(p) ~= 1 then
     p = vim.fn.fnamemodify(p, ":h")
@@ -43,9 +38,47 @@ function M.parse_revs(args)
     return
   end
 
+  local cached = argo:get_flag("cached", "staged") == "true"
+  local left, right = M.parse_revs(git_root, rev_arg, cached)
+
+  ---@type WorktreeViewOptions
+  local options = {
+    show_untracked = arg_parser.ambiguous_bool(
+      argo:get_flag("u", "untracked-files"),
+      nil,
+      {"all", "normal", "true"},
+      {"no", "false"}
+    )
+  }
+
+  local v = WorktreeView({
+    git_root = git_root,
+    rev_arg = rev_arg,
+    path_args = paths,
+    left = left,
+    right = right,
+    options = options
+  })
+
+  table.insert(M.views, v)
+
+  return v
+end
+
+---Parse a given rev arg.
+---@param git_root string
+---@param rev_arg string
+---@param cached boolean
+---@return Rev left
+---@return Rev right
+function M.parse_revs(git_root, rev_arg, cached)
+  ---@type Rev
+  local left
+  ---@type Rev
+  local right
+
   local e_git_root = vim.fn.shellescape(git_root)
   local base_cmd = "git -C " .. e_git_root .. " "
-  local cached = argo:get_flag("cached", "staged") == "true"
 
   if not rev_arg then
     if cached then
@@ -87,28 +120,7 @@ function M.parse_revs(args)
     end
   end
 
-  ---@type ViewOptions
-  local options = {
-    show_untracked = arg_parser.ambiguous_bool(
-      argo:get_flag("u", "untracked-files"),
-      nil,
-      {"all", "normal", "true"},
-      {"no", "false"}
-    )
-  }
-
-  local v = View({
-      git_root = git_root,
-      rev_arg = rev_arg,
-      path_args = paths,
-      left = left,
-      right = right,
-      options = options
-    })
-
-  table.insert(M.views, v)
-
-  return v
+  return left, right
 end
 
 function M.add_view(view)
@@ -171,7 +183,7 @@ end
 ---file open in the view. Returns nil if the current tabpage is not a diffview,
 ---no file is open in the view, or there is no entry under the cursor in the
 ---file panel.
----@param view View|nil Use the given view rather than looking up the current
+---@param view WorktreeView|nil Use the given view rather than looking up the current
 ---   one.
 ---@return FileEntry|nil
 function M.infer_cur_file(view)

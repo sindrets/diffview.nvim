@@ -39,7 +39,9 @@ Example configuration with default settings:
     require'diffview'.setup {
       diff_binaries = false,    -- Show diffs for binaries
       file_panel = {
-        width = 35,
+        position = "left",      -- One of 'left', 'right', 'top', 'bottom'
+        width = 35,             -- Only applies when position is 'left' or 'right'
+        height = 10,            -- Only applies when position is 'top' or 'bottom'
         use_icons = true
       },
       key_bindings = {
@@ -210,11 +212,11 @@ custom diffviews.
 Example usage:
 https://gist.github.com/sindrets/b750723f5f23182904f70a6274106304
 
-CView                                             *diffview.api.c_view.CView*
+CWorktreeView         *diffview.api.views.worktree.worktree_view.CWorktreeView*
 
     Class that represents a custom Diffview.
 
-    CView({opt})
+    CWorktreeView({opt})
 
         Parameters: ~
             {opt}   (table)   Table containing the args passed to the view
@@ -233,7 +235,8 @@ CView                                             *diffview.api.c_view.CView*
                                         list of `FileData`, and is called from
                                         `View:update_files`.
                 Parameters: ~
-                    {view} (CView)  The CView object that called the function.
+                    {view} (CWorktreeView)  The CWorktreeView object that
+                                            called the function.
 
             {get_file_data} (function)  This should return a list of lines that
                                         make up the buffer indicated by `path`
@@ -250,7 +253,7 @@ FileDict                                                *diffview.git.FileDict*
         {working} (FileData[])
         {staged}  (FileData[])
 
-FileData                                         *diffview.api.c_view.FileData*
+FileData                   *diffview.api.views.worktree.worktree_view.FileData*
 
     Table that contains the metadata used to create file entries.
 
@@ -271,7 +274,7 @@ FileData                                         *diffview.api.c_view.FileData*
         {selected} (boolean)    If true, indicates that this should be the
                                 initially selected file.
 
-GitStats                                        *diffview.file-entry.GitStats*
+GitStats                                   *diffview.views.file_entry.GitStats*
 
     Table describing number of additions and deletions in a file.
 

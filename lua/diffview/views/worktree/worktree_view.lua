@@ -2,12 +2,13 @@ local oop = require'diffview.oop'
 local utils = require'diffview.utils'
 local git = require'diffview.git'
 local Event = require'diffview.events'.Event
-local EventEmitter = require'diffview.events'.EventEmitter
-local FileEntry = require'diffview.scene.file_entry'.FileEntry
+local FileEntry = require'diffview.views.file_entry'.FileEntry
 local RevType = require'diffview.rev'.RevType
 local Diff = require'diffview.diff'.Diff
 local EditToken = require'diffview.diff'.EditToken
-local FilePanel = require'diffview.scene.file_panel'.FilePanel
+local View = require'diffview.views.view'.View
+local LayoutMode = require'diffview.views.view'.LayoutMode
+local FilePanel = require'diffview.views.worktree.file_panel'.FilePanel
 local a = vim.api
 
 local M = {}
@@ -18,43 +19,30 @@ local win_reset_opts = {
   scrollbind = false
 }
 
----@class LayoutMode
-
----@class ELayoutMode
----@field HORIZONTAL LayoutMode
----@field VERTICAL LayoutMode
-local LayoutMode = oop.enum {
-  "HORIZONTAL",
-  "VERTICAL"
-}
-
----@class ViewOptions
+---@class WorktreeViewOptions
 ---@field show_untracked boolean|nil
 
----@class View
----@field tabpage integer
+---@class WorktreeView
 ---@field git_root string Absolute path the root of the git directory.
 ---@field git_dir string Absolute path to the '.git' directory.
 ---@field rev_arg string
 ---@field path_args string[]
 ---@field left Rev
 ---@field right Rev
----@field options ViewOptions
----@field emitter EventEmitter
----@field layout_mode LayoutMode
+---@field options WorktreeViewOptions
 ---@field file_panel FilePanel
 ---@field left_winid integer
 ---@field right_winid integer
 ---@field files FileDict
 ---@field file_idx integer
 ---@field nulled boolean
----@field ready boolean
-local View = oop.Object
-View = oop.create_class("View")
+local WorktreeView = View
+WorktreeView = oop.create_class("WorktreeView", View)
 
----View constructor
----@return View
-function View:init(opt)
+---WorktreeView constructor
+---@return WorktreeView
+function WorktreeView:init(opt)
+  self.super:init()
   self.git_root = opt.git_root
   self.git_dir = git.git_dir(opt.git_root)
   self.rev_arg = opt.rev_arg
@@ -62,12 +50,9 @@ function View:init(opt)
   self.left = opt.left
   self.right = opt.right
   self.options = opt.options
-  self.emitter = EventEmitter()
-  self.layout_mode = View.get_layout_mode()
   self.files = git.diff_file_list(opt.git_root, opt.left, opt.right, opt.path_args, opt.options)
   self.file_idx = 1
   self.nulled = false
-  self.ready = false
   self.file_panel = FilePanel(
     self.git_root,
     self.files,
@@ -77,7 +62,8 @@ function View:init(opt)
   FileEntry.update_index_stat(self.git_root, self.git_dir)
 end
 
-function View:open()
+---@Override
+function WorktreeView:open()
   vim.cmd("tab split")
   self.tabpage = a.nvim_get_current_tabpage()
   self:init_layout()
@@ -92,7 +78,8 @@ function View:open()
   end)
 end
 
-function View:close()
+---@Override
+function WorktreeView:close()
   for _, file in self.files:ipairs() do
     file:destroy()
   end
@@ -105,7 +92,8 @@ function View:close()
   end
 end
 
-function View:init_layout()
+---@Override
+function WorktreeView:init_layout()
   local split_cmd = self.layout_mode == LayoutMode.VERTICAL and "sp" or "vsp"
   self.left_winid = a.nvim_get_current_win()
   FileEntry.load_null_buffer(self.left_winid)
@@ -117,14 +105,14 @@ end
 
 ---Get the current file.
 ---@return FileEntry
-function View:cur_file()
+function WorktreeView:cur_file()
   if self.files:size() > 0 then
     return self.files[utils.clamp(self.file_idx, 1, self.files:size())]
   end
   return nil
 end
 
-function View:next_file()
+function WorktreeView:next_file()
   self:ensure_layout()
   if self:file_safeguard() then return end
 
@@ -142,7 +130,7 @@ function View:next_file()
   end
 end
 
-function View:prev_file()
+function WorktreeView:prev_file()
   self:ensure_layout()
   if self:file_safeguard() then return end
 
@@ -160,7 +148,7 @@ function View:prev_file()
   end
 end
 
-function View:set_file(file, focus)
+function WorktreeView:set_file(file, focus)
   self:ensure_layout()
   if self:file_safeguard() or not file then return end
 
@@ -181,7 +169,7 @@ function View:set_file(file, focus)
   end
 end
 
-function View:set_file_by_path(path, focus)
+function WorktreeView:set_file_by_path(path, focus)
   ---@type FileEntry
   for _, file in self.files:ipairs() do
     if file.path == path then
@@ -193,14 +181,14 @@ end
 
 ---Get an updated list of files.
 ---@return FileDict
-function View:get_updated_files()
+function WorktreeView:get_updated_files()
   return git.diff_file_list(
     self.git_root, self.left, self.right, self.path_args, self.options
   )
 end
 
 ---Update the file list, including stats and status for all files.
-function View:update_files()
+function WorktreeView:update_files()
   self:ensure_layout()
 
   -- If left is tracking HEAD and right is LOCAL: Update HEAD rev.
@@ -280,9 +268,10 @@ function View:update_files()
   self.update_needed = false
 end
 
+---@Override
 ---Checks the state of the view layout.
 ---@return LayoutState
-function View:validate_layout()
+function WorktreeView:validate_layout()
   ---@class LayoutState
   ---@field tabpage boolean
   ---@field left_win boolean
@@ -297,9 +286,10 @@ function View:validate_layout()
   return state
 end
 
+---@Override
 ---Recover the layout after the user has messed it up.
 ---@param state LayoutState
-function View:recover_layout(state)
+function WorktreeView:recover_layout(state)
   self.ready = false
 
   if not state.tabpage then
@@ -336,8 +326,9 @@ function View:recover_layout(state)
   self.ready = true
 end
 
+---@Override
 ---Ensure both left and right windows exist in the view's tabpage.
-function View:ensure_layout()
+function WorktreeView:ensure_layout()
   local state = self:validate_layout()
   if not state.valid then
     self:recover_layout(state)
@@ -346,7 +337,7 @@ end
 
 ---Ensures there are files to load, and loads the null buffer otherwise.
 ---@return boolean
-function View:file_safeguard()
+function WorktreeView:file_safeguard()
   if self.files:size() == 0 then
     local cur = self:cur_file()
     if cur then cur:detach_buffers() end
@@ -358,7 +349,8 @@ function View:file_safeguard()
   return false
 end
 
-function View:on_enter()
+---@Override
+function WorktreeView:trigger_enter()
   if self.ready then
     self:update_files()
   end
@@ -369,14 +361,16 @@ function View:on_enter()
   end
 end
 
-function View:on_leave()
+---@Override
+function WorktreeView:trigger_leave()
   local file = self:cur_file()
   if file then
     file:detach_buffers()
   end
 end
 
-function View:on_buf_write_post()
+---@Override
+function WorktreeView:trigger_buf_write_post()
   if git.has_local(self.left, self.right) then
     self.update_needed = true
     if a.nvim_get_current_tabpage() == self.tabpage then
@@ -385,14 +379,15 @@ function View:on_buf_write_post()
   end
 end
 
-function View:on_win_leave()
+---@Override
+function WorktreeView:trigger_win_leave()
   if self.ready and a.nvim_tabpage_is_valid(self.tabpage) then
     self:fix_foreign_windows()
   end
 end
 
 ---Disable unwanted options in all windows not part of the view.
-function View:fix_foreign_windows()
+function WorktreeView:fix_foreign_windows()
   local win_ids = a.nvim_tabpage_list_wins(self.tabpage)
   for _, id in ipairs(win_ids) do
     if not (
@@ -406,20 +401,10 @@ function View:fix_foreign_windows()
   end
 end
 
-function View:on_files_staged(callback)
+function WorktreeView:on_files_staged(callback)
   self.emitter:on(Event.FILES_STAGED, callback)
 end
 
-function View.get_layout_mode()
-  local diffopts = utils.str_split(vim.o.diffopt, ",")
-  if vim.tbl_contains(diffopts, "horizontal") then
-    return LayoutMode.VERTICAL
-  else
-    return LayoutMode.HORIZONTAL
-  end
-end
-
-M.LayoutMode = LayoutMode
-M.View = View
+M.WorktreeView = WorktreeView
 
 return M

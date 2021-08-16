@@ -59,6 +59,19 @@ function Panel:init(opt)
   self.relative = opt.relative or "editor"
   self.width = opt.width or 30
   self.height = opt.height or 16
+
+  local pos = { "left", "top", "right", "bottom" }
+  local rel = { "editor", "window" }
+  assert(
+    vim.tbl_contains(pos, self.position),
+    "'position' must be one of: " .. table.concat(pos, ", ")
+  )
+  assert(
+    vim.tbl_contains(rel, self.relative),
+    "'relative' must be one of: " .. table.concat(rel, ", ")
+  )
+  assert(type(self.width) == "number", "'width' must be a number!")
+  assert(type(self.height) == "number", "'height' must be a number!")
 end
 
 function Panel:is_open(in_tabpage)

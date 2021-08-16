@@ -2,7 +2,7 @@ local oop = require'diffview.oop'
 local utils = require'diffview.utils'
 local Rev = require'diffview.rev'.Rev
 local RevType = require'diffview.rev'.RevType
-local FileEntry = require'diffview.scene.file_entry'.FileEntry
+local FileEntry = require'diffview.views.file_entry'.FileEntry
 local M = {}
 
 ---@class FileDict
@@ -128,7 +128,7 @@ end
 ---@param left Rev
 ---@param right Rev
 ---@param path_args string[]|nil
----@param options ViewOptions
+---@param options WorktreeViewOptions
 ---@return FileDict
 function M.diff_file_list(git_root, left, right, path_args, options)
   ---@type FileDict
