@@ -49,7 +49,8 @@ function EventEmitter:once(event, callback)
   )
 end
 
-function EventEmitter:emit(event, args)
+function EventEmitter:emit(event, ...)
+  local args = {...}
   if type(self.listeners[event]) == "table" then
     for _, cb in ipairs(self.listeners[event]) do
       cb(args)

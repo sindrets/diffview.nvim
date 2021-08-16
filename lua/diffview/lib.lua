@@ -3,12 +3,12 @@ local RevType = require'diffview.rev'.RevType
 local arg_parser = require'diffview.arg_parser'
 local git = require'diffview.git'
 local utils =  require'diffview.utils'
-local WorktreeView = require'diffview.views.worktree.worktree_view'.WorktreeView
+local StandardView = require'diffview.views.standard.standard_view'.StandardView
 local a = vim.api
 
 local M = {}
 
----@type WorktreeView[]
+---@type View[]
 M.views = {}
 
 function M.process_args(args)
@@ -41,7 +41,7 @@ function M.process_args(args)
   local cached = argo:get_flag("cached", "staged") == "true"
   local left, right = M.parse_revs(git_root, rev_arg, cached)
 
-  ---@type WorktreeViewOptions
+  ---@type StandardViewOptions
   local options = {
     show_untracked = arg_parser.ambiguous_bool(
       argo:get_flag("u", "untracked-files"),
@@ -51,7 +51,7 @@ function M.process_args(args)
     )
   }
 
-  local v = WorktreeView({
+  local v = StandardView({
     git_root = git_root,
     rev_arg = rev_arg,
     path_args = paths,
@@ -159,7 +159,9 @@ function M.dispose_stray_views()
   end
 end
 
-function M.get_current_diffview()
+---Get the currently open Diffview.
+---@return View
+function M.get_current_view()
   local tabpage = a.nvim_get_current_tabpage()
   for _, view in ipairs(M.views) do
     if view.tabpage == tabpage then
@@ -178,30 +180,14 @@ function M.tabpage_to_view(tabpage)
   end
 end
 
----Infer the current selected file from the current diffview. If the file panel
----is focused: return the file entry under the cursor. Otherwise return the
----file open in the view. Returns nil if the current tabpage is not a diffview,
----no file is open in the view, or there is no entry under the cursor in the
----file panel.
----@param view WorktreeView|nil Use the given view rather than looking up the current
----   one.
----@return FileEntry|nil
-function M.infer_cur_file(view)
-  view = view or M.get_current_diffview()
-  if view then
-    if view.file_panel:is_focused() then
-      return view.file_panel:get_file_at_cursor()
-    else
-      return view:cur_file()
-    end
-  end
-end
-
 function M.update_colors()
+  ---@type any
   for _, view in ipairs(M.views) do
-    if view.file_panel:buf_loaded() then
-      view.file_panel:render()
-      view.file_panel:redraw()
+    if view:instanceof(StandardView) then
+      if view.file_panel:buf_loaded() then
+        view.file_panel:render()
+        view.file_panel:redraw()
+      end
     end
   end
 end

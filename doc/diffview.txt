@@ -212,11 +212,11 @@ custom diffviews.
 Example usage:
 https://gist.github.com/sindrets/b750723f5f23182904f70a6274106304
 
-CWorktreeView         *diffview.api.views.worktree.worktree_view.CWorktreeView*
+CStandardView         *diffview.api.views.standard.standard_view.CStandardView*
 
     Class that represents a custom Diffview.
 
-    CWorktreeView({opt})
+    CStandardView({opt})
 
         Parameters: ~
             {opt}   (table)   Table containing the args passed to the view
@@ -235,7 +235,7 @@ CWorktreeView         *diffview.api.views.worktree.worktree_view.CWorktreeView*
                                         list of `FileData`, and is called from
                                         `View:update_files`.
                 Parameters: ~
-                    {view} (CWorktreeView)  The CWorktreeView object that
+                    {view} (CStandardView)  The CStandardView object that
                                             called the function.
 
             {get_file_data} (function)  This should return a list of lines that
@@ -253,7 +253,7 @@ FileDict                                                *diffview.git.FileDict*
         {working} (FileData[])
         {staged}  (FileData[])
 
-FileData                   *diffview.api.views.worktree.worktree_view.FileData*
+FileData                   *diffview.api.views.standard.standard_view.FileData*
 
     Table that contains the metadata used to create file entries.
 

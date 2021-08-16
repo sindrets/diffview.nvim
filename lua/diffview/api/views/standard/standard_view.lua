@@ -1,9 +1,9 @@
 local oop = require'diffview.oop'
 local utils = require'diffview.utils'
 local EventEmitter = require'diffview.events'.EventEmitter
-local WorktreeView = require'diffview.views.worktree.worktree_view'.WorktreeView
+local StandardView = require'diffview.views.standard.standard_view'.StandardView
 local CFileEntry = require'diffview.api.views.file_entry'.CFileEntry
-local FilePanel = require'diffview.views.worktree.file_panel'.FilePanel
+local FilePanel = require'diffview.views.standard.file_panel'.FilePanel
 local FileDict = require'diffview.git'.FileDict
 local Rev = require'diffview.rev'.Rev
 local RevType = require'diffview.rev'.RevType
@@ -20,16 +20,16 @@ local M = {}
 ---@field right_null boolean Indicates that the right buffer should be represented by the null buffer.
 ---@field selected boolean|nil Indicates that this should be the initially selected file.
 
----@class CWorktreeView
+---@class CStandardView
 ---@field files any
 ---@field fetch_files function A function that should return an updated list of files.
 ---@field get_file_data function A function that is called with parameters `path: string` and `split: string`, and should return a list of lines that should make up the buffer.
-local CWorktreeView = WorktreeView
-CWorktreeView = oop.create_class("CWorktreeView", WorktreeView)
+local CStandardView = StandardView
+CStandardView = oop.create_class("CStandardView", StandardView)
 
----CWorktreeView constructor.
+---CStandardView constructor.
 ---@param opt any
-function CWorktreeView:init(opt)
+function CStandardView:init(opt)
   self.git_root = opt.git_root
   self.git_dir = git.git_dir(opt.git_root)
   self.rev_arg = opt.rev_arg
@@ -38,7 +38,7 @@ function CWorktreeView:init(opt)
   self.right = opt.right
   self.options = opt.options
   self.emitter = EventEmitter()
-  self.layout_mode = CWorktreeView.get_layout_mode()
+  self.layout_mode = CStandardView.get_layout_mode()
   self.files = FileDict()
   self.file_idx = 1
   self.nulled = false
@@ -63,11 +63,11 @@ function CWorktreeView:init(opt)
 end
 
 ---@Override
-function CWorktreeView:get_updated_files()
+function CStandardView:get_updated_files()
   return self:create_file_entries(self.fetch_files(self))
 end
 
-function CWorktreeView:create_file_entries(files)
+function CStandardView:create_file_entries(files)
   local entries = {}
   local i, file_idx = 1, 1
 
@@ -106,5 +106,5 @@ function CWorktreeView:create_file_entries(files)
   return entries, file_idx
 end
 
-M.CWorktreeView = CWorktreeView
+M.CStandardView = CStandardView
 return M

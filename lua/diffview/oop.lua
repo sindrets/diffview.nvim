@@ -128,6 +128,9 @@ local function subclass(base_class, name)
   inst_internals.init = inst_init_def
   inst_internals.__newindex = inst_newindex
   function inst_internals.class() return the_class end
+  function inst_internals.instanceof(_, other)
+    return the_class == other or base_class:isa(other)
+  end
 
   -- Look for field 'key' in instance 'inst'
   function inst_internals.__index(inst, key)
@@ -155,8 +158,8 @@ local function subclass(base_class, name)
 
   function class_internals.name(_) return name end
   function class_internals.super(_) return base_class end
-  function class_internals.instanceof(_, other)
-    return (base_class == other or base_class:instanceof(other))
+  function class_internals.isa(_, other)
+    return (the_class == other or base_class:isa(other))
   end
 
   ---@diagnostic disable-next-line: redefined-local
@@ -184,6 +187,7 @@ end
 ---@class Object
 ---@field init function
 ---@field class function
+---@field instanceof function
 ---@field virtual function
 local Object = {}
 
@@ -196,6 +200,7 @@ function obj_inst_internals.init() end
 obj_inst_internals.__index = obj_inst_internals
 obj_inst_internals.__newindex = obj_newitem
 function obj_inst_internals.class() return Object end
+function obj_inst_internals.instanceof(_, other) return other == Object end
 function obj_inst_internals.__tostring(inst) return "a " .. inst:class():name() end
 
 local obj_class_internals = {
@@ -204,7 +209,7 @@ local obj_class_internals = {
 }
 function obj_class_internals.name() return "Object" end
 function obj_class_internals.super() return nil end
-function obj_class_internals.instanceof() return false end
+function obj_class_internals.isa(_, other) return other == Object end
 meta_obj[Object] = { virtuals = {} }
 
 setmetatable(Object, {

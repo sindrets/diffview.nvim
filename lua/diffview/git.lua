@@ -128,7 +128,7 @@ end
 ---@param left Rev
 ---@param right Rev
 ---@param path_args string[]|nil
----@param options WorktreeViewOptions
+---@param options StandardViewOptions
 ---@return FileDict
 function M.diff_file_list(git_root, left, right, path_args, options)
   ---@type FileDict
@@ -312,20 +312,29 @@ end
 ---@param kind "staged"|"working"
 ---@param commit string
 function M.restore_file(git_root, path, kind, commit)
+  local file_exists = vim.fn.filereadable(utils.path_join({ git_root, path })) == 1
   local base_cmd = "git -C " .. vim.fn.shellescape(git_root) .. " "
+  local out
 
-  -- Wite file blob into db
-  local out = vim.fn.system(base_cmd .. "hash-object -w -- " .. vim.fn.shellescape(path))
-  if utils.shell_error() then
-    utils.err("Failed to write file blob into the object database. Aborting file restoration.")
-    utils.err("Git output: " .. out)
-    return
+  if file_exists then
+    -- Wite file blob into db
+    out = vim.fn.system(base_cmd .. "hash-object -w -- " .. vim.fn.shellescape(path))
+    if utils.shell_error() then
+      utils.err("Failed to write file blob into the object database. Aborting file restoration.")
+      utils.err("Git output: " .. out)
+      return
+    end
   end
 
-  local undo = (":sp %s | %%!git show %s"):format(
-    vim.fn.fnameescape(path),
-    out:sub(1, 11)
-  )
+  local undo
+  if file_exists then
+    undo = (":sp %s | %%!git show %s"):format(
+      vim.fn.fnameescape(path),
+      out:sub(1, 11)
+    )
+  else
+    undo = (":!git rm %s"):format(vim.fn.fnameescape(path))
+  end
 
   -- Revert file
   local cmd = ("%s checkout %s -- %s"):format(
