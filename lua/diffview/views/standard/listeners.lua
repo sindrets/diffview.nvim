@@ -2,10 +2,40 @@ local utils = require'diffview.utils'
 local git = require'diffview.git'
 local RevType = require'diffview.rev'.RevType
 local Event = require'diffview.events'.Event
+local api = vim.api
 
 ---@param view StandardView
 return function(view)
   return {
+    tab_enter = function ()
+      if view.ready then
+        view:update_files()
+      end
+
+      local file = view:cur_file()
+      if file then
+        file:attach_buffers()
+      end
+    end,
+    tab_leave = function ()
+      local file = view:cur_file()
+      if file then
+        file:detach_buffers()
+      end
+    end,
+    buf_write_post = function ()
+      if git.has_local(view.left, view.right) then
+        view.update_needed = true
+        if api.nvim_get_current_tabpage() == view.tabpage then
+          view:update_files()
+        end
+      end
+    end,
+    win_leave = function ()
+      if view.ready and api.nvim_tabpage_is_valid(view.tabpage) then
+        view:fix_foreign_windows()
+      end
+    end,
     select_next_entry = function ()
       view:next_file()
     end,

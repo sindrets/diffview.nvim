@@ -9,7 +9,7 @@ local EditToken = require'diffview.diff'.EditToken
 local View = require'diffview.views.view'.View
 local LayoutMode = require'diffview.views.view'.LayoutMode
 local FilePanel = require'diffview.views.standard.file_panel'.FilePanel
-local a = vim.api
+local api = vim.api
 
 local M = {}
 
@@ -65,7 +65,7 @@ end
 ---@Override
 function StandardView:open()
   vim.cmd("tab split")
-  self.tabpage = a.nvim_get_current_tabpage()
+  self.tabpage = api.nvim_get_current_tabpage()
   self:init_layout()
   self:init_event_listeners()
   vim.schedule(function ()
@@ -87,8 +87,8 @@ function StandardView:close()
 
   self.file_panel:destroy()
 
-  if self.tabpage and a.nvim_tabpage_is_valid(self.tabpage) then
-    local pagenr = a.nvim_tabpage_get_number(self.tabpage)
+  if self.tabpage and api.nvim_tabpage_is_valid(self.tabpage) then
+    local pagenr = api.nvim_tabpage_get_number(self.tabpage)
     vim.cmd("tabclose " .. pagenr)
   end
 end
@@ -96,10 +96,10 @@ end
 ---@Override
 function StandardView:init_layout()
   local split_cmd = self.layout_mode == LayoutMode.VERTICAL and "sp" or "vsp"
-  self.left_winid = a.nvim_get_current_win()
+  self.left_winid = api.nvim_get_current_win()
   FileEntry.load_null_buffer(self.left_winid)
   vim.cmd("belowright " .. split_cmd)
-  self.right_winid = a.nvim_get_current_win()
+  self.right_winid = api.nvim_get_current_win()
   FileEntry.load_null_buffer(self.right_winid)
   self.file_panel:open()
 end
@@ -164,7 +164,7 @@ function StandardView:set_file(file, focus)
       self.nulled = false
 
       if focus then
-        a.nvim_set_current_win(self.right_winid)
+        api.nvim_set_current_win(self.right_winid)
       end
     end
   end
@@ -204,7 +204,7 @@ function StandardView:update_files()
   end
 
   local index_stat = vim.loop.fs_stat(utils.path_join({ self.git_dir, "index" }))
-  local last_winid = a.nvim_get_current_win()
+  local last_winid = api.nvim_get_current_win()
   local new_files = self:get_updated_files()
   local files = {
     { cur_files = self.files.working, new_files = new_files.working },
@@ -262,8 +262,8 @@ function StandardView:update_files()
   self.file_idx = utils.clamp(self.file_idx, 1, self.files:size())
   self:set_file(self:cur_file())
 
-  if a.nvim_win_is_valid(last_winid) then
-    a.nvim_set_current_win(last_winid)
+  if api.nvim_win_is_valid(last_winid) then
+    api.nvim_set_current_win(last_winid)
   end
 
   self.update_needed = false
@@ -279,9 +279,9 @@ function StandardView:validate_layout()
   ---@field right_win boolean
   ---@field valid boolean
   local state = {
-    tabpage = a.nvim_tabpage_is_valid(self.tabpage),
-    left_win = a.nvim_win_is_valid(self.left_winid),
-    right_win = a.nvim_win_is_valid(self.right_winid)
+    tabpage = api.nvim_tabpage_is_valid(self.tabpage),
+    left_win = api.nvim_win_is_valid(self.left_winid),
+    right_win = api.nvim_win_is_valid(self.right_winid)
   }
   state.valid = state.tabpage and state.left_win and state.right_win
   return state
@@ -295,14 +295,14 @@ function StandardView:recover_layout(state)
 
   if not state.tabpage then
     vim.cmd("tab split")
-    self.tabpage = a.nvim_get_current_tabpage()
+    self.tabpage = api.nvim_get_current_tabpage()
     self.file_panel:close()
     self:init_layout()
     self.ready = true
     return
   end
 
-  a.nvim_set_current_tabpage(self.tabpage)
+  api.nvim_set_current_tabpage(self.tabpage)
   self.file_panel:close()
   local split_cmd = self.layout_mode == LayoutMode.VERTICAL and "sp" or "vsp"
 
@@ -310,16 +310,16 @@ function StandardView:recover_layout(state)
     self:init_layout()
 
   elseif not state.left_win then
-    a.nvim_set_current_win(self.right_winid)
+    api.nvim_set_current_win(self.right_winid)
     vim.cmd("aboveleft " .. split_cmd)
-    self.left_winid = a.nvim_get_current_win()
+    self.left_winid = api.nvim_get_current_win()
     self.file_panel:open()
     self:set_file(self:cur_file())
 
   elseif not state.right_win then
-    a.nvim_set_current_win(self.left_winid)
+    api.nvim_set_current_win(self.left_winid)
     vim.cmd("belowright " .. split_cmd)
-    self.right_winid = a.nvim_get_current_win()
+    self.right_winid = api.nvim_get_current_win()
     self.file_panel:open()
     self:set_file(self:cur_file())
   end
@@ -350,53 +350,16 @@ function StandardView:file_safeguard()
   return false
 end
 
----@Override
-function StandardView:trigger_enter()
-  if self.ready then
-    self:update_files()
-  end
-
-  local file = self:cur_file()
-  if file then
-    file:attach_buffers()
-  end
-end
-
----@Override
-function StandardView:trigger_leave()
-  local file = self:cur_file()
-  if file then
-    file:detach_buffers()
-  end
-end
-
----@Override
-function StandardView:trigger_buf_write_post()
-  if git.has_local(self.left, self.right) then
-    self.update_needed = true
-    if a.nvim_get_current_tabpage() == self.tabpage then
-      self:update_files()
-    end
-  end
-end
-
----@Override
-function StandardView:trigger_win_leave()
-  if self.ready and a.nvim_tabpage_is_valid(self.tabpage) then
-    self:fix_foreign_windows()
-  end
-end
-
 ---Disable unwanted options in all windows not part of the view.
 function StandardView:fix_foreign_windows()
-  local win_ids = a.nvim_tabpage_list_wins(self.tabpage)
+  local win_ids = api.nvim_tabpage_list_wins(self.tabpage)
   for _, id in ipairs(win_ids) do
     if not (
         id == self.file_panel.winid
         or id == self.left_winid
         or id == self.right_winid) then
       for k, v in pairs(win_reset_opts) do
-        a.nvim_win_set_option(id, k, v)
+        api.nvim_win_set_option(id, k, v)
       end
     end
   end

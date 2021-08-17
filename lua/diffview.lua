@@ -63,33 +63,6 @@ function M.completion(arg_lead, cmd_line, cur_pos)
   return args
 end
 
-function M.trigger_tab_enter()
-  local view = lib.get_current_view()
-  if view then
-    view:trigger_enter()
-  end
-end
-
-function M.trigger_tab_leave()
-  local view = lib.get_current_view()
-  if view then
-    view:trigger_leave()
-  end
-end
-
-function M.trigger_buf_write_post()
-  for _, view in ipairs(lib.views) do
-    view:trigger_buf_write_post()
-  end
-end
-
-function M.trigger_win_leave()
-  local view = lib.get_current_view()
-  if view then
-    view:trigger_win_leave()
-  end
-end
-
 function M.update_colors()
   colors.setup()
   lib.update_colors()

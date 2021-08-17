@@ -15,11 +15,11 @@ endfunction
 
 augroup Diffview
     au!
-    au TabEnter * lua require'diffview'.trigger_tab_enter()
-    au TabLeave * lua require'diffview'.trigger_tab_leave()
+    au TabEnter * lua require'diffview'.trigger_event("tab_enter")
+    au TabLeave * lua require'diffview'.trigger_event("tab_leave")
     au TabClosed * lua require'diffview'.close(tonumber(vim.fn.expand("<afile>")))
-    au BufWritePost * lua require'diffview'.trigger_buf_write_post()
-    au WinLeave * lua require'diffview'.trigger_win_leave()
+    au BufWritePost * lua require'diffview'.trigger_event("buf_write_post")
+    au WinLeave * lua require'diffview'.trigger_event("win_leave")
     au User FugitiveChanged lua require'diffview'.trigger_event("refresh_files")
     au ColorScheme * lua require'diffview'.update_colors()
 augroup END

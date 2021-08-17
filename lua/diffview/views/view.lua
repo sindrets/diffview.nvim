@@ -60,22 +60,6 @@ function View:ensure_layout()
   end
 end
 
-function View:trigger_enter()
-  -- Method stub
-end
-
-function View:trigger_leave()
-  -- Method stub
-end
-
-function View:trigger_buf_write_post()
-  -- Method stub
-end
-
-function View:trigger_win_leave()
-  -- Method stub
-end
-
 function View.get_layout_mode()
   local diffopts = utils.str_split(vim.o.diffopt, ",")
   if vim.tbl_contains(diffopts, "horizontal") then
