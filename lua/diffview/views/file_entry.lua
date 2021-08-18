@@ -101,44 +101,48 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
     },
   }
 
-  for _, split in ipairs(splits) do
-    local winnr = vim.fn.win_id2win(split.winid)
+  pcall(function()
+    vim.opt.eventignore = "WinEnter,WinLeave"
+    for _, split in ipairs(splits) do
+      local winnr = vim.fn.win_id2win(split.winid)
 
-    if not (split.bufid and a.nvim_buf_is_loaded(split.bufid)) then
-      if split.rev.type == RevType.LOCAL then
-        if split.binary or FileEntry.should_null(split.rev, self.status, split.pos) then
-          local bn = FileEntry._create_buffer(git_root, split.rev, self.path, true)
+      if not (split.bufid and a.nvim_buf_is_loaded(split.bufid)) then
+        if split.rev.type == RevType.LOCAL then
+          if split.binary or FileEntry.should_null(split.rev, self.status, split.pos) then
+            local bn = FileEntry._create_buffer(git_root, split.rev, self.path, true)
+            a.nvim_win_set_buf(split.winid, bn)
+            split.bufid = bn
+          else
+            vim.cmd(winnr .. "windo edit " .. vim.fn.fnameescape(self.absolute_path))
+            split.bufid = a.nvim_get_current_buf()
+          end
+        elseif split.rev.type == RevType.COMMIT or split.rev.type == RevType.INDEX then
+          local bn
+          if self.oldpath and split.pos == "left" then
+            bn = FileEntry._create_buffer(git_root, split.rev, self.oldpath, split.binary)
+          else
+            bn = FileEntry._create_buffer(
+              git_root,
+              split.rev,
+              self.path,
+              split.binary or FileEntry.should_null(split.rev, self.status, split.pos)
+            )
+          end
+          table.insert(self.created_bufs, bn)
           a.nvim_win_set_buf(split.winid, bn)
           split.bufid = bn
-        else
-          vim.cmd(winnr .. "windo edit " .. vim.fn.fnameescape(self.absolute_path))
-          split.bufid = a.nvim_get_current_buf()
+          vim.cmd(winnr .. "windo filetype detect")
         end
-      elseif split.rev.type == RevType.COMMIT or split.rev.type == RevType.INDEX then
-        local bn
-        if self.oldpath and split.pos == "left" then
-          bn = FileEntry._create_buffer(git_root, split.rev, self.oldpath, split.binary)
-        else
-          bn = FileEntry._create_buffer(
-            git_root,
-            split.rev,
-            self.path,
-            split.binary or FileEntry.should_null(split.rev, self.status, split.pos)
-          )
-        end
-        table.insert(self.created_bufs, bn)
-        a.nvim_win_set_buf(split.winid, bn)
-        split.bufid = bn
-        vim.cmd(winnr .. "windo filetype detect")
+
+        FileEntry._attach_buffer(split.bufid)
+      else
+        a.nvim_win_set_buf(split.winid, split.bufid)
+        FileEntry._attach_buffer(split.bufid)
       end
-
-      FileEntry._attach_buffer(split.bufid)
-    else
-      a.nvim_win_set_buf(split.winid, split.bufid)
-      FileEntry._attach_buffer(split.bufid)
     end
-  end
+  end)
 
+  vim.opt.eventignore = ""
   self.left_bufid = splits[1].bufid
   self.right_bufid = splits[2].bufid
 

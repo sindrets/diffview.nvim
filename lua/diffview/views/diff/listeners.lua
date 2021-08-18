@@ -4,7 +4,7 @@ local RevType = require("diffview.rev").RevType
 local Event = require("diffview.events").Event
 local api = vim.api
 
----@param view StandardView
+---@param view DiffView
 return function(view)
   return {
     tab_enter = function()
@@ -43,14 +43,14 @@ return function(view)
       view:prev_file()
     end,
     next_entry = function()
-      view.file_panel:highlight_next_file()
+      view.panel:highlight_next_file()
     end,
     prev_entry = function()
-      view.file_panel:highlight_prev_file()
+      view.panel:highlight_prev_file()
     end,
     select_entry = function()
-      if view.file_panel:is_open() then
-        local file = view.file_panel:get_file_at_cursor()
+      if view.panel:is_open() then
+        local file = view.panel:get_file_at_cursor()
         if file then
           view:set_file(file, true)
         end
@@ -121,10 +121,10 @@ return function(view)
       end
     end,
     focus_files = function()
-      view.file_panel:focus(true)
+      view.panel:focus(true)
     end,
     toggle_files = function()
-      view.file_panel:toggle()
+      view.panel:toggle()
     end,
     refresh_files = function()
       view:update_files()

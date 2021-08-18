@@ -3,7 +3,7 @@ local RevType = require("diffview.rev").RevType
 local arg_parser = require("diffview.arg_parser")
 local git = require("diffview.git")
 local utils = require("diffview.utils")
-local StandardView = require("diffview.views.standard.standard_view").StandardView
+local DiffView = require("diffview.views.diff.diff_view").DiffView
 local a = vim.api
 
 local M = {}
@@ -41,7 +41,7 @@ function M.process_args(args)
   local cached = argo:get_flag("cached", "staged") == "true"
   local left, right = M.parse_revs(git_root, rev_arg, cached)
 
-  ---@type StandardViewOptions
+  ---@type DiffViewOptions
   local options = {
     show_untracked = arg_parser.ambiguous_bool(
       argo:get_flag("u", "untracked-files"),
@@ -51,7 +51,7 @@ function M.process_args(args)
     ),
   }
 
-  local v = StandardView({
+  local v = DiffView({
     git_root = git_root,
     rev_arg = rev_arg,
     path_args = paths,
@@ -183,12 +183,13 @@ function M.tabpage_to_view(tabpage)
 end
 
 function M.update_colors()
+  local StandardView = require("diffview.views.standard.standard_view").StandardView
   ---@type any
   for _, view in ipairs(M.views) do
     if view:instanceof(StandardView) then
-      if view.file_panel:buf_loaded() then
-        view.file_panel:render()
-        view.file_panel:redraw()
+      if view.panel:buf_loaded() then
+        view.panel:render()
+        view.panel:redraw()
       end
     end
   end

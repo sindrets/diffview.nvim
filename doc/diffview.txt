@@ -212,11 +212,11 @@ custom diffviews.
 Example usage:
 https://gist.github.com/sindrets/b750723f5f23182904f70a6274106304
 
-CStandardView         *diffview.api.views.standard.standard_view.CStandardView*
+CDiffView                         *diffview.api.views.diff.diff_view.CDiffView*
 
     Class that represents a custom Diffview.
 
-    CStandardView({opt})
+    CDiffView({opt})
 
         Parameters: ~
             {opt}   (table)   Table containing the args passed to the view
@@ -235,8 +235,8 @@ CStandardView         *diffview.api.views.standard.standard_view.CStandardView*
                                         list of `FileData`, and is called from
                                         `View:update_files`.
                 Parameters: ~
-                    {view} (CStandardView)  The CStandardView object that
-                                            called the function.
+                    {view} (CDiffView)  The CDiffView object that called the
+                                        function.
 
             {get_file_data} (function)  This should return a list of lines that
                                         make up the buffer indicated by `path`
@@ -253,7 +253,7 @@ FileDict                                                *diffview.git.FileDict*
         {working} (FileData[])
         {staged}  (FileData[])
 
-FileData                   *diffview.api.views.standard.standard_view.FileData*
+FileData                           *diffview.api.views.diff.diff_view.FileData*
 
     Table that contains the metadata used to create file entries.
 

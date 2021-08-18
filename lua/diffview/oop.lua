@@ -101,15 +101,6 @@ end
 local callup_store = {}
 setmetatable(callup_store, { __mode = "k" })
 
---- Function used to transfer a method call from a class to its superclass
-local function create_callup(inst, target)
-  local callup = function(_, ...)
-    return target(inst, ...)
-  end
-  callup_store[callup] = true
-  return callup
-end
-
 local function inst_init_def(inst)
   inst.super:init()
 end
@@ -168,12 +159,6 @@ local function subclass(base_class, name)
     end
 
     res = inst.super[key] -- Is it somewhere higher in the hierarchy?
-
-    if type(res) == "function" and not callup_store[res] then
-      -- If it's a method of the super class: use the callup function to call
-      -- `res` with the correct `self`.
-      return create_callup(inst, res)
-    end
 
     return res
   end

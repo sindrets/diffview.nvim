@@ -76,7 +76,7 @@ end
 
 ---@Override
 function FilePanel:open()
-  self.super.open(self)
+  FilePanel:super().open(self)
   vim.cmd("wincmd =")
 end
 

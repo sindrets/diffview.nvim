@@ -134,7 +134,7 @@ end
 ---@param left Rev
 ---@param right Rev
 ---@param path_args string[]|nil
----@param options StandardViewOptions
+---@param options DiffViewOptions
 ---@return FileDict
 function M.diff_file_list(git_root, left, right, path_args, options)
   ---@type FileDict
