@@ -98,11 +98,16 @@ local function secure_cast(class, inst)
   return casted
 end
 
+local callup_store = {}
+setmetatable(callup_store, { __mode = "k" })
+
 --- Function used to transfer a method call from a class to its superclass
 local function create_callup(inst, target)
-  return function(_, ...)
+  local callup = function(_, ...)
     return target(inst, ...)
   end
+  callup_store[callup] = true
+  return callup
 end
 
 local function inst_init_def(inst)
@@ -145,16 +150,15 @@ local function subclass(base_class, name)
     __le = b.__le,
     __concat = b.__concat,
     __call = b.__call,
+    __newindex = inst_newindex,
+    init = inst_init_def,
+    class = function()
+      return the_class
+    end,
+    instanceof = function(_, other)
+      return the_class == other or base_class:isa(other)
+    end,
   }
-
-  inst_internals.init = inst_init_def
-  inst_internals.__newindex = inst_newindex
-  function inst_internals.class()
-    return the_class
-  end
-  function inst_internals.instanceof(_, other)
-    return the_class == other or base_class:isa(other)
-  end
 
   -- Look for field 'key' in instance 'inst'
   function inst_internals.__index(inst, key)
@@ -165,10 +169,9 @@ local function subclass(base_class, name)
 
     res = inst.super[key] -- Is it somewhere higher in the hierarchy?
 
-    if type(res) == "function" then
+    if type(res) == "function" and not callup_store[res] then
       -- If it's a method of the super class: use the callup function to call
       -- `res` with the correct `self`.
-      -- TODO: Check if res is already a callup.
       return create_callup(inst, res)
     end
 
@@ -182,18 +185,17 @@ local function subclass(base_class, name)
     virtual = make_virtual,
     cast = secure_cast,
     trycast = try_cast,
+    name = function(_)
+      return name
+    end,
+    super = function(_)
+      return base_class
+    end,
+    isa = function(_, other)
+      return the_class == other or base_class:isa(other)
+    end,
   }
   meta_obj[the_class] = { virtuals = duplicate(meta_obj[base_class].virtuals) }
-
-  function class_internals.name(_)
-    return name
-  end
-  function class_internals.super(_)
-    return base_class
-  end
-  function class_internals.isa(_, other)
-    return (the_class == other or base_class:isa(other))
-  end
 
   ---@diagnostic disable-next-line: redefined-local
   local function newmethod(class, name, meth)
@@ -228,19 +230,20 @@ local function obj_newitem()
   error("Do not modify the 'Object' class. Subclass it instead.")
 end
 
-local obj_inst_internals = {}
-function obj_inst_internals.init() end
+local obj_inst_internals = {
+  __newindex = obj_newitem,
+  __tostring = function(inst)
+    return "a " .. inst:class():name()
+  end,
+  init = function() end,
+  class = function()
+    return Object
+  end,
+  instanceof = function(_, other)
+    return other == Object
+  end,
+}
 obj_inst_internals.__index = obj_inst_internals
-obj_inst_internals.__newindex = obj_newitem
-function obj_inst_internals.class()
-  return Object
-end
-function obj_inst_internals.instanceof(_, other)
-  return other == Object
-end
-function obj_inst_internals.__tostring(inst)
-  return "a " .. inst:class():name()
-end
 
 local obj_class_internals = {
   static = obj_inst_internals,
@@ -248,16 +251,16 @@ local obj_class_internals = {
   subclass = subclass,
   cast = secure_cast,
   trycast = try_cast,
+  name = function()
+    return "Object"
+  end,
+  super = function()
+    return nil
+  end,
+  isa = function(_, other)
+    return other == Object
+  end,
 }
-function obj_class_internals.name()
-  return "Object"
-end
-function obj_class_internals.super()
-  return nil
-end
-function obj_class_internals.isa(_, other)
-  return other == Object
-end
 meta_obj[Object] = { virtuals = {} }
 
 setmetatable(Object, {
