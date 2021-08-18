@@ -3,10 +3,14 @@ local M = {}
 
 function M.get_hl_attr(hl_group_name, attr)
   local id = a.nvim_get_hl_id_by_name(hl_group_name)
-  if not id then return end
+  if not id then
+    return
+  end
 
   local value = vim.fn.synIDattr(id, attr)
-  if not value or value == "" then return end
+  if not value or value == "" then
+    return
+  end
 
   return value
 end
@@ -25,15 +29,15 @@ end
 
 function M.get_colors()
   return {
-    white    = M.get_fg('Normal') or 'White',
-    red      = M.get_fg('Keyword') or 'Red',
-    green    = M.get_fg('Character') or 'Green',
-    yellow   = M.get_fg('PreProc') or 'Yellow',
-    blue     = M.get_fg('Include') or 'Blue',
-    purple   = M.get_fg('Define') or 'Purple',
-    cyan     = M.get_fg('Conditional') or 'Cyan',
-    dark_red = M.get_fg('Keyword') or 'DarkRed',
-    orange   = M.get_fg('Number') or 'Orange',
+    white = M.get_fg("Normal") or "White",
+    red = M.get_fg("Keyword") or "Red",
+    green = M.get_fg("Character") or "Green",
+    yellow = M.get_fg("PreProc") or "Yellow",
+    blue = M.get_fg("Include") or "Blue",
+    purple = M.get_fg("Define") or "Purple",
+    cyan = M.get_fg("Conditional") or "Cyan",
+    dark_red = M.get_fg("Keyword") or "DarkRed",
+    orange = M.get_fg("Number") or "Orange",
   }
 end
 

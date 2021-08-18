@@ -1,6 +1,6 @@
-local oop = require'diffview.oop'
-local utils = require'diffview.utils'
-local renderer = require'diffview.renderer'
+local oop = require("diffview.oop")
+local utils = require("diffview.utils")
+local renderer = require("diffview.renderer")
 local api = vim.api
 local M = {}
 local name_counter = 1
@@ -10,10 +10,10 @@ local name_counter = 1
 ---@class EForm
 ---@field COLUMN Form
 ---@field ROW Form
-local Form = oop.enum {
+local Form = oop.enum({
   "COLUMN",
-  "ROW"
-}
+  "ROW",
+})
 
 ---@class Panel
 ---@field position string
@@ -38,9 +38,9 @@ Panel.winopts = {
   foldenable = false,
   spell = false,
   wrap = false,
-  signcolumn = 'yes',
-  foldmethod = 'manual',
-  foldcolumn = '0',
+  signcolumn = "yes",
+  foldmethod = "manual",
+  foldcolumn = "0",
   scrollbind = false,
   cursorbind = false,
   diff = false,
@@ -50,7 +50,7 @@ Panel.bufopts = {
   swapfile = false,
   buftype = "nofile",
   modifiable = false,
-  bufhidden = "hide"
+  bufhidden = "hide",
 }
 
 function Panel:init(opt)
@@ -97,7 +97,9 @@ function Panel:focus(open_if_closed)
 end
 
 function Panel:resize()
-  if not self:is_open(true) then return end
+  if not self:is_open(true) then
+    return
+  end
 
   local winnr = vim.fn.win_id2win(self.winid)
   local cmd
@@ -110,11 +112,15 @@ function Panel:resize()
 end
 
 function Panel:open()
-  if not self:buf_loaded() then self:init_buffer() end
-  if self:is_open() then return end
+  if not self:buf_loaded() then
+    self:init_buffer()
+  end
+  if self:is_open() then
+    return
+  end
 
-  local split_dir = vim.tbl_contains({ "top", "left" }, self.position)
-    and "aboveleft" or "belowright"
+  local split_dir = vim.tbl_contains({ "top", "left" }, self.position) and "aboveleft"
+    or "belowright"
   local split_cmd = self.form == Form.ROW and "sp" or "vsp"
   vim.cmd(split_dir .. " " .. split_cmd)
 
@@ -186,7 +192,9 @@ end
 Panel:virtual("render")
 
 function Panel:redraw()
-  if not self.render_data then return end
+  if not self.render_data then
+    return
+  end
   renderer.render(self.bufid, self.render_data)
 end
 

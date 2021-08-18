@@ -1,8 +1,8 @@
-local config = require'diffview.config'
-local oop = require'diffview.oop'
-local utils = require'diffview.utils'
-local renderer = require'diffview.renderer'
-local Panel = require'diffview.ui.panel'.Panel
+local config = require("diffview.config")
+local oop = require("diffview.oop")
+local utils = require("diffview.utils")
+local renderer = require("diffview.renderer")
+local Panel = require("diffview.ui.panel").Panel
 local api = vim.api
 local M = {}
 
@@ -31,29 +31,29 @@ FilePanel.winopts = {
   spell = false,
   wrap = false,
   cursorline = true,
-  signcolumn = 'yes',
-  foldmethod = 'manual',
-  foldcolumn = '0',
+  signcolumn = "yes",
+  foldmethod = "manual",
+  foldcolumn = "0",
   scrollbind = false,
   cursorbind = false,
   diff = false,
   winhl = table.concat({
-    'EndOfBuffer:DiffviewEndOfBuffer',
-    'Normal:DiffviewNormal',
-    'CursorLine:DiffviewCursorLine',
-    'VertSplit:DiffviewVertSplit',
-    'SignColumn:DiffviewNormal',
-    'StatusLine:DiffviewStatusLine',
-    'StatusLineNC:DiffviewStatuslineNC'
-  }, ',')
+    "EndOfBuffer:DiffviewEndOfBuffer",
+    "Normal:DiffviewNormal",
+    "CursorLine:DiffviewCursorLine",
+    "VertSplit:DiffviewVertSplit",
+    "SignColumn:DiffviewNormal",
+    "StatusLine:DiffviewStatusLine",
+    "StatusLineNC:DiffviewStatuslineNC",
+  }, ","),
 }
 
 FilePanel.bufopts = {
   swapfile = false,
-  buftype = 'nofile';
-  modifiable = false;
-  filetype = 'DiffviewFiles';
-  bufhidden = 'hide';
+  buftype = "nofile",
+  modifiable = false,
+  filetype = "DiffviewFiles",
+  bufhidden = "hide",
 }
 
 ---FilePanel constructor.
@@ -66,7 +66,7 @@ function FilePanel:init(git_root, files, path_args, rev_pretty_name)
   self.super:init({
     position = conf.file_panel.position,
     width = conf.file_panel.width,
-    height = conf.file_panel.height
+    height = conf.file_panel.height,
   })
   self.git_root = git_root
   self.files = files
@@ -110,18 +110,18 @@ function FilePanel:init_buffer()
     ---@type any
     working = self.render_data:create_component({
       { name = "title" },
-      { name = "files" }
+      { name = "files" },
     }),
     ---@type any
     staged = self.render_data:create_component({
       { name = "title" },
-      { name = "files" }
+      { name = "files" },
     }),
     ---@type any
     info = self.render_data:create_component({
       { name = "title" },
-      { name = "entries" }
-    })
+      { name = "entries" },
+    }),
   }
 
   self:render()
@@ -133,7 +133,9 @@ end
 ---Get the file entry under the cursor.
 ---@return FileEntry|nil
 function FilePanel:get_file_at_cursor()
-  if not (self:is_open() and self:buf_loaded()) then return end
+  if not (self:is_open() and self:buf_loaded()) then
+    return
+  end
 
   local cursor = api.nvim_win_get_cursor(self.winid)
   local line = cursor[1]
@@ -146,7 +148,9 @@ function FilePanel:get_file_at_cursor()
 end
 
 function FilePanel:highlight_file(file)
-  if not (self:is_open() and self:buf_loaded()) then return end
+  if not (self:is_open() and self:buf_loaded()) then
+    return
+  end
 
   for i, f in self.files:ipairs() do
     if f == file then
@@ -157,13 +161,15 @@ function FilePanel:highlight_file(file)
       else
         offset = self.components.working.files.comp.lstart
       end
-      pcall(api.nvim_win_set_cursor, self.winid, {i + offset, 0})
+      pcall(api.nvim_win_set_cursor, self.winid, { i + offset, 0 })
     end
   end
 end
 
 function FilePanel:highlight_prev_file()
-  if not (self:is_open() and self:buf_loaded()) or self.files:size() == 0 then return end
+  if not (self:is_open() and self:buf_loaded()) or self.files:size() == 0 then
+    return
+  end
 
   local cursor = api.nvim_win_get_cursor(self.winid)
   local line = cursor[1]
@@ -178,11 +184,13 @@ function FilePanel:highlight_prev_file()
   end
 
   line = utils.clamp(line - 1, min, max)
-  pcall(api.nvim_win_set_cursor, self.winid, {line, 0})
+  pcall(api.nvim_win_set_cursor, self.winid, { line, 0 })
 end
 
 function FilePanel:highlight_next_file()
-  if not (self:is_open() and self:buf_loaded()) or self.files:size() == 0 then return end
+  if not (self:is_open() and self:buf_loaded()) or self.files:size() == 0 then
+    return
+  end
 
   local cursor = api.nvim_win_get_cursor(self.winid)
   local line = cursor[1]
@@ -197,7 +205,7 @@ function FilePanel:highlight_next_file()
   end
 
   line = utils.clamp(line + 1, min, max)
-  pcall(api.nvim_win_set_cursor, self.winid, {line, 0})
+  pcall(api.nvim_win_set_cursor, self.winid, { line, 0 })
 end
 
 ---@param comp RenderComponent
@@ -218,9 +226,19 @@ local function render_files(comp, files)
 
     if file.stats then
       offset = #s + 1
-      comp:add_hl("DiffviewFilePanelInsertions", line_idx, offset, offset + string.len(file.stats.additions))
+      comp:add_hl(
+        "DiffviewFilePanelInsertions",
+        line_idx,
+        offset,
+        offset + string.len(file.stats.additions)
+      )
       offset = offset + string.len(file.stats.additions) + 2
-      comp:add_hl("DiffviewFilePanelDeletions", line_idx, offset, offset + string.len(file.stats.deletions))
+      comp:add_hl(
+        "DiffviewFilePanelDeletions",
+        line_idx,
+        offset,
+        offset + string.len(file.stats.deletions)
+      )
       s = s .. " " .. file.stats.additions .. ", " .. file.stats.deletions
     end
 
@@ -234,7 +252,9 @@ local function render_files(comp, files)
 end
 
 function FilePanel:render()
-  if not self.render_data then return end
+  if not self.render_data then
+    return
+  end
 
   self.render_data:clear()
 
@@ -249,9 +269,9 @@ function FilePanel:render()
   line_idx = 0
   s = "Changes"
   comp:add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
-  local change_count = "("  .. #self.files.working .. ")"
+  local change_count = "(" .. #self.files.working .. ")"
   comp:add_hl("DiffviewFilePanelCounter", line_idx, #s + 1, #s + 1 + string.len(change_count))
-  s =  s .. " " .. change_count
+  s = s .. " " .. change_count
   comp:add_line(s)
 
   render_files(self.components.working.files.comp, self.files.working)
@@ -272,10 +292,7 @@ function FilePanel:render()
   end
 
   if self.rev_pretty_name or (self.path_args and #self.path_args > 0) then
-    local extra_info = utils.tbl_concat(
-      { self.rev_pretty_name },
-      self.path_args or {}
-    )
+    local extra_info = utils.tbl_concat({ self.rev_pretty_name }, self.path_args or {})
 
     comp = self.components.info.title.comp
     line_idx = 0
@@ -290,7 +307,9 @@ function FilePanel:render()
     line_idx = 0
     for _, arg in ipairs(extra_info) do
       local relpath = utils.path_relative(arg, self.git_root)
-      if relpath == "" then relpath = "." end
+      if relpath == "" then
+        relpath = "."
+      end
       s = utils.path_shorten(relpath, self.width - 5)
       comp:add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
       comp:add_line(s)

@@ -1,13 +1,13 @@
-local oop = require'diffview.oop'
-local utils = require'diffview.utils'
-local EventEmitter = require'diffview.events'.EventEmitter
-local StandardView = require'diffview.views.standard.standard_view'.StandardView
-local CFileEntry = require'diffview.api.views.file_entry'.CFileEntry
-local FilePanel = require'diffview.views.standard.file_panel'.FilePanel
-local FileDict = require'diffview.git'.FileDict
-local Rev = require'diffview.rev'.Rev
-local RevType = require'diffview.rev'.RevType
-local git = require'diffview.git'
+local oop = require("diffview.oop")
+local utils = require("diffview.utils")
+local EventEmitter = require("diffview.events").EventEmitter
+local StandardView = require("diffview.views.standard.standard_view").StandardView
+local CFileEntry = require("diffview.api.views.file_entry").CFileEntry
+local FilePanel = require("diffview.views.standard.file_panel").FilePanel
+local FileDict = require("diffview.git").FileDict
+local Rev = require("diffview.rev").Rev
+local RevType = require("diffview.rev").RevType
+local git = require("diffview.git")
 
 local M = {}
 
@@ -74,27 +74,32 @@ function CStandardView:create_file_entries(files)
   local sections = {
     { kind = "working", files = files.working, left = self.left, right = self.right },
     {
-      kind = "staged", files = files.staged, left = git.head_rev(self.git_root),
-      right = Rev(RevType.INDEX)
-    }
+      kind = "staged",
+      files = files.staged,
+      left = git.head_rev(self.git_root),
+      right = Rev(RevType.INDEX),
+    },
   }
 
   for _, v in ipairs(sections) do
     entries[v.kind] = {}
     for _, file_data in ipairs(v.files) do
-      table.insert(entries[v.kind], CFileEntry({
-        path = file_data.path,
-        oldpath = file_data.oldpath,
-        absolute_path = utils.path_join({ self.git_root, file_data.path }),
-        status = file_data.status,
-        stats = file_data.stats,
-        kind = v.kind,
-        left = v.left,
-        right = v.right,
-        left_null = file_data.left_null,
-        right_null = file_data.right_null,
-        get_file_data = self.get_file_data
-      }))
+      table.insert(
+        entries[v.kind],
+        CFileEntry({
+          path = file_data.path,
+          oldpath = file_data.oldpath,
+          absolute_path = utils.path_join({ self.git_root, file_data.path }),
+          status = file_data.status,
+          stats = file_data.stats,
+          kind = v.kind,
+          left = v.left,
+          right = v.right,
+          left_null = file_data.left_null,
+          right_null = file_data.right_null,
+          get_file_data = self.get_file_data,
+        })
+      )
 
       if file_data.selected == true then
         file_idx = i

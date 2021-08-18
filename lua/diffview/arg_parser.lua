@@ -1,4 +1,4 @@
-local oop = require'diffview.oop'
+local oop = require("diffview.oop")
 
 local M = {}
 
@@ -26,8 +26,10 @@ end
 ---@vararg ... string[] Flag synonyms
 ---@return any
 function ArgObject:get_flag(...)
-  for _, name in ipairs({...}) do
-    if self.flags[name] ~= nil then return self.flags[name] end
+  for _, name in ipairs({ ... }) do
+    if self.flags[name] ~= nil then
+      return self.flags[name]
+    end
   end
 end
 
@@ -82,13 +84,15 @@ end
 function FlagValueMap:get_completion(flag_name)
   local is_short = flag_name:match(short_flag_pat) ~= nil
   if is_short then
-    flag_name = flag_name:sub(1,2)
+    flag_name = flag_name:sub(1, 2)
   else
     flag_name = flag_name:gsub("=.*", "")
   end
 
   local values = self.map[flag_name]
-  if not values then return nil end
+  if not values then
+    return nil
+  end
 
   local items = {}
   for _, v in ipairs(values) do
@@ -196,8 +200,12 @@ function M.scan_ex_args(cmd_line, cur_pos)
 end
 
 function M.ambiguous_bool(value, default, truthy, falsy)
-  if vim.tbl_contains(truthy, value) then return true end
-  if vim.tbl_contains(falsy, value) then return false end
+  if vim.tbl_contains(truthy, value) then
+    return true
+  end
+  if vim.tbl_contains(falsy, value) then
+    return false
+  end
   return default
 end
 

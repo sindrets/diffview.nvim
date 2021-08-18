@@ -1,6 +1,6 @@
-local oop = require'diffview.oop'
-local utils = require'diffview.utils'
-local EventEmitter = require'diffview.events'.EventEmitter
+local oop = require("diffview.oop")
+local utils = require("diffview.utils")
+local EventEmitter = require("diffview.events").EventEmitter
 local a = vim.api
 
 local M = {}
@@ -10,10 +10,10 @@ local M = {}
 ---@class ELayoutMode
 ---@field HORIZONTAL LayoutMode
 ---@field VERTICAL LayoutMode
-local LayoutMode = oop.enum {
+local LayoutMode = oop.enum({
   "HORIZONTAL",
-  "VERTICAL"
-}
+  "VERTICAL",
+})
 
 ---@class View
 ---@field tabpage integer

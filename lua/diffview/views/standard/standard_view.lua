@@ -1,14 +1,14 @@
-local oop = require'diffview.oop'
-local utils = require'diffview.utils'
-local git = require'diffview.git'
-local Event = require'diffview.events'.Event
-local FileEntry = require'diffview.views.file_entry'.FileEntry
-local RevType = require'diffview.rev'.RevType
-local Diff = require'diffview.diff'.Diff
-local EditToken = require'diffview.diff'.EditToken
-local View = require'diffview.views.view'.View
-local LayoutMode = require'diffview.views.view'.LayoutMode
-local FilePanel = require'diffview.views.standard.file_panel'.FilePanel
+local oop = require("diffview.oop")
+local utils = require("diffview.utils")
+local git = require("diffview.git")
+local Event = require("diffview.events").Event
+local FileEntry = require("diffview.views.file_entry").FileEntry
+local RevType = require("diffview.rev").RevType
+local Diff = require("diffview.diff").Diff
+local EditToken = require("diffview.diff").EditToken
+local View = require("diffview.views.view").View
+local LayoutMode = require("diffview.views.view").LayoutMode
+local FilePanel = require("diffview.views.standard.file_panel").FilePanel
 local api = vim.api
 
 local M = {}
@@ -16,7 +16,7 @@ local M = {}
 local win_reset_opts = {
   diff = false,
   cursorbind = false,
-  scrollbind = false
+  scrollbind = false,
 }
 
 ---@class StandardViewOptions
@@ -68,7 +68,7 @@ function StandardView:open()
   self.tabpage = api.nvim_get_current_tabpage()
   self:init_layout()
   self:init_event_listeners()
-  vim.schedule(function ()
+  vim.schedule(function()
     local file = self:cur_file()
     if file then
       self:set_file(file)
@@ -115,12 +115,16 @@ end
 
 function StandardView:next_file()
   self:ensure_layout()
-  if self:file_safeguard() then return end
+  if self:file_safeguard() then
+    return
+  end
 
   if self.files:size() > 1 or self.nulled then
     local cur = self:cur_file()
-    if cur then cur:detach_buffers() end
-    self.file_idx = (self.file_idx) % self.files:size() + 1
+    if cur then
+      cur:detach_buffers()
+    end
+    self.file_idx = self.file_idx % self.files:size() + 1
     vim.cmd("diffoff!")
     cur = self.files[self.file_idx]
     cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
@@ -133,11 +137,15 @@ end
 
 function StandardView:prev_file()
   self:ensure_layout()
-  if self:file_safeguard() then return end
+  if self:file_safeguard() then
+    return
+  end
 
   if self.files:size() > 1 or self.nulled then
     local cur = self:cur_file()
-    if cur then cur:detach_buffers() end
+    if cur then
+      cur:detach_buffers()
+    end
     self.file_idx = (self.file_idx - 2) % self.files:size() + 1
     vim.cmd("diffoff!")
     cur = self.files[self.file_idx]
@@ -151,12 +159,16 @@ end
 
 function StandardView:set_file(file, focus)
   self:ensure_layout()
-  if self:file_safeguard() or not file then return end
+  if self:file_safeguard() or not file then
+    return
+  end
 
   for i, f in self.files:ipairs() do
     if f == file then
       local cur = self:cur_file()
-      if cur then cur:detach_buffers() end
+      if cur then
+        cur:detach_buffers()
+      end
       self.file_idx = i
       vim.cmd("diffoff!")
       self.files[self.file_idx]:load_buffers(self.git_root, self.left_winid, self.right_winid)
@@ -183,9 +195,7 @@ end
 ---Get an updated list of files.
 ---@return FileDict
 function StandardView:get_updated_files()
-  return git.diff_file_list(
-    self.git_root, self.left, self.right, self.path_args, self.options
-  )
+  return git.diff_file_list(self.git_root, self.left, self.right, self.path_args, self.options)
 end
 
 ---Update the file list, including stats and status for all files.
@@ -208,11 +218,11 @@ function StandardView:update_files()
   local new_files = self:get_updated_files()
   local files = {
     { cur_files = self.files.working, new_files = new_files.working },
-    { cur_files = self.files.staged, new_files = new_files.staged }
+    { cur_files = self.files.staged, new_files = new_files.staged },
   }
 
   for _, v in ipairs(files) do
-    local diff = Diff(v.cur_files, v.new_files, function (aa, bb)
+    local diff = Diff(v.cur_files, v.new_files, function(aa, bb)
       return aa.path == bb.path
     end)
     local script = diff:create_edit_script()
@@ -240,7 +250,9 @@ function StandardView:update_files()
         table.remove(v.cur_files, ai)
       elseif opr == EditToken.INSERT then
         table.insert(v.cur_files, ai, v.new_files[bi])
-        if ai <= self.file_idx then self.file_idx = self.file_idx + 1 end
+        if ai <= self.file_idx then
+          self.file_idx = self.file_idx + 1
+        end
         ai = ai + 1
         bi = bi + 1
       elseif opr == EditToken.REPLACE then
@@ -281,7 +293,7 @@ function StandardView:validate_layout()
   local state = {
     tabpage = api.nvim_tabpage_is_valid(self.tabpage),
     left_win = api.nvim_win_is_valid(self.left_winid),
-    right_win = api.nvim_win_is_valid(self.right_winid)
+    right_win = api.nvim_win_is_valid(self.right_winid),
   }
   state.valid = state.tabpage and state.left_win and state.right_win
   return state
@@ -308,14 +320,12 @@ function StandardView:recover_layout(state)
 
   if not state.left_win and not state.right_win then
     self:init_layout()
-
   elseif not state.left_win then
     api.nvim_set_current_win(self.right_winid)
     vim.cmd("aboveleft " .. split_cmd)
     self.left_winid = api.nvim_get_current_win()
     self.file_panel:open()
     self:set_file(self:cur_file())
-
   elseif not state.right_win then
     api.nvim_set_current_win(self.left_winid)
     vim.cmd("belowright " .. split_cmd)
@@ -341,7 +351,9 @@ end
 function StandardView:file_safeguard()
   if self.files:size() == 0 then
     local cur = self:cur_file()
-    if cur then cur:detach_buffers() end
+    if cur then
+      cur:detach_buffers()
+    end
     FileEntry.load_null_buffer(self.left_winid)
     FileEntry.load_null_buffer(self.right_winid)
     self.nulled = true
@@ -354,10 +366,7 @@ end
 function StandardView:fix_foreign_windows()
   local win_ids = api.nvim_tabpage_list_wins(self.tabpage)
   for _, id in ipairs(win_ids) do
-    if not (
-        id == self.file_panel.winid
-        or id == self.left_winid
-        or id == self.right_winid) then
+    if not (id == self.file_panel.winid or id == self.left_winid or id == self.right_winid) then
       for k, v in pairs(win_reset_opts) do
         api.nvim_win_set_option(id, k, v)
       end
@@ -370,7 +379,7 @@ function StandardView:on_files_staged(callback)
 end
 
 function StandardView:init_event_listeners()
-  local listeners = require'diffview.views.standard.listeners'(self)
+  local listeners = require("diffview.views.standard.listeners")(self)
   for event, callback in pairs(listeners) do
     self.emitter:on(event, callback)
   end

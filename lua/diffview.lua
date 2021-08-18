@@ -1,14 +1,14 @@
-local arg_parser = require'diffview.arg_parser'
-local lib = require'diffview.lib'
-local config = require'diffview.config'
-local colors = require'diffview.colors'
-local utils = require "diffview.utils"
+local arg_parser = require("diffview.arg_parser")
+local lib = require("diffview.lib")
+local config = require("diffview.config")
+local colors = require("diffview.colors")
+local utils = require("diffview.utils")
 local M = {}
 
 local flag_value_completion = arg_parser.FlagValueMap()
-flag_value_completion:put({"u", "untracked-files"}, {"true", "normal", "all", "false", "no"})
-flag_value_completion:put({"cached", "staged"}, {"true", "false"})
-flag_value_completion:put({"C"}, {})
+flag_value_completion:put({ "u", "untracked-files" }, { "true", "normal", "all", "false", "no" })
+flag_value_completion:put({ "cached", "staged" }, { "true", "false" })
+flag_value_completion:put({ "C" }, {})
 
 function M.setup(user_config)
   config.setup(user_config or {})
@@ -27,7 +27,7 @@ end
 
 function M.close(tabpage)
   if tabpage then
-    vim.schedule(function ()
+    vim.schedule(function()
       lib.dispose_stray_views()
     end)
     return
@@ -56,7 +56,9 @@ function M.completion(arg_lead, cmd_line, cur_pos)
     return commits
   else
     local flag_completion = flag_value_completion:get_completion(arg_lead)
-    if flag_completion then return flag_completion end
+    if flag_completion then
+      return flag_completion
+    end
 
     return flag_value_completion:get_all_names()
   end

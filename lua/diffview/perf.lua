@@ -1,6 +1,6 @@
 ---@diagnostic disable: redefined-local
-local oop = require'diffview.oop'
-local utils = require'diffview.utils'
+local oop = require("diffview.oop")
+local utils = require("diffview.utils")
 local luv = vim.loop
 local M = {}
 
@@ -36,13 +36,17 @@ function PerfTimer:time()
 end
 
 function PerfTimer:print_result()
-  if not self.final_time then self:time() end
+  if not self.final_time then
+    self:time()
+  end
 
   if #self.laps == 0 then
-    print(string.format(
-      "%s %.2fms",
-      utils.str_right_pad((self.subject or "TIME") .. ":", 24),
-      self.final_time)
+    print(
+      string.format(
+        "%s %.2fms",
+        utils.str_right_pad((self.subject or "TIME") .. ":", 24),
+        self.final_time
+      )
     )
   else
     print((self.subject or "LAPS") .. ":")

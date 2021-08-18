@@ -1,4 +1,4 @@
-local oop = require'diffview.oop'
+local oop = require("diffview.oop")
 local M = {}
 
 ---@class RevType
@@ -8,12 +8,12 @@ local M = {}
 ---@field COMMIT RevType
 ---@field INDEX RevType
 ---@field CUSTOM RevType
-local RevType = oop.enum {
+local RevType = oop.enum({
   "LOCAL",
   "COMMIT",
   "INDEX",
-  "CUSTOM"
-}
+  "CUSTOM",
+})
 
 ---@class Rev
 ---@field type integer

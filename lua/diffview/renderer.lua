@@ -1,6 +1,6 @@
-local oop = require'diffview.oop'
-local utils = require'diffview.utils'
-local config = require'diffview.config'
+local oop = require("diffview.oop")
+local utils = require("diffview.utils")
+local config = require("diffview.config")
 local a = vim.api
 local M = {}
 local web_devicons
@@ -84,11 +84,11 @@ end
 
 function RenderComponent:add_hl(group, line_idx, first, last)
   table.insert(self.hl, {
-      group = group,
-      line_idx = line_idx,
-      first = first,
-      last = last
-    })
+    group = group,
+    line_idx = line_idx,
+    first = first,
+    last = last,
+  })
 end
 
 function RenderComponent:clear()
@@ -151,11 +151,11 @@ end
 
 function RenderData:add_hl(group, line_idx, first, last)
   table.insert(self.hl, {
-      group = group,
-      line_idx = line_idx,
-      first = first,
-      last = last
-    })
+    group = group,
+    line_idx = line_idx,
+    first = first,
+    last = last,
+  })
 end
 
 function RenderData:clear()
@@ -185,11 +185,11 @@ local function process_component(line_idx, lines, hl_data, component)
 
     for _, hl in ipairs(component.hl) do
       table.insert(hl_data, {
-          group = hl.group,
-          line_idx = hl.line_idx + line_idx,
-          first = hl.first,
-          last = hl.last
-        })
+        group = hl.group,
+        line_idx = hl.line_idx + line_idx,
+        first = hl.first,
+        last = hl.last,
+      })
     end
     component.height = #component.lines
 
@@ -209,7 +209,9 @@ end
 ---@param bufid integer
 ---@param data RenderData
 function M.render(bufid, data)
-  if not a.nvim_buf_is_loaded(bufid) then return end
+  if not a.nvim_buf_is_loaded(bufid) then
+    return
+  end
 
   local was_modifiable = a.nvim_buf_get_option(bufid, "modifiable")
   a.nvim_buf_set_option(bufid, "modifiable", true)
@@ -254,14 +256,18 @@ function M.get_git_hl(status)
 end
 
 function M.get_file_icon(name, ext, render_data, line_idx, offset)
-  if not config.get_config().file_panel.use_icons then return " " end
+  if not config.get_config().file_panel.use_icons then
+    return " "
+  end
   if not web_devicons then
     local ok
-    ok, web_devicons = pcall(require, 'nvim-web-devicons')
+    ok, web_devicons = pcall(require, "nvim-web-devicons")
     if not ok then
       config.get_config().file_panel.use_icons = false
-      utils.warn("nvim-web-devicons is required to use file icons! "
-        .. "Set `use_icons = false` in your config to not see this message.")
+      utils.warn(
+        "nvim-web-devicons is required to use file icons! "
+          .. "Set `use_icons = false` in your config to not see this message."
+      )
       return " "
     end
   end

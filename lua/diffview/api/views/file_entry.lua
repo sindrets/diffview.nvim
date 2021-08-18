@@ -1,7 +1,7 @@
-local oop = require'diffview.oop'
-local utils = require'diffview.utils'
-local FileEntry = require'diffview.views.file_entry'.FileEntry
-local RevType = require'diffview.rev'.RevType
+local oop = require("diffview.oop")
+local utils = require("diffview.utils")
+local FileEntry = require("diffview.views.file_entry").FileEntry
+local RevType = require("diffview.rev").RevType
 
 local a = vim.api
 
@@ -31,13 +31,21 @@ function CFileEntry:load_buffers(git_root, left_winid, right_winid)
   local last_winid = a.nvim_get_current_win()
   local splits = {
     {
-      winid = left_winid, bufid = self.left_bufid, rev = self.left, pos = "left",
-      lines = self.get_file_data(self.kind, self.path, "left"), null = self.left_null == true
+      winid = left_winid,
+      bufid = self.left_bufid,
+      rev = self.left,
+      pos = "left",
+      lines = self.get_file_data(self.kind, self.path, "left"),
+      null = self.left_null == true,
     },
     {
-      winid = right_winid, bufid = self.right_bufid, rev = self.right, pos = "right",
-      lines = self.get_file_data(self.kind, self.path, "right"), null = self.right_null == true
-    }
+      winid = right_winid,
+      bufid = self.right_bufid,
+      rev = self.right,
+      pos = "right",
+      lines = self.get_file_data(self.kind, self.path, "right"),
+      null = self.right_null == true,
+    },
   }
 
   for _, split in ipairs(splits) do
@@ -45,23 +53,26 @@ function CFileEntry:load_buffers(git_root, left_winid, right_winid)
 
     if not (split.bufid and a.nvim_buf_is_loaded(split.bufid)) then
       if split.rev.type == RevType.LOCAL then
-
         if split.null or CFileEntry.should_null(split.rev, self.status, split.pos) then
-          local bn = CFileEntry._create_buffer(git_root ,split.rev, self.path, split.lines, true)
+          local bn = CFileEntry._create_buffer(git_root, split.rev, self.path, split.lines, true)
           a.nvim_win_set_buf(split.winid, bn)
           split.bufid = bn
         else
           vim.cmd(winnr .. "windo edit " .. vim.fn.fnameescape(self.absolute_path))
           split.bufid = a.nvim_get_current_buf()
         end
-
-      elseif vim.tbl_contains({ RevType.COMMIT, RevType.INDEX, RevType.CUSTOM }, split.rev.type) then
+      elseif
+        vim.tbl_contains({ RevType.COMMIT, RevType.INDEX, RevType.CUSTOM }, split.rev.type)
+      then
         local bn
         if self.oldpath and split.pos == "left" then
           bn = CFileEntry._create_buffer(git_root, split.rev, self.oldpath, split.lines, split.null)
         else
           bn = CFileEntry._create_buffer(
-            git_root, split.rev, self.path, split.lines,
+            git_root,
+            split.rev,
+            self.path,
+            split.lines,
             split.null or CFileEntry.should_null(split.rev, self.status, split.pos)
           )
         end
@@ -88,7 +99,9 @@ end
 ---@static
 ---@Override
 function CFileEntry._create_buffer(git_root, rev, path, lines, null)
-  if null or not lines then return CFileEntry._get_null_buffer() end
+  if null or not lines then
+    return CFileEntry._get_null_buffer()
+  end
 
   local bn = a.nvim_create_buf(false, false)
   a.nvim_buf_set_lines(bn, 0, -1, false, lines)
@@ -102,9 +115,8 @@ function CFileEntry._create_buffer(git_root, rev, path, lines, null)
     context = "[diff]"
   end
 
-  local fullname = utils.path_join({
-    "diffview://", git_root, context, path
-  })
+  -- stylua: ignore
+  local fullname = utils.path_join({ "diffview://", git_root, context, path, })
   a.nvim_buf_set_option(bn, "modified", false)
   a.nvim_buf_set_option(bn, "modifiable", false)
 
@@ -113,9 +125,8 @@ function CFileEntry._create_buffer(git_root, rev, path, lines, null)
     -- Resolve name conflict
     local i = 1
     while not ok do
-      fullname = utils.path_join({
-        "diffview://", git_root, context, i, path
-      })
+      -- stylua: ignore
+      fullname = utils.path_join({ "diffview://", git_root, context, i, path, })
       ok = pcall(a.nvim_buf_set_name, bn, fullname)
       i = i + 1
     end

@@ -1,9 +1,9 @@
-local Rev = require'diffview.rev'.Rev
-local RevType = require'diffview.rev'.RevType
-local arg_parser = require'diffview.arg_parser'
-local git = require'diffview.git'
-local utils =  require'diffview.utils'
-local StandardView = require'diffview.views.standard.standard_view'.StandardView
+local Rev = require("diffview.rev").Rev
+local RevType = require("diffview.rev").RevType
+local arg_parser = require("diffview.arg_parser")
+local git = require("diffview.git")
+local utils = require("diffview.utils")
+local StandardView = require("diffview.views.standard.standard_view").StandardView
 local a = vim.api
 
 local M = {}
@@ -21,13 +21,13 @@ function M.process_args(args)
   end
 
   local fpath = (
-    vim.bo.buftype == ""
-    and vim.fn.filereadable(vim.fn.expand("%f"))
-    and vim.fn.expand("%f:p:h")
-    or "."
-  )
+      vim.bo.buftype == ""
+        and vim.fn.filereadable(vim.fn.expand("%f"))
+        and vim.fn.expand("%f:p:h")
+      or "."
+    )
   local cpath = argo:get_flag("C")
-  local p = not vim.tbl_contains({"true", "", nil}, cpath) and cpath or fpath
+  local p = not vim.tbl_contains({ "true", "", nil }, cpath) and cpath or fpath
   if vim.fn.isdirectory(p) ~= 1 then
     p = vim.fn.fnamemodify(p, ":h")
   end
@@ -46,9 +46,9 @@ function M.process_args(args)
     show_untracked = arg_parser.ambiguous_bool(
       argo:get_flag("u", "untracked-files"),
       nil,
-      {"all", "normal", "true"},
-      {"no", "false"}
-    )
+      { "all", "normal", "true" },
+      { "no", "false" }
+    ),
   }
 
   local v = StandardView({
@@ -57,7 +57,7 @@ function M.process_args(args)
     path_args = paths,
     left = left,
     right = right,
-    options = options
+    options = options,
   })
 
   table.insert(M.views, v)
@@ -90,7 +90,9 @@ function M.parse_revs(git_root, rev_arg, cached)
     end
   elseif rev_arg:match("%.%.%.") then
     left, right = git.symmetric_diff_revs(git_root, rev_arg)
-    if not (left or right) then return end
+    if not (left or right) then
+      return
+    end
   else
     local rev_strings = vim.fn.systemlist(
       base_cmd .. "rev-parse --revs-only " .. vim.fn.shellescape(rev_arg)
@@ -147,7 +149,7 @@ function M.dispose_stray_views()
   for _, view in ipairs(M.views) do
     if not tabpage_map[view.tabpage] then
       -- Need to schedule here because the tabnr's don't update fast enough.
-      vim.schedule(function ()
+      vim.schedule(function()
         view:close()
       end)
       table.insert(dispose, view)

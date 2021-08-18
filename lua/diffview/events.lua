@@ -1,4 +1,4 @@
-local oop = require'diffview.oop'
+local oop = require("diffview.oop")
 
 local M = {}
 
@@ -6,9 +6,9 @@ local M = {}
 
 ---@class EEvent
 ---@field FILES_STAGED Event
-local Event = oop.enum {
-  "FILES_STAGED"
-}
+local Event = oop.enum({
+  "FILES_STAGED",
+})
 
 ---@class EventEmitter
 ---@field listeners table<Event, function[]>
@@ -25,12 +25,9 @@ function EventEmitter:on(event, callback)
   if not self.listeners[event] then
     self.listeners[event] = {}
   end
-  table.insert(
-    self.listeners[event],
-    function (args)
-      callback(unpack(args))
-    end
-  )
+  table.insert(self.listeners[event], function(args)
+    callback(unpack(args))
+  end)
 end
 
 function EventEmitter:once(event, callback)
@@ -38,19 +35,16 @@ function EventEmitter:once(event, callback)
     self.listeners[event] = {}
   end
   local emitted = false
-  table.insert(
-    self.listeners[event],
-    function (args)
-      if not emitted then
-        emitted = true
-        callback(unpack(args))
-      end
+  table.insert(self.listeners[event], function(args)
+    if not emitted then
+      emitted = true
+      callback(unpack(args))
     end
-  )
+  end)
 end
 
 function EventEmitter:emit(event, ...)
-  local args = {...}
+  local args = { ... }
   if type(self.listeners[event]) == "table" then
     for _, cb in ipairs(self.listeners[event]) do
       cb(args)
