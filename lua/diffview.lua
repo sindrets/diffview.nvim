@@ -5,6 +5,7 @@ local colors = require("diffview.colors")
 local utils = require("diffview.utils")
 local M = {}
 
+---@type FlagValueMap
 local flag_value_completion = arg_parser.FlagValueMap()
 flag_value_completion:put({ "u", "untracked-files" }, { "true", "normal", "all", "false", "no" })
 flag_value_completion:put({ "cached", "staged" }, { "true", "false" })
@@ -40,28 +41,53 @@ function M.close(tabpage)
   end
 end
 
+local function filter_completion(arg_lead, items)
+  return vim.tbl_filter(function(item)
+    return item:match(utils.pattern_esc(arg_lead))
+  end, items)
+end
+
 function M.completion(arg_lead, cmd_line, cur_pos)
   local args, argidx, divideridx = arg_parser.scan_ex_args(cmd_line, cur_pos)
+  local fpath = (
+      vim.bo.buftype == ""
+        and vim.fn.filereadable(vim.fn.expand("%"))
+        and vim.fn.expand("%:p:h")
+      or "."
+    )
+  local git_dir = require("diffview.git").git_dir(fpath)
+  local git_root = require("diffview.git").toplevel(fpath)
 
   if argidx >= divideridx then
     return vim.fn.getcompletion(arg_lead, "file", 0)
-  elseif argidx == 2 and arg_lead:sub(1, 1) ~= "-" then
-    local commits = vim.fn.systemlist("git rev-list --max-count=30 --abbrev-commit HEAD")
-    if arg_lead:match(".*%.%..*") then
-      arg_lead = arg_lead:gsub("(.*%.%.)(.*)", "%1")
-      for k, v in pairs(commits) do
-        commits[k] = arg_lead .. v
-      end
-    end
-    return commits
+  elseif argidx == 2 and arg_lead:sub(1, 1) ~= "-" and git_dir and git_root then
+    -- stylua: ignore start
+    local targets = {
+      "HEAD", "FETCH_HEAD", "ORIG_HEAD", "MERGE_HEAD",
+      "REBASE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD"
+    }
+    local heads = vim.tbl_filter(
+      function(name) return vim.tbl_contains(targets, name) end,
+      vim.tbl_map(
+        function(v) return vim.fn.fnamemodify(v, ":t") end,
+        vim.fn.glob(git_dir .. "/*", false, true)
+      )
+    )
+    -- stylua: ignore end
+    local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " "
+    local revs = vim.fn.systemlist(cmd .. "rev-parse --symbolic --branches --tags --remotes")
+    local stashes = vim.fn.systemlist(cmd .. "stash list --pretty=format:%gd")
+
+    return filter_completion(arg_lead, utils.tbl_concat(heads, revs, stashes))
   else
     local flag_completion = flag_value_completion:get_completion(arg_lead)
     if flag_completion then
-      return flag_completion
+      return filter_completion(arg_lead, flag_completion)
     end
 
-    return flag_value_completion:get_all_names()
+    return filter_completion(arg_lead, flag_value_completion:get_all_names())
   end
+
   return args
 end
 

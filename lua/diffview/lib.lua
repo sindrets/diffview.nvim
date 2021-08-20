@@ -22,8 +22,8 @@ function M.process_args(args)
 
   local fpath = (
       vim.bo.buftype == ""
-        and vim.fn.filereadable(vim.fn.expand("%f"))
-        and vim.fn.expand("%f:p:h")
+        and vim.fn.filereadable(vim.fn.expand("%"))
+        and vim.fn.expand("%:p:h")
       or "."
     )
   local cpath = argo:get_flag("C")
