@@ -45,7 +45,7 @@ end
 ---@param s string
 ---@return string
 function M.pattern_esc(s)
-  return string.gsub(s, "[%(|%)|%%|%[|%]|%-|%.|%?|%+|%*|%^|%$]", {
+  local result = string.gsub(s, "[%(|%)|%%|%[|%]|%-|%.|%?|%+|%*|%^|%$]", {
     ["%"] = "%%",
     ["-"] = "%-",
     ["("] = "%(",
@@ -59,6 +59,7 @@ function M.pattern_esc(s)
     ["^"] = "%^",
     ["$"] = "%$",
   })
+  return result
 end
 
 function M.path_join(paths)

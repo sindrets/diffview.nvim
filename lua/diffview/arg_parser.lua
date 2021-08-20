@@ -81,22 +81,22 @@ function FlagValueMap:get_all_names()
   return names
 end
 
-function FlagValueMap:get_completion(flag_name)
-  local is_short = flag_name:match(short_flag_pat) ~= nil
+function FlagValueMap:get_completion(arg_lead)
+  local is_short = arg_lead:match(short_flag_pat) ~= nil
   if is_short then
-    flag_name = flag_name:sub(1, 2)
+    arg_lead = arg_lead:sub(1, 2)
   else
-    flag_name = flag_name:gsub("=.*", "")
+    arg_lead = arg_lead:gsub("=.*", "")
   end
 
-  local values = self.map[flag_name]
+  local values = self.map[arg_lead]
   if not values then
     return nil
   end
 
   local items = {}
   for _, v in ipairs(values) do
-    table.insert(items, flag_name .. (not is_short and "=" or "") .. v)
+    table.insert(items, arg_lead .. (not is_short and "=" or "") .. v)
   end
 
   return items
@@ -154,7 +154,7 @@ function M.scan_ex_args(cmd_line, cur_pos)
   local arg = ""
 
   local i = 1
-  while i < #cmd_line do
+  while i <= #cmd_line do
     if not argidx and i > cur_pos then
       argidx = #args + 1
     end
@@ -169,7 +169,7 @@ function M.scan_ex_args(cmd_line, cur_pos)
     elseif char:match("%s") then
       if arg ~= "" then
         table.insert(args, arg)
-        if arg == "--" then
+        if arg == "--" and i - 1 < #cmd_line then
           divideridx = #args
         end
       end
@@ -184,7 +184,7 @@ function M.scan_ex_args(cmd_line, cur_pos)
 
   if #arg > 0 then
     table.insert(args, arg)
-    if arg == "--" then
+    if arg == "--" and cmd_line:sub(#cmd_line, #cmd_line) ~= "-" then
       divideridx = #args
     end
   end
