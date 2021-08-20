@@ -2,7 +2,7 @@
 -- An implementation of Myers' diff algorithm
 -- Derived from: https://github.com/Swatinem/diff
 --]]
-local oop = require'diffview.oop'
+local oop = require("diffview.oop")
 local M = {}
 
 ---@class EditToken
@@ -10,12 +10,12 @@ local M = {}
 ---@field DELETE integer
 ---@field INSERT integer
 ---@field REPLACE integer
-local EditToken = oop.enum {
+local EditToken = oop.enum({
   "NOOP",
   "DELETE",
   "INSERT",
-  "REPLACE"
-}
+  "REPLACE",
+})
 
 ---@class Diff
 ---@field a any[]
@@ -25,37 +25,33 @@ local EditToken = oop.enum {
 ---@field up table<integer, integer>
 ---@field down table<integer, integer>
 ---@field eql_fn function
-local Diff = oop.class()
+local Diff = oop.Object
+Diff = oop.create_class("Diff")
 
 ---Diff constructor.
 ---@param a any[]
 ---@param b any[]
 ---@param eql_fn function|nil
 ---@return Diff
-function Diff:new(a, b, eql_fn)
-  local this = {
-    a = a,
-    b = b,
-    moda = {},
-    modb = {},
-    up = {},
-    down = {},
-    eql_fn = eql_fn or function (aa, bb)
-      return aa == bb
-    end
-  }
+function Diff:init(a, b, eql_fn)
+  self.a = a
+  self.b = b
+  self.moda = {}
+  self.modb = {}
+  self.up = {}
+  self.down = {}
+  self.eql_fn = eql_fn or function(aa, bb)
+    return aa == bb
+  end
 
   for i = 1, #a do
-    this.moda[i] = false
+    self.moda[i] = false
   end
   for i = 1, #b do
-    this.modb[i] = false
+    self.modb[i] = false
   end
 
-  setmetatable(this, self)
-
-  this:lcs(1, #this.a + 1, 1, #this.b + 1)
-  return this
+  self:lcs(1, #self.a + 1, 1, #self.b + 1)
 end
 
 function Diff:create_edit_script()
@@ -129,7 +125,7 @@ function Diff:lcs(astart, aend, bstart, bend)
 end
 
 function Diff:snake(astart, aend, bstart, bend)
-  local N =  aend - astart
+  local N = aend - astart
   local MM = bend - bstart
 
   local kdown = astart - bstart
@@ -148,7 +144,7 @@ function Diff:snake(astart, aend, bstart, bend)
 
     -- Forward path
     for k = kdown - D, kdown + D, 2 do
-      if (k == kdown - D) then
+      if k == kdown - D then
         x = self.down[k + 1] -- down
       else
         x = self.down[k - 1] + 1 -- right
@@ -169,7 +165,7 @@ function Diff:snake(astart, aend, bstart, bend)
           x = self.down[k],
           y = self.down[k] - k,
           u = self.up[k],
-          v = self.up[k] - k
+          v = self.up[k] - k,
         }
       end
     end
@@ -197,7 +193,7 @@ function Diff:snake(astart, aend, bstart, bend)
           x = self.down[k],
           y = self.down[k] - k,
           u = self.up[k],
-          v = self.up[k] - k
+          v = self.up[k] - k,
         }
       end
     end
@@ -230,7 +226,7 @@ function M._test_exec(a, b, script)
 end
 
 function M._test_diff(a, b)
-  local diff = Diff:new(a,b)
+  local diff = Diff(a, b)
   local script = diff:create_edit_script()
   print("a", vim.inspect(a))
   print("b", vim.inspect(b))
@@ -241,18 +237,18 @@ end
 
 function M._test()
   -- deletion
-  local a = {1,2,3,4,5,6,7,8,9}
-  local b = {1,2,5,6,8,9}
+  local a = { 1, 2, 3, 4, 5, 6, 7, 8, 9 }
+  local b = { 1, 2, 5, 6, 8, 9 }
   M._test_diff(a, b)
 
   -- insertion
-  a = {1,2,5,6,8,9}
-  b = {1,2,3,4,5,6,7,8,9}
+  a = { 1, 2, 5, 6, 8, 9 }
+  b = { 1, 2, 3, 4, 5, 6, 7, 8, 9 }
   M._test_diff(a, b)
 
   -- deletion, insertion, replacement
-  a = {1,2,3,4,5,6,7,8,9}
-  b = {1,2,10,11,5,6,12,13,8}
+  a = { 1, 2, 3, 4, 5, 6, 7, 8, 9 }
+  b = { 1, 2, 10, 11, 5, 6, 12, 13, 8 }
   M._test_diff(a, b)
 end
 

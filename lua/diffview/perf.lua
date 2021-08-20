@@ -1,6 +1,6 @@
 ---@diagnostic disable: redefined-local
-local oop = require'diffview.oop'
-local utils = require'diffview.utils'
+local oop = require("diffview.oop")
+local utils = require("diffview.utils")
 local luv = vim.loop
 local M = {}
 
@@ -10,19 +10,16 @@ local M = {}
 ---@field last integer Stop time (ns)
 ---@field final_time number Final time (ms)
 ---@field laps number[] List of lap times (ms)
-local PerfTimer = oop.class()
+local PerfTimer = oop.Object
+PerfTimer = oop.create_class("PerfTimer")
 
 ---PerfTimer constructor.
 ---@param subject string|nil
 ---@return PerfTimer
-function PerfTimer:new(subject)
-  local this = {
-    subject = subject,
-    first = luv.hrtime(),
-    laps = {}
-  }
-  setmetatable(this, self)
-  return this
+function PerfTimer:init(subject)
+  self.subject = subject
+  self.first = luv.hrtime()
+  self.laps = {}
 end
 
 ---Record a lap time.
@@ -39,13 +36,17 @@ function PerfTimer:time()
 end
 
 function PerfTimer:print_result()
-  if not self.final_time then self:time() end
+  if not self.final_time then
+    self:time()
+  end
 
   if #self.laps == 0 then
-    print(string.format(
-      "%s %.2fms",
-      utils.str_right_pad((self.subject or "TIME") .. ":", 24),
-      self.final_time)
+    print(
+      string.format(
+        "%s %.2fms",
+        utils.str_right_pad((self.subject or "TIME") .. ":", 24),
+        self.final_time
+      )
     )
   else
     print((self.subject or "LAPS") .. ":")

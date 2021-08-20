@@ -1,35 +1,39 @@
 local api = vim.api
 local M = {}
 
-local path_sep = package.config:sub(1,1)
+local path_sep = package.config:sub(1, 1)
 
 function M._echo_multiline(msg)
   for _, s in ipairs(vim.fn.split(msg, "\n")) do
-    vim.cmd("echom '" .. s:gsub("'", "''").."'")
+    vim.cmd("echom '" .. s:gsub("'", "''") .. "'")
   end
 end
 
 function M.info(msg)
-  vim.cmd('echohl Directory')
+  vim.cmd("echohl Directory")
   M._echo_multiline("[Diffview.nvim] " .. msg)
-  vim.cmd('echohl None')
+  vim.cmd("echohl None")
 end
 
 function M.warn(msg)
-  vim.cmd('echohl WarningMsg')
+  vim.cmd("echohl WarningMsg")
   M._echo_multiline("[Diffview.nvim] " .. msg)
-  vim.cmd('echohl None')
+  vim.cmd("echohl None")
 end
 
 function M.err(msg)
-  vim.cmd('echohl ErrorMsg')
+  vim.cmd("echohl ErrorMsg")
   M._echo_multiline("[Diffview.nvim] " .. msg)
-  vim.cmd('echohl None')
+  vim.cmd("echohl None")
 end
 
 function M.clamp(value, min, max)
-  if value < min then return min end
-  if value > max then return max end
+  if value < min then
+    return min
+  end
+  if value > max then
+    return max
+  end
   return value
 end
 
@@ -41,28 +45,36 @@ end
 ---@param s string
 ---@return string
 function M.pattern_esc(s)
-  return (
-    s:gsub('%%', '%%%%')
-      :gsub('%^', '%%^')
-      :gsub('%$', '%%$')
-      :gsub('%(', '%%(')
-      :gsub('%)', '%%)')
-      :gsub('%.', '%%.')
-      :gsub('%[', '%%[')
-      :gsub('%]', '%%]')
-      :gsub('%*', '%%*')
-      :gsub('%+', '%%+')
-      :gsub('%-', '%%-')
-      :gsub('%?', '%%?')
-  )
+  return string.gsub(s, "[%(|%)|%%|%[|%]|%-|%.|%?|%+|%*|%^|%$]", {
+    ["%"] = "%%",
+    ["-"] = "%-",
+    ["("] = "%(",
+    [")"] = "%)",
+    ["."] = "%.",
+    ["["] = "%[",
+    ["]"] = "%]",
+    ["?"] = "%?",
+    ["+"] = "%+",
+    ["*"] = "%*",
+    ["^"] = "%^",
+    ["$"] = "%$",
+  })
 end
 
 function M.path_join(paths)
-  return table.concat(paths, path_sep)
+  local result = paths[1]
+  for i = 2, #paths do
+    if tostring(paths[i]):sub(1, 1) == path_sep then
+      result = result .. paths[i]
+    else
+      result = result .. path_sep .. paths[i]
+    end
+  end
+  return result
 end
 
 function M.path_split(path)
-  return path:gmatch('[^'..path_sep..']+'..path_sep..'?')
+  return path:gmatch("[^" .. path_sep .. "]+" .. path_sep .. "?")
 end
 
 ---Get the basename of the given path.
@@ -71,7 +83,9 @@ end
 function M.path_basename(path)
   path = M.path_remove_trailing(path)
   local i = path:match("^.*()" .. path_sep)
-  if not i then return path end
+  if not i then
+    return path
+  end
   return path:sub(i + 1, #path)
 end
 
@@ -88,7 +102,9 @@ end
 function M.path_parent(path, remove_trailing)
   path = " " .. M.path_remove_trailing(path)
   local i = path:match("^.+()" .. path_sep)
-  if not i then return nil end
+  if not i then
+    return nil
+  end
   path = path:sub(2, i)
   if remove_trailing then
     path = M.path_remove_trailing(path)
@@ -110,11 +126,11 @@ function M.path_add_trailing(path)
     return path
   end
 
-  return path..path_sep
+  return path .. path_sep
 end
 
 function M.path_remove_trailing(path)
-  local p, _ = path:gsub(path_sep..'$', '')
+  local p, _ = path:gsub(path_sep .. "$", "")
   return p
 end
 
@@ -133,7 +149,9 @@ end
 
 function M.str_right_pad(s, min_size, fill)
   local result = s
-  if not fill then fill = " " end
+  if not fill then
+    fill = " "
+  end
 
   while #result < min_size do
     result = result .. fill
@@ -144,7 +162,9 @@ end
 
 function M.str_left_pad(s, min_size, fill)
   local result = s
-  if not fill then fill = " " end
+  if not fill then
+    fill = " "
+  end
 
   while #result < min_size do
     result = fill .. result
@@ -155,7 +175,9 @@ end
 
 function M.str_center_pad(s, min_size, fill)
   local result = s
-  if not fill then fill = " " end
+  if not fill then
+    fill = " "
+  end
 
   while #result < min_size do
     if #result % 2 == 0 then
@@ -198,7 +220,9 @@ end
 ---@return string
 function M.system(cmd)
   local pfile = io.popen(cmd)
-  if not pfile then return end
+  if not pfile then
+    return
+  end
   local data = pfile:read("*a")
   io.close(pfile)
 
@@ -212,7 +236,9 @@ end
 ---@return string[]
 function M.system_list(cmd)
   local pfile = io.popen(cmd)
-  if not pfile then return end
+  if not pfile then
+    return
+  end
 
   local lines = {}
   for line in pfile:lines() do
@@ -241,7 +267,7 @@ function M.tbl_concat(...)
   local result = {}
   local n = 0
 
-  for _, t in ipairs({...}) do
+  for _, t in ipairs({ ... }) do
     for i, v in ipairs(t) do
       result[n + i] = v
     end
@@ -252,7 +278,9 @@ function M.tbl_concat(...)
 end
 
 function M.tbl_deep_clone(t)
-  if not t then return end
+  if not t then
+    return
+  end
   local clone = {}
 
   for k, v in pairs(t) do
@@ -267,7 +295,7 @@ function M.tbl_deep_clone(t)
 end
 
 function M.tbl_pack(...)
-  return {n=select('#',...); ...}
+  return { n = select("#", ...), ... }
 end
 
 function M.tbl_unpack(t, i, j)
@@ -294,7 +322,7 @@ function M.wipe_named_buffer(name)
     end
 
     api.nvim_buf_set_name(bn, "")
-    vim.schedule(function ()
+    vim.schedule(function()
       pcall(api.nvim_buf_delete, bn, {})
     end)
   end
@@ -352,7 +380,7 @@ local function merge(t, first, mid, last, comparator)
   local j = 1
   local k = first
 
-  while (i <= n1 and j <= n2) do
+  while i <= n1 and j <= n2 do
     if comparator(ls[i], rs[j]) then
       t[k] = ls[i]
       i = i + 1
@@ -377,7 +405,9 @@ local function merge(t, first, mid, last, comparator)
 end
 
 local function split_merge(t, first, last, comparator)
-  if (last - first) < 1 then return end
+  if (last - first) < 1 then
+    return
+  end
 
   local mid = math.floor((first + last) / 2)
 
@@ -391,7 +421,7 @@ end
 ---@param comparator function|nil
 function M.merge_sort(t, comparator)
   if not comparator then
-    comparator = function (a, b)
+    comparator = function(a, b)
       return a < b
     end
   end

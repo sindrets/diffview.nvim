@@ -1,25 +1,25 @@
-local oop = require'diffview.oop'
-local utils = require'diffview.utils'
-local Rev = require'diffview.rev'.Rev
-local RevType = require'diffview.rev'.RevType
-local FileEntry = require'diffview.file-entry'.FileEntry
+local oop = require("diffview.oop")
+local utils = require("diffview.utils")
+local Rev = require("diffview.rev").Rev
+local RevType = require("diffview.rev").RevType
+local FileEntry = require("diffview.views.file_entry").FileEntry
 local M = {}
 
 ---@class FileDict
 ---@field working FileEntry[]
 ---@field staged FileEntry[]
-local FileDict = oop.class()
+local FileDict = oop.Object
+FileDict = oop.create_class("FileDict")
 
 ---FileDict constructor.
 ---@return FileDict
-function FileDict:new()
-  local this = {
-    working = {},
-    staged = {}
-  }
-  setmetatable(this, self)
-  local mt = getmetatable(this)
-  mt.__index = function (t, k)
+function FileDict:init()
+  self.working = {}
+  self.staged = {}
+
+  local mt = getmetatable(self)
+  local old_index = mt.__index
+  mt.__index = function(t, k)
     if type(k) == "number" then
       if k > #t.working then
         return t.staged[k - #t.working]
@@ -27,10 +27,9 @@ function FileDict:new()
         return t.working[k]
       end
     else
-      return FileDict[k]
+      return old_index(t, k)
     end
   end
-  return this
 end
 
 function FileDict:size()
@@ -40,7 +39,7 @@ end
 function FileDict:iter()
   local i = 0
   local n = #self.working + #self.staged
-  return function ()
+  return function()
     i = i + 1
     if i <= n then
       return self[i]
@@ -51,7 +50,7 @@ end
 function FileDict:ipairs()
   local i = 0
   local n = #self.working + #self.staged
-  return function ()
+  return function()
     i = i + 1
     if i <= n then
       ---@type integer, FileEntry
@@ -73,30 +72,33 @@ local function tracked_files(git_root, left, right, args, kind)
       local name = s:match("[%a%s][^%s]*\t(.*)")
       local oldname
 
-      if name:match('\t') ~= nil then
-        oldname = name:match('(.*)\t')
-        name = name:gsub('^.*\t', '')
+      if name:match("\t") ~= nil then
+        oldname = name:match("(.*)\t")
+        name = name:gsub("^.*\t", "")
       end
 
       local stats = {
         additions = tonumber(stat_data[i]:match("^%d+")),
-        deletions = tonumber(stat_data[i]:match("^%d+%s+(%d+)"))
+        deletions = tonumber(stat_data[i]:match("^%d+%s+(%d+)")),
       }
 
       if not stats.additions or not stats.deletions then
         stats = nil
       end
 
-      table.insert(files, FileEntry:new({
-        path = name,
-        oldpath = oldname,
-        absolute_path = utils.path_join({git_root, name}),
-        status = status,
-        stats = stats,
-        kind = kind,
-        left = left,
-        right = right
-      }))
+      table.insert(
+        files,
+        FileEntry({
+          path = name,
+          oldpath = oldname,
+          absolute_path = utils.path_join({ git_root, name }),
+          status = status,
+          stats = stats,
+          kind = kind,
+          left = left,
+          right = right,
+        })
+      )
     end
   end
 
@@ -110,14 +112,17 @@ local function untracked_files(git_root, left, right)
 
   if not utils.shell_error() and #untracked > 0 then
     for _, s in ipairs(untracked) do
-      table.insert(files, FileEntry:new({
-            path = s,
-            absolute_path = utils.path_join({git_root, s}),
-            status = "?",
-            kind = "working",
-            left = left,
-            right = right
-        }))
+      table.insert(
+        files,
+        FileEntry({
+          path = s,
+          absolute_path = utils.path_join({ git_root, s }),
+          status = "?",
+          kind = "working",
+          left = left,
+          right = right,
+        })
+      )
     end
   end
 
@@ -129,11 +134,11 @@ end
 ---@param left Rev
 ---@param right Rev
 ---@param path_args string[]|nil
----@param options ViewOptions
+---@param options DiffViewOptions
 ---@return FileDict
 function M.diff_file_list(git_root, left, right, path_args, options)
   ---@type FileDict
-  local files = FileDict:new()
+  local files = FileDict()
 
   local p_args = ""
   if path_args and #path_args > 0 then
@@ -147,7 +152,9 @@ function M.diff_file_list(git_root, left, right, path_args, options)
   files.working = tracked_files(git_root, left, right, rev_arg .. p_args, "working")
 
   local show_untracked = options.show_untracked
-  if show_untracked == nil then show_untracked = M.show_untracked(git_root) end
+  if show_untracked == nil then
+    show_untracked = M.show_untracked(git_root)
+  end
 
   if show_untracked and M.has_local(left, right) then
     local untracked = untracked_files(git_root, left, right)
@@ -155,7 +162,7 @@ function M.diff_file_list(git_root, left, right, path_args, options)
     if #untracked > 0 then
       files.working = utils.tbl_concat(files.working, untracked)
 
-      utils.merge_sort(files.working, function (a, b)
+      utils.merge_sort(files.working, function(a, b)
         return a.path:lower() < b.path:lower()
       end)
     end
@@ -163,7 +170,7 @@ function M.diff_file_list(git_root, left, right, path_args, options)
 
   if left.type == RevType.INDEX and right.type == RevType.LOCAL then
     local left_rev = M.head_rev(git_root)
-    local right_rev = Rev:new(RevType.INDEX)
+    local right_rev = Rev(RevType.INDEX)
     files.staged = tracked_files(git_root, left_rev, right_rev, "--cached HEAD" .. p_args, "staged")
   end
 
@@ -214,7 +221,7 @@ function M.head_rev(git_root)
   end
 
   local s = vim.trim(rev_string):gsub("^%^", "")
-  return Rev:new(RevType.COMMIT, s, true)
+  return Rev(RevType.COMMIT, s, true)
 end
 
 ---Parse two endpoint, commit revs from a symmetric difference notated rev arg.
@@ -234,20 +241,20 @@ function M.symmetric_diff_revs(git_root, rev_arg)
   end
 
   out = vim.fn.systemlist(
-    base_cmd .. "merge-base "
-    .. vim.fn.shellescape(r1) .. " "
-    .. vim.fn.shellescape(r2)
+    base_cmd .. "merge-base " .. vim.fn.shellescape(r1) .. " " .. vim.fn.shellescape(r2)
   )
-  if utils.shell_error() then return err() end
+  if utils.shell_error() then
+    return err()
+  end
   local left_hash = out[1]:gsub("^%^", "")
 
-  out = vim.fn.systemlist(
-    base_cmd .. "rev-parse --revs-only " .. vim.fn.shellescape(r2)
-  )
-  if utils.shell_error() then return err() end
+  out = vim.fn.systemlist(base_cmd .. "rev-parse --revs-only " .. vim.fn.shellescape(r2))
+  if utils.shell_error() then
+    return err()
+  end
   local right_hash = out[1]:gsub("^%^", "")
 
-  return Rev:new(RevType.COMMIT, left_hash), Rev:new(RevType.COMMIT, right_hash)
+  return Rev(RevType.COMMIT, left_hash), Rev(RevType.COMMIT, right_hash)
 end
 
 ---Get the git root path of a given path.
@@ -255,7 +262,9 @@ end
 ---@return string|nil
 function M.toplevel(path)
   local out = vim.fn.system("git -C " .. vim.fn.shellescape(path) .. " rev-parse --show-toplevel")
-  if utils.shell_error() then return nil end
+  if utils.shell_error() then
+    return nil
+  end
   return vim.trim(out)
 end
 
@@ -266,7 +275,9 @@ function M.git_dir(path)
   local out = vim.fn.system(
     "git -C " .. vim.fn.shellescape(path) .. " rev-parse --path-format=absolute --git-dir"
   )
-  if utils.shell_error()  then return nil end
+  if utils.shell_error() then
+    return nil
+  end
   return vim.trim(out)
 end
 
@@ -300,7 +311,9 @@ end
 ---@param git_root string
 ---@return boolean
 function M.show_untracked(git_root)
-  local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " config --type=bool status.showUntrackedFiles"
+  local cmd = "git -C "
+    .. vim.fn.shellescape(git_root)
+    .. " config --type=bool status.showUntrackedFiles"
   return vim.trim(vim.fn.system(cmd)) ~= "false"
 end
 
@@ -313,20 +326,26 @@ end
 ---@param kind "staged"|"working"
 ---@param commit string
 function M.restore_file(git_root, path, kind, commit)
+  local file_exists = vim.fn.filereadable(utils.path_join({ git_root, path })) == 1
   local base_cmd = "git -C " .. vim.fn.shellescape(git_root) .. " "
+  local out
 
-  -- Wite file blob into db
-  local out = vim.fn.system(base_cmd .. "hash-object -w -- " .. vim.fn.shellescape(path))
-  if utils.shell_error() then
-    utils.err("Failed to write file blob into the object database. Aborting file restoration.")
-    utils.err("Git output: " .. out)
-    return
+  if file_exists then
+    -- Wite file blob into db
+    out = vim.fn.system(base_cmd .. "hash-object -w -- " .. vim.fn.shellescape(path))
+    if utils.shell_error() then
+      utils.err("Failed to write file blob into the object database. Aborting file restoration.")
+      utils.err("Git output: " .. out)
+      return
+    end
   end
 
-  local undo = (":sp %s | %%!git show %s"):format(
-    vim.fn.fnameescape(path),
-    out:sub(1, 11)
-  )
+  local undo
+  if file_exists then
+    undo = (":sp %s | %%!git show %s"):format(vim.fn.fnameescape(path), out:sub(1, 11))
+  else
+    undo = (":!git rm %s"):format(vim.fn.fnameescape(path))
+  end
 
   -- Revert file
   local cmd = ("%s checkout %s -- %s"):format(

@@ -1,6 +1,6 @@
-local oop = require'diffview.oop'
-local utils = require'diffview.utils'
-local config = require'diffview.config'
+local oop = require("diffview.oop")
+local utils = require("diffview.utils")
+local config = require("diffview.config")
 local a = vim.api
 local M = {}
 local web_devicons
@@ -18,21 +18,18 @@ local web_devicons
 ---@field lstart integer
 ---@field lend integer
 ---@field height integer
-local RenderComponent = oop.class()
+local RenderComponent = oop.Object
+RenderComponent = oop.create_class("RenderComponent")
 
 ---RenderComponent constructor.
 ---@return RenderComponent
-function RenderComponent:new()
-  local this = {
-    lines = {},
-    hl = {},
-    components = {},
-    lstart = -1,
-    lend = -1,
-    height = 0
-  }
-  setmetatable(this, self)
-  return this
+function RenderComponent:init()
+  self.lines = {}
+  self.hl = {}
+  self.components = {}
+  self.lstart = -1
+  self.lend = -1
+  self.height = 0
 end
 
 local function create_subcomponents(component, comp_struct, schema)
@@ -55,7 +52,7 @@ end
 ---@return RenderComponent|any
 function RenderComponent:create_component(schema)
   local comp_struct
-  local new_comp = RenderComponent:new()
+  local new_comp = RenderComponent()
   table.insert(self.components, new_comp)
 
   if schema then
@@ -87,11 +84,11 @@ end
 
 function RenderComponent:add_hl(group, line_idx, first, last)
   table.insert(self.hl, {
-      group = group,
-      line_idx = line_idx,
-      first = first,
-      last = last
-    })
+    group = group,
+    line_idx = line_idx,
+    first = first,
+    last = last,
+  })
 end
 
 function RenderComponent:clear()
@@ -110,19 +107,16 @@ end
 ---@field hl HlData[]
 ---@field components RenderComponent[]
 ---@field namespace integer
-local RenderData = oop.class()
+local RenderData = oop.Object
+RenderData = oop.create_class("RenderData")
 
 ---RenderData constructor.
 ---@return RenderData
-function RenderData:new(ns_name)
-  local this = {
-    lines = {},
-    hl = {},
-    components = {},
-    namespace = a.nvim_create_namespace(ns_name)
-  }
-  setmetatable(this, self)
-  return this
+function RenderData:init(ns_name)
+  self.lines = {}
+  self.hl = {}
+  self.components = {}
+  self.namespace = a.nvim_create_namespace(ns_name)
 end
 
 ---Create and add a new component.
@@ -130,7 +124,7 @@ end
 ---@return RenderComponent|any
 function RenderData:create_component(schema)
   local comp_struct
-  local new_comp = RenderComponent:new()
+  local new_comp = RenderComponent()
   table.insert(self.components, new_comp)
 
   if schema then
@@ -157,11 +151,11 @@ end
 
 function RenderData:add_hl(group, line_idx, first, last)
   table.insert(self.hl, {
-      group = group,
-      line_idx = line_idx,
-      first = first,
-      last = last
-    })
+    group = group,
+    line_idx = line_idx,
+    first = first,
+    last = last,
+  })
 end
 
 function RenderData:clear()
@@ -191,11 +185,11 @@ local function process_component(line_idx, lines, hl_data, component)
 
     for _, hl in ipairs(component.hl) do
       table.insert(hl_data, {
-          group = hl.group,
-          line_idx = hl.line_idx + line_idx,
-          first = hl.first,
-          last = hl.last
-        })
+        group = hl.group,
+        line_idx = hl.line_idx + line_idx,
+        first = hl.first,
+        last = hl.last,
+      })
     end
     component.height = #component.lines
 
@@ -215,7 +209,9 @@ end
 ---@param bufid integer
 ---@param data RenderData
 function M.render(bufid, data)
-  if not a.nvim_buf_is_loaded(bufid) then return end
+  if not a.nvim_buf_is_loaded(bufid) then
+    return
+  end
 
   local was_modifiable = a.nvim_buf_get_option(bufid, "modifiable")
   a.nvim_buf_set_option(bufid, "modifiable", true)
@@ -260,14 +256,18 @@ function M.get_git_hl(status)
 end
 
 function M.get_file_icon(name, ext, render_data, line_idx, offset)
-  if not config.get_config().file_panel.use_icons then return " " end
+  if not config.get_config().file_panel.use_icons then
+    return " "
+  end
   if not web_devicons then
     local ok
-    ok, web_devicons = pcall(require, 'nvim-web-devicons')
+    ok, web_devicons = pcall(require, "nvim-web-devicons")
     if not ok then
       config.get_config().file_panel.use_icons = false
-      utils.warn("nvim-web-devicons is required to use file icons! "
-        .. "Set `use_icons = false` in your config to not see this message.")
+      utils.warn(
+        "nvim-web-devicons is required to use file icons! "
+          .. "Set `use_icons = false` in your config to not see this message."
+      )
       return " "
     end
   end

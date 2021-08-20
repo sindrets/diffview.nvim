@@ -1,15 +1,18 @@
-local utils = require'diffview.utils'
+local utils = require("diffview.utils")
 local M = {}
 
 function M.diffview_callback(cb_name)
-  return string.format("<Cmd>lua require'diffview'.on_keypress('%s')<CR>", cb_name)
+  return string.format("<Cmd>lua require'diffview'.trigger_event('%s')<CR>", cb_name)
 end
 
+-- stylua: ignore start
 M.defaults = {
   diff_binaries = false,
   file_panel = {
+    position = "left",
     width = 35,
-    use_icons = true
+    height = 10,
+    use_icons = true,
   },
   key_bindings = {
     disable_defaults = false,
@@ -36,9 +39,10 @@ M.defaults = {
       ["<s-tab>"]       = M.diffview_callback("select_prev_entry"),
       ["<leader>e"]     = M.diffview_callback("focus_files"),
       ["<leader>b"]     = M.diffview_callback("toggle_files"),
-    }
-  }
+    },
+  },
 }
+-- stylua: ignore end
 
 M._config = M.defaults
 
@@ -52,10 +56,10 @@ function M.setup(user_config)
   M._config = vim.tbl_deep_extend("force", M._config, user_config)
 
   if M._config.key_bindings.disable_defaults then
-    M._config.key_bindings.view =
-      (user_config.key_bindings and user_config.key_bindings.view) or {}
-    M._config.key_bindings.file_panel =
-      (user_config.key_bindings and user_config.key_bindings.file_panel) or {}
+    M._config.key_bindings.view = (user_config.key_bindings and user_config.key_bindings.view) or {}
+    M._config.key_bindings.file_panel = (
+        user_config.key_bindings and user_config.key_bindings.file_panel
+      ) or {}
   end
 end
 

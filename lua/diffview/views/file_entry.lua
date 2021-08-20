@@ -1,7 +1,7 @@
-local oop = require'diffview.oop'
-local utils = require'diffview.utils'
-local config = require'diffview.config'
-local RevType = require'diffview.rev'.RevType
+local oop = require("diffview.oop")
+local utils = require("diffview.utils")
+local config = require("diffview.config")
+local RevType = require("diffview.rev").RevType
 local a = vim.api
 local M = {}
 
@@ -28,16 +28,8 @@ local fstat_cache = {}
 ---@field left_bufid integer
 ---@field right_bufid integer
 ---@field created_bufs integer[]
----STATIC-INTERFACE:
----@field _null_buffer integer|nil
----@field _get_null_buffer function
----@field _create_buffer function
----@field should_null function
----@field load_null_buffer function
----@field _update_windows function
----@field _attach_buffer function
----@field _detach_buffer function
-local FileEntry = oop.class()
+local FileEntry = oop.Object
+FileEntry = oop.create_class("FileEntry")
 
 ---@static
 ---@type integer|nil
@@ -49,29 +41,26 @@ FileEntry.winopts = {
   scrollbind = true,
   cursorbind = true,
   foldmethod = "diff",
-  foldlevel = 0
+  foldcolumn = "1",
+  foldlevel = 0,
 }
 
 ---FileEntry constructor
 ---@param opt table
 ---@return FileEntry
-function FileEntry:new(opt)
-  local this = {
-    path = opt.path,
-    oldpath = opt.oldpath,
-    absolute_path = opt.absolute_path,
-    parent_path = utils.path_parent(opt.path, true) or "",
-    basename = utils.path_basename(opt.path),
-    extension = utils.path_extension(opt.path),
-    status = opt.status,
-    stats = opt.stats,
-    kind = opt.kind,
-    left = opt.left,
-    right = opt.right,
-    created_bufs = {}
-  }
-  setmetatable(this, self)
-  return this
+function FileEntry:init(opt)
+  self.path = opt.path
+  self.oldpath = opt.oldpath
+  self.absolute_path = opt.absolute_path
+  self.parent_path = utils.path_parent(opt.path, true) or ""
+  self.basename = utils.path_basename(opt.path)
+  self.extension = utils.path_extension(opt.path)
+  self.status = opt.status
+  self.stats = opt.stats
+  self.kind = opt.kind
+  self.left = opt.left
+  self.right = opt.right
+  self.created_bufs = {}
 end
 
 function FileEntry:destroy()
@@ -88,7 +77,7 @@ end
 function FileEntry:load_buffers(git_root, left_winid, right_winid)
   if not config.get_config().diff_binaries then
     if self.left_binary == nil then
-      local git = require'diffview.git'
+      local git = require("diffview.git")
       self.left_binary = git.is_binary(git_root, self.oldpath or self.path, self.left)
       self.right_binary = git.is_binary(git_root, self.path, self.right)
     end
@@ -97,53 +86,63 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
   local last_winid = a.nvim_get_current_win()
   local splits = {
     {
-      winid = left_winid, bufid = self.left_bufid,
-      rev = self.left, pos = "left", binary = self.left_binary == true
+      winid = left_winid,
+      bufid = self.left_bufid,
+      rev = self.left,
+      pos = "left",
+      binary = self.left_binary == true,
     },
     {
-      winid = right_winid, bufid = self.right_bufid,
-      rev = self.right, pos = "right", binary = self.right_binary == true
-    }
+      winid = right_winid,
+      bufid = self.right_bufid,
+      rev = self.right,
+      pos = "right",
+      binary = self.right_binary == true,
+    },
   }
 
-  for _, split in ipairs(splits) do
-    local winnr = vim.fn.win_id2win(split.winid)
+  pcall(function()
+    vim.opt.eventignore = "WinEnter,WinLeave"
+    for _, split in ipairs(splits) do
+      local winnr = vim.fn.win_id2win(split.winid)
 
-    if not (split.bufid and a.nvim_buf_is_loaded(split.bufid)) then
-      if split.rev.type == RevType.LOCAL then
-
-        if split.binary or FileEntry.should_null(split.rev, self.status, split.pos) then
-          local bn = FileEntry._create_buffer(git_root, split.rev, self.path, true)
+      if not (split.bufid and a.nvim_buf_is_loaded(split.bufid)) then
+        if split.rev.type == RevType.LOCAL then
+          if split.binary or FileEntry.should_null(split.rev, self.status, split.pos) then
+            local bn = FileEntry._create_buffer(git_root, split.rev, self.path, true)
+            a.nvim_win_set_buf(split.winid, bn)
+            split.bufid = bn
+          else
+            vim.cmd(winnr .. "windo edit " .. vim.fn.fnameescape(self.absolute_path))
+            split.bufid = a.nvim_get_current_buf()
+          end
+        elseif split.rev.type == RevType.COMMIT or split.rev.type == RevType.INDEX then
+          local bn
+          if self.oldpath and split.pos == "left" then
+            bn = FileEntry._create_buffer(git_root, split.rev, self.oldpath, split.binary)
+          else
+            bn = FileEntry._create_buffer(
+              git_root,
+              split.rev,
+              self.path,
+              split.binary or FileEntry.should_null(split.rev, self.status, split.pos)
+            )
+          end
+          table.insert(self.created_bufs, bn)
           a.nvim_win_set_buf(split.winid, bn)
           split.bufid = bn
-        else
-          vim.cmd(winnr .. "windo edit " .. vim.fn.fnameescape(self.absolute_path))
-          split.bufid = a.nvim_get_current_buf()
+          vim.cmd(winnr .. "windo filetype detect")
         end
 
-      elseif split.rev.type == RevType.COMMIT or split.rev.type == RevType.INDEX then
-        local bn
-        if self.oldpath and split.pos == "left" then
-          bn = FileEntry._create_buffer(git_root, split.rev, self.oldpath, split.binary)
-        else
-          bn = FileEntry._create_buffer(
-            git_root, split.rev, self.path,
-            split.binary or FileEntry.should_null(split.rev, self.status, split.pos)
-          )
-        end
-        table.insert(self.created_bufs, bn)
-        a.nvim_win_set_buf(split.winid, bn)
-        split.bufid = bn
-        vim.cmd(winnr .. "windo filetype detect")
+        FileEntry._attach_buffer(split.bufid)
+      else
+        a.nvim_win_set_buf(split.winid, split.bufid)
+        FileEntry._attach_buffer(split.bufid)
       end
-
-      FileEntry._attach_buffer(split.bufid)
-    else
-      a.nvim_win_set_buf(split.winid, split.bufid)
-      FileEntry._attach_buffer(split.bufid)
     end
-  end
+  end)
 
+  vim.opt.eventignore = ""
   self.left_bufid = splits[1].bufid
   self.right_bufid = splits[2].bufid
 
@@ -152,13 +151,21 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
 end
 
 function FileEntry:attach_buffers()
-  if self.left_bufid then FileEntry._attach_buffer(self.left_bufid) end
-  if self.right_bufid then FileEntry._attach_buffer(self.right_bufid) end
+  if self.left_bufid then
+    FileEntry._attach_buffer(self.left_bufid)
+  end
+  if self.right_bufid then
+    FileEntry._attach_buffer(self.right_bufid)
+  end
 end
 
 function FileEntry:detach_buffers()
-  if self.left_bufid then FileEntry._detach_buffer(self.left_bufid) end
-  if self.right_bufid then FileEntry._detach_buffer(self.right_bufid) end
+  if self.left_bufid then
+    FileEntry._detach_buffer(self.left_bufid)
+  end
+  if self.right_bufid then
+    FileEntry._detach_buffer(self.right_bufid)
+  end
 end
 
 ---@param split "left"|"right"
@@ -199,19 +206,22 @@ end
 ---@param other FileEntry
 ---@return boolean
 function FileEntry:compare(other)
-  if self.stats and not other.stats then return false end
-  if not self.stats and other.stats then return false end
+  if self.stats and not other.stats then
+    return false
+  end
+  if not self.stats and other.stats then
+    return false
+  end
   if self.stats and other.stats then
-    if (self.stats.additions ~= other.stats.additions
-        or self.stats.deletions ~= other.stats.deletions) then
+    if
+      self.stats.additions ~= other.stats.additions
+      or self.stats.deletions ~= other.stats.deletions
+    then
       return false
     end
   end
 
-  return (
-    self.path == other.path
-    and self.status == other.status
-    )
+  return (self.path == other.path and self.status == other.status)
 end
 
 ---@static Get the bufid of the null buffer. Create it if it's not loaded.
@@ -219,7 +229,7 @@ end
 function FileEntry._get_null_buffer()
   if not (FileEntry._null_buffer and a.nvim_buf_is_loaded(FileEntry._null_buffer)) then
     local bn = a.nvim_create_buf(false, false)
-    local bufname = utils.path_join({"diffview", "null"})
+    local bufname = utils.path_join({ "diffview://", "null" })
     a.nvim_buf_set_option(bn, "modified", false)
     a.nvim_buf_set_option(bn, "modifiable", false)
 
@@ -241,21 +251,29 @@ end
 ---@param path string
 ---@param null boolean
 function FileEntry._create_buffer(git_root, rev, path, null)
-  if null then return FileEntry._get_null_buffer() end
+  if null then
+    return FileEntry._get_null_buffer()
+  end
 
   local bn = a.nvim_create_buf(false, false)
-  local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " show " .. (rev.commit or "") .. ":" .. vim.fn.shellescape(path)
+  local cmd = "git -C "
+    .. vim.fn.shellescape(git_root)
+    .. " show "
+    .. (rev.commit or "")
+    .. ":"
+    .. vim.fn.shellescape(path)
   local lines = vim.fn.systemlist(cmd)
   a.nvim_buf_set_lines(bn, 0, -1, false, lines)
 
-  local basename = utils.path_basename(path)
-  local bufname = basename
+  local context
   if rev.type == RevType.COMMIT then
-    bufname = rev:abbrev() .. "_" .. basename
+    context = rev:abbrev()
   elseif rev.type == RevType.INDEX then
-    bufname = "[index]_" .. basename
+    context = ":0:"
   end
-  local fullname = utils.path_join({"diffview", bufname})
+
+  -- stylua: ignore
+  local fullname = utils.path_join({ "diffview://", git_root, context, path, })
   a.nvim_buf_set_option(bn, "modified", false)
   a.nvim_buf_set_option(bn, "modifiable", false)
 
@@ -264,7 +282,8 @@ function FileEntry._create_buffer(git_root, rev, path, null)
     -- Resolve name conflict
     local i = 1
     while not ok do
-      fullname = utils.path_join({"diffview", i .. "_" .. bufname})
+      -- stylua: ignore
+      fullname = utils.path_join({ "diffview://", git_root, context, i, path, })
       ok = pcall(a.nvim_buf_set_name, bn, fullname)
       i = i + 1
     end
@@ -283,10 +302,7 @@ function FileEntry.should_null(rev, status, pos)
   if rev.type == RevType.LOCAL then
     return status == "D"
   elseif rev.type == RevType.COMMIT then
-    return (
-      vim.tbl_contains({ "?", "A" }, status)
-      and pos == "left"
-    )
+    return (vim.tbl_contains({ "?", "A" }, status) and pos == "left")
   end
 end
 
@@ -299,7 +315,9 @@ end
 
 ---@static
 function FileEntry.safe_delete_buf(bufid)
-  if bufid == FileEntry._null_buffer then return end
+  if bufid == FileEntry._null_buffer then
+    return
+  end
   for _, winid in ipairs(utils.tabpage_win_find_buf(0, bufid)) do
     FileEntry.load_null_buffer(winid)
   end
@@ -339,9 +357,11 @@ end
 function FileEntry.update_index_stat(git_root, git_dir, stat)
   stat = stat or vim.loop.fs_stat(utils.path_join({ git_dir, "index" }))
   if stat then
-    if not fstat_cache[git_root] then fstat_cache[git_root] = {} end
+    if not fstat_cache[git_root] then
+      fstat_cache[git_root] = {}
+    end
     fstat_cache[git_root].index = {
-      mtime = stat.mtime.sec
+      mtime = stat.mtime.sec,
     }
   end
 end

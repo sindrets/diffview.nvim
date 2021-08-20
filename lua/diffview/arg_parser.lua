@@ -1,4 +1,4 @@
-local oop = require'diffview.oop'
+local oop = require("diffview.oop")
 
 local M = {}
 
@@ -9,43 +9,39 @@ local long_flag_pat = "^%-%-(%a[%a%d-]*)=?(.*)"
 ---@field flags table<string, string>
 ---@field args string[]
 ---@field post_args string[]
-local ArgObject = oop.class()
+local ArgObject = oop.Object
+ArgObject = oop.create_class("ArgObject")
 
 ---ArgObject constructor.
 ---@param flags table<string, string>
 ---@param args string[]
 ---@return ArgObject
-function ArgObject:new(flags, args, post_args)
-  local this = {
-    flags = flags,
-    args = args,
-    post_args = post_args
-  }
-  setmetatable(this, self)
-  return this
+function ArgObject:init(flags, args, post_args)
+  self.flags = flags
+  self.args = args
+  self.post_args = post_args
 end
 
 ---Get a flag value.
 ---@vararg ... string[] Flag synonyms
 ---@return any
 function ArgObject:get_flag(...)
-  for _, name in ipairs({...}) do
-    if self.flags[name] ~= nil then return self.flags[name] end
+  for _, name in ipairs({ ... }) do
+    if self.flags[name] ~= nil then
+      return self.flags[name]
+    end
   end
 end
 
 ---@class FlagValueMap
 ---@field map table<string, string[]>
-local FlagValueMap = oop.class()
+local FlagValueMap = oop.Object
+FlagValueMap = oop.create_class("FlagValueMap")
 
 ---FlagValueMap constructor
 ---@return FlagValueMap
-function FlagValueMap:new()
-  local this = {
-    map = {}
-  }
-  setmetatable(this, self)
-  return this
+function FlagValueMap:init()
+  self.map = {}
 end
 
 function FlagValueMap:put(flag_synonyms, values)
@@ -88,13 +84,15 @@ end
 function FlagValueMap:get_completion(flag_name)
   local is_short = flag_name:match(short_flag_pat) ~= nil
   if is_short then
-    flag_name = flag_name:sub(1,2)
+    flag_name = flag_name:sub(1, 2)
   else
     flag_name = flag_name:gsub("=.*", "")
   end
 
   local values = self.map[flag_name]
-  if not values then return nil end
+  if not values then
+    return nil
+  end
 
   local items = {}
   for _, v in ipairs(values) do
@@ -140,7 +138,7 @@ function M.parse(args)
     ::continue::
   end
 
-  return ArgObject:new(flags, pre_args, post_args)
+  return ArgObject(flags, pre_args, post_args)
 end
 
 ---Scan an EX arg string and split into individual args.
@@ -202,8 +200,12 @@ function M.scan_ex_args(cmd_line, cur_pos)
 end
 
 function M.ambiguous_bool(value, default, truthy, falsy)
-  if vim.tbl_contains(truthy, value) then return true end
-  if vim.tbl_contains(falsy, value) then return false end
+  if vim.tbl_contains(truthy, value) then
+    return true
+  end
+  if vim.tbl_contains(falsy, value) then
+    return false
+  end
   return default
 end
 
