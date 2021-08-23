@@ -18,7 +18,7 @@ function M.diffview_open(args)
   local paths = {}
 
   for _, path in ipairs(argo.post_args) do
-    table.insert(paths, path)
+    table.insert(paths, vim.fn.expand(path))
   end
 
   local fpath = (
@@ -35,7 +35,10 @@ function M.diffview_open(args)
 
   local git_root = git.toplevel(p)
   if not git_root then
-    utils.err(string.format("Path not a git repo (or any parent): '%s'", p))
+    utils.err(
+      string.format("Path not a git repo (or any parent): '%s'",
+        vim.fn.fnamemodify(p, ":."))
+    )
     return
   end
 
@@ -72,21 +75,36 @@ function M.file_history(args)
   target_path = vim.fn.fnamemodify(target_path, ":p")
 
   if vim.fn.isdirectory(target_path) == 1 then
-    utils.err(string.format("Target is not a file: '%s'", target_path))
+    utils.err(
+      string.format("Target is not a file: '%s'",
+        vim.fn.fnamemodify(target_path, ":."))
+    )
     return
   end
 
   local p = vim.fn.fnamemodify(target_path, ":h")
   local git_root = git.toplevel(p)
   if not git_root then
-    utils.err(string.format("Path not a git repo (or any parent): '%s'", p))
+    utils.err(
+      string.format("Path not a git repo (or any parent): '%s'",
+        vim.fn.fnamemodify(p, ":."))
+    )
     return
   end
 
+  ---@type FileHistoryView
   local v = FileHistoryView({
     git_root = git_root,
     target_path = utils.path_relative(target_path, git_root)
   })
+
+  if v.files:size() == 0 then
+    utils.info(
+      string.format("Target has no git history: '%s'",
+        vim.fn.fnamemodify(target_path, ":."))
+    )
+    return
+  end
 
   table.insert(M.views, v)
 

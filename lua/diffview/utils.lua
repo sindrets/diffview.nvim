@@ -37,6 +37,10 @@ function M.clamp(value, min, max)
   return value
 end
 
+function M.sign(n)
+  return (n > 0 and 1 or 0) - (n < 0 and 1 or 0)
+end
+
 function M.shell_error()
   return vim.v.shell_error ~= 0
 end

@@ -259,7 +259,7 @@ function FilePanel:render()
   ---@type RenderComponent
   local comp = self.components.path.comp
   local line_idx = 0
-  local s = utils.path_shorten(self.git_root, self.width - 6)
+  local s = utils.path_shorten(vim.fn.fnamemodify(self.git_root, ":~"), self.width - 6)
   comp:add_hl("DiffviewFilePanelRootPath", line_idx, 0, #s)
   comp:add_line(s)
 

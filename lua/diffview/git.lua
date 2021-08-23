@@ -136,7 +136,8 @@ function M.file_history_list(git_root, path, max_count)
   local use_count = max_count and max_count < math.huge
 
   local cmd = string.format(
-    "git -C %s log --pretty='format:%%H %%P%%n%%an%%n%%ai%%n%%s' --name-status --follow %s -- %s",
+    "git -C %s log --pretty='format:%%H %%P%%n%%an%%n%%ad%%n%%ar%%n%%s' "
+    .. "--date=raw --name-status --follow %s -- %s",
     vim.fn.shellescape(git_root),
     use_count and ("-n" .. max_count) or "",
     vim.fn.shellescape(path)
@@ -144,7 +145,8 @@ function M.file_history_list(git_root, path, max_count)
   local status_data = vim.fn.systemlist(cmd)
 
   cmd = string.format(
-    "git -C %s log --pretty='format:%%H %%P%%n%%an%%n%%ai%%n%%s' --numstat --follow %s -- %s",
+    "git -C %s log --pretty='format:%%H %%P%%n%%an%%n%%ad%%n%%ar%%n%%s' "
+    .. "--date=raw --numstat --follow %s -- %s",
     vim.fn.shellescape(git_root),
     use_count and ("-n" .. max_count) or "",
     vim.fn.shellescape(path)
@@ -152,17 +154,20 @@ function M.file_history_list(git_root, path, max_count)
   local num_data = vim.fn.systemlist(cmd)
 
   if not utils.shell_error() then
-    for i = 1, #status_data, 6 do
+    for i = 1, #status_data, 7 do
       -- print(vim.inspect(utils.tbl_slice(status_data, i, i + 5)))
       local right_hash, left_hash = unpack(utils.str_split(status_data[i]))
+      local time, offset = unpack(utils.str_split(status_data[i + 2]))
       local commit = Commit({
         hash = right_hash,
         author = status_data[i + 1],
-        date = status_data[i + 2],
-        subject = status_data[i + 3],
+        time = tonumber(time),
+        time_offset = offset,
+        rel_date = status_data[i + 3],
+        subject = status_data[i + 4],
       })
-      local status = status_data[i + 4]:sub(1, 1):gsub("%s", " ")
-      local name = status_data[i + 4]:match("[%a%s][^%s]*\t(.*)")
+      local status = status_data[i + 5]:sub(1, 1):gsub("%s", " ")
+      local name = status_data[i + 5]:match("[%a%s][^%s]*\t(.*)")
       local oldname
 
       if name:match("\t") ~= nil then
@@ -171,8 +176,8 @@ function M.file_history_list(git_root, path, max_count)
       end
 
       local stats = {
-        additions = tonumber(num_data[i + 4]:match("^%d+")),
-        deletions = tonumber(num_data[i + 4]:match("^%d+%s+(%d+)")),
+        additions = tonumber(num_data[i + 5]:match("^%d+")),
+        deletions = tonumber(num_data[i + 5]:match("^%d+%s+(%d+)")),
       }
 
       if not stats.additions or not stats.deletions then

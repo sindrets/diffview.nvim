@@ -215,7 +215,13 @@ local function render_entries(comp, files)
 
     offset = #s + 1
     if file.commit then
-      local info = file.commit.author .. ", " .. file.commit.date
+      local date = (
+        -- 3 months
+        os.difftime(os.time(), file.commit.time) > 60 * 60 * 24 * 30 * 3
+        and file.commit.iso_date
+        or file.commit.rel_date
+      )
+      local info = file.commit.author .. ", " .. date
       comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #info)
       s = s .. " " .. info
     end
@@ -239,8 +245,8 @@ function FileHistoryPanel:render()
   -- root path
   local s = (
     self.form == Form.COLUMN
-    and utils.path_shorten(self.git_root, self.width - 6)
-    or self.git_root
+    and utils.path_shorten(vim.fn.fnamemodify(self.git_root, ":~"), self.width - 6)
+    or vim.fn.fnamemodify(self.git_root, ":~")
   )
   comp:add_hl("DiffviewFilePanelRootPath", line_idx, 0, #s)
   comp:add_line(s)
@@ -252,7 +258,13 @@ function FileHistoryPanel:render()
     -- file path
     local icon = renderer.get_file_icon(file.basename, file.extension, comp, line_idx, 0)
     local offset = #icon
-    comp:add_hl("DiffviewFilePanelFileName", line_idx, offset, offset + #file.path)
+    comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #file.parent_path + 1)
+    comp:add_hl(
+      "DiffviewFilePanelFileName",
+      line_idx,
+      offset + #file.parent_path + 1,
+      offset + #file.basename
+    )
     s = icon .. file.path
     comp:add_line(s)
     line_idx = line_idx + 1
