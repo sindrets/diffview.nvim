@@ -21,6 +21,7 @@ local fstat_cache = {}
 ---@field status string
 ---@field stats GitStats
 ---@field kind "working"|"staged"
+---@field commit Commit|nil
 ---@field left_binary boolean|nil
 ---@field right_binary boolean|nil
 ---@field left Rev
@@ -58,6 +59,7 @@ function FileEntry:init(opt)
   self.status = opt.status
   self.stats = opt.stats
   self.kind = opt.kind
+  self.commit = opt.commit
   self.left = opt.left
   self.right = opt.right
   self.created_bufs = {}

@@ -4,6 +4,7 @@ local arg_parser = require("diffview.arg_parser")
 local git = require("diffview.git")
 local utils = require("diffview.utils")
 local DiffView = require("diffview.views.diff.diff_view").DiffView
+local FileHistoryView = require("diffview.views.file_history.file_history_view").FileHistoryView
 local a = vim.api
 
 local M = {}
@@ -11,7 +12,7 @@ local M = {}
 ---@type View[]
 M.views = {}
 
-function M.process_args(args)
+function M.diffview_open(args)
   local argo = arg_parser.parse(args)
   local rev_arg = argo.args[1]
   local paths = {}
@@ -34,7 +35,7 @@ function M.process_args(args)
 
   local git_root = git.toplevel(p)
   if not git_root then
-    utils.err("Path not a git repo (or any parent): '" .. p .. "'")
+    utils.err(string.format("Path not a git repo (or any parent): '%s'", p))
     return
   end
 
@@ -58,6 +59,33 @@ function M.process_args(args)
     left = left,
     right = right,
     options = options,
+  })
+
+  table.insert(M.views, v)
+
+  return v
+end
+
+function M.file_history(args)
+  local argo = arg_parser.parse(args)
+  local target_path = argo.args[1] and vim.fn.expand(argo.args[1]) or vim.fn.expand("%")
+  target_path = vim.fn.fnamemodify(target_path, ":p")
+
+  if vim.fn.isdirectory(target_path) == 1 then
+    utils.err(string.format("Target is not a file: '%s'", target_path))
+    return
+  end
+
+  local p = vim.fn.fnamemodify(target_path, ":h")
+  local git_root = git.toplevel(p)
+  if not git_root then
+    utils.err(string.format("Path not a git repo (or any parent): '%s'", p))
+    return
+  end
+
+  local v = FileHistoryView({
+    git_root = git_root,
+    target_path = utils.path_relative(target_path, git_root)
   })
 
   table.insert(M.views, v)

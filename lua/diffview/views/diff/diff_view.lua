@@ -47,7 +47,6 @@ function DiffView:init(opt)
   self.options = opt.options
   self.files = git.diff_file_list(opt.git_root, opt.left, opt.right, opt.path_args, opt.options)
   self.file_idx = 1
-  self.nulled = false
   self.panel = FilePanel(
     self.git_root,
     self.files,

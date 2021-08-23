@@ -2,6 +2,7 @@ local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local Rev = require("diffview.rev").Rev
 local RevType = require("diffview.rev").RevType
+local Commit = require("diffview.commit").Commit
 local FileEntry = require("diffview.views.file_entry").FileEntry
 local M = {}
 
@@ -124,6 +125,99 @@ local function untracked_files(git_root, left, right)
         })
       )
     end
+  end
+
+  return files
+end
+
+function M.file_history_list(git_root, path, max_count)
+  ---@type FileDict
+  local files = FileDict()
+  local use_count = max_count and max_count < math.huge
+
+  local cmd = string.format(
+    "git -C %s log --pretty='format:%%H %%P%%n%%an%%n%%ai%%n%%s' --name-status --follow %s -- %s",
+    vim.fn.shellescape(git_root),
+    use_count and ("-n" .. max_count) or "",
+    vim.fn.shellescape(path)
+  )
+  local status_data = vim.fn.systemlist(cmd)
+
+  cmd = string.format(
+    "git -C %s log --pretty='format:%%H %%P%%n%%an%%n%%ai%%n%%s' --numstat --follow %s -- %s",
+    vim.fn.shellescape(git_root),
+    use_count and ("-n" .. max_count) or "",
+    vim.fn.shellescape(path)
+  )
+  local num_data = vim.fn.systemlist(cmd)
+
+  if not utils.shell_error() then
+    for i = 1, #status_data, 6 do
+      -- print(vim.inspect(utils.tbl_slice(status_data, i, i + 5)))
+      local right_hash, left_hash = unpack(utils.str_split(status_data[i]))
+      local commit = Commit({
+        hash = right_hash,
+        author = status_data[i + 1],
+        date = status_data[i + 2],
+        subject = status_data[i + 3],
+      })
+      local status = status_data[i + 4]:sub(1, 1):gsub("%s", " ")
+      local name = status_data[i + 4]:match("[%a%s][^%s]*\t(.*)")
+      local oldname
+
+      if name:match("\t") ~= nil then
+        oldname = name:match("(.*)\t")
+        name = name:gsub("^.*\t", "")
+      end
+
+      local stats = {
+        additions = tonumber(num_data[i + 4]:match("^%d+")),
+        deletions = tonumber(num_data[i + 4]:match("^%d+%s+(%d+)")),
+      }
+
+      if not stats.additions or not stats.deletions then
+        stats = nil
+      end
+
+      table.insert(
+        files.working,
+        FileEntry({
+          path = name,
+          oldpath = oldname,
+          absolute_path = utils.path_join({ git_root, name }),
+          status = status,
+          stats = stats,
+          kind = "working",
+          commit = commit,
+          left = Rev(RevType.COMMIT, left_hash),
+          right = Rev(RevType.COMMIT, right_hash),
+        })
+      )
+    end
+  end
+
+  local entry = files[1] or {}
+  local cur_status = M.get_file_status(
+    git_root,
+    path,
+    (entry.right and entry.right.commit) or "HEAD"
+  )
+
+  if cur_status then
+    table.insert(
+      files.working,
+      1,
+      FileEntry({
+        path = path,
+        oldpath = entry.path ~= path and entry.path or nil,
+        absolute_path = utils.path_join({ git_root, path }),
+        status = cur_status,
+        stats = M.get_file_stats(git_root, path, (entry.right and entry.right.commit) or "HEAD"),
+        kind = "working",
+        left = entry.right,
+        right = Rev(RevType.LOCAL)
+      })
+    )
   end
 
   return files
@@ -315,6 +409,40 @@ function M.show_untracked(git_root)
     .. vim.fn.shellescape(git_root)
     .. " config --type=bool status.showUntrackedFiles"
   return vim.trim(vim.fn.system(cmd)) ~= "false"
+end
+
+function M.get_file_status(git_root, path, rev_arg)
+  local cmd = "git -C "
+    .. vim.fn.shellescape(git_root)
+    .. " diff --name-status "
+    .. vim.fn.shellescape(rev_arg)
+    .. " -- "
+    .. vim.fn.shellescape(path)
+  local out = vim.fn.system(cmd)
+  if not utils.shell_error() and #out > 0 then
+    return out:sub(1, 1)
+  end
+end
+
+function M.get_file_stats(git_root, path, rev_arg)
+  local cmd = "git -C "
+    .. vim.fn.shellescape(git_root)
+    .. " diff --numstat "
+    .. vim.fn.shellescape(rev_arg)
+    .. " -- "
+    .. vim.fn.shellescape(path)
+  local out = vim.fn.system(cmd)
+  if not utils.shell_error() and #out > 0 then
+    local stats = {
+      additions = tonumber(out:match("^%d+")),
+      deletions = tonumber(out:match("^%d+%s+(%d+)")),
+    }
+
+    if not stats.additions or not stats.deletions then
+      stats = nil
+    end
+    return stats
+  end
 end
 
 ---Restore a file to the state it was in, in a given commit / rev. If no commit

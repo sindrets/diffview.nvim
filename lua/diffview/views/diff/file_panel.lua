@@ -6,8 +6,6 @@ local Panel = require("diffview.ui.panel").Panel
 local api = vim.api
 local M = {}
 
-local name_counter = 1
-
 ---@class FilePanel
 ---@field git_root string
 ---@field files FileDict
@@ -32,6 +30,7 @@ FilePanel.winopts = {
   wrap = false,
   cursorline = true,
   signcolumn = "yes",
+  colorcolumn = "",
   foldmethod = "manual",
   foldcolumn = "0",
   scrollbind = false,
@@ -88,8 +87,7 @@ function FilePanel:init_buffer()
     api.nvim_buf_set_option(bn, k, v)
   end
 
-  local bufname = string.format("diffview:///panels/%d/DiffviewPanel", name_counter)
-  name_counter = name_counter + 1
+  local bufname = string.format("diffview:///panels/%d/DiffviewPanel", Panel.next_uid())
   local ok = pcall(api.nvim_buf_set_name, bn, bufname)
   if not ok then
     utils.wipe_named_buffer(bufname)

@@ -191,9 +191,12 @@ function M.str_center_pad(s, min_size, fill)
   return result
 end
 
-function M.str_shorten(s, new_length)
-  if string.len(s) > new_length - 1 then
-    return "…" .. s:sub(string.len(s) - new_length + 1, string.len(s))
+function M.str_shorten(s, max_length, head)
+  if string.len(s) > max_length then
+    if head then
+      return "…" .. s:sub(string.len(s) - max_length + 1, string.len(s))
+    end
+    return s:sub(1, max_length - 1) .. "…"
   end
   return s
 end

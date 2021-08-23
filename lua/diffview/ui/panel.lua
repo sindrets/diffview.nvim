@@ -3,7 +3,7 @@ local utils = require("diffview.utils")
 local renderer = require("diffview.renderer")
 local api = vim.api
 local M = {}
-local name_counter = 1
+local uid_counter = 0
 
 ---@class Form
 
@@ -39,6 +39,7 @@ Panel.winopts = {
   spell = false,
   wrap = false,
   signcolumn = "yes",
+  colorcolumn = "",
   foldmethod = "manual",
   foldcolumn = "0",
   scrollbind = false,
@@ -52,6 +53,12 @@ Panel.bufopts = {
   modifiable = false,
   bufhidden = "hide",
 }
+
+function Panel.next_uid()
+  local uid = uid_counter
+  uid_counter = uid_counter + 1
+  return uid
+end
 
 function Panel:init(opt)
   self.position = opt.position or "left"
@@ -172,8 +179,7 @@ function Panel:init_buffer()
     api.nvim_buf_set_option(bn, k, v)
   end
 
-  local bufname = string.format("diffview:///panels/%d/DiffviewPanel", name_counter)
-  name_counter = name_counter + 1
+  local bufname = string.format("diffview:///panels/%d/DiffviewPanel", Panel.next_uid())
   local ok = pcall(api.nvim_buf_set_name, bn, bufname)
   if not ok then
     utils.wipe_named_buffer(bufname)

@@ -74,6 +74,7 @@ M.hl_links = {
   StatusUnknown = "diffRemoved",
   StatusDeleted = "diffRemoved",
   StatusBroken = "diffRemoved",
+  StatusIgnored = "Comment"
 }
 
 function M.setup()

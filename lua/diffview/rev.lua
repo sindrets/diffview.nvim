@@ -34,10 +34,11 @@ function Rev:init(type, commit, head)
 end
 
 ---Get an abbreviated commit SHA. Returns `nil` if this Rev is not a commit.
+---@param length integer|nil
 ---@return string|nil
-function Rev:abbrev()
+function Rev:abbrev(length)
   if self.commit then
-    return self.commit:sub(1, 7)
+    return self.commit:sub(1, length or 7)
   end
   return nil
 end

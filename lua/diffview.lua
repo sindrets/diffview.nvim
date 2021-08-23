@@ -20,7 +20,14 @@ function M.init()
 end
 
 function M.open(...)
-  local view = lib.process_args(utils.tbl_pack(...))
+  local view = lib.diffview_open(utils.tbl_pack(...))
+  if view then
+    view:open()
+  end
+end
+
+function M.file_history(...)
+  local view = lib.file_history(utils.tbl_pack(...))
   if view then
     view:open()
   end
