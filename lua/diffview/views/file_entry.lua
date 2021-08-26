@@ -1,7 +1,7 @@
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local config = require("diffview.config")
-local RevType = require("diffview.rev").RevType
+local RevType = require("diffview.git.rev").RevType
 local a = vim.api
 local M = {}
 
@@ -79,7 +79,7 @@ end
 function FileEntry:load_buffers(git_root, left_winid, right_winid)
   if not config.get_config().diff_binaries then
     if self.left_binary == nil then
-      local git = require("diffview.git")
+      local git = require("diffview.git.utils")
       self.left_binary = git.is_binary(git_root, self.oldpath or self.path, self.left)
       self.right_binary = git.is_binary(git_root, self.path, self.right)
     end

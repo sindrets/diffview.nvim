@@ -1,64 +1,11 @@
-local oop = require("diffview.oop")
 local utils = require("diffview.utils")
-local Rev = require("diffview.rev").Rev
-local RevType = require("diffview.rev").RevType
-local Commit = require("diffview.commit").Commit
+local FileDict = require("diffview.git.file_dict").FileDict
+local Rev = require("diffview.git.rev").Rev
+local RevType = require("diffview.git.rev").RevType
+local Commit = require("diffview.git.commit").Commit
+local LogEntry = require("diffview.git.log_entry").LogEntry
 local FileEntry = require("diffview.views.file_entry").FileEntry
 local M = {}
-
----@class FileDict
----@field working FileEntry[]
----@field staged FileEntry[]
-local FileDict = oop.Object
-FileDict = oop.create_class("FileDict")
-
----FileDict constructor.
----@return FileDict
-function FileDict:init()
-  self.working = {}
-  self.staged = {}
-
-  local mt = getmetatable(self)
-  local old_index = mt.__index
-  mt.__index = function(t, k)
-    if type(k) == "number" then
-      if k > #t.working then
-        return t.staged[k - #t.working]
-      else
-        return t.working[k]
-      end
-    else
-      return old_index(t, k)
-    end
-  end
-end
-
-function FileDict:size()
-  return #self.working + #self.staged
-end
-
-function FileDict:iter()
-  local i = 0
-  local n = #self.working + #self.staged
-  return function()
-    i = i + 1
-    if i <= n then
-      return self[i]
-    end
-  end
-end
-
-function FileDict:ipairs()
-  local i = 0
-  local n = #self.working + #self.staged
-  return function()
-    i = i + 1
-    if i <= n then
-      ---@type integer, FileEntry
-      return i, self[i]
-    end
-  end
-end
 
 local function tracked_files(git_root, left, right, args, kind)
   local files = {}
@@ -130,102 +77,133 @@ local function untracked_files(git_root, left, right)
   return files
 end
 
-function M.file_history_list(git_root, path, max_count)
-  ---@type FileDict
-  local files = FileDict()
-  local use_count = max_count and max_count < math.huge
+function M.file_history_list(git_root, path_args, opt)
+  ---@type LogEntry[]
+  local entries = {}
+  local use_count = opt.max_count and opt.max_count < math.huge
+  local base_cmd = string.format("git -C %s ", vim.fn.shellescape(git_root))
 
+  local p_args = ""
+  if path_args and #path_args > 0 then
+    p_args = ""
+    for _, arg in ipairs(path_args) do
+      p_args = p_args .. " " .. vim.fn.shellescape(arg)
+    end
+  end
+
+  -- '-m': diff merges, '-c': combine merges
   local cmd = string.format(
-    "git -C %s log --pretty='format:%%H %%P%%n%%an%%n%%ad%%n%%ar%%n%%s' "
-    .. "--date=raw --name-status --follow %s -- %s",
-    vim.fn.shellescape(git_root),
-    use_count and ("-n" .. max_count) or "",
-    vim.fn.shellescape(path)
+    "%s log --pretty='format:%%H %%P%%n%%an%%n%%ad%%n%%ar%%n%%s' "
+    .. "--date=raw --name-status -m -c %s %s -- %s",
+    base_cmd,
+    opt.follow and "--follow --first-parent" or "",
+    use_count and ("-n" .. opt.max_count) or "",
+    p_args
   )
   local status_data = vim.fn.systemlist(cmd)
 
   cmd = string.format(
-    "git -C %s log --pretty='format:%%H %%P%%n%%an%%n%%ad%%n%%ar%%n%%s' "
-    .. "--date=raw --numstat --follow %s -- %s",
-    vim.fn.shellescape(git_root),
-    use_count and ("-n" .. max_count) or "",
-    vim.fn.shellescape(path)
+    "%s log --pretty='format:%%H %%P%%n%%an%%n%%ad%%n%%ar%%n%%s' "
+    .. "--date=raw --numstat -m -c %s %s -- %s",
+    base_cmd,
+    opt.follow and "--follow --first-parent" or "",
+    use_count and ("-n" .. opt.max_count) or "",
+    p_args
   )
   local num_data = vim.fn.systemlist(cmd)
 
+  -- print(vim.inspect(status_data))
   if not utils.shell_error() then
-    for i = 1, #status_data, 7 do
+    local i = 1
+    local offset = 0
+    while i <= #num_data do
       -- print(vim.inspect(utils.tbl_slice(status_data, i, i + 5)))
-      local right_hash, left_hash = unpack(utils.str_split(status_data[i]))
-      local time, offset = unpack(utils.str_split(status_data[i + 2]))
+      local right_hash, left_hash, merge_hash = unpack(utils.str_split(status_data[offset + i]))
+      local time, time_offset = unpack(utils.str_split(status_data[offset + i + 2]))
       local commit = Commit({
         hash = right_hash,
-        author = status_data[i + 1],
+        author = status_data[offset + i + 1],
         time = tonumber(time),
-        time_offset = offset,
-        rel_date = status_data[i + 3],
-        subject = status_data[i + 4],
+        time_offset = time_offset,
+        rel_date = status_data[offset + i + 3],
+        subject = status_data[offset + i + 4],
       })
-      local status = status_data[i + 5]:sub(1, 1):gsub("%s", " ")
-      local name = status_data[i + 5]:match("[%a%s][^%s]*\t(.*)")
-      local oldname
 
-      if name:match("\t") ~= nil then
-        oldname = name:match("(.*)\t")
-        name = name:gsub("^.*\t", "")
+      -- 'git log --name-status' doesn't work properly for merge commits. It
+      -- lists only an incomplete list of files at best. We need to use 'git
+      -- show' to get file statuses for merge commits.
+      local sdata = status_data
+      if merge_hash then
+        while sdata[offset + i + 5] ~= "" do
+          offset = offset + 1
+        end
+        sdata = {}
+        local lines = vim.fn.systemlist(
+          string.format(
+            "%s show --format= -m --first-parent --name-status %s -- %s",
+            base_cmd, right_hash, p_args
+          )
+        )
+        offset = offset - #lines
+        for k = 1, #lines do
+          sdata[offset + i + 4 + k] = lines[k]
+        end
       end
 
-      local stats = {
-        additions = tonumber(num_data[i + 5]:match("^%d+")),
-        deletions = tonumber(num_data[i + 5]:match("^%d+%s+(%d+)")),
-      }
+      local files = {}
+      local j = 5
+      while i + j <= #num_data and num_data[i + j] ~= "" do
+        -- print(sdata[offset + i + j], sdata[offset + i + j]:match("[%a%s][^%s]*\t(.*)"))
+        local status = sdata[offset + i + j]:sub(1, 1):gsub("%s", " ")
+        local name = sdata[offset + i + j]:match("[%a%s][^%s]*\t(.*)")
+        local oldname
 
-      if not stats.additions or not stats.deletions then
-        stats = nil
+        if name:match("\t") ~= nil then
+          oldname = name:match("(.*)\t")
+          name = name:gsub("^.*\t", "")
+        end
+
+        local stats = {
+          additions = tonumber(num_data[i + j]:match("^%d+")),
+          deletions = tonumber(num_data[i + j]:match("^%d+%s+(%d+)")),
+        }
+
+        if not stats.additions or not stats.deletions then
+          stats = nil
+        end
+
+        -- print(name, oldname, status, stats.additions, stats.deletions)
+        table.insert(
+          files,
+          FileEntry({
+              path = name,
+              oldpath = oldname,
+              absolute_path = utils.path_join({ git_root, name }),
+              status = status,
+              stats = stats,
+              kind = "working",
+              commit = commit,
+              left = Rev(RevType.COMMIT, left_hash),
+              right = Rev(RevType.COMMIT, right_hash),
+          })
+        )
+        j = j + 1
       end
 
       table.insert(
-        files.working,
-        FileEntry({
-          path = name,
-          oldpath = oldname,
-          absolute_path = utils.path_join({ git_root, name }),
-          status = status,
-          stats = stats,
-          kind = "working",
-          commit = commit,
-          left = Rev(RevType.COMMIT, left_hash),
-          right = Rev(RevType.COMMIT, right_hash),
+        entries,
+        LogEntry({
+            path_args = path_args,
+            commit = commit,
+            files = files
         })
       )
+
+      i = i + j + 1
     end
   end
 
-  local entry = files[1] or {}
-  local cur_status = M.get_file_status(
-    git_root,
-    path,
-    (entry.right and entry.right.commit) or "HEAD"
-  )
-
-  if cur_status then
-    table.insert(
-      files.working,
-      1,
-      FileEntry({
-        path = path,
-        oldpath = entry.path ~= path and entry.path or nil,
-        absolute_path = utils.path_join({ git_root, path }),
-        status = cur_status,
-        stats = M.get_file_stats(git_root, path, (entry.right and entry.right.commit) or "HEAD"),
-        kind = "working",
-        left = entry.right,
-        right = Rev(RevType.LOCAL)
-      })
-    )
-  end
-
-  return files
+  return entries
 end
 
 ---Get a list of files modified between two revs.
@@ -233,9 +211,9 @@ end
 ---@param left Rev
 ---@param right Rev
 ---@param path_args string[]|nil
----@param options DiffViewOptions
+---@param opt DiffViewOptions
 ---@return FileDict
-function M.diff_file_list(git_root, left, right, path_args, options)
+function M.diff_file_list(git_root, left, right, path_args, opt)
   ---@type FileDict
   local files = FileDict()
 
@@ -250,7 +228,7 @@ function M.diff_file_list(git_root, left, right, path_args, options)
   local rev_arg = M.rev_to_arg(left, right)
   files.working = tracked_files(git_root, left, right, rev_arg .. p_args, "working")
 
-  local show_untracked = options.show_untracked
+  local show_untracked = opt.show_untracked
   if show_untracked == nil then
     show_untracked = M.show_untracked(git_root)
   end

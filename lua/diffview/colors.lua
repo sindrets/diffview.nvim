@@ -53,6 +53,7 @@ end
 
 M.hl_links = {
   Normal = "Normal",
+  NonText = "NonText",
   CursorLine = "CursorLine",
   VertSplit = "VertSplit",
   SignColumn = "Normal",

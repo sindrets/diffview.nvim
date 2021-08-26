@@ -4,26 +4,31 @@ local config = require("diffview.config")
 local a = vim.api
 local M = {}
 local web_devicons
+local uid_counter = 0
 
 ---@class HlData
 ---@field group string
 ---@field line_idx integer
----@field first integer
----@field last integer
+---@field first integer 0 based, inclusive
+---@field last integer Exclusive
 
 ---@class RenderComponent
+---@field name string
+---@field parent RenderComponent
 ---@field lines string[]
 ---@field hl HlData[]
 ---@field components RenderComponent[]
----@field lstart integer
----@field lend integer
+---@field lstart integer Inclusive
+---@field lend integer Exclusive
 ---@field height integer
+---@field context any
 local RenderComponent = oop.Object
 RenderComponent = oop.create_class("RenderComponent")
 
 ---RenderComponent constructor.
 ---@return RenderComponent
-function RenderComponent:init()
+function RenderComponent:init(name)
+  self.name = name
   self.lines = {}
   self.hl = {}
   self.components = {}
@@ -32,19 +37,28 @@ function RenderComponent:init()
   self.height = 0
 end
 
-local function create_subcomponents(component, comp_struct, schema)
-  local new_comp = component:create_component()
-  comp_struct[schema.name] = { comp = new_comp }
-
-  for _, v in ipairs(schema) do
-    if v.name then
-      local sub_comp = new_comp:create_component()
-      comp_struct[v.name] = { comp = sub_comp }
-      if #v > 0 then
-        create_subcomponents(sub_comp, comp_struct[v.name], v)
-      end
+local function create_subcomponents(parent, comp_struct, schema)
+  for i, v in ipairs(schema) do
+    v.name = v.name or RenderComponent.next_uid()
+    local sub_comp = parent:create_component()
+    sub_comp.name = v.name
+    sub_comp.context = v.context
+    sub_comp.parent = parent
+    comp_struct[i] = {
+      _name = v.name,
+      comp = sub_comp
+    }
+    comp_struct[v.name] = comp_struct[i]
+    if #v > 0 then
+      create_subcomponents(sub_comp, comp_struct[i], v)
     end
   end
+end
+
+function RenderComponent.next_uid()
+  local uid = "comp_" .. uid_counter
+  uid_counter = uid_counter + 1
+  return uid
 end
 
 ---Create and add a new component.
@@ -52,15 +66,13 @@ end
 ---@return RenderComponent|any
 function RenderComponent:create_component(schema)
   local comp_struct
-  local new_comp = RenderComponent()
+  local new_comp = RenderComponent(schema and schema.name or RenderComponent.next_uid())
   table.insert(self.components, new_comp)
 
   if schema then
-    comp_struct = { comp = new_comp }
-    for _, v in ipairs(schema) do
-      create_subcomponents(new_comp, comp_struct, v)
-    end
-
+    new_comp.context = schema.context
+    comp_struct = { _name = new_comp.name, comp = new_comp }
+    create_subcomponents(new_comp, comp_struct, schema)
     return comp_struct
   end
 
@@ -102,6 +114,26 @@ function RenderComponent:clear()
   end
 end
 
+function RenderComponent:get_comp_on_line(line)
+  line = line - 1
+
+  local function recurse(child)
+    if line >= child.lstart and line < child.lend then
+      -- print(child.name, line, child.lstart, child.lend)
+      if #child.components > 0 then
+        for _, v in ipairs(child.components) do
+          local target = recurse(v)
+          if target then return target end
+        end
+      else
+        return child
+      end
+    end
+  end
+
+  return recurse(self)
+end
+
 ---@class RenderData
 ---@field lines string[]
 ---@field hl HlData[]
@@ -124,14 +156,13 @@ end
 ---@return RenderComponent|any
 function RenderData:create_component(schema)
   local comp_struct
-  local new_comp = RenderComponent()
+  local new_comp = RenderComponent(schema and schema.name or RenderComponent.next_uid())
   table.insert(self.components, new_comp)
 
   if schema then
-    comp_struct = { comp = new_comp }
-    for _, v in ipairs(schema) do
-      create_subcomponents(new_comp, comp_struct, v)
-    end
+    new_comp.context = schema.context
+    comp_struct = { _name = new_comp.name, comp = new_comp }
+    create_subcomponents(new_comp, comp_struct, schema)
     return comp_struct
   end
 
@@ -173,10 +204,13 @@ end
 ---@return integer
 local function process_component(line_idx, lines, hl_data, component)
   if #component.components > 0 then
+    component.lstart = line_idx
     for _, c in ipairs(component.components) do
       line_idx = process_component(line_idx, lines, hl_data, c)
     end
 
+    component.lend = line_idx
+    component.height = component.lend - component.lstart
     return line_idx
   else
     for _, line in ipairs(component.lines) do
@@ -257,14 +291,14 @@ function M.get_git_hl(status)
 end
 
 function M.get_file_icon(name, ext, render_data, line_idx, offset)
-  if not config.get_config().file_panel.use_icons then
+  if not config.get_config().use_icons then
     return " "
   end
   if not web_devicons then
     local ok
     ok, web_devicons = pcall(require, "nvim-web-devicons")
     if not ok then
-      config.get_config().file_panel.use_icons = false
+      config.get_config().use_icons = false
       utils.warn(
         "nvim-web-devicons is required to use file icons! "
           .. "Set `use_icons = false` in your config to not see this message."

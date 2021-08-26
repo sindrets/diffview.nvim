@@ -1,7 +1,7 @@
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local FileEntry = require("diffview.views.file_entry").FileEntry
-local RevType = require("diffview.rev").RevType
+local RevType = require("diffview.git.rev").RevType
 
 local a = vim.api
 

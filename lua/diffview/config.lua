@@ -8,11 +8,21 @@ end
 -- stylua: ignore start
 M.defaults = {
   diff_binaries = false,
+  use_icons = true,
+  signs = {
+    fold_closed = "",
+    fold_open = "",
+  },
   file_panel = {
     position = "left",
     width = 35,
     height = 10,
-    use_icons = true,
+  },
+  file_history_panel = {
+    position = "bottom",
+    width = 35,
+    height = 16,
+    max_count = 256,
   },
   key_bindings = {
     disable_defaults = false,
@@ -40,6 +50,19 @@ M.defaults = {
       ["<leader>e"]     = M.diffview_callback("focus_files"),
       ["<leader>b"]     = M.diffview_callback("toggle_files"),
     },
+    file_history_panel = {
+      ["j"]             = M.diffview_callback("next_entry"),
+      ["<down>"]        = M.diffview_callback("next_entry"),
+      ["k"]             = M.diffview_callback("prev_entry"),
+      ["<up>"]          = M.diffview_callback("prev_entry"),
+      ["<cr>"]          = M.diffview_callback("select_entry"),
+      ["o"]             = M.diffview_callback("select_entry"),
+      ["<2-LeftMouse>"] = M.diffview_callback("select_entry"),
+      ["<tab>"]         = M.diffview_callback("select_next_entry"),
+      ["<s-tab>"]       = M.diffview_callback("select_prev_entry"),
+      ["<leader>e"]     = M.diffview_callback("focus_files"),
+      ["<leader>b"]     = M.diffview_callback("toggle_files"),
+    },
   },
 }
 -- stylua: ignore end
@@ -59,6 +82,9 @@ function M.setup(user_config)
     M._config.key_bindings.view = (user_config.key_bindings and user_config.key_bindings.view) or {}
     M._config.key_bindings.file_panel = (
         user_config.key_bindings and user_config.key_bindings.file_panel
+      ) or {}
+    M._config.key_bindings.file_history_panel = (
+        user_config.key_bindings and user_config.key_bindings.file_history_panel
       ) or {}
   end
 end

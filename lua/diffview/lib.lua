@@ -1,7 +1,7 @@
-local Rev = require("diffview.rev").Rev
-local RevType = require("diffview.rev").RevType
+local Rev = require("diffview.git.rev").Rev
+local RevType = require("diffview.git.rev").RevType
 local arg_parser = require("diffview.arg_parser")
-local git = require("diffview.git")
+local git = require("diffview.git.utils")
 local utils = require("diffview.utils")
 local DiffView = require("diffview.views.diff.diff_view").DiffView
 local FileHistoryView = require("diffview.views.file_history.file_history_view").FileHistoryView
@@ -71,23 +71,35 @@ end
 
 function M.file_history(args)
   local argo = arg_parser.parse(args)
-  local target_path = argo.args[1] and vim.fn.expand(argo.args[1]) or vim.fn.expand("%")
-  target_path = vim.fn.fnamemodify(target_path, ":p")
+  local paths = {}
 
-  if vim.fn.isdirectory(target_path) == 1 then
-    utils.err(
-      string.format("Target is not a file: '%s'",
-        vim.fn.fnamemodify(target_path, ":."))
-    )
-    return
+  for _, path in ipairs(argo.args) do
+    table.insert(paths, vim.fn.expand(path))
   end
 
-  local p = vim.fn.fnamemodify(target_path, ":h")
+  if #paths == 0 then
+    if vim.bo.buftype == "" then
+      table.insert(paths, vim.fn.expand("%"))
+    else
+      utils.err("No target!")
+      return
+    end
+  end
+
+  local p
+  if vim.fn.filereadable(paths[1]) then
+    p = vim.fn.isdirectory(paths[1]) ~= 1 and vim.fn.fnamemodify(paths[1], ":h") or paths[1]
+  elseif vim.bo.buftype == "" and vim.fn.filereadable(vim.fn.expand("%")) then
+    p = vim.fn.expand("%:p:h")
+  else
+    p = "."
+  end
+
   local git_root = git.toplevel(p)
   if not git_root then
     utils.err(
       string.format("Path not a git repo (or any parent): '%s'",
-        vim.fn.fnamemodify(p, ":."))
+        vim.fn.fnamemodify(paths[1], ":."))
     )
     return
   end
@@ -95,14 +107,12 @@ function M.file_history(args)
   ---@type FileHistoryView
   local v = FileHistoryView({
     git_root = git_root,
-    target_path = utils.path_relative(target_path, git_root)
+    path_args = paths,
+    max_count = require("diffview.config").get_config().file_history_panel.max_count
   })
 
-  if v.files:size() == 0 then
-    utils.info(
-      string.format("Target has no git history: '%s'",
-        vim.fn.fnamemodify(target_path, ":."))
-    )
+  if #v.entries == 0 then
+    utils.info(string.format("Target has no git history: '%s'", table.concat(paths)))
     return
   end
 

@@ -102,25 +102,25 @@ function FilePanel:init_buffer()
   self.bufid = bn
   self.render_data = renderer.RenderData(bufname)
 
-  self.components = {
-    ---@type any
-    path = self.render_data:create_component({}),
-    ---@type any
-    working = self.render_data:create_component({
+  ---@type any
+  self.components = self.render_data:create_component({
+    { name = "path" },
+    {
+      name = "working",
       { name = "title" },
-      { name = "files" },
-    }),
-    ---@type any
-    staged = self.render_data:create_component({
+      { name = "files" }
+    },
+    {
+      name = "staged",
       { name = "title" },
-      { name = "files" },
-    }),
-    ---@type any
-    info = self.render_data:create_component({
+      { name = "files" }
+    },
+    {
+      name = "info",
       { name = "title" },
-      { name = "entries" },
-    }),
-  }
+      { name = "entries" }
+    },
+  })
 
   self:render()
   self:redraw()

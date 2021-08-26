@@ -40,11 +40,17 @@ local cb = require'diffview.config'.diffview_callback
 
 require'diffview'.setup {
   diff_binaries = false,    -- Show diffs for binaries
+  use_icons = true        -- Requires nvim-web-devicons
   file_panel = {
     position = "left",      -- One of 'left', 'right', 'top', 'bottom'
     width = 35,             -- Only applies when position is 'left' or 'right'
     height = 10,            -- Only applies when position is 'top' or 'bottom'
-    use_icons = true        -- Requires nvim-web-devicons
+  },
+  file_history_panel = {
+    position = "bottom",
+    width = 35,
+    height = 16,
+    max_count = 256,        -- Limit the number of log entries
   },
   key_bindings = {
     disable_defaults = false,                   -- Disable the default key bindings
@@ -73,8 +79,21 @@ require'diffview'.setup {
       ["<s-tab>"]       = cb("select_prev_entry"),
       ["<leader>e"]     = cb("focus_files"),
       ["<leader>b"]     = cb("toggle_files"),
-    }
-  }
+    },
+    file_history_panel = {
+      ["j"]             = cd("next_entry"),
+      ["<down>"]        = cd("next_entry"),
+      ["k"]             = cd("prev_entry"),
+      ["<up>"]          = cd("prev_entry"),
+      ["<cr>"]          = cd("select_entry"),
+      ["o"]             = cd("select_entry"),
+      ["<2-LeftMouse>"] = cd("select_entry"),
+      ["<tab>"]         = cd("select_next_entry"),
+      ["<s-tab>"]       = cd("select_prev_entry"),
+      ["<leader>e"]     = cd("focus_files"),
+      ["<leader>b"]     = cd("toggle_files"),
+    },
+  },
 }
 ```
 

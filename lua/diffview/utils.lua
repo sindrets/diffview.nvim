@@ -310,6 +310,15 @@ function M.tbl_unpack(t, i, j)
   return unpack(t, i or 1, j or t.n or #t)
 end
 
+function M.tbl_indexof(t, v)
+  for i, vt in ipairs(t) do
+    if vt == v then
+      return i
+    end
+  end
+  return -1
+end
+
 function M.find_named_buffer(name)
   for _, v in ipairs(api.nvim_list_bufs()) do
     if vim.fn.bufname(v) == name then

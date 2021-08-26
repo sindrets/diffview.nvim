@@ -1,6 +1,5 @@
 local oop = require("diffview.oop")
-local utils = require("diffview.utils")
-local git = require("diffview.git")
+local git = require("diffview.git.utils")
 local Event = require("diffview.events").Event
 local EventEmitter = require("diffview.events").EventEmitter
 local StandardView = require("diffview.views.standard.standard_view").StandardView
@@ -15,8 +14,8 @@ local M = {}
 ---@field git_root string
 ---@field git_dir string
 ---@field panel FileHistoryPanel
----@field target_path string
----@field files FileDict
+---@field path_args string[]
+---@field entries LogEntry[]
 ---@field file_idx integer
 local FileHistoryView = StandardView
 FileHistoryView = oop.create_class("FileHistoryView", StandardView)
@@ -28,10 +27,14 @@ function FileHistoryView:init(opt)
   self.nulled = false
   self.git_root = opt.git_root
   self.git_dir = git.git_dir(self.git_root)
-  self.target_path = opt.target_path
-  self.files = git.file_history_list(self.git_root, self.target_path, opt.max_count)
+  self.path_args = opt.path_args
+  self.entries = git.file_history_list(
+    self.git_root,
+    self.path_args,
+    { max_count = opt.max_count }
+  )
   self.file_idx = 1
-  self.panel = FileHistoryPanel(self.git_root, self.files)
+  self.panel = FileHistoryPanel(self.git_root, self.entries, self.path_args)
 end
 
 ---@Override
@@ -41,7 +44,7 @@ function FileHistoryView:open()
   self:init_layout()
   self:init_event_listeners()
   vim.schedule(function()
-    local file = self:cur_file()
+    local file = self.panel:next_file()
     if file then
       self:set_file(file)
     else
@@ -53,59 +56,48 @@ end
 
 ---@Override
 function FileHistoryView:close()
-  for _, file in self.files:ipairs() do
-    file:destroy()
+  for _, entry in ipairs(self.entries) do
+    entry:destroy()
   end
   FileHistoryView:super().close(self)
 end
 
----Get the current file.
----@return FileEntry
-function FileHistoryView:cur_file()
-  if self.files:size() > 0 then
-    return self.files[utils.clamp(self.file_idx, 1, self.files:size())]
-  end
-  return nil
-end
-
-function FileHistoryView:next_file()
+function FileHistoryView:next_item()
   self:ensure_layout()
   if self:file_safeguard() then
     return
   end
 
-  if self.files:size() > 1 or self.nulled then
-    local cur = self:cur_file()
+  if self.panel:num_items() > 1 or self.nulled then
+    local cur = self.panel.cur_item[2]
     if cur then
       cur:detach_buffers()
     end
-    self.file_idx = self.file_idx % self.files:size() + 1
     vim.cmd("diffoff!")
-    cur = self.files[self.file_idx]
+    cur = self.panel:next_file()
     cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
-    self.panel:highlight_file(self:cur_file())
+    self.panel:highlight_item(cur)
     self.nulled = false
 
     return cur
   end
 end
 
-function FileHistoryView:prev_file()
+function FileHistoryView:prev_item()
   self:ensure_layout()
   if self:file_safeguard() then
     return
   end
 
-  if self.files:size() > 1 or self.nulled then
-    local cur = self:cur_file()
+  if self.panel:num_items() > 1 or self.nulled then
+    local cur = self.panel.cur_item[2]
     if cur then
       cur:detach_buffers()
     end
-    self.file_idx = (self.file_idx - 2) % self.files:size() + 1
     vim.cmd("diffoff!")
-    cur = self.files[self.file_idx]
+    cur = self.panel:prev_file()
     cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
-    self.panel:highlight_file(self:cur_file())
+    self.panel:highlight_item(cur)
     self.nulled = false
 
     return cur
@@ -118,21 +110,20 @@ function FileHistoryView:set_file(file, focus)
     return
   end
 
-  for i, f in self.files:ipairs() do
-    if f == file then
-      local cur = self:cur_file()
-      if cur then
-        cur:detach_buffers()
-      end
-      self.file_idx = i
-      vim.cmd("diffoff!")
-      self.files[self.file_idx]:load_buffers(self.git_root, self.left_winid, self.right_winid)
-      self.panel:highlight_file(self:cur_file())
-      self.nulled = false
+  local entry = self.panel:find_entry(file)
+  if entry then
+    local cur = self.panel.cur_item[2]
+    if cur then
+      cur:detach_buffers()
+    end
+    vim.cmd("diffoff!")
+    file:load_buffers(self.git_root, self.left_winid, self.right_winid)
+    self.panel.cur_item = { entry, file }
+    self.panel:highlight_item(file)
+    self.nulled = false
 
-      if focus then
-        api.nvim_set_current_win(self.right_winid)
-      end
+    if focus then
+      api.nvim_set_current_win(self.right_winid)
     end
   end
 end
@@ -163,13 +154,13 @@ function FileHistoryView:recover_layout(state)
     vim.cmd("aboveleft " .. split_cmd)
     self.left_winid = api.nvim_get_current_win()
     self.panel:open()
-    self:set_file(self:cur_file())
+    self:set_file(self.panel.cur_item[2])
   elseif not state.right_win then
     api.nvim_set_current_win(self.left_winid)
     vim.cmd("belowright " .. split_cmd)
     self.right_winid = api.nvim_get_current_win()
     self.panel:open()
-    self:set_file(self:cur_file())
+    self:set_file(self.panel.cur_item[2])
   end
 
   self.ready = true
@@ -178,8 +169,8 @@ end
 ---Ensures there are files to load, and loads the null buffer otherwise.
 ---@return boolean
 function FileHistoryView:file_safeguard()
-  if self.files:size() == 0 then
-    local cur = self:cur_file()
+  if self.panel:num_items() == 0 then
+    local cur = self.panel.cur_item[2]
     if cur then
       cur:detach_buffers()
     end
@@ -209,9 +200,13 @@ end
 ---@return FileEntry|nil
 function FileHistoryView:infer_cur_file()
   if self.panel:is_focused() then
-    return self.panel:get_file_at_cursor()
+    local item = self.panel:get_item_at_cursor()
+    if not item:instanceof(FileEntry) then
+      return item.files[1]
+    end
+    return item
   else
-    return self:cur_file()
+    return self.panel.cur_item[2]
   end
 end
 

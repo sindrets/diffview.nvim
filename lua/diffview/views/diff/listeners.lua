@@ -1,6 +1,6 @@
 local utils = require("diffview.utils")
-local git = require("diffview.git")
-local RevType = require("diffview.rev").RevType
+local git = require("diffview.git.utils")
+local RevType = require("diffview.git.rev").RevType
 local Event = require("diffview.events").Event
 local api = vim.api
 
@@ -29,6 +29,20 @@ return function(view)
         if api.nvim_get_current_tabpage() == view.tabpage then
           view:update_files()
         end
+      end
+    end,
+    buf_new = function()
+      if view.ready and api.nvim_tabpage_is_valid(view.tabpage) then
+        vim.schedule(function ()
+          view:fix_foreign_windows()
+        end)
+      end
+    end,
+    cursor_hold = function()
+      if view.ready and api.nvim_tabpage_is_valid(view.tabpage) then
+        vim.schedule(function ()
+          view:fix_foreign_windows()
+        end)
       end
     end,
     win_leave = function()
