@@ -1,4 +1,7 @@
 local utils = require("diffview.utils")
+local git = require("diffview.git.utils")
+local lib = require("diffview.lib")
+local DiffView = require("diffview.views.diff.diff_view").DiffView
 local api = vim.api
 
 ---@param view FileHistoryView
@@ -46,6 +49,34 @@ return function(view)
         end
       end
     end,
+    open_in_diffview = function()
+      if view.panel:is_cur_win() then
+        local item = view.panel:get_item_at_cursor()
+        if item then
+          ---@type FileEntry
+          local file
+          if item.files then
+            file = item.files[1]
+          else
+            file = item
+          end
+
+          if file then
+            ---@type DiffView
+            local new_view = DiffView({
+              git_root = view.git_root,
+              rev_arg = git.rev_to_pretty_string(file.left, file.right),
+              left = file.left,
+              right = file.right,
+              options = {}
+            })
+
+            lib.add_view(new_view)
+            new_view:open()
+          end
+        end
+      end
+    end,
     select_next_entry = function()
       view:next_item()
     end,
@@ -80,6 +111,24 @@ return function(view)
     end,
     toggle_files = function()
       view.panel:toggle()
+    end,
+    open_all_folds = function()
+      if view.panel:is_cur_win() and not view.panel.single_file then
+        for _, entry in ipairs(view.panel.entries) do
+          entry.folded = false
+        end
+        view.panel:render()
+        view.panel:redraw()
+      end
+    end,
+    close_all_folds = function()
+      if view.panel:is_cur_win() and not view.panel.single_file then
+        for _, entry in ipairs(view.panel.entries) do
+          entry.folded = true
+        end
+        view.panel:render()
+        view.panel:redraw()
+      end
     end,
     close = function()
       if view.panel.option_panel:is_cur_win() then
