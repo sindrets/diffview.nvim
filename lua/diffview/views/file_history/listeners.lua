@@ -1,3 +1,4 @@
+local utils = require("diffview.utils")
 local api = vim.api
 
 ---@param view FileHistoryView
@@ -34,6 +35,17 @@ return function(view)
         view:fix_foreign_windows()
       end
     end,
+    win_closed = function(winid)
+      if winid and winid == view.panel.option_panel.winid then
+        local op = view.panel.option_panel
+        if not utils.tbl_deep_equals(op.option_state, view.panel.log_options) then
+          op.option_state = nil
+          view.panel.option_panel.winid = nil
+          view.panel:update_entries()
+          view:next_item()
+        end
+      end
+    end,
     select_next_entry = function()
       view:next_item()
     end,
@@ -47,7 +59,7 @@ return function(view)
       view.panel:highlight_prev_item()
     end,
     select_entry = function()
-      if view.panel:is_open() then
+      if view.panel:is_cur_win() then
         local item = view.panel:get_item_at_cursor()
         if item then
           -- print(vim.inspect(item))
@@ -68,6 +80,26 @@ return function(view)
     end,
     toggle_files = function()
       view.panel:toggle()
+    end,
+    close = function()
+      if view.panel.option_panel:is_cur_win() then
+        view.panel.option_panel:close()
+      elseif view.panel:is_cur_win() then
+        view.panel:close()
+      elseif view:is_cur_tabpage() then
+        view:close()
+      end
+    end,
+    options = function()
+      view.panel.option_panel:open()
+    end,
+    select = function()
+      if view.panel.option_panel:is_cur_win() then
+        local item = view.panel.option_panel:get_item_at_cursor()
+        if item then
+          view.panel.option_panel.emitter:emit("set_option", item[1])
+        end
+      end
     end,
   }
 end

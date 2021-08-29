@@ -48,6 +48,7 @@ function M.get_hl_groups()
     FilePanelTitle = { fg = M.get_fg("Directory") or colors.blue, gui = "bold" },
     FilePanelCounter = { fg = M.get_fg("Identifier") or colors.purple, gui = "bold" },
     FilePanelFileName = { fg = M.get_fg("Normal") or colors.white },
+    Dim1 = { fg = M.get_fg("Comment") or colors.white },
   }
 end
 

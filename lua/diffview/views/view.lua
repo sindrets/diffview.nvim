@@ -1,7 +1,7 @@
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local EventEmitter = require("diffview.events").EventEmitter
-local a = vim.api
+local api = vim.api
 
 local M = {}
 
@@ -36,16 +36,20 @@ end
 
 function View:open()
   vim.cmd("tab split")
-  self.tabpage = a.nvim_get_current_tabpage()
+  self.tabpage = api.nvim_get_current_tabpage()
   self:init_layout()
   self.ready = true
 end
 
 function View:close()
-  if self.tabpage and a.nvim_tabpage_is_valid(self.tabpage) then
-    local pagenr = a.nvim_tabpage_get_number(self.tabpage)
+  if self.tabpage and api.nvim_tabpage_is_valid(self.tabpage) then
+    local pagenr = api.nvim_tabpage_get_number(self.tabpage)
     vim.cmd("tabclose " .. pagenr)
   end
+end
+
+function View:is_cur_tabpage()
+  return self.tabpage == api.nvim_get_current_tabpage()
 end
 
 View:virtual("init_layout")

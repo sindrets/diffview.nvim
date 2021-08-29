@@ -62,10 +62,11 @@ FilePanel.bufopts = {
 ---@return FilePanel
 function FilePanel:init(git_root, files, path_args, rev_pretty_name)
   local conf = config.get_config()
-  self.super:init({
+  FilePanel:super().init(self, {
     position = conf.file_panel.position,
     width = conf.file_panel.width,
     height = conf.file_panel.height,
+    bufname = "DiffviewFilePanel",
   })
   self.git_root = git_root
   self.files = files
@@ -79,29 +80,14 @@ function FilePanel:open()
   vim.cmd("wincmd =")
 end
 
----@Override
-function FilePanel:init_buffer()
-  local bn = api.nvim_create_buf(false, false)
-
-  for k, v in pairs(FilePanel.bufopts) do
-    api.nvim_buf_set_option(bn, k, v)
-  end
-
-  local bufname = string.format("diffview:///panels/%d/DiffviewPanel", Panel.next_uid())
-  local ok = pcall(api.nvim_buf_set_name, bn, bufname)
-  if not ok then
-    utils.wipe_named_buffer(bufname)
-    api.nvim_buf_set_name(bn, bufname)
-  end
-
+function FilePanel:init_buffer_opts()
   local conf = config.get_config()
   for lhs, rhs in pairs(conf.key_bindings.file_panel) do
-    api.nvim_buf_set_keymap(bn, "n", lhs, rhs, { noremap = true, silent = true })
+    api.nvim_buf_set_keymap(self.bufid, "n", lhs, rhs, { noremap = true, silent = true })
   end
+end
 
-  self.bufid = bn
-  self.render_data = renderer.RenderData(bufname)
-
+function FilePanel:update_components()
   ---@type any
   self.components = self.render_data:create_component({
     { name = "path" },
@@ -121,11 +107,6 @@ function FilePanel:init_buffer()
       { name = "entries" }
     },
   })
-
-  self:render()
-  self:redraw()
-
-  return bn
 end
 
 ---Get the file entry under the cursor.

@@ -1,6 +1,7 @@
 local api = vim.api
 local M = {}
 
+local mapping_callbacks = {}
 local path_sep = package.config:sub(1, 1)
 
 function M._echo_multiline(msg)
@@ -302,6 +303,45 @@ function M.tbl_deep_clone(t)
   return clone
 end
 
+function M.tbl_deep_equals(t1, t2)
+  if not (t1 and t2) then
+    return false
+  end
+
+  local function recurse(t11, t22)
+    if #t11 ~= #t22 then
+      return false
+    end
+
+    local seen = {}
+    for key, value in pairs(t11) do
+      seen[key] = true
+      if type(value) == "table" then
+        if type(t22[key]) ~= "table" then
+          return false
+        end
+        if not recurse(value, t22[key]) then
+          return false
+        end
+      else
+        if not (value == t22[key]) then
+          return false
+        end
+      end
+    end
+
+    for key, _ in pairs(t22) do
+      if not seen[key] then
+        return false
+      end
+    end
+
+    return true
+  end
+
+  return recurse(t1, t2)
+end
+
 function M.tbl_pack(...)
   return { n = select("#", ...), ... }
 end
@@ -388,6 +428,64 @@ function M.tabpage_win_find_buf(tabpage, bufid)
   return result
 end
 
+function M.clear_prompt()
+  vim.cmd("norm! :esc<CR>")
+end
+
+function M.input_char(prompt)
+  if prompt then
+    print(prompt)
+  end
+  local c
+  while type(c) ~= "number" do
+    c = vim.fn.getchar()
+  end
+  M.clear_prompt()
+  return vim.fn.nr2char(c)
+end
+
+function M.input(prompt, default, completion)
+  local v = vim.fn.input({
+    prompt = prompt,
+    default = default,
+    completion = completion,
+    cancelreturn = "__INPUT_CANCELLED__"
+  })
+  M.clear_prompt()
+  return v
+end
+
+local function prepare_mapping(t)
+  local default_options = { noremap = true, silent = true }
+  if type(t[4]) ~= "table" then
+    t[4] = {}
+  end
+  local opts = vim.tbl_extend("force", default_options, t.opt or t[4])
+  local rhs
+  if type(t[3]) == "function" then
+    mapping_callbacks[#mapping_callbacks+1] = t[3]
+    rhs = string.format(
+      "<Cmd>lua require('diffview.utils')._mapping_callbacks[%d]()<CR>",
+      #mapping_callbacks
+    )
+  else
+    assert(type(t[3]) == "string", "The rhs of the mapping must be either a string or a function!")
+    rhs = t[3]
+  end
+
+  return { t[1], t[2], rhs, opts }
+end
+
+function M.map(t)
+  local prepared = prepare_mapping(t)
+  vim.api.nvim_set_keymap(prepared[1], prepared[2], prepared[3], prepared[4])
+end
+
+function M.buf_map(bufid, t)
+  local prepared = prepare_mapping(t)
+  vim.api.nvim_buf_set_keymap(bufid, prepared[1], prepared[2], prepared[3], prepared[4])
+end
+
 local function merge(t, first, mid, last, comparator)
   local n1 = mid - first + 1
   local n2 = last - mid
@@ -446,6 +544,7 @@ function M.merge_sort(t, comparator)
   split_merge(t, 1, #t, comparator)
 end
 
+M._mapping_callbacks = mapping_callbacks
 M.path_sep = path_sep
 
 return M

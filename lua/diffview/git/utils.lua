@@ -77,11 +77,15 @@ local function untracked_files(git_root, left, right)
   return files
 end
 
+---@param git_root string
+---@param path_args string[]
+---@param opt LogOptions
+---@return LogEntry[]
 function M.file_history_list(git_root, path_args, opt)
   ---@type LogEntry[]
   local entries = {}
-  local use_count = opt.max_count and opt.max_count < math.huge
   local base_cmd = string.format("git -C %s ", vim.fn.shellescape(git_root))
+  local single_file = #path_args == 1 and vim.fn.isdirectory(path_args[1]) == 0
 
   local p_args = ""
   if path_args and #path_args > 0 then
@@ -91,33 +95,41 @@ function M.file_history_list(git_root, path_args, opt)
     end
   end
 
-  -- '-m': diff merges, '-c': combine merges
+  local options = string.format(
+    "%s %s %s %s %s %s %s %s",
+    opt.follow and single_file and "--follow --first-parent" or "-m -c",
+    opt.all and "--all" or "",
+    opt.merges and "--merges --first-parent" or "",
+    opt.no_merges and "--no-merges" or "",
+    opt.reverse and "--reverse" or "",
+    opt.max_count and ("-n" .. vim.fn.shellescape(opt.max_count)) or "",
+    opt.author and ("--author=" .. vim.fn.shellescape(opt.author)) or "",
+    opt.grep and ("--grep=" .. vim.fn.shellescape(opt.grep)) or ""
+  )
+
   local cmd = string.format(
     "%s log --pretty='format:%%H %%P%%n%%an%%n%%ad%%n%%ar%%n%%s' "
-    .. "--date=raw --name-status -m -c %s %s -- %s",
+    .. "--date=raw --name-status %s -- %s",
     base_cmd,
-    opt.follow and "--follow --first-parent" or "",
-    use_count and ("-n" .. opt.max_count) or "",
+    options,
     p_args
   )
   local status_data = vim.fn.systemlist(cmd)
 
   cmd = string.format(
     "%s log --pretty='format:%%H %%P%%n%%an%%n%%ad%%n%%ar%%n%%s' "
-    .. "--date=raw --numstat -m -c %s %s -- %s",
+    .. "--date=raw --numstat %s -- %s",
     base_cmd,
-    opt.follow and "--follow --first-parent" or "",
-    use_count and ("-n" .. opt.max_count) or "",
+    options,
     p_args
   )
   local num_data = vim.fn.systemlist(cmd)
 
-  -- print(vim.inspect(status_data))
   if not utils.shell_error() then
     local i = 1
     local offset = 0
+    local old_path
     while i <= #num_data do
-      -- print(vim.inspect(utils.tbl_slice(status_data, i, i + 5)))
       local right_hash, left_hash, merge_hash = unpack(utils.str_split(status_data[offset + i]))
       local time, time_offset = unpack(utils.str_split(status_data[offset + i + 2]))
       local commit = Commit({
@@ -131,19 +143,25 @@ function M.file_history_list(git_root, path_args, opt)
 
       -- 'git log --name-status' doesn't work properly for merge commits. It
       -- lists only an incomplete list of files at best. We need to use 'git
-      -- show' to get file statuses for merge commits.
+      -- show' to get file statuses for merge commits. And merges do not always
+      -- have changes.
       local sdata = status_data
       if merge_hash then
-        while sdata[offset + i + 5] ~= "" do
+        while sdata[offset + i + 5] and sdata[offset + i + 5] ~= "" do
           offset = offset + 1
         end
         sdata = {}
         local lines = vim.fn.systemlist(
           string.format(
             "%s show --format= -m --first-parent --name-status %s -- %s",
-            base_cmd, right_hash, p_args
+            base_cmd, right_hash, old_path or p_args
           )
         )
+        if #lines == 0 then
+          -- Give up: something has been renamed. We can no longer track the
+          -- history.
+          goto escape
+        end
         offset = offset - #lines
         for k = 1, #lines do
           sdata[offset + i + 4 + k] = lines[k]
@@ -153,7 +171,6 @@ function M.file_history_list(git_root, path_args, opt)
       local files = {}
       local j = 5
       while i + j <= #num_data and num_data[i + j] ~= "" do
-        -- print(sdata[offset + i + j], sdata[offset + i + j]:match("[%a%s][^%s]*\t(.*)"))
         local status = sdata[offset + i + j]:sub(1, 1):gsub("%s", " ")
         local name = sdata[offset + i + j]:match("[%a%s][^%s]*\t(.*)")
         local oldname
@@ -161,6 +178,9 @@ function M.file_history_list(git_root, path_args, opt)
         if name:match("\t") ~= nil then
           oldname = name:match("(.*)\t")
           name = name:gsub("^.*\t", "")
+          if single_file then
+            old_path = oldname
+          end
         end
 
         local stats = {
@@ -172,7 +192,6 @@ function M.file_history_list(git_root, path_args, opt)
           stats = nil
         end
 
-        -- print(name, oldname, status, stats.additions, stats.deletions)
         table.insert(
           files,
           FileEntry({
@@ -195,7 +214,8 @@ function M.file_history_list(git_root, path_args, opt)
         LogEntry({
             path_args = path_args,
             commit = commit,
-            files = files
+            files = files,
+            single_file = single_file
         })
       )
 
@@ -203,6 +223,7 @@ function M.file_history_list(git_root, path_args, opt)
     end
   end
 
+  ::escape::
   return entries
 end
 

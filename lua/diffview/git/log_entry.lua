@@ -16,8 +16,10 @@ function LogEntry:init(opt)
   self.path_args = opt.path_args
   self.commit = opt.commit
   self.files = opt.files
-  self.single_file = #self.path_args == 1 and vim.fn.isdirectory(self.path_args[1]) == 0
   self.folded = true
+  self.single_file = opt.single_file or (
+    #self.path_args == 1 and vim.fn.isdirectory(self.path_args[1]) == 0
+  )
 
   self:update_status()
   self:update_stats()
@@ -38,6 +40,9 @@ function LogEntry:update_status()
     elseif self.status ~= file.status then
       self.status = file.status
     end
+  end
+  if not self.status then
+    self.status = "X"
   end
 end
 

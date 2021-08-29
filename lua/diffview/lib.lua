@@ -3,6 +3,7 @@ local RevType = require("diffview.git.rev").RevType
 local arg_parser = require("diffview.arg_parser")
 local git = require("diffview.git.utils")
 local utils = require("diffview.utils")
+local config = require("diffview.config")
 local DiffView = require("diffview.views.diff.diff_view").DiffView
 local FileHistoryView = require("diffview.views.file_history.file_history_view").FileHistoryView
 local a = vim.api
@@ -108,7 +109,7 @@ function M.file_history(args)
   local v = FileHistoryView({
     git_root = git_root,
     path_args = paths,
-    max_count = require("diffview.config").get_config().file_history_panel.max_count
+    log_options = config.get_config().file_history_panel.log_options
   })
 
   if #v.entries == 0 then

@@ -25,6 +25,9 @@ local Form = oop.enum({
 ---@field winid integer
 ---@field render_data RenderData
 ---@field components any
+---@field bufname string
+---@field init_buffer_opts function Abstract
+---@field update_components function Abstract
 ---@field render function Abstract
 local Panel = oop.Object
 Panel = oop.create_class("Panel")
@@ -64,11 +67,13 @@ function Panel:init(opt)
   self.position = opt.position or "left"
   self.form = vim.tbl_contains({ "top", "bottom" }, self.position) and Form.ROW or Form.COLUMN
   self.relative = opt.relative or "editor"
-  self.width = opt.width or 30
-  self.height = opt.height or 16
+  self.width = opt.width
+  self.height = opt.height
+  self.bufname = opt.bufname or "DiffviewPanel"
 
   local pos = { "left", "top", "right", "bottom" }
   local rel = { "editor", "window" }
+  local dim = { "number", "nil" }
   assert(
     vim.tbl_contains(pos, self.position),
     "'position' must be one of: " .. table.concat(pos, ", ")
@@ -77,8 +82,14 @@ function Panel:init(opt)
     vim.tbl_contains(rel, self.relative),
     "'relative' must be one of: " .. table.concat(rel, ", ")
   )
-  assert(type(self.width) == "number", "'width' must be a number!")
-  assert(type(self.height) == "number", "'height' must be a number!")
+  assert(
+    vim.tbl_contains(dim, type(self.width)),
+    "'width' must be one of: " .. table.concat(dim, ", ")
+  )
+  assert(
+    vim.tbl_contains(dim, type(self.height)),
+    "'height' must be one of: " .. table.concat(dim, ", ")
+  )
 end
 
 function Panel:is_open(in_tabpage)
@@ -89,6 +100,10 @@ function Panel:is_open(in_tabpage)
     return vim.tbl_contains(api.nvim_tabpage_list_wins(0), self.winid)
   end
   return valid
+end
+
+function Panel:is_cur_win()
+  return self:is_open() and api.nvim_get_current_win() == self.winid
 end
 
 function Panel:is_focused()
@@ -108,14 +123,17 @@ function Panel:resize()
     return
   end
 
-  local winnr = vim.fn.win_id2win(self.winid)
+  local winnr = api.nvim_win_get_number(self.winid)
   local cmd
-  if self.form == Form.COLUMN then
+  if self.form == Form.COLUMN and self.width then
     cmd = string.format("vert %dres %d", winnr, self.width)
-  else
+  elseif self.height then
     cmd = string.format("%dres %d", winnr, self.height)
   end
-  vim.cmd(cmd)
+
+  if cmd then
+    vim.cmd(cmd)
+  end
 end
 
 function Panel:open()
@@ -179,7 +197,7 @@ function Panel:init_buffer()
     api.nvim_buf_set_option(bn, k, v)
   end
 
-  local bufname = string.format("diffview:///panels/%d/DiffviewPanel", Panel.next_uid())
+  local bufname = string.format("diffview:///panels/%d/%s", Panel.next_uid(), self.bufname)
   local ok = pcall(api.nvim_buf_set_name, bn, bufname)
   if not ok then
     utils.wipe_named_buffer(bufname)
@@ -189,12 +207,16 @@ function Panel:init_buffer()
   self.bufid = bn
   self.render_data = renderer.RenderData(bufname)
 
+  self:init_buffer_opts()
+  self:update_components()
   self:render()
   self:redraw()
 
   return bn
 end
 
+Panel:virtual("init_buffer_opts")
+Panel:virtual("update_components")
 Panel:virtual("render")
 
 function Panel:redraw()

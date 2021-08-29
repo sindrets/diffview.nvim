@@ -31,10 +31,10 @@ function FileHistoryView:init(opt)
   self.entries = git.file_history_list(
     self.git_root,
     self.path_args,
-    { max_count = opt.max_count }
+    opt.log_options
   )
   self.file_idx = 1
-  self.panel = FileHistoryPanel(self.git_root, self.entries, self.path_args)
+  self.panel = FileHistoryPanel(self.git_root, self.entries, self.path_args, opt.log_options)
 end
 
 ---@Override
@@ -75,11 +75,13 @@ function FileHistoryView:next_item()
     end
     vim.cmd("diffoff!")
     cur = self.panel:next_file()
-    cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
-    self.panel:highlight_item(cur)
-    self.nulled = false
+    if cur then
+      cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
+      self.panel:highlight_item(cur)
+      self.nulled = false
 
-    return cur
+      return cur
+    end
   end
 end
 
@@ -96,11 +98,13 @@ function FileHistoryView:prev_item()
     end
     vim.cmd("diffoff!")
     cur = self.panel:prev_file()
-    cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
-    self.panel:highlight_item(cur)
-    self.nulled = false
+    if cur then
+      cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
+      self.panel:highlight_item(cur)
+      self.nulled = false
 
-    return cur
+      return cur
+    end
   end
 end
 
