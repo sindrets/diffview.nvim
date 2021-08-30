@@ -3,7 +3,8 @@
 Single tabpage interface for easily cycling through diffs for all modified files
 for any git rev.
 
-![preview](.github/media/screenshot_2.png)
+![preview](https://user-images.githubusercontent.com/2786478/131269942-e34100dd-cbb9-48fe-af31-6e518ce06e9e.png)
+
 
 ## Introduction
 
@@ -125,6 +126,8 @@ invoked from the view, these will target the file currently open in the view
 rather than the file under the cursor in the file panel.
 
 ## File History
+
+![file-history-multi](https://user-images.githubusercontent.com/2786478/131269782-f4184640-6d73-4226-b425-feccb5002dd0.png)
 
 The file history view allows you to list all the commits that changed a given
 file or directory, and view the changes made in a diff split.
