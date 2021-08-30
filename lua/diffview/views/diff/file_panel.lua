@@ -209,44 +209,48 @@ function FilePanel:highlight_next_file()
 end
 
 ---@param comp RenderComponent
+---@param files FileEntry
+local function render_file(comp, file, line_idx)
+  comp:add_hl(renderer.get_git_hl(file.status), line_idx, 0, 1)
+  local s = file.status .. " "
+  local offset = #s
+  local icon = renderer.get_file_icon(file.basename, file.extension, comp, line_idx, offset)
+  offset = offset + #icon
+  comp:add_hl("DiffviewFilePanelFileName", line_idx, offset, offset + #file.basename)
+  s = s .. icon .. file.basename
+
+  if file.stats then
+    offset = #s + 1
+    comp:add_hl(
+      "DiffviewFilePanelInsertions",
+      line_idx,
+      offset,
+      offset + string.len(file.stats.additions)
+    )
+    offset = offset + string.len(file.stats.additions) + 2
+    comp:add_hl(
+      "DiffviewFilePanelDeletions",
+      line_idx,
+      offset,
+      offset + string.len(file.stats.deletions)
+    )
+    s = s .. " " .. file.stats.additions .. ", " .. file.stats.deletions
+  end
+
+  offset = #s + 1
+  comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #file.parent_path)
+  s = s .. " " .. file.parent_path
+
+  comp:add_line(s)
+end
+
+---@param comp RenderComponent
 ---@param files FileEntry[]
 local function render_files(comp, files)
   local line_idx = 0
 
   for _, file in ipairs(files) do
-    local offset = 0
-
-    comp:add_hl(renderer.get_git_hl(file.status), line_idx, 0, 1)
-    local s = file.status .. " "
-    offset = #s
-    local icon = renderer.get_file_icon(file.basename, file.extension, comp, line_idx, offset)
-    offset = offset + #icon
-    comp:add_hl("DiffviewFilePanelFileName", line_idx, offset, offset + #file.basename)
-    s = s .. icon .. file.basename
-
-    if file.stats then
-      offset = #s + 1
-      comp:add_hl(
-        "DiffviewFilePanelInsertions",
-        line_idx,
-        offset,
-        offset + string.len(file.stats.additions)
-      )
-      offset = offset + string.len(file.stats.additions) + 2
-      comp:add_hl(
-        "DiffviewFilePanelDeletions",
-        line_idx,
-        offset,
-        offset + string.len(file.stats.deletions)
-      )
-      s = s .. " " .. file.stats.additions .. ", " .. file.stats.deletions
-    end
-
-    offset = #s + 1
-    comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #file.parent_path)
-    s = s .. " " .. file.parent_path
-
-    comp:add_line(s)
+    render_file(comp, file, line_idx)
     line_idx = line_idx + 1
   end
 end
