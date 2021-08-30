@@ -157,12 +157,11 @@ function Panel:open()
 
   self.winid = api.nvim_get_current_win()
   self:resize()
+  vim.cmd("buffer " .. self.bufid)
 
   for k, v in pairs(self.class().winopts) do
-    api.nvim_win_set_option(self.winid, k, v)
+    utils.set_local(self.winid, k, v)
   end
-
-  vim.cmd("buffer " .. self.bufid)
 end
 
 function Panel:close()

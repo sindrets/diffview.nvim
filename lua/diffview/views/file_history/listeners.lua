@@ -2,7 +2,6 @@ local utils = require("diffview.utils")
 local git = require("diffview.git.utils")
 local lib = require("diffview.lib")
 local DiffView = require("diffview.views.diff.diff_view").DiffView
-local api = vim.api
 
 ---@param view FileHistoryView
 return function(view)
@@ -17,25 +16,6 @@ return function(view)
       local file = view.panel.cur_item[2]
       if file then
         file:detach_buffers()
-      end
-    end,
-    buf_new = function()
-      if view.ready and api.nvim_tabpage_is_valid(view.tabpage) then
-        vim.schedule(function()
-          view:fix_foreign_windows()
-        end)
-      end
-    end,
-    cursor_hold = function()
-      if view.ready and api.nvim_tabpage_is_valid(view.tabpage) then
-        vim.schedule(function()
-          view:fix_foreign_windows()
-        end)
-      end
-    end,
-    win_leave = function()
-      if view.ready and api.nvim_tabpage_is_valid(view.tabpage) then
-        view:fix_foreign_windows()
       end
     end,
     win_closed = function(winid)

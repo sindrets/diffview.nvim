@@ -328,10 +328,8 @@ end
 
 ---@static
 function FileEntry._update_windows(left_winid, right_winid)
-  for _, id in ipairs({ left_winid, right_winid }) do
-    for k, v in pairs(FileEntry.winopts) do
-      api.nvim_win_set_option(id, k, v)
-    end
+  for k, v in pairs(FileEntry.winopts) do
+    utils.set_local({ left_winid, right_winid }, k, v)
   end
 
   -- Scroll to trigger the scrollbind and sync the windows. This works more

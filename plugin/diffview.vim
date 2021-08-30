@@ -20,10 +20,7 @@ augroup Diffview
     au TabLeave * lua require'diffview'.trigger_event("tab_leave")
     au TabClosed * lua require'diffview'.close(tonumber(vim.fn.expand("<afile>")))
     au BufWritePost * lua require'diffview'.trigger_event("buf_write_post")
-    au WinLeave * lua require'diffview'.trigger_event("win_leave")
     au WinClosed * lua require'diffview'.trigger_event("win_closed", tonumber(vim.fn.expand("<afile>")))
-    au BufNew * lua require'diffview'.trigger_event("buf_new")
-    au CursorHold * lua require'diffview'.trigger_event("cursor_hold")
     au User FugitiveChanged lua require'diffview'.trigger_event("refresh_files")
     au ColorScheme * lua require'diffview'.update_colors()
 augroup END

@@ -31,25 +31,6 @@ return function(view)
         end
       end
     end,
-    buf_new = function()
-      if view.ready and api.nvim_tabpage_is_valid(view.tabpage) then
-        vim.schedule(function()
-          view:fix_foreign_windows()
-        end)
-      end
-    end,
-    cursor_hold = function()
-      if view.ready and api.nvim_tabpage_is_valid(view.tabpage) then
-        vim.schedule(function()
-          view:fix_foreign_windows()
-        end)
-      end
-    end,
-    win_leave = function()
-      if view.ready and api.nvim_tabpage_is_valid(view.tabpage) then
-        view:fix_foreign_windows()
-      end
-    end,
     select_next_entry = function()
       view:next_file()
     end,

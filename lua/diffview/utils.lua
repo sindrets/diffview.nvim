@@ -258,6 +258,56 @@ function M.system_list(cmd)
   return lines
 end
 
+---HACK: workaround for inconsistent behavior from `vim.opt_local`.
+---@see [Neovim issue](https://github.com/neovim/neovim/issues/14670)
+---@param winids number[]|number Either a list of winids, or a single winid (0 for current window).
+---@param option string
+---@param value string[]|string
+---@param opt table
+function M.set_local(winids, option, value, opt)
+  local last_winid
+  local rhs
+
+  opt = vim.tbl_extend("keep", opt or {}, {
+    noautocmd = true,
+    keepjumps = true,
+    restore_cursor = true
+  })
+
+  if opt.restore_cursor then
+    last_winid = api.nvim_get_current_win()
+  end
+
+  if type(value) == "boolean" then
+    if value == false then
+      rhs = "no" .. option
+    else
+      rhs = option
+    end
+  else
+    rhs = option .. "=" .. (type(value) == "table" and table.concat(value, ",") or value)
+  end
+
+  if type(winids) ~= "table" then
+    winids = { winids }
+  end
+
+  for _, id in ipairs(winids) do
+    local nr = id ~= 0 and tostring(api.nvim_win_get_number(id)) or ""
+    local cmd = string.format(
+      "%s %s %swindo setlocal ",
+      opt.noautocmd and "noautocmd",
+      opt.keepjumps and "keepjumps",
+      nr
+    )
+    vim.cmd(cmd .. rhs)
+  end
+
+  if last_winid then
+    api.nvim_set_current_win(last_winid)
+  end
+end
+
 ---Create a shallow copy of a portion of a list.
 ---@param t table
 ---@param first integer First index, inclusive

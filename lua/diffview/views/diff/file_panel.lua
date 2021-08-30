@@ -19,23 +19,8 @@ local M = {}
 local FilePanel = Panel
 FilePanel = oop.create_class("FilePanel", Panel)
 
-FilePanel.winopts = {
-  relativenumber = false,
-  number = false,
-  list = false,
-  winfixwidth = true,
-  winfixheight = true,
-  foldenable = false,
-  spell = false,
-  wrap = false,
+FilePanel.winopts = vim.tbl_extend("force", Panel.winopts, {
   cursorline = true,
-  signcolumn = "yes",
-  colorcolumn = "",
-  foldmethod = "manual",
-  foldcolumn = "0",
-  scrollbind = false,
-  cursorbind = false,
-  diff = false,
   winhl = table.concat({
     "EndOfBuffer:DiffviewEndOfBuffer",
     "Normal:DiffviewNormal",
@@ -45,15 +30,11 @@ FilePanel.winopts = {
     "StatusLine:DiffviewStatusLine",
     "StatusLineNC:DiffviewStatuslineNC",
   }, ","),
-}
+})
 
-FilePanel.bufopts = {
-  swapfile = false,
-  buftype = "nofile",
-  modifiable = false,
+FilePanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
   filetype = "DiffviewFiles",
-  bufhidden = "hide",
-}
+})
 
 ---FilePanel constructor.
 ---@param git_root string
