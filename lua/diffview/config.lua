@@ -93,13 +93,13 @@ end
 function M.setup(user_config)
   user_config = user_config or {}
 
-  -- deprecation notices TODO
-  if type(user_config.file_panel.use_icons) ~= "nil" then
-    utils.warn("'file_panel.use_icons' has been deprecated. See ':h diffview.changelog-64'.")
-  end
-
   M._config = utils.tbl_deep_clone(M.defaults)
   M._config = vim.tbl_deep_extend("force", M._config, user_config)
+
+  -- deprecation notices
+  if type(M._config.file_panel.use_icons) ~= "nil" then
+    utils.warn("'file_panel.use_icons' has been deprecated. See ':h diffview.changelog-64'.")
+  end
 
   if M._config.key_bindings.disable_defaults then
     for name, _ in pairs(M._config.key_bindings) do
