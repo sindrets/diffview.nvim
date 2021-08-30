@@ -31,6 +31,7 @@ local M = {}
 ---@field winid integer
 ---@field render_data RenderData
 ---@field option_panel FHOptionPanel
+---@field option_mapping string
 ---@field components any
 local FileHistoryPanel = Panel
 FileHistoryPanel = oop.create_class("FileHistoryPanel", Panel)
@@ -92,7 +93,11 @@ end
 
 function FileHistoryPanel:init_buffer_opts()
   local conf = config.get_config()
+  local option_rhs = config.diffview_callback("options")
   for lhs, rhs in pairs(conf.key_bindings.file_history_panel) do
+    if rhs == option_rhs then
+      self.option_mapping = lhs
+    end
     api.nvim_buf_set_keymap(self.bufid, "n", lhs, rhs, { noremap = true, silent = true })
   end
 end
@@ -113,7 +118,7 @@ function FileHistoryPanel:update_components()
 
   ---@type any
   self.components = self.render_data:create_component({
-    { name = "path" },
+    { name = "header" },
     {
       name = "log",
       { name = "title" },

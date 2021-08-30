@@ -156,7 +156,7 @@ return {
     panel.render_data:clear()
 
     ---@type RenderComponent
-    local comp = panel.components.path.comp
+    local comp = panel.components.header.comp
     local line_idx = 0
 
     -- root path
@@ -169,43 +169,52 @@ return {
     comp:add_line(s)
     line_idx = line_idx + 1
 
-    if #panel.entries > 0 then
-      local offset
-      if panel.single_file then
-        local file = panel.entries[1].files[1]
+    local offset
+    if panel.single_file then
+      local file = panel.entries[1].files[1]
 
-        -- file path
-        local icon = renderer.get_file_icon(file.basename, file.extension, comp, line_idx, 0)
-        offset = #icon
-        comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #file.parent_path + 1)
-        comp:add_hl(
-          "DiffviewFilePanelFileName",
-          line_idx,
-          offset + #file.parent_path + 1,
-          offset + #file.basename
-          )
-        s = icon .. file.path
-        comp:add_line(s)
-      else
-        s = "Showing history for: "
-        comp:add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
-        offset = #s
-        local paths = table.concat(panel.path_args, " ")
-        comp:add_hl("DiffviewFilePanelFileName", line_idx, offset, offset + #paths)
-        comp:add_line(s .. paths)
-      end
-
-      -- title
-      comp = panel.components.log.title.comp
-      comp:add_line("")
-      line_idx = 1
-      s = "File History"
-      comp:add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
-      local change_count = "(" .. #panel.entries .. ")"
-      comp:add_hl("DiffviewFilePanelCounter", line_idx, #s + 1, #s + 1 + string.len(change_count))
-      s = s .. " " .. change_count
+      -- file path
+      local icon = renderer.get_file_icon(file.basename, file.extension, comp, line_idx, 0)
+      offset = #icon
+      comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #file.parent_path + 1)
+      comp:add_hl(
+        "DiffviewFilePanelFileName",
+        line_idx,
+        offset + #file.parent_path + 1,
+        offset + #file.basename
+        )
+      s = icon .. file.path
       comp:add_line(s)
+    else
+      s = "Showing history for: "
+      comp:add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
+      offset = #s
+      local paths = table.concat(panel.path_args, " ")
+      comp:add_hl("DiffviewFilePanelFileName", line_idx, offset, offset + #paths)
+      comp:add_line(s .. paths)
+    end
 
+    if panel.option_mapping then
+      line_idx = line_idx + 1
+      s = "Options: "
+      comp:add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
+      offset = #s
+      comp:add_hl("DiffviewFilePanelCounter", line_idx, offset, offset + #panel.option_mapping)
+      comp:add_line(s .. panel.option_mapping)
+    end
+
+    -- title
+    comp = panel.components.log.title.comp
+    comp:add_line("")
+    line_idx = 1
+    s = "File History"
+    comp:add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
+    local change_count = "(" .. #panel.entries .. ")"
+    comp:add_hl("DiffviewFilePanelCounter", line_idx, #s + 1, #s + 1 + string.len(change_count))
+    s = s .. " " .. change_count
+    comp:add_line(s)
+
+    if #panel.entries > 0 then
       render_entries(panel.components.log.entries, panel.entries)
     end
   end,

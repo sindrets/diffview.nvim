@@ -30,6 +30,7 @@ M.defaults = {
       all = false,
       merges = false,
       no_merges = false,
+      reverse = false,
     }
   },
   key_bindings = {
@@ -59,7 +60,7 @@ M.defaults = {
       ["<leader>b"]     = cb("toggle_files"),
     },
     file_history_panel = {
-      ["!"]             = cb("options"),
+      ["g!"]            = cb("options"),
       ["<C-d>"]         = cb("open_in_diffview"),
       ["zR"]            = cb("open_all_folds"),
       ["zM"]            = cb("close_all_folds"),
@@ -91,6 +92,12 @@ end
 
 function M.setup(user_config)
   user_config = user_config or {}
+
+  -- deprecation notices TODO
+  if type(user_config.file_panel.use_icons) ~= "nil" then
+    utils.warn("'file_panel.use_icons' has been deprecated. See ':h diffview.changelog-64'.")
+  end
+
   M._config = utils.tbl_deep_clone(M.defaults)
   M._config = vim.tbl_deep_extend("force", M._config, user_config)
 

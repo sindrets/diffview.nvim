@@ -80,6 +80,9 @@ function FHOptionPanel:init(parent)
       local o = FHOptionPanel.flags.options[option_name]
       local new_value = utils.input(o[2], log_options[option_name])
       if new_value ~= "__INPUT_CANCELLED__" then
+        if new_value == "" then
+          new_value = nil
+        end
         log_options[option_name] = new_value
       end
     end
@@ -146,7 +149,6 @@ end
 ---Get the file entry under the cursor.
 ---@return LogEntry|FileEntry|nil
 function FHOptionPanel:get_item_at_cursor()
-  -- TODO
   if not (self:is_open() and self:buf_loaded()) then
     return
   end
