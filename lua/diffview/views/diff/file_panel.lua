@@ -94,17 +94,17 @@ function FilePanel:update_components()
     {
       name = "working",
       { name = "title" },
-      { name = "files" }
+      { name = "files" },
     },
     {
       name = "staged",
       { name = "title" },
-      { name = "files" }
+      { name = "files" },
     },
     {
       name = "info",
       { name = "title" },
-      { name = "entries" }
+      { name = "entries" },
     },
   })
 end

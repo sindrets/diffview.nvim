@@ -15,22 +15,18 @@ local M = {}
 local FHOptionPanel = Panel
 FHOptionPanel = oop.create_class("FHOptionPanel", Panel)
 
-FHOptionPanel.winopts = vim.tbl_extend(
-  "force",
-  Panel.winopts,
-  {
-    cursorline = true,
-    winhl = table.concat({
-      "EndOfBuffer:DiffviewEndOfBuffer",
-      "Normal:DiffviewNormal",
-      "CursorLine:DiffviewCursorLine",
-      "VertSplit:DiffviewVertSplit",
-      "SignColumn:DiffviewNormal",
-      "StatusLine:DiffviewStatusLine",
-      "StatusLineNC:DiffviewStatuslineNC",
-    }, ","),
-  }
-)
+FHOptionPanel.winopts = vim.tbl_extend("force", Panel.winopts, {
+  cursorline = true,
+  winhl = table.concat({
+    "EndOfBuffer:DiffviewEndOfBuffer",
+    "Normal:DiffviewNormal",
+    "CursorLine:DiffviewCursorLine",
+    "VertSplit:DiffviewVertSplit",
+    "SignColumn:DiffviewNormal",
+    "StatusLine:DiffviewStatusLine",
+    "StatusLineNC:DiffviewStatuslineNC",
+  }, ","),
+})
 
 FHOptionPanel.bufopts = {
   swapfile = false,
@@ -51,8 +47,8 @@ FHOptionPanel.flags = {
   options = {
     { "=n", "--max-count=", "Limit number of commits", key = "max_count" },
     { "=a", "--author=", "List only commits from a given author", key = "author" },
-    { "=g", "--grep=", "Filter commit messages", key = "grep" }
-  }
+    { "=g", "--grep=", "Filter commit messages", key = "grep" },
+  },
 }
 
 for _, list in pairs(FHOptionPanel.flags) do
@@ -106,11 +102,12 @@ function FHOptionPanel:init_buffer_opts()
   for group, _ in pairs(FHOptionPanel.flags) do
     for option_name, v in pairs(FHOptionPanel.flags[group]) do
       utils.buf_map(self.bufid, {
-          "n", v[1],
-          function()
-            self.emitter:emit("set_option", option_name)
-          end
-        })
+        "n",
+        v[1],
+        function()
+          self.emitter:emit("set_option", option_name)
+        end,
+      })
     end
   end
 end
@@ -119,16 +116,10 @@ function FHOptionPanel:update_components()
   local switch_schema = {}
   local option_schema = {}
   for _, option in ipairs(FHOptionPanel.flags.switches) do
-    table.insert(
-      switch_schema,
-      { name = "switch", context = { option.key, option } }
-    )
+    table.insert(switch_schema, { name = "switch", context = { option.key, option } })
   end
   for _, option in ipairs(FHOptionPanel.flags.options) do
-    table.insert(
-      option_schema,
-      { name = "option", context = { option.key, option } }
-    )
+    table.insert(option_schema, { name = "option", context = { option.key, option } })
   end
 
   ---@type any

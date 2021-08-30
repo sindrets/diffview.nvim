@@ -33,14 +33,14 @@ return function(view)
     end,
     buf_new = function()
       if view.ready and api.nvim_tabpage_is_valid(view.tabpage) then
-        vim.schedule(function ()
+        vim.schedule(function()
           view:fix_foreign_windows()
         end)
       end
     end,
     cursor_hold = function()
       if view.ready and api.nvim_tabpage_is_valid(view.tabpage) then
-        vim.schedule(function ()
+        vim.schedule(function()
           view:fix_foreign_windows()
         end)
       end

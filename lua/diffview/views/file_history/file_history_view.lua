@@ -28,11 +28,7 @@ function FileHistoryView:init(opt)
   self.git_root = opt.git_root
   self.git_dir = git.git_dir(self.git_root)
   self.path_args = opt.path_args
-  self.entries = git.file_history_list(
-    self.git_root,
-    self.path_args,
-    opt.log_options
-  )
+  self.entries = git.file_history_list(self.git_root, self.path_args, opt.log_options)
   self.file_idx = 1
   self.panel = FileHistoryPanel(self.git_root, self.entries, self.path_args, opt.log_options)
 end

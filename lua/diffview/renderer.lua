@@ -46,7 +46,7 @@ local function create_subcomponents(parent, comp_struct, schema)
     sub_comp.parent = parent
     comp_struct[i] = {
       _name = v.name,
-      comp = sub_comp
+      comp = sub_comp,
     }
     comp_struct[v.name] = comp_struct[i]
     if #v > 0 then
@@ -123,7 +123,9 @@ function RenderComponent:get_comp_on_line(line)
       if #child.components > 0 then
         for _, v in ipairs(child.components) do
           local target = recurse(v)
-          if target then return target end
+          if target then
+            return target
+          end
         end
       else
         return child
@@ -283,7 +285,7 @@ local git_status_hl_map = {
   ["X"] = "DiffviewStatusUnknown",
   ["D"] = "DiffviewStatusDeleted",
   ["B"] = "DiffviewStatusBroken",
-  ["!"] = "DiffviewStatusIgnored"
+  ["!"] = "DiffviewStatusIgnored",
 }
 
 function M.get_git_hl(status)

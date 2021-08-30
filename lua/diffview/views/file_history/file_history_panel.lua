@@ -105,15 +105,12 @@ end
 function FileHistoryPanel:update_components()
   local entry_schema = {}
   for _, entry in ipairs(self.entries) do
-    table.insert(
-      entry_schema,
-      {
-        name = "entry",
-        context = entry,
-        { name = "commit" },
-        { name = "files" }
-      }
-    )
+    table.insert(entry_schema, {
+      name = "entry",
+      context = entry,
+      { name = "commit" },
+      { name = "files" },
+    })
   end
 
   ---@type any

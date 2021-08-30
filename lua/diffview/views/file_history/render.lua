@@ -69,7 +69,7 @@ local function render_entries(parent, entries)
 
   for i, entry in ipairs(entries) do
     if not entry.status then
-      print(vim.inspect(entry, {depth = 2}))
+      print(vim.inspect(entry, { depth = 2 }))
     end
     local entry_struct = parent[i]
     local line_idx = 0
@@ -88,7 +88,8 @@ local function render_entries(parent, entries)
 
     if not entry.single_file then
       offset = #s
-      local counter = " " .. utils.str_left_pad(tostring(#entry.files), #tostring(max_num_files))
+      local counter = " "
+        .. utils.str_left_pad(tostring(#entry.files), #tostring(max_num_files))
         .. " files"
       comp:add_hl("DiffviewFilePanelCounter", line_idx, offset, offset + #counter)
       s = s .. counter
@@ -119,19 +120,21 @@ local function render_entries(parent, entries)
     end
 
     offset = #s + 1
-    local subject = #entry.files > 0 and entry.files[1].right.type == RevType.LOCAL
-      and "[Not Committed Yet]" or utils.str_shorten(entry.commit.subject, 72)
+    local subject = #entry.files > 0
+        and entry.files[1].right.type == RevType.LOCAL
+        and "[Not Committed Yet]"
+      or utils.str_shorten(entry.commit.subject, 72)
     comp:add_hl("DiffviewFilePanelFileName", line_idx, offset, offset + #subject)
     s = s .. " " .. subject
 
     offset = #s + 1
     if entry.commit then
+      -- 3 months
       local date = (
-        -- 3 months
-        os.difftime(os.time(), entry.commit.time) > 60 * 60 * 24 * 30 * 3
-        and entry.commit.iso_date
-        or entry.commit.rel_date
-      )
+          os.difftime(os.time(), entry.commit.time) > 60 * 60 * 24 * 30 * 3
+            and entry.commit.iso_date
+          or entry.commit.rel_date
+        )
       local info = entry.commit.author .. ", " .. date
       comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #info)
       s = s .. " " .. info
@@ -161,10 +164,10 @@ return {
 
     -- root path
     local s = (
-      panel.form == Form.COLUMN
-      and utils.path_shorten(vim.fn.fnamemodify(panel.git_root, ":~"), panel.width - 6)
-      or vim.fn.fnamemodify(panel.git_root, ":~")
-    )
+        panel.form == Form.COLUMN
+          and utils.path_shorten(vim.fn.fnamemodify(panel.git_root, ":~"), panel.width - 6)
+        or vim.fn.fnamemodify(panel.git_root, ":~")
+      )
     comp:add_hl("DiffviewFilePanelRootPath", line_idx, 0, #s)
     comp:add_line(s)
     line_idx = line_idx + 1
@@ -182,7 +185,7 @@ return {
         line_idx,
         offset + #file.parent_path + 1,
         offset + #file.basename
-        )
+      )
       s = icon .. file.path
       comp:add_line(s)
     else
@@ -298,5 +301,5 @@ return {
       s = s .. ")"
       comp:add_line(s)
     end
-  end
+  end,
 }

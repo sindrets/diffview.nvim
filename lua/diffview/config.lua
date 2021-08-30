@@ -104,9 +104,8 @@ function M.setup(user_config)
   if M._config.key_bindings.disable_defaults then
     for name, _ in pairs(M._config.key_bindings) do
       if name ~= "disable_defaults" then
-        M._config.key_bindings[name] = (
-          user_config.key_bindings and user_config.key_bindings[name]
-        ) or {}
+        M._config.key_bindings[name] = (user_config.key_bindings and user_config.key_bindings[name])
+          or {}
       end
     end
   end

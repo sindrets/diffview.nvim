@@ -37,8 +37,7 @@ function M.diffview_open(args)
   local git_root = git.toplevel(p)
   if not git_root then
     utils.err(
-      string.format("Path not a git repo (or any parent): '%s'",
-        vim.fn.fnamemodify(p, ":."))
+      string.format("Path not a git repo (or any parent): '%s'", vim.fn.fnamemodify(p, ":."))
     )
     return
   end
@@ -99,8 +98,7 @@ function M.file_history(args)
   local git_root = git.toplevel(p)
   if not git_root then
     utils.err(
-      string.format("Path not a git repo (or any parent): '%s'",
-        vim.fn.fnamemodify(paths[1], ":."))
+      string.format("Path not a git repo (or any parent): '%s'", vim.fn.fnamemodify(paths[1], ":."))
     )
     return
   end
@@ -109,7 +107,7 @@ function M.file_history(args)
   local v = FileHistoryView({
     git_root = git_root,
     path_args = paths,
-    log_options = config.get_config().file_history_panel.log_options
+    log_options = config.get_config().file_history_panel.log_options,
   })
 
   if #v.entries == 0 then

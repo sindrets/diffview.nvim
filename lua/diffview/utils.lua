@@ -449,7 +449,7 @@ function M.input(prompt, default, completion)
     prompt = prompt,
     default = default,
     completion = completion,
-    cancelreturn = "__INPUT_CANCELLED__"
+    cancelreturn = "__INPUT_CANCELLED__",
   })
   M.clear_prompt()
   return v
@@ -463,7 +463,7 @@ local function prepare_mapping(t)
   local opts = vim.tbl_extend("force", default_options, t.opt or t[4])
   local rhs
   if type(t[3]) == "function" then
-    mapping_callbacks[#mapping_callbacks+1] = t[3]
+    mapping_callbacks[#mapping_callbacks + 1] = t[3]
     rhs = string.format(
       "<Cmd>lua require('diffview.utils')._mapping_callbacks[%d]()<CR>",
       #mapping_callbacks

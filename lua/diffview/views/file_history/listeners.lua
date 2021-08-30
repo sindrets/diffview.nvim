@@ -21,14 +21,14 @@ return function(view)
     end,
     buf_new = function()
       if view.ready and api.nvim_tabpage_is_valid(view.tabpage) then
-        vim.schedule(function ()
+        vim.schedule(function()
           view:fix_foreign_windows()
         end)
       end
     end,
     cursor_hold = function()
       if view.ready and api.nvim_tabpage_is_valid(view.tabpage) then
-        vim.schedule(function ()
+        vim.schedule(function()
           view:fix_foreign_windows()
         end)
       end
@@ -68,7 +68,7 @@ return function(view)
               rev_arg = git.rev_to_pretty_string(file.left, file.right),
               left = file.left,
               right = file.right,
-              options = {}
+              options = {},
             })
 
             lib.add_view(new_view)

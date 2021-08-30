@@ -109,7 +109,7 @@ function M.file_history_list(git_root, path_args, opt)
 
   local cmd = string.format(
     "%s log --pretty='format:%%H %%P%%n%%an%%n%%ad%%n%%ar%%n%%s' "
-    .. "--date=raw --name-status %s -- %s",
+      .. "--date=raw --name-status %s -- %s",
     base_cmd,
     options,
     p_args
@@ -118,7 +118,7 @@ function M.file_history_list(git_root, path_args, opt)
 
   cmd = string.format(
     "%s log --pretty='format:%%H %%P%%n%%an%%n%%ad%%n%%ar%%n%%s' "
-    .. "--date=raw --numstat %s -- %s",
+      .. "--date=raw --numstat %s -- %s",
     base_cmd,
     options,
     p_args
@@ -154,7 +154,9 @@ function M.file_history_list(git_root, path_args, opt)
         local lines = vim.fn.systemlist(
           string.format(
             "%s show --format= -m --first-parent --name-status %s -- %s",
-            base_cmd, right_hash, old_path or p_args
+            base_cmd,
+            right_hash,
+            old_path or p_args
           )
         )
         if #lines == 0 then
@@ -195,15 +197,15 @@ function M.file_history_list(git_root, path_args, opt)
         table.insert(
           files,
           FileEntry({
-              path = name,
-              oldpath = oldname,
-              absolute_path = utils.path_join({ git_root, name }),
-              status = status,
-              stats = stats,
-              kind = "working",
-              commit = commit,
-              left = Rev(RevType.COMMIT, left_hash),
-              right = Rev(RevType.COMMIT, right_hash),
+            path = name,
+            oldpath = oldname,
+            absolute_path = utils.path_join({ git_root, name }),
+            status = status,
+            stats = stats,
+            kind = "working",
+            commit = commit,
+            left = Rev(RevType.COMMIT, left_hash),
+            right = Rev(RevType.COMMIT, right_hash),
           })
         )
         j = j + 1
@@ -212,10 +214,10 @@ function M.file_history_list(git_root, path_args, opt)
       table.insert(
         entries,
         LogEntry({
-            path_args = path_args,
-            commit = commit,
-            files = files,
-            single_file = single_file
+          path_args = path_args,
+          commit = commit,
+          files = files,
+          single_file = single_file,
         })
       )
 
