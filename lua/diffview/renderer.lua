@@ -1,29 +1,34 @@
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local config = require("diffview.config")
-local a = vim.api
+local api = vim.api
 local M = {}
 local web_devicons
+local uid_counter = 0
 
 ---@class HlData
 ---@field group string
 ---@field line_idx integer
----@field first integer
----@field last integer
+---@field first integer 0 indexed, inclusive
+---@field last integer Exclusive
 
 ---@class RenderComponent
+---@field name string
+---@field parent RenderComponent
 ---@field lines string[]
 ---@field hl HlData[]
 ---@field components RenderComponent[]
----@field lstart integer
----@field lend integer
+---@field lstart integer 0 indexed, Inclusive
+---@field lend integer Exclusive
 ---@field height integer
+---@field context any
 local RenderComponent = oop.Object
 RenderComponent = oop.create_class("RenderComponent")
 
 ---RenderComponent constructor.
 ---@return RenderComponent
-function RenderComponent:init()
+function RenderComponent:init(name)
+  self.name = name
   self.lines = {}
   self.hl = {}
   self.components = {}
@@ -32,19 +37,28 @@ function RenderComponent:init()
   self.height = 0
 end
 
-local function create_subcomponents(component, comp_struct, schema)
-  local new_comp = component:create_component()
-  comp_struct[schema.name] = { comp = new_comp }
-
-  for _, v in ipairs(schema) do
-    if v.name then
-      local sub_comp = new_comp:create_component()
-      comp_struct[v.name] = { comp = sub_comp }
-      if #v > 0 then
-        create_subcomponents(sub_comp, comp_struct[v.name], v)
-      end
+local function create_subcomponents(parent, comp_struct, schema)
+  for i, v in ipairs(schema) do
+    v.name = v.name or RenderComponent.next_uid()
+    local sub_comp = parent:create_component()
+    sub_comp.name = v.name
+    sub_comp.context = v.context
+    sub_comp.parent = parent
+    comp_struct[i] = {
+      _name = v.name,
+      comp = sub_comp,
+    }
+    comp_struct[v.name] = comp_struct[i]
+    if #v > 0 then
+      create_subcomponents(sub_comp, comp_struct[i], v)
     end
   end
+end
+
+function RenderComponent.next_uid()
+  local uid = "comp_" .. uid_counter
+  uid_counter = uid_counter + 1
+  return uid
 end
 
 ---Create and add a new component.
@@ -52,15 +66,13 @@ end
 ---@return RenderComponent|any
 function RenderComponent:create_component(schema)
   local comp_struct
-  local new_comp = RenderComponent()
+  local new_comp = RenderComponent(schema and schema.name or RenderComponent.next_uid())
   table.insert(self.components, new_comp)
 
   if schema then
-    comp_struct = { comp = new_comp }
-    for _, v in ipairs(schema) do
-      create_subcomponents(new_comp, comp_struct, v)
-    end
-
+    new_comp.context = schema.context
+    comp_struct = { _name = new_comp.name, comp = new_comp }
+    create_subcomponents(new_comp, comp_struct, schema)
     return comp_struct
   end
 
@@ -102,6 +114,28 @@ function RenderComponent:clear()
   end
 end
 
+function RenderComponent:get_comp_on_line(line)
+  line = line - 1
+
+  local function recurse(child)
+    if line >= child.lstart and line < child.lend then
+      -- print(child.name, line, child.lstart, child.lend)
+      if #child.components > 0 then
+        for _, v in ipairs(child.components) do
+          local target = recurse(v)
+          if target then
+            return target
+          end
+        end
+      else
+        return child
+      end
+    end
+  end
+
+  return recurse(self)
+end
+
 ---@class RenderData
 ---@field lines string[]
 ---@field hl HlData[]
@@ -116,7 +150,7 @@ function RenderData:init(ns_name)
   self.lines = {}
   self.hl = {}
   self.components = {}
-  self.namespace = a.nvim_create_namespace(ns_name)
+  self.namespace = api.nvim_create_namespace(ns_name)
 end
 
 ---Create and add a new component.
@@ -124,14 +158,13 @@ end
 ---@return RenderComponent|any
 function RenderData:create_component(schema)
   local comp_struct
-  local new_comp = RenderComponent()
+  local new_comp = RenderComponent(schema and schema.name or RenderComponent.next_uid())
   table.insert(self.components, new_comp)
 
   if schema then
-    comp_struct = { comp = new_comp }
-    for _, v in ipairs(schema) do
-      create_subcomponents(new_comp, comp_struct, v)
-    end
+    new_comp.context = schema.context
+    comp_struct = { _name = new_comp.name, comp = new_comp }
+    create_subcomponents(new_comp, comp_struct, schema)
     return comp_struct
   end
 
@@ -166,6 +199,79 @@ function RenderData:clear()
   end
 end
 
+---Create a function to enable easily contraining the cursor to a given list of
+---components.
+---@param components RenderComponent[]
+function M.create_cursor_constraint(components)
+  local stack = utils.tbl_slice(components, 1)
+  utils.merge_sort(stack, function(a, b)
+    return a.lstart <= b.lstart
+  end)
+
+  ---Given a cursor delta or target: returns the next valid line index inside a
+  ---contraining component. When the cursor is trying to move out of a
+  ---constraint, the next component is determined by the direction the cursor is
+  ---moving.
+  ---@param winid_or_opt number|{from: number, to: number}
+  ---@param delta number The amount of change from the current cursor positon.
+  ---Not needed if the first argument is a table.
+  ---@return number
+  return function(winid_or_opt, delta)
+    local line_from, line_to
+    if type(winid_or_opt) == "number" then
+      local cursor = api.nvim_win_get_cursor(winid_or_opt)
+      line_from, line_to = cursor[1] - 1, cursor[1] - 1 + delta
+    else
+      line_from, line_to = winid_or_opt.from - 1, winid_or_opt.to - 1
+    end
+
+    local min, max = math.min(line_from, line_to), math.max(line_from, line_to)
+    local nearest_dist, dist, target = math.huge, nil, {}
+    local top, bot
+
+    for i, comp in ipairs(stack) do
+      if comp.height > 0 then
+        if min <= comp.lend and max >= comp.lstart then
+          if not top then
+            top = { idx = i, comp = comp }
+            bot = top
+          else
+            bot = { idx = i, comp = comp }
+          end
+        end
+
+        dist = math.min(math.abs(line_to - comp.lstart), math.abs(line_to - comp.lend))
+        if dist < nearest_dist then
+          nearest_dist = dist
+          target = { idx = i, comp = comp }
+        end
+      end
+    end
+
+    if not top and target.comp then
+      return utils.clamp(line_to + 1, target.comp.lstart + 1, target.comp.lend)
+    elseif top then
+      if line_to < line_from then
+        if line_to < top.comp.lstart and top.idx > 1 then
+          target = { idx = top.idx - 1, comp = stack[top.idx - 1] }
+        else
+          target = top
+        end
+        return utils.clamp(line_to + 1, target.comp.lstart + 1, target.comp.lend)
+      else
+        if line_to >= bot.comp.lend and bot.idx < #stack then
+          target = { idx = bot.idx + 1, comp = stack[bot.idx + 1] }
+        else
+          target = bot
+        end
+        return utils.clamp(line_to + 1, target.comp.lstart + 1, target.comp.lend)
+      end
+    end
+
+    return line_from
+  end
+end
+
 ---@param line_idx integer
 ---@param lines string[]
 ---@param hl_data HlData[]
@@ -173,10 +279,13 @@ end
 ---@return integer
 local function process_component(line_idx, lines, hl_data, component)
   if #component.components > 0 then
+    component.lstart = line_idx
     for _, c in ipairs(component.components) do
       line_idx = process_component(line_idx, lines, hl_data, c)
     end
 
+    component.lend = line_idx
+    component.height = component.lend - component.lstart
     return line_idx
   else
     for _, line in ipairs(component.lines) do
@@ -209,12 +318,12 @@ end
 ---@param bufid integer
 ---@param data RenderData
 function M.render(bufid, data)
-  if not a.nvim_buf_is_loaded(bufid) then
+  if not api.nvim_buf_is_loaded(bufid) then
     return
   end
 
-  local was_modifiable = a.nvim_buf_get_option(bufid, "modifiable")
-  a.nvim_buf_set_option(bufid, "modifiable", true)
+  local was_modifiable = api.nvim_buf_get_option(bufid, "modifiable")
+  api.nvim_buf_set_option(bufid, "modifiable", true)
 
   local lines, hl_data
   local line_idx = 0
@@ -229,13 +338,13 @@ function M.render(bufid, data)
     hl_data = data.hl
   end
 
-  a.nvim_buf_set_lines(bufid, 0, -1, false, lines)
-  a.nvim_buf_clear_namespace(bufid, data.namespace, 0, -1)
+  api.nvim_buf_set_lines(bufid, 0, -1, false, lines)
+  api.nvim_buf_clear_namespace(bufid, data.namespace, 0, -1)
   for _, hl in ipairs(hl_data) do
-    a.nvim_buf_add_highlight(bufid, data.namespace, hl.group, hl.line_idx, hl.first, hl.last)
+    api.nvim_buf_add_highlight(bufid, data.namespace, hl.group, hl.line_idx, hl.first, hl.last)
   end
 
-  a.nvim_buf_set_option(bufid, "modifiable", was_modifiable)
+  api.nvim_buf_set_option(bufid, "modifiable", was_modifiable)
 end
 
 local git_status_hl_map = {
@@ -249,6 +358,7 @@ local git_status_hl_map = {
   ["X"] = "DiffviewStatusUnknown",
   ["D"] = "DiffviewStatusDeleted",
   ["B"] = "DiffviewStatusBroken",
+  ["!"] = "DiffviewStatusIgnored",
 }
 
 function M.get_git_hl(status)
@@ -256,14 +366,14 @@ function M.get_git_hl(status)
 end
 
 function M.get_file_icon(name, ext, render_data, line_idx, offset)
-  if not config.get_config().file_panel.use_icons then
+  if not config.get_config().use_icons then
     return " "
   end
   if not web_devicons then
     local ok
     ok, web_devicons = pcall(require, "nvim-web-devicons")
     if not ok then
-      config.get_config().file_panel.use_icons = false
+      config.get_config().use_icons = false
       utils.warn(
         "nvim-web-devicons is required to use file icons! "
           .. "Set `use_icons = false` in your config to not see this message."

@@ -3,7 +3,8 @@
 Single tabpage interface for easily cycling through diffs for all modified files
 for any git rev.
 
-![preview](.github/media/screenshot_2.png)
+![preview](https://user-images.githubusercontent.com/2786478/131269942-e34100dd-cbb9-48fe-af31-6e518ce06e9e.png)
+
 
 ## Introduction
 
@@ -40,11 +41,24 @@ local cb = require'diffview.config'.diffview_callback
 
 require'diffview'.setup {
   diff_binaries = false,    -- Show diffs for binaries
+  use_icons = true          -- Requires nvim-web-devicons
   file_panel = {
     position = "left",      -- One of 'left', 'right', 'top', 'bottom'
     width = 35,             -- Only applies when position is 'left' or 'right'
     height = 10,            -- Only applies when position is 'top' or 'bottom'
-    use_icons = true        -- Requires nvim-web-devicons
+  },
+  file_history_panel = {
+    position = "bottom",
+    width = 35,
+    height = 16,
+    log_options = {
+      max_count = 256,      -- Limit the number of commits
+      follow = false,       -- Follow renames (only for single file)
+      all = false,          -- Include all refs under 'refs/' including HEAD
+      merges = false,       -- List only merge commits
+      no_merges = false,    -- List no merge commits
+      reverse = false,      -- List commits in reverse order
+    },
   },
   key_bindings = {
     disable_defaults = false,                   -- Disable the default key bindings
@@ -73,8 +87,29 @@ require'diffview'.setup {
       ["<s-tab>"]       = cb("select_prev_entry"),
       ["<leader>e"]     = cb("focus_files"),
       ["<leader>b"]     = cb("toggle_files"),
-    }
-  }
+    },
+    file_history_panel = {
+      ["g!"]            = cb("options"),            -- Open the option panel
+      ["<C-d>"]         = cb("open_in_diffview"),   -- Open the entry under the cursor in a diffview
+      ["zR"]            = cb("open_all_folds"),
+      ["zM"]            = cb("close_all_folds"),
+      ["j"]             = cb("next_entry"),
+      ["<down>"]        = cb("next_entry"),
+      ["k"]             = cb("prev_entry"),
+      ["<up>"]          = cb("prev_entry"),
+      ["<cr>"]          = cb("select_entry"),
+      ["o"]             = cb("select_entry"),
+      ["<2-LeftMouse>"] = cb("select_entry"),
+      ["<tab>"]         = cb("select_next_entry"),
+      ["<s-tab>"]       = cb("select_prev_entry"),
+      ["<leader>e"]     = cb("focus_files"),
+      ["<leader>b"]     = cb("toggle_files"),
+    },
+    option_panel = {
+      ["<tab>"] = cb("select"),
+      ["q"]     = cb("close"),
+    },
+  },
 }
 ```
 
@@ -89,6 +124,13 @@ that only really make sense specifically in the file panel, such as
 `toggle_stage_entry` and `restore_entry` work just fine from the view. When
 invoked from the view, these will target the file currently open in the view
 rather than the file under the cursor in the file panel.
+
+## File History
+
+![file-history-multi](https://user-images.githubusercontent.com/2786478/131269782-f4184640-6d73-4226-b425-feccb5002dd0.png)
+
+The file history view allows you to list all the commits that changed a given
+file or directory, and view the changes made in a diff split.
 
 ## Usage
 
@@ -120,6 +162,12 @@ Additional commands for convenience:
 
 With a Diffview open and the default key bindings, you can cycle through changed
 files with `<tab>` and `<s-tab>` (see configuration to change the key bindings).
+
+### `:DiffviewFileHistory [paths]`
+
+Opens a new file history view that lists all commits that changed a given file
+or directory. If no `[paths]` are given, defaults to the current file. Multiple
+`[paths]` may be provided.
 
 ## Tips
 

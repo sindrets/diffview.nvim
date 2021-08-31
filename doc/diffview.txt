@@ -38,11 +38,24 @@ Example configuration with default settings:
     local cb = require'diffview.config'.diffview_callback
     require'diffview'.setup {
       diff_binaries = false,    -- Show diffs for binaries
+      use_icons = true          -- Requires nvim-web-devicons
       file_panel = {
         position = "left",      -- One of 'left', 'right', 'top', 'bottom'
         width = 35,             -- Only applies when position is 'left' or 'right'
         height = 10,            -- Only applies when position is 'top' or 'bottom'
-        use_icons = true
+      },
+      file_history_panel = {
+        position = "bottom",
+        width = 35,
+        height = 16,
+        log_options = {
+          max_count = 256,      -- Limit the number of commits
+          follow = false,       -- Follow renames (only for single file)
+          all = false,          -- Include all refs under 'refs/' including HEAD
+          merges = false,       -- List only merge commits
+          no_merges = false,    -- List no merge commits
+          reverse = false,      -- List commits in reverse order
+        },
       },
       key_bindings = {
         disable_defaults = false,                   -- Disable the default key bindings
@@ -71,8 +84,29 @@ Example configuration with default settings:
           ["<s-tab>"]       = cb("select_prev_entry"),
           ["<leader>e"]     = cb("focus_files"),
           ["<leader>b"]     = cb("toggle_files"),
-        }
-      }
+        },
+        file_history_panel = {
+          ["g!"]            = cb("options"),            -- Open the option panel
+          ["<C-d>"]         = cb("open_in_diffview"),   -- Open the entry under the cursor in a diffview
+          ["zR"]            = cb("open_all_folds"),
+          ["zM"]            = cb("close_all_folds"),
+          ["j"]             = cb("next_entry"),
+          ["<down>"]        = cb("next_entry"),
+          ["k"]             = cb("prev_entry"),
+          ["<up>"]          = cb("prev_entry"),
+          ["<cr>"]          = cb("select_entry"),
+          ["o"]             = cb("select_entry"),
+          ["<2-LeftMouse>"] = cb("select_entry"),
+          ["<tab>"]         = cb("select_next_entry"),
+          ["<s-tab>"]       = cb("select_prev_entry"),
+          ["<leader>e"]     = cb("focus_files"),
+          ["<leader>b"]     = cb("toggle_files"),
+        },
+        option_panel = {
+          ["<tab>"] = cb("select"),
+          ["q"]     = cb("close"),
+        },
+      },
     }
 <
 
@@ -100,6 +134,7 @@ COMMANDS                                            *diffview-nvim-commands*
         :DiffviewOpen HEAD~4..HEAD~2
         :DiffviewOpen d4a7b0d
         :DiffviewOpen d4a7b0d..519b30e
+        :DiffviewOpen origin/main...HEAD
         :DiffviewOpen HEAD~2 -- lua/diffview plugin
         :DiffviewOpen d4a7b0d -uno
 <
@@ -116,6 +151,22 @@ COMMANDS                                            *diffview-nvim-commands*
 
         -C{path}        Run as if git was started in {path} instead of the
                         current working directory.
+
+                                                        *:DiffviewFileHistory*
+:DiffviewFileHistory [paths]
+                        Opens a new file history view that lists all commits
+                        that changed a given file or directory. If no [paths]
+                        are given, defaults to the current file. Multiple
+                        [paths] may be provided.
+
+                        From the file history panel (the panel listing the
+                        commits) you can open an option panel by pressing
+                        `g!`. The option panel will allow you to change the
+                        flags that will be passed to `git-log`. A flag can
+                        be adjusted either by moving the cursor to its line
+                        followed by pressing <Tab>, or by using the mappings
+                        that are shown directly in the panel, preceding the
+                        flags' descriptions.
 
                                                         *:DiffviewClose*
 :DiffviewClose          Close the active Diffview.
@@ -204,7 +255,54 @@ R                       Update the stats and entries in the file list.
 
 <leader>e               Bring focus to the file panel.
 
-API                                              *diffview-api*
+                                        *diffview-nvim-maps-file-history-panel*
+File history panel maps~
+
+These mappings are available in the file history panel buffer (the panel
+listing the commits).
+
+                                                   *diffview-nvim-maps-options*
+g!                      Open the options panel.
+
+                                          *diffview-nvim-maps-open_in_diffview*
+<C-d>                   Open the commit entry under the cursor in a Diffview.
+
+                                            *diffview-nvim-maps-open_all_folds*
+zR                      Open the fold on all commit entries (only when showing
+                        history for multiple files).
+
+                                           *diffview-nvim-maps-close_all_folds*
+zM                      Close the fold on all commit entries (only when showing
+                        history for multiple files).
+
+j                       Bring the cursor to the next item.
+<Down>
+
+k                       Bring the cursor to the previous item.
+<Up>
+
+o                       Open the diff for the selected item.
+<CR>
+<2-LeftMouse>
+
+<Tab>                   Open the diff for the next item.
+
+<S-Tab>                 Open the diff for the previous item.
+
+<leader>b               Toggle the file history panel.
+
+<leader>e               Bring focus to the file history panel.
+
+                                 *diffview-nvim-maps-file-history-option-panel*
+File history option panel maps~
+
+These mappings are available from the file history options panel. The option
+panel will allow you to change the flags that will be passed to `git-log`. A
+flag can be adjusted either by moving the cursor to its line followed by
+pressing <Tab>, or by using the mappings that are shown directly in the
+panel, preceding the flags' descriptions.
+
+API                                                              *diffview-api*
 
 Diffview provides an API that lets plugins supply custom file data to create
 custom diffviews.

@@ -1,9 +1,9 @@
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
-local git = require("diffview.git")
+local git = require("diffview.git.utils")
 local Event = require("diffview.events").Event
 local FileEntry = require("diffview.views.file_entry").FileEntry
-local RevType = require("diffview.rev").RevType
+local RevType = require("diffview.git.rev").RevType
 local Diff = require("diffview.diff").Diff
 local EditToken = require("diffview.diff").EditToken
 local StandardView = require("diffview.views.standard.standard_view").StandardView
@@ -47,7 +47,6 @@ function DiffView:init(opt)
   self.options = opt.options
   self.files = git.diff_file_list(opt.git_root, opt.left, opt.right, opt.path_args, opt.options)
   self.file_idx = 1
-  self.nulled = false
   self.panel = FilePanel(
     self.git_root,
     self.files,
@@ -247,6 +246,7 @@ function DiffView:update_files()
   end
 
   FileEntry.update_index_stat(self.git_root, self.git_dir, index_stat)
+  self.panel:update_components()
   self.panel:render()
   self.panel:redraw()
   self.file_idx = utils.clamp(self.file_idx, 1, self.files:size())

@@ -1,9 +1,8 @@
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local FileEntry = require("diffview.views.file_entry").FileEntry
-local RevType = require("diffview.rev").RevType
-
-local a = vim.api
+local RevType = require("diffview.git.rev").RevType
+local api = vim.api
 
 local M = {}
 
@@ -28,7 +27,7 @@ end
 
 ---@Override
 function CFileEntry:load_buffers(git_root, left_winid, right_winid)
-  local last_winid = a.nvim_get_current_win()
+  local last_winid = api.nvim_get_current_win()
   local splits = {
     {
       winid = left_winid,
@@ -51,17 +50,17 @@ function CFileEntry:load_buffers(git_root, left_winid, right_winid)
   pcall(function()
     vim.opt.eventignore = "WinEnter,WinLeave"
     for _, split in ipairs(splits) do
-      local winnr = vim.fn.win_id2win(split.winid)
+      local winnr = api.nvim_win_get_number(split.winid)
 
-      if not (split.bufid and a.nvim_buf_is_loaded(split.bufid)) then
+      if not (split.bufid and api.nvim_buf_is_loaded(split.bufid)) then
         if split.rev.type == RevType.LOCAL then
           if split.null or CFileEntry.should_null(split.rev, self.status, split.pos) then
             local bn = CFileEntry._create_buffer(git_root, split.rev, self.path, split.lines, true)
-            a.nvim_win_set_buf(split.winid, bn)
+            api.nvim_win_set_buf(split.winid, bn)
             split.bufid = bn
           else
             vim.cmd(winnr .. "windo edit " .. vim.fn.fnameescape(self.absolute_path))
-            split.bufid = a.nvim_get_current_buf()
+            split.bufid = api.nvim_get_current_buf()
           end
         elseif
           vim.tbl_contains({ RevType.COMMIT, RevType.INDEX, RevType.CUSTOM }, split.rev.type)
@@ -85,14 +84,14 @@ function CFileEntry:load_buffers(git_root, left_winid, right_winid)
             )
           end
           table.insert(self.created_bufs, bn)
-          a.nvim_win_set_buf(split.winid, bn)
+          api.nvim_win_set_buf(split.winid, bn)
           split.bufid = bn
           vim.cmd(winnr .. "windo filetype detect")
         end
 
         CFileEntry._attach_buffer(split.bufid)
       else
-        a.nvim_win_set_buf(split.winid, split.bufid)
+        api.nvim_win_set_buf(split.winid, split.bufid)
         CFileEntry._attach_buffer(split.bufid)
       end
     end
@@ -103,7 +102,7 @@ function CFileEntry:load_buffers(git_root, left_winid, right_winid)
   self.right_bufid = splits[2].bufid
 
   CFileEntry._update_windows(left_winid, right_winid)
-  a.nvim_set_current_win(last_winid)
+  api.nvim_set_current_win(last_winid)
 end
 
 ---@static
@@ -113,8 +112,8 @@ function CFileEntry._create_buffer(git_root, rev, path, lines, null)
     return CFileEntry._get_null_buffer()
   end
 
-  local bn = a.nvim_create_buf(false, false)
-  a.nvim_buf_set_lines(bn, 0, -1, false, lines)
+  local bn = api.nvim_create_buf(false, false)
+  api.nvim_buf_set_lines(bn, 0, -1, false, lines)
 
   local context
   if rev.type == RevType.COMMIT then
@@ -126,18 +125,18 @@ function CFileEntry._create_buffer(git_root, rev, path, lines, null)
   end
 
   -- stylua: ignore
-  local fullname = utils.path_join({ "diffview://", git_root, context, path, })
-  a.nvim_buf_set_option(bn, "modified", false)
-  a.nvim_buf_set_option(bn, "modifiable", false)
+  local fullname = utils.path_join({ "diffview://", git_root, ".git", context, path, })
+  api.nvim_buf_set_option(bn, "modified", false)
+  api.nvim_buf_set_option(bn, "modifiable", false)
 
-  local ok = pcall(a.nvim_buf_set_name, bn, fullname)
+  local ok = pcall(api.nvim_buf_set_name, bn, fullname)
   if not ok then
     -- Resolve name conflict
     local i = 1
     while not ok do
       -- stylua: ignore
-      fullname = utils.path_join({ "diffview://", git_root, context, i, path, })
-      ok = pcall(a.nvim_buf_set_name, bn, fullname)
+      fullname = utils.path_join({ "diffview://", git_root, ".git", context, i, path, })
+      ok = pcall(api.nvim_buf_set_name, bn, fullname)
       i = i + 1
     end
   end

@@ -7,12 +7,6 @@ local api = vim.api
 
 local M = {}
 
-local win_reset_opts = {
-  diff = false,
-  cursorbind = false,
-  scrollbind = false,
-}
-
 ---@class StandardView
 ---@field panel Panel
 ---@field left_winid integer
@@ -110,18 +104,6 @@ function StandardView:ensure_layout()
   local state = self:validate_layout()
   if not state.valid then
     self:recover_layout(state)
-  end
-end
-
----Disable unwanted options in all windows not part of the view.
-function StandardView:fix_foreign_windows()
-  local win_ids = api.nvim_tabpage_list_wins(self.tabpage)
-  for _, id in ipairs(win_ids) do
-    if not (id == self.panel.winid or id == self.left_winid or id == self.right_winid) then
-      for k, v in pairs(win_reset_opts) do
-        api.nvim_win_set_option(id, k, v)
-      end
-    end
   end
 end
 
