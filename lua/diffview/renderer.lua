@@ -1,7 +1,7 @@
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local config = require("diffview.config")
-local a = vim.api
+local api = vim.api
 local M = {}
 local web_devicons
 local uid_counter = 0
@@ -9,7 +9,7 @@ local uid_counter = 0
 ---@class HlData
 ---@field group string
 ---@field line_idx integer
----@field first integer 0 based, inclusive
+---@field first integer 0 indexed, inclusive
 ---@field last integer Exclusive
 
 ---@class RenderComponent
@@ -18,7 +18,7 @@ local uid_counter = 0
 ---@field lines string[]
 ---@field hl HlData[]
 ---@field components RenderComponent[]
----@field lstart integer Inclusive
+---@field lstart integer 0 indexed, Inclusive
 ---@field lend integer Exclusive
 ---@field height integer
 ---@field context any
@@ -150,7 +150,7 @@ function RenderData:init(ns_name)
   self.lines = {}
   self.hl = {}
   self.components = {}
-  self.namespace = a.nvim_create_namespace(ns_name)
+  self.namespace = api.nvim_create_namespace(ns_name)
 end
 
 ---Create and add a new component.
@@ -196,6 +196,79 @@ function RenderData:clear()
   self.hl = {}
   for _, c in ipairs(self.components) do
     c:clear()
+  end
+end
+
+---Create a function to enable easily contraining the cursor to a given list of
+---components.
+---@param components RenderComponent[]
+function M.create_cursor_constraint(components)
+  local stack = utils.tbl_slice(components, 1)
+  utils.merge_sort(stack, function(a, b)
+    return a.lstart <= b.lstart
+  end)
+
+  ---Given a cursor delta or target: returns the next valid line index inside a
+  ---contraining component. When the cursor is trying to move out of a
+  ---constraint, the next component is determined by the direction the cursor is
+  ---moving.
+  ---@param winid_or_opt number|{from: number, to: number}
+  ---@param delta number The amount of change from the current cursor positon.
+  ---Not needed if the first argument is a table.
+  ---@return number
+  return function(winid_or_opt, delta)
+    local line_from, line_to
+    if type(winid_or_opt) == "number" then
+      local cursor = api.nvim_win_get_cursor(winid_or_opt)
+      line_from, line_to = cursor[1] - 1, cursor[1] - 1 + delta
+    else
+      line_from, line_to = winid_or_opt.from - 1, winid_or_opt.to - 1
+    end
+
+    local min, max = math.min(line_from, line_to), math.max(line_from, line_to)
+    local nearest_dist, dist, target = math.huge, nil, {}
+    local top, bot
+
+    for i, comp in ipairs(stack) do
+      if comp.height > 0 then
+        if min <= comp.lend and max >= comp.lstart then
+          if not top then
+            top = { idx = i, comp = comp }
+            bot = top
+          else
+            bot = { idx = i, comp = comp }
+          end
+        end
+
+        dist = math.min(math.abs(line_to - comp.lstart), math.abs(line_to - comp.lend))
+        if dist < nearest_dist then
+          nearest_dist = dist
+          target = { idx = i, comp = comp }
+        end
+      end
+    end
+
+    if not top and target.comp then
+      return utils.clamp(line_to + 1, target.comp.lstart + 1, target.comp.lend)
+    elseif top then
+      if line_to < line_from then
+        if line_to < top.comp.lstart and top.idx > 1 then
+          target = { idx = top.idx - 1, comp = stack[top.idx - 1] }
+        else
+          target = top
+        end
+        return utils.clamp(line_to + 1, target.comp.lstart + 1, target.comp.lend)
+      else
+        if line_to >= bot.comp.lend and bot.idx < #stack then
+          target = { idx = bot.idx + 1, comp = stack[bot.idx + 1] }
+        else
+          target = bot
+        end
+        return utils.clamp(line_to + 1, target.comp.lstart + 1, target.comp.lend)
+      end
+    end
+
+    return line_from
   end
 end
 
@@ -245,12 +318,12 @@ end
 ---@param bufid integer
 ---@param data RenderData
 function M.render(bufid, data)
-  if not a.nvim_buf_is_loaded(bufid) then
+  if not api.nvim_buf_is_loaded(bufid) then
     return
   end
 
-  local was_modifiable = a.nvim_buf_get_option(bufid, "modifiable")
-  a.nvim_buf_set_option(bufid, "modifiable", true)
+  local was_modifiable = api.nvim_buf_get_option(bufid, "modifiable")
+  api.nvim_buf_set_option(bufid, "modifiable", true)
 
   local lines, hl_data
   local line_idx = 0
@@ -265,13 +338,13 @@ function M.render(bufid, data)
     hl_data = data.hl
   end
 
-  a.nvim_buf_set_lines(bufid, 0, -1, false, lines)
-  a.nvim_buf_clear_namespace(bufid, data.namespace, 0, -1)
+  api.nvim_buf_set_lines(bufid, 0, -1, false, lines)
+  api.nvim_buf_clear_namespace(bufid, data.namespace, 0, -1)
   for _, hl in ipairs(hl_data) do
-    a.nvim_buf_add_highlight(bufid, data.namespace, hl.group, hl.line_idx, hl.first, hl.last)
+    api.nvim_buf_add_highlight(bufid, data.namespace, hl.group, hl.line_idx, hl.first, hl.last)
   end
 
-  a.nvim_buf_set_option(bufid, "modifiable", was_modifiable)
+  api.nvim_buf_set_option(bufid, "modifiable", was_modifiable)
 end
 
 local git_status_hl_map = {

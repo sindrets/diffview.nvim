@@ -16,6 +16,7 @@ local M = {}
 ---@field winid integer
 ---@field render_data RenderData
 ---@field components any
+---@field constrain_cursor function
 local FilePanel = Panel
 FilePanel = oop.create_class("FilePanel", Panel)
 
@@ -88,6 +89,11 @@ function FilePanel:update_components()
       { name = "entries" },
     },
   })
+
+  self.constrain_cursor = renderer.create_cursor_constraint({
+    self.components.working.files.comp,
+    self.components.staged.files.comp,
+  })
 end
 
 ---Get the file entry under the cursor.
@@ -131,20 +137,7 @@ function FilePanel:highlight_prev_file()
     return
   end
 
-  local cursor = api.nvim_win_get_cursor(self.winid)
-  local line = cursor[1]
-  local min, max
-
-  if #self.files.working == 0 or line - 1 > self.components.staged.files.comp.lstart then
-    min = self.components.staged.files.comp.lstart + 1
-    max = self.components.staged.files.comp.lend
-  else
-    min = self.components.working.files.comp.lstart + 1
-    max = self.components.working.files.comp.lend
-  end
-
-  line = utils.clamp(line - 1, min, max)
-  pcall(api.nvim_win_set_cursor, self.winid, { line, 0 })
+  pcall(api.nvim_win_set_cursor, self.winid, { self.constrain_cursor(self.winid, -1), 0 })
 end
 
 function FilePanel:highlight_next_file()
@@ -152,20 +145,7 @@ function FilePanel:highlight_next_file()
     return
   end
 
-  local cursor = api.nvim_win_get_cursor(self.winid)
-  local line = cursor[1]
-  local min, max
-
-  if #self.files.working == 0 or line + 1 > self.components.working.files.comp.lend then
-    min = self.components.staged.files.comp.lstart + 1
-    max = self.components.staged.files.comp.lend
-  else
-    min = self.components.working.files.comp.lstart + 1
-    max = self.components.working.files.comp.lend
-  end
-
-  line = utils.clamp(line + 1, min, max)
-  pcall(api.nvim_win_set_cursor, self.winid, { line, 0 })
+  pcall(api.nvim_win_set_cursor, self.winid, { self.constrain_cursor(self.winid, 1), 0 })
 end
 
 ---@param comp RenderComponent

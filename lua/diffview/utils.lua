@@ -265,7 +265,7 @@ end
 ---@param value string[]|string
 ---@param opt table
 function M.set_local(winids, option, value, opt)
-  local last_winid
+  local last_winid = api.nvim_get_current_win()
   local rhs
 
   opt = vim.tbl_extend("keep", opt or {}, {
@@ -273,10 +273,6 @@ function M.set_local(winids, option, value, opt)
     keepjumps = true,
     restore_cursor = true
   })
-
-  if opt.restore_cursor then
-    last_winid = api.nvim_get_current_win()
-  end
 
   if type(value) == "boolean" then
     if value == false then
@@ -293,7 +289,7 @@ function M.set_local(winids, option, value, opt)
   end
 
   for _, id in ipairs(winids) do
-    local nr = id ~= 0 and tostring(api.nvim_win_get_number(id)) or ""
+    local nr = tostring(api.nvim_win_get_number(id == 0 and last_winid or id))
     local cmd = string.format(
       "%s %s %swindo setlocal ",
       opt.noautocmd and "noautocmd",
@@ -303,7 +299,7 @@ function M.set_local(winids, option, value, opt)
     vim.cmd(cmd .. rhs)
   end
 
-  if last_winid then
+  if opt.restore_cursor then
     api.nvim_set_current_win(last_winid)
   end
 end

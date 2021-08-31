@@ -246,6 +246,7 @@ function DiffView:update_files()
   end
 
   FileEntry.update_index_stat(self.git_root, self.git_dir, index_stat)
+  self.panel:update_components()
   self.panel:render()
   self.panel:redraw()
   self.file_idx = utils.clamp(self.file_idx, 1, self.files:size())

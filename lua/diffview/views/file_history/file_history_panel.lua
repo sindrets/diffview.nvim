@@ -2,6 +2,7 @@ local config = require("diffview.config")
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local git = require("diffview.git.utils")
+local renderer = require("diffview.renderer")
 local Panel = require("diffview.ui.panel").Panel
 local LogEntry = require("diffview.git.log_entry").LogEntry
 local FHOptionPanel = require("diffview.views.file_history.option_panel").FHOptionPanel
@@ -33,6 +34,7 @@ local M = {}
 ---@field option_panel FHOptionPanel
 ---@field option_mapping string
 ---@field components any
+---@field constrain_cursor function
 local FileHistoryPanel = Panel
 FileHistoryPanel = oop.create_class("FileHistoryPanel", Panel)
 
@@ -122,6 +124,8 @@ function FileHistoryPanel:update_components()
       { name = "entries", unpack(entry_schema) },
     },
   })
+
+  self.constrain_cursor = renderer.create_cursor_constraint({ self.components.log.entries.comp })
 end
 
 function FileHistoryPanel:update_entries()
@@ -259,9 +263,9 @@ function FileHistoryPanel:highlight_item(item)
   end
 
   if item:instanceof(LogEntry) then
-    for _, comp in ipairs(self.components.log.entries) do
-      if comp.context == item then
-        pcall(api.nvim_win_set_cursor, self.winid, { comp.lstart, 0 })
+    for _, comp_struct in ipairs(self.components.log.entries) do
+      if comp_struct.comp.context == item then
+        pcall(api.nvim_win_set_cursor, self.winid, { comp_struct.comp.lstart, 0 })
       end
     end
   else
@@ -272,7 +276,7 @@ function FileHistoryPanel:highlight_item(item)
           pcall(api.nvim_win_set_cursor, self.winid, { comp_struct.comp.lstart + 1, 0 })
         else
           if comp_struct.comp.context.folded then
-            self:set_entry_fold(comp_struct.comp.context, true)
+            comp_struct.comp.context.folded = false
             self:render()
             self:redraw()
           end
@@ -288,13 +292,7 @@ function FileHistoryPanel:highlight_prev_item()
     return
   end
 
-  local cursor = api.nvim_win_get_cursor(self.winid)
-  local line = cursor[1]
-  local min = self.components.log.entries.comp.lstart + 1
-  local max = self.components.log.entries.comp.lend
-
-  line = utils.clamp(line - 1, min, max)
-  pcall(api.nvim_win_set_cursor, self.winid, { line, 0 })
+  pcall(api.nvim_win_set_cursor, self.winid, { self.constrain_cursor(self.winid, -1), 0 })
 end
 
 function FileHistoryPanel:highlight_next_file()
@@ -302,13 +300,7 @@ function FileHistoryPanel:highlight_next_file()
     return
   end
 
-  local cursor = api.nvim_win_get_cursor(self.winid)
-  local line = cursor[1]
-  local min = self.components.log.entries.comp.lstart + 1
-  local max = self.components.log.entries.comp.lend
-
-  line = utils.clamp(line + 1, min, max)
-  pcall(api.nvim_win_set_cursor, self.winid, { line, 0 })
+  pcall(api.nvim_win_set_cursor, self.winid, { self.constrain_cursor(self.winid, 1), 0 })
 end
 
 function FileHistoryPanel:set_entry_fold(entry, open)
