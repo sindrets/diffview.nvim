@@ -46,6 +46,13 @@ FileEntry.winopts = {
   foldlevel = 0,
 }
 
+FileEntry.bufopts = {
+  buftype = "nofile",
+  modifiable = false,
+  swapfile = false,
+  bufhidden = "hide",
+}
+
 ---FileEntry constructor
 ---@param opt table
 ---@return FileEntry
@@ -232,8 +239,9 @@ function FileEntry._get_null_buffer()
   if not (FileEntry._null_buffer and api.nvim_buf_is_loaded(FileEntry._null_buffer)) then
     local bn = api.nvim_create_buf(false, false)
     local bufname = utils.path_join({ "diffview://", "null" })
-    api.nvim_buf_set_option(bn, "modified", false)
-    api.nvim_buf_set_option(bn, "modifiable", false)
+    for option, value in pairs(FileEntry.bufopts) do
+      api.nvim_buf_set_option(bn, option, value)
+    end
 
     local ok = pcall(api.nvim_buf_set_name, bn, bufname)
     if not ok then
@@ -276,8 +284,9 @@ function FileEntry._create_buffer(git_root, rev, path, null)
 
   -- stylua: ignore
   local fullname = utils.path_join({ "diffview://", git_root, ".git", context, path, })
-  api.nvim_buf_set_option(bn, "modified", false)
-  api.nvim_buf_set_option(bn, "modifiable", false)
+  for option, value in pairs(FileEntry.bufopts) do
+    api.nvim_buf_set_option(bn, option, value)
+  end
 
   local ok = pcall(api.nvim_buf_set_name, bn, fullname)
   if not ok then

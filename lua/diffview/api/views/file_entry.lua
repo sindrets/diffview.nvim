@@ -126,8 +126,9 @@ function CFileEntry._create_buffer(git_root, rev, path, lines, null)
 
   -- stylua: ignore
   local fullname = utils.path_join({ "diffview://", git_root, ".git", context, path, })
-  api.nvim_buf_set_option(bn, "modified", false)
-  api.nvim_buf_set_option(bn, "modifiable", false)
+  for option, value in pairs(FileEntry.bufopts) do
+    api.nvim_buf_set_option(bn, option, value)
+  end
 
   local ok = pcall(api.nvim_buf_set_name, bn, fullname)
   if not ok then
