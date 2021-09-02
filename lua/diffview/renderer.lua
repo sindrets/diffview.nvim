@@ -382,7 +382,7 @@ function M.get_file_icon(name, ext, render_data, line_idx, offset)
     end
   end
 
-  local icon, hl = web_devicons.get_icon(name, ext)
+  local icon, hl = web_devicons.get_icon(name, ext, { default = true })
 
   if icon then
     if hl then
