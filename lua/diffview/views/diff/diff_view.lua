@@ -56,11 +56,7 @@ function DiffView:init(opt)
   FileEntry.update_index_stat(self.git_root, self.git_dir)
 end
 
----@Override
-function DiffView:open()
-  vim.cmd("tab split")
-  self.tabpage = api.nvim_get_current_tabpage()
-  self:init_layout()
+function DiffView:post_open()
   self:init_event_listeners()
   vim.schedule(function()
     local file = self:cur_file()

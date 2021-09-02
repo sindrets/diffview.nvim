@@ -6,7 +6,7 @@ local utils = require("diffview.utils")
 local config = require("diffview.config")
 local DiffView = require("diffview.views.diff.diff_view").DiffView
 local FileHistoryView = require("diffview.views.file_history.file_history_view").FileHistoryView
-local a = vim.api
+local api = vim.api
 
 local M = {}
 
@@ -180,10 +180,12 @@ function M.parse_revs(git_root, rev_arg, cached)
   return left, right
 end
 
+---@param view View
 function M.add_view(view)
   table.insert(M.views, view)
 end
 
+---@param view View
 function M.dispose_view(view)
   for j, v in ipairs(M.views) do
     if v == view then
@@ -196,7 +198,7 @@ end
 ---Close and dispose of views that have no tabpage.
 function M.dispose_stray_views()
   local tabpage_map = {}
-  for _, id in ipairs(a.nvim_list_tabpages()) do
+  for _, id in ipairs(api.nvim_list_tabpages()) do
     tabpage_map[id] = true
   end
 
@@ -219,7 +221,7 @@ end
 ---Get the currently open Diffview.
 ---@return View
 function M.get_current_view()
-  local tabpage = a.nvim_get_current_tabpage()
+  local tabpage = api.nvim_get_current_tabpage()
   for _, view in ipairs(M.views) do
     if view.tabpage == tabpage then
       return view
@@ -233,6 +235,30 @@ function M.tabpage_to_view(tabpage)
   for _, view in ipairs(M.views) do
     if view.tabpage == tabpage then
       return view
+    end
+  end
+end
+
+---Get the first tabpage that is not a view. Tries the previous tabpage first.
+---If there are no non-view tabpages: returns nil.
+---@return number|nil
+function M.get_prev_non_view_tabpage()
+  local tabs = api.nvim_list_tabpages()
+  if #tabs > 1 then
+    local seen = {}
+    for _, view in ipairs(M.views) do
+      seen[view.tabpage] = true
+    end
+
+    local prev_tab = utils.tabnr_to_id(vim.fn.tabpagenr("#")) or -1
+    if api.nvim_tabpage_is_valid(prev_tab) and not seen[prev_tab] then
+      return prev_tab
+    else
+      for _, id in ipairs(tabs) do
+        if not seen[id] then
+          return id
+        end
+      end
     end
   end
 end

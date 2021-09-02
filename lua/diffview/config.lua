@@ -36,10 +36,11 @@ M.defaults = {
   key_bindings = {
     disable_defaults = false,
     view = {
-      ["<tab>"]     = cb("select_next_entry"),
-      ["<s-tab>"]   = cb("select_prev_entry"),
-      ["<leader>e"] = cb("focus_files"),
-      ["<leader>b"] = cb("toggle_files"),
+      ["<tab>"]      = cb("select_next_entry"),
+      ["<s-tab>"]    = cb("select_prev_entry"),
+      ["<C-w><C-f>"] = cb("goto_file"),
+      ["<leader>e"]  = cb("focus_files"),
+      ["<leader>b"]  = cb("toggle_files"),
     },
     file_panel = {
       ["j"]             = cb("next_entry"),
@@ -56,6 +57,7 @@ M.defaults = {
       ["R"]             = cb("refresh_files"),
       ["<tab>"]         = cb("select_next_entry"),
       ["<s-tab>"]       = cb("select_prev_entry"),
+      ["<C-w><C-f>"]    = cb("goto_file"),
       ["<leader>e"]     = cb("focus_files"),
       ["<leader>b"]     = cb("toggle_files"),
     },
@@ -73,6 +75,7 @@ M.defaults = {
       ["<2-LeftMouse>"] = cb("select_entry"),
       ["<tab>"]         = cb("select_next_entry"),
       ["<s-tab>"]       = cb("select_prev_entry"),
+      ["<C-w><C-f>"]    = cb("goto_file"),
       ["<leader>e"]     = cb("focus_files"),
       ["<leader>b"]     = cb("toggle_files"),
     },

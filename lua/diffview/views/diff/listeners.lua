@@ -1,5 +1,6 @@
 local utils = require("diffview.utils")
 local git = require("diffview.git.utils")
+local lib = require("diffview.lib")
 local RevType = require("diffview.git.rev").RevType
 local Event = require("diffview.events").Event
 local api = vim.api
@@ -113,6 +114,30 @@ return function(view)
         end
         git.restore_file(view.git_root, file.path, file.kind, commit)
         view:update_files()
+      end
+    end,
+    goto_file = function()
+      local file = view:infer_cur_file()
+      if file then
+        if not file.right.type == RevType.LOCAL then
+          -- Ensure file exists
+          if vim.fn.filereadable(file.absolute_path) ~= 1 then
+            utils.err(string.format(
+              "File does not exist on disk: '%s'",
+              vim.fn.fnamemodify(file.absolute_path, ":.")
+            ))
+            return
+          end
+        end
+
+        local target_tab = lib.get_prev_non_view_tabpage()
+        if target_tab then
+          api.nvim_set_current_tabpage(target_tab)
+          vim.cmd("sp " .. vim.fn.fnameescape(file.absolute_path))
+        else
+          vim.cmd("tab split")
+          vim.cmd("e " .. vim.fn.fnameescape(file.absolute_path))
+        end
       end
     end,
     focus_files = function()
