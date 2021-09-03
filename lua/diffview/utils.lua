@@ -304,6 +304,14 @@ function M.set_local(winids, option, value, opt)
   end
 end
 
+function M.tabnr_to_id(tabnr)
+  for _, id in ipairs(api.nvim_list_tabpages()) do
+    if api.nvim_tabpage_get_number(id) == tabnr then
+      return id
+    end
+  end
+end
+
 ---Create a shallow copy of a portion of a list.
 ---@param t table
 ---@param first integer First index, inclusive

@@ -2,7 +2,6 @@ local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local EventEmitter = require("diffview.events").EventEmitter
 local api = vim.api
-
 local M = {}
 
 ---@class LayoutMode
@@ -21,10 +20,16 @@ local LayoutMode = oop.enum({
 ---@field layout_mode LayoutMode
 ---@field ready boolean
 ---@field init_layout function Abstract
+---@field post_open function Abstract
 ---@field validate_layout function Abstract
 ---@field recover_layout function Abstract
 local View = oop.Object
 View = oop.create_class("View")
+
+View:virtual("init_layout")
+View:virtual("post_open")
+View:virtual("validate_layout")
+View:virtual("recover_layout")
 
 ---View constructor
 ---@return View
@@ -38,7 +43,7 @@ function View:open()
   vim.cmd("tab split")
   self.tabpage = api.nvim_get_current_tabpage()
   self:init_layout()
-  self.ready = true
+  self:post_open()
 end
 
 function View:close()
@@ -51,10 +56,6 @@ end
 function View:is_cur_tabpage()
   return self.tabpage == api.nvim_get_current_tabpage()
 end
-
-View:virtual("init_layout")
-View:virtual("validate_layout")
-View:virtual("recover_layout")
 
 ---Ensure both left and right windows exist in the view's tabpage.
 function View:ensure_layout()

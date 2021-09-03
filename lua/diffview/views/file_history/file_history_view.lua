@@ -33,11 +33,7 @@ function FileHistoryView:init(opt)
   self.panel = FileHistoryPanel(self.git_root, self.entries, self.path_args, opt.log_options)
 end
 
----@Override
-function FileHistoryView:open()
-  vim.cmd("tab split")
-  self.tabpage = api.nvim_get_current_tabpage()
-  self:init_layout()
+function FileHistoryView:post_open()
   self:init_event_listeners()
   vim.schedule(function()
     local file = self.panel:next_file()

@@ -18,7 +18,7 @@ StandardView = oop.create_class("StandardView", View)
 ---StandardView constructor
 ---@return StandardView
 function StandardView:init()
-  self.super:init()
+ StandardView:super().init(self)
   self.nulled = false
   self.panel = Panel()
 end

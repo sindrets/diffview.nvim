@@ -62,10 +62,13 @@ Example configuration with default settings:
         -- The `view` bindings are active in the diff buffers, only when the current
         -- tabpage is a Diffview.
         view = {
-          ["<tab>"]     = cb("select_next_entry"),  -- Open the diff for the next file 
-          ["<s-tab>"]   = cb("select_prev_entry"),  -- Open the diff for the previous file
-          ["<leader>e"] = cb("focus_files"),        -- Bring focus to the files panel
-          ["<leader>b"] = cb("toggle_files"),       -- Toggle the files panel.
+          ["<tab>"]      = cb("select_next_entry"),  -- Open the diff for the next file 
+          ["<s-tab>"]    = cb("select_prev_entry"),  -- Open the diff for the previous file
+          ["gf"]         = cb("goto_file"),          -- Open the file in a new split in previous tabpage
+          ["<C-w><C-f>"] = cb("goto_file_split"),    -- Open the file in a new split
+          ["<C-w>gf"]    = cb("goto_file_tab"),      -- Open the file in a new tabpage
+          ["<leader>e"]  = cb("focus_files"),        -- Bring focus to the files panel
+          ["<leader>b"]  = cb("toggle_files"),       -- Toggle the files panel.
         },
         file_panel = {
           ["j"]             = cb("next_entry"),         -- Bring the cursor to the next file entry
@@ -82,6 +85,9 @@ Example configuration with default settings:
           ["R"]             = cb("refresh_files"),      -- Update stats and entries in the file list.
           ["<tab>"]         = cb("select_next_entry"),
           ["<s-tab>"]       = cb("select_prev_entry"),
+          ["gf"]            = cb("goto_file"),
+          ["<C-w><C-f>"]    = cb("goto_file_split"),
+          ["<C-w>gf"]       = cb("goto_file_tab"),
           ["<leader>e"]     = cb("focus_files"),
           ["<leader>b"]     = cb("toggle_files"),
         },
@@ -99,6 +105,9 @@ Example configuration with default settings:
           ["<2-LeftMouse>"] = cb("select_entry"),
           ["<tab>"]         = cb("select_next_entry"),
           ["<s-tab>"]       = cb("select_prev_entry"),
+          ["gf"]            = cb("goto_file"),
+          ["<C-w><C-f>"]    = cb("goto_file_split"),
+          ["<C-w>gf"]       = cb("goto_file_tab"),
           ["<leader>e"]     = cb("focus_files"),
           ["<leader>b"]     = cb("toggle_files"),
         },
@@ -181,7 +190,7 @@ COMMANDS                                            *diffview-nvim-commands*
 :DiffviewRefresh        Update stats and entries in the file list of the
                         current Diffview.
 
-MAPS                                                    *diffview-nvim-maps*
+MAPS                                                      *diffview-nvim-maps*
 
 All listed maps are the defaults, but all mappings can be configured. Most of
 the file panel mappings should also work from the view if they are added to
@@ -191,6 +200,17 @@ really make sense specifically in the file panel, such as `next_entry`,
 `restore_entry` work just fine from the view. When invoked from the view,
 these will target the file currently open in the view rather than the file
 under the cursor in the file panel.
+
+                                                 *diffview-nvim-file-inference*
+File inference~
+
+Mappings that target a file will infer the target file according to a set of
+simple rules:
+
+        - If the cursor is in one of the diff buffers, the target file will be the
+          file being compared.
+        - If the cursor is in a file panel, the target file will be determined by
+          the entry under the cursor.
 
                                                       *diffview-nvim-maps-view*
 View maps~
@@ -203,6 +223,24 @@ tabpage.
 
                                          *diffview-nvim-maps-select_prev_entry*
 <S-Tab>                 Open the diff for the previous file.
+
+                                                *diffview-nvim-maps-goto_file*
+gf                      Open the local version of the file in a new split in a
+                        different tabpage. This will target your previous
+                        (last accessed) tabpage first. If you have no
+                        non-diffview tabpages open, the file will open in a
+                        new tabpage. See |diffview-nvim-file-inference| for
+                        details on how the file target is determined.
+
+                                          *diffview-nvim-maps-goto_file_split*
+<C-w><C-f>              Open the local version of the file in a new split. See
+                        |diffview-nvim-file-inference| for details on how the
+                        file target is determined.
+
+                                            *diffview-nvim-maps-goto_file_tab*
+<C-w>gf                 Open the local version of the file in a new tabpage.
+                        See |diffview-nvim-file-inference| for details on how
+                        the file target is determined.
 
                                               *diffview-nvim-maps-toggle_files*
 <leader>b               Toggle the file panel.
@@ -251,6 +289,8 @@ R                       Update the stats and entries in the file list.
 
 <S-Tab>                 Open the diff for the previous file.
 
+<C-w><C-f>              Open the file in a new split in a different tabpage.
+
 <leader>b               Toggle the file panel.
 
 <leader>e               Bring focus to the file panel.
@@ -288,6 +328,8 @@ o                       Open the diff for the selected item.
 <Tab>                   Open the diff for the next item.
 
 <S-Tab>                 Open the diff for the previous item.
+
+<C-w><C-f>              Open the file in a new split in a different tabpage.
 
 <leader>b               Toggle the file history panel.
 
