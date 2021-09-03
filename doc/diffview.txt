@@ -64,7 +64,9 @@ Example configuration with default settings:
         view = {
           ["<tab>"]      = cb("select_next_entry"),  -- Open the diff for the next file 
           ["<s-tab>"]    = cb("select_prev_entry"),  -- Open the diff for the previous file
-          ["<C-w><C-f>"] = cb("goto_file"),          -- Open the file in a new split in another tabpage
+          ["gf"]         = cb("goto_file"),          -- Open the file in a new split in previous tabpage
+          ["<C-w><C-f>"] = cb("goto_file_split"),    -- Open the file in a new split
+          ["<C-w>gf"]    = cb("goto_file_tab"),      -- Open the file in a new tabpage
           ["<leader>e"]  = cb("focus_files"),        -- Bring focus to the files panel
           ["<leader>b"]  = cb("toggle_files"),       -- Toggle the files panel.
         },
@@ -83,7 +85,9 @@ Example configuration with default settings:
           ["R"]             = cb("refresh_files"),      -- Update stats and entries in the file list.
           ["<tab>"]         = cb("select_next_entry"),
           ["<s-tab>"]       = cb("select_prev_entry"),
-          ["<C-w><C-f>"]    = cb("goto_file"),
+          ["gf"]            = cb("goto_file"),
+          ["<C-w><C-f>"]    = cb("goto_file_split"),
+          ["<C-w>gf"]       = cb("goto_file_tab"),
           ["<leader>e"]     = cb("focus_files"),
           ["<leader>b"]     = cb("toggle_files"),
         },
@@ -101,7 +105,9 @@ Example configuration with default settings:
           ["<2-LeftMouse>"] = cb("select_entry"),
           ["<tab>"]         = cb("select_next_entry"),
           ["<s-tab>"]       = cb("select_prev_entry"),
-          ["<C-w><C-f>"]    = cb("goto_file"),
+          ["gf"]            = cb("goto_file"),
+          ["<C-w><C-f>"]    = cb("goto_file_split"),
+          ["<C-w>gf"]       = cb("goto_file_tab"),
           ["<leader>e"]     = cb("focus_files"),
           ["<leader>b"]     = cb("toggle_files"),
         },
@@ -219,12 +225,22 @@ tabpage.
 <S-Tab>                 Open the diff for the previous file.
 
                                                 *diffview-nvim-maps-goto_file*
-<C-w><C-f>              Open the file in a new split in a different tabpage.
-                        This will target your previous tabpage first. If your
-                        previous tabpage was a Diffview, or you have only one
-                        tabpage open, the file will open in a new tabpage. See
+gf                      Open the local version of the file in a new split in a
+                        different tabpage. This will target your previous
+                        (last accessed) tabpage first. If you have no
+                        non-diffview tabpages open, the file will open in a
+                        new tabpage. See |diffview-nvim-file-inference| for
+                        details on how the file target is determined.
+
+                                          *diffview-nvim-maps-goto_file_split*
+<C-w><C-f>              Open the local version of the file in a new split. See
                         |diffview-nvim-file-inference| for details on how the
                         file target is determined.
+
+                                            *diffview-nvim-maps-goto_file_tab*
+<C-w>gf                 Open the local version of the file in a new tabpage.
+                        See |diffview-nvim-file-inference| for details on how
+                        the file target is determined.
 
                                               *diffview-nvim-maps-toggle_files*
 <leader>b               Toggle the file panel.
