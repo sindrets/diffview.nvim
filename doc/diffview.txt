@@ -39,6 +39,10 @@ Example configuration with default settings:
     require'diffview'.setup {
       diff_binaries = false,    -- Show diffs for binaries
       use_icons = true          -- Requires nvim-web-devicons
+      signs = {
+        fold_closed = "",
+        fold_open = "",
+      },
       file_panel = {
         position = "left",      -- One of 'left', 'right', 'top', 'bottom'
         width = 35,             -- Only applies when position is 'left' or 'right'

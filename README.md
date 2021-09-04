@@ -42,6 +42,10 @@ local cb = require'diffview.config'.diffview_callback
 require'diffview'.setup {
   diff_binaries = false,    -- Show diffs for binaries
   use_icons = true          -- Requires nvim-web-devicons
+  signs = {
+    fold_closed = "",
+    fold_open = "",
+  },
   file_panel = {
     position = "left",      -- One of 'left', 'right', 'top', 'bottom'
     width = 35,             -- Only applies when position is 'left' or 'right'
@@ -139,7 +143,8 @@ rather than the file under the cursor in the file panel.
 ![file-history-multi](https://user-images.githubusercontent.com/2786478/131269782-f4184640-6d73-4226-b425-feccb5002dd0.png)
 
 The file history view allows you to list all the commits that changed a given
-file or directory, and view the changes made in a diff split.
+file or directory, and view the changes made in a diff split. Open a file
+history view for your current file by calling `:DiffviewFileHistory`.
 
 ## Usage
 
@@ -154,6 +159,7 @@ for that rev. Examples:
 - `:DiffviewOpen HEAD~4..HEAD~2`
 - `:DiffviewOpen d4a7b0d`
 - `:DiffviewOpen d4a7b0d..519b30e`
+- `:DiffviewOpen origin/main...HEAD`
 
 You can also provide additional paths to narrow down what files are shown:
 
@@ -176,7 +182,9 @@ files with `<tab>` and `<s-tab>` (see configuration to change the key bindings).
 
 Opens a new file history view that lists all commits that changed a given file
 or directory. If no `[paths]` are given, defaults to the current file. Multiple
-`[paths]` may be provided.
+`[paths]` may be provided. If you want to view the file history for all changed
+files for every commit, simply call `:DiffviewFileHistory .` (assuming your cwd
+is the top level of the git repository).
 
 ## Tips
 
