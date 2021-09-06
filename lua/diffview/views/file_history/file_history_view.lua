@@ -70,6 +70,7 @@ function FileHistoryView:next_item()
     cur = self.panel:next_file()
     if cur then
       cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
+      self:update_windows()
       self.panel:highlight_item(cur)
       self.nulled = false
 
@@ -93,6 +94,7 @@ function FileHistoryView:prev_item()
     cur = self.panel:prev_file()
     if cur then
       cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
+      self:update_windows()
       self.panel:highlight_item(cur)
       self.nulled = false
 
@@ -115,6 +117,7 @@ function FileHistoryView:set_file(file, focus)
     end
     vim.cmd("diffoff!")
     file:load_buffers(self.git_root, self.left_winid, self.right_winid)
+    self:update_windows()
     self.panel.cur_item = { entry, file }
     self.panel:highlight_item(file)
     self.nulled = false
