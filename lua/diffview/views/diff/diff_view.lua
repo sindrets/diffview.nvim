@@ -38,6 +38,7 @@ function DiffView:init(opt)
   self.layout_mode = DiffView.get_layout_mode()
   self.ready = false
   self.nulled = false
+  self.winopts = { left = {}, right = {} }
   self.git_root = opt.git_root
   self.git_dir = git.git_dir(opt.git_root)
   self.rev_arg = opt.rev_arg
@@ -101,6 +102,7 @@ function DiffView:next_file()
     vim.cmd("diffoff!")
     cur = self.files[self.file_idx]
     cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
+    self:update_windows()
     self.panel:highlight_file(self:cur_file())
     self.nulled = false
 
@@ -123,6 +125,7 @@ function DiffView:prev_file()
     vim.cmd("diffoff!")
     cur = self.files[self.file_idx]
     cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
+    self:update_windows()
     self.panel:highlight_file(self:cur_file())
     self.nulled = false
 
@@ -145,6 +148,7 @@ function DiffView:set_file(file, focus)
       self.file_idx = i
       vim.cmd("diffoff!")
       self.files[self.file_idx]:load_buffers(self.git_root, self.left_winid, self.right_winid)
+      self:update_windows()
       self.panel:highlight_file(self:cur_file())
       self.nulled = false
 
@@ -281,12 +285,14 @@ function DiffView:recover_layout(state)
     vim.cmd("aboveleft " .. split_cmd)
     self.left_winid = api.nvim_get_current_win()
     self.panel:open()
+    self:post_layout()
     self:set_file(self:cur_file())
   elseif not state.right_win then
     api.nvim_set_current_win(self.left_winid)
     vim.cmd("belowright " .. split_cmd)
     self.right_winid = api.nvim_get_current_win()
     self.panel:open()
+    self:post_layout()
     self:set_file(self:cur_file())
   end
 

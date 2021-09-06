@@ -25,6 +25,7 @@ function FileHistoryView:init(opt)
   self.layout_mode = FileHistoryView.get_layout_mode()
   self.ready = false
   self.nulled = false
+  self.winopts = { left = {}, right = {} }
   self.git_root = opt.git_root
   self.git_dir = git.git_dir(self.git_root)
   self.path_args = opt.path_args
@@ -150,12 +151,14 @@ function FileHistoryView:recover_layout(state)
     vim.cmd("aboveleft " .. split_cmd)
     self.left_winid = api.nvim_get_current_win()
     self.panel:open()
+    self:post_layout()
     self:set_file(self.panel.cur_item[2])
   elseif not state.right_win then
     api.nvim_set_current_win(self.left_winid)
     vim.cmd("belowright " .. split_cmd)
     self.right_winid = api.nvim_get_current_win()
     self.panel:open()
+    self:post_layout()
     self:set_file(self.panel.cur_item[2])
   end
 

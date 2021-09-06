@@ -413,6 +413,12 @@ function M.tbl_indexof(t, v)
   return -1
 end
 
+function M.tbl_clear(t)
+  for k, _ in pairs(t) do
+    t[k] = nil
+  end
+end
+
 function M.find_named_buffer(name)
   for _, v in ipairs(api.nvim_list_bufs()) do
     if vim.fn.bufname(v) == name then

@@ -1,4 +1,6 @@
 local oop = require("diffview.oop")
+local utils = require("diffview.utils")
+local config = require("diffview.config")
 local FileEntry = require("diffview.views.file_entry").FileEntry
 local View = require("diffview.views.view").View
 local LayoutMode = require("diffview.views.view").LayoutMode
@@ -9,6 +11,7 @@ local M = {}
 
 ---@class StandardView
 ---@field panel Panel
+---@field winopts table
 ---@field left_winid integer
 ---@field right_winid integer
 ---@field nulled boolean
@@ -21,6 +24,7 @@ function StandardView:init()
  StandardView:super().init(self)
   self.nulled = false
   self.panel = Panel()
+  self.winopts = { left = {}, right = {} }
 end
 
 ---@Override
@@ -42,6 +46,34 @@ function StandardView:init_layout()
   self.right_winid = api.nvim_get_current_win()
   FileEntry.load_null_buffer(self.right_winid)
   self.panel:open()
+  self:post_layout()
+end
+
+function StandardView:post_layout()
+  if config.get_config().enhanced_diff_hl then
+    local curhl = vim.wo[self.left_winid].winhl
+    self.winopts.left.winhl = table.concat({
+        "DiffAdd:DiffviewDiffAddAsDelete",
+        "DiffDelete:DiffviewDiffDelete",
+        curhl ~= "" and curhl or nil
+      }, ",")
+
+    curhl = vim.wo[self.right_winid].winhl
+    self.winopts.right.winhl = table.concat({
+        "DiffDelete:DiffviewDiffDelete",
+        curhl ~= "" and curhl or nil
+      }, ",")
+  end
+end
+
+function StandardView:update_windows()
+  for k, v in pairs(self.winopts.left) do
+    utils.set_local(self.left_winid, k, v)
+  end
+
+  for k, v in pairs(self.winopts.right) do
+    utils.set_local(self.right_winid, k, v)
+  end
 end
 
 ---@Override
@@ -88,11 +120,13 @@ function StandardView:recover_layout(state)
     vim.cmd("aboveleft " .. split_cmd)
     self.left_winid = api.nvim_get_current_win()
     self.panel:open()
+    self:post_layout()
   elseif not state.right_win then
     api.nvim_set_current_win(self.left_winid)
     vim.cmd("belowright " .. split_cmd)
     self.right_winid = api.nvim_get_current_win()
     self.panel:open()
+    self:post_layout()
   end
 
   self.ready = true
