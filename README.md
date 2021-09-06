@@ -41,7 +41,7 @@ local cb = require'diffview.config'.diffview_callback
 
 require'diffview'.setup {
   diff_binaries = false,    -- Show diffs for binaries
-  use_icons = true          -- Requires nvim-web-devicons
+  use_icons = true,         -- Requires nvim-web-devicons
   signs = {
     fold_closed = "",
     fold_open = "",
