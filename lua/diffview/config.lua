@@ -11,6 +11,7 @@ local cb = M.diffview_callback
 M.defaults = {
   diff_binaries = false,
   use_icons = true,
+  enhanced_diff_hl = false,
   signs = {
     fold_closed = "",
     fold_open = "",

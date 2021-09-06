@@ -79,7 +79,17 @@ M.hl_links = {
   StatusIgnored = "Comment",
 }
 
+function M.update_diff_hl()
+  local fg = M.get_fg("DiffDelete") or "NONE"
+  local bg = M.get_bg("DiffDelete") or "red"
+  local gui = M.get_gui("DiffDelete") or "NONE"
+  vim.cmd(string.format("hi def DiffviewDiffAddAsDelete guifg=%s guibg=%s gui=%s", fg, bg, gui))
+  vim.cmd("hi def link DiffviewDiffDelete Comment")
+end
+
 function M.setup()
+  M.update_diff_hl()
+
   for name, v in pairs(M.get_hl_groups()) do
     local fg = v.fg and " guifg=" .. v.fg or ""
     local bg = v.bg and " guibg=" .. v.bg or ""

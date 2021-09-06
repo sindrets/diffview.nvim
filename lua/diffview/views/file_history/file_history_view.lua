@@ -25,6 +25,7 @@ function FileHistoryView:init(opt)
   self.layout_mode = FileHistoryView.get_layout_mode()
   self.ready = false
   self.nulled = false
+  self.winopts = { left = {}, right = {} }
   self.git_root = opt.git_root
   self.git_dir = git.git_dir(self.git_root)
   self.path_args = opt.path_args
@@ -69,6 +70,7 @@ function FileHistoryView:next_item()
     cur = self.panel:next_file()
     if cur then
       cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
+      self:update_windows()
       self.panel:highlight_item(cur)
       self.nulled = false
 
@@ -92,6 +94,7 @@ function FileHistoryView:prev_item()
     cur = self.panel:prev_file()
     if cur then
       cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
+      self:update_windows()
       self.panel:highlight_item(cur)
       self.nulled = false
 
@@ -114,6 +117,7 @@ function FileHistoryView:set_file(file, focus)
     end
     vim.cmd("diffoff!")
     file:load_buffers(self.git_root, self.left_winid, self.right_winid)
+    self:update_windows()
     self.panel.cur_item = { entry, file }
     self.panel:highlight_item(file)
     self.nulled = false
@@ -150,12 +154,14 @@ function FileHistoryView:recover_layout(state)
     vim.cmd("aboveleft " .. split_cmd)
     self.left_winid = api.nvim_get_current_win()
     self.panel:open()
+    self:post_layout()
     self:set_file(self.panel.cur_item[2])
   elseif not state.right_win then
     api.nvim_set_current_win(self.left_winid)
     vim.cmd("belowright " .. split_cmd)
     self.right_winid = api.nvim_get_current_win()
     self.panel:open()
+    self:post_layout()
     self:set_file(self.panel.cur_item[2])
   end
 
