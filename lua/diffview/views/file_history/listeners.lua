@@ -95,6 +95,23 @@ return function(view)
           -- print(vim.inspect(item))
           if item.files then
             if view.panel.single_file then
+              view:set_file(item.files[1], false)
+            else
+              view.panel:toggle_entry_fold(item)
+            end
+          else
+            view:set_file(item, false)
+          end
+        end
+      end
+    end,
+    focus_entry = function()
+      if view.panel:is_cur_win() then
+        local item = view.panel:get_item_at_cursor()
+        if item then
+          -- print(vim.inspect(item))
+          if item.files then
+            if view.panel.single_file then
               view:set_file(item.files[1], true)
             else
               view.panel:toggle_entry_fold(item)
