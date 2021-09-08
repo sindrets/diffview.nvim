@@ -65,6 +65,14 @@ return function(view)
       if view.panel:is_open() then
         local file = view.panel:get_file_at_cursor()
         if file then
+          view:set_file(file, false)
+        end
+      end
+    end,
+    focus_entry = function()
+      if view.panel:is_open() then
+        local file = view.panel:get_file_at_cursor()
+        if file then
           view:set_file(file, true)
         end
       end

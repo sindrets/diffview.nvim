@@ -24,7 +24,7 @@ for any git rev.
 Install the plugin with your package manager of choice.
 
 ```vim
-" Plug 
+" Plug
 Plug 'sindrets/diffview.nvim'
 ```
 
@@ -70,7 +70,7 @@ require'diffview'.setup {
     -- The `view` bindings are active in the diff buffers, only when the current
     -- tabpage is a Diffview.
     view = {
-      ["<tab>"]      = cb("select_next_entry"),  -- Open the diff for the next file 
+      ["<tab>"]      = cb("select_next_entry"),  -- Open the diff for the next file
       ["<s-tab>"]    = cb("select_prev_entry"),  -- Open the diff for the previous file
       ["gf"]         = cb("goto_file"),          -- Open the file in a new split in previous tabpage
       ["<C-w><C-f>"] = cb("goto_file_split"),    -- Open the file in a new split
@@ -138,6 +138,15 @@ that only really make sense specifically in the file panel, such as
 `toggle_stage_entry` and `restore_entry` work just fine from the view. When
 invoked from the view, these will target the file currently open in the view
 rather than the file under the cursor in the file panel.
+
+### Available Unused Mappings
+
+This section documents key-mappable functions that are not mapped by default.
+
+- `focus_entry`
+  - Like `select_entry`, but open the diff for the selected entry while
+    focusing cursor on the current file. Available in both the file panel and
+    the history panel.
 
 ## File History
 
