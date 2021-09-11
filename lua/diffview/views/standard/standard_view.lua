@@ -1,4 +1,6 @@
 local oop = require("diffview.oop")
+local utils = require("diffview.utils")
+local config = require("diffview.config")
 local FileEntry = require("diffview.views.file_entry").FileEntry
 local View = require("diffview.views.view").View
 local LayoutMode = require("diffview.views.view").LayoutMode
@@ -7,14 +9,9 @@ local api = vim.api
 
 local M = {}
 
-local win_reset_opts = {
-  diff = false,
-  cursorbind = false,
-  scrollbind = false,
-}
-
 ---@class StandardView
 ---@field panel Panel
+---@field winopts table
 ---@field left_winid integer
 ---@field right_winid integer
 ---@field nulled boolean
@@ -24,9 +21,10 @@ StandardView = oop.create_class("StandardView", View)
 ---StandardView constructor
 ---@return StandardView
 function StandardView:init()
-  self.super:init()
+ StandardView:super().init(self)
   self.nulled = false
   self.panel = Panel()
+  self.winopts = { left = {}, right = {} }
 end
 
 ---@Override
@@ -48,6 +46,34 @@ function StandardView:init_layout()
   self.right_winid = api.nvim_get_current_win()
   FileEntry.load_null_buffer(self.right_winid)
   self.panel:open()
+  self:post_layout()
+end
+
+function StandardView:post_layout()
+  if config.get_config().enhanced_diff_hl then
+    local curhl = vim.wo[self.left_winid].winhl
+    self.winopts.left.winhl = table.concat({
+        "DiffAdd:DiffviewDiffAddAsDelete",
+        "DiffDelete:DiffviewDiffDelete",
+        curhl ~= "" and curhl or nil
+      }, ",")
+
+    curhl = vim.wo[self.right_winid].winhl
+    self.winopts.right.winhl = table.concat({
+        "DiffDelete:DiffviewDiffDelete",
+        curhl ~= "" and curhl or nil
+      }, ",")
+  end
+end
+
+function StandardView:update_windows()
+  for k, v in pairs(self.winopts.left) do
+    utils.set_local(self.left_winid, k, v)
+  end
+
+  for k, v in pairs(self.winopts.right) do
+    utils.set_local(self.right_winid, k, v)
+  end
 end
 
 ---@Override
@@ -94,11 +120,13 @@ function StandardView:recover_layout(state)
     vim.cmd("aboveleft " .. split_cmd)
     self.left_winid = api.nvim_get_current_win()
     self.panel:open()
+    self:post_layout()
   elseif not state.right_win then
     api.nvim_set_current_win(self.left_winid)
     vim.cmd("belowright " .. split_cmd)
     self.right_winid = api.nvim_get_current_win()
     self.panel:open()
+    self:post_layout()
   end
 
   self.ready = true
@@ -110,18 +138,6 @@ function StandardView:ensure_layout()
   local state = self:validate_layout()
   if not state.valid then
     self:recover_layout(state)
-  end
-end
-
----Disable unwanted options in all windows not part of the view.
-function StandardView:fix_foreign_windows()
-  local win_ids = api.nvim_tabpage_list_wins(self.tabpage)
-  for _, id in ipairs(win_ids) do
-    if not (id == self.panel.winid or id == self.left_winid or id == self.right_winid) then
-      for k, v in pairs(win_reset_opts) do
-        api.nvim_win_set_option(id, k, v)
-      end
-    end
   end
 end
 

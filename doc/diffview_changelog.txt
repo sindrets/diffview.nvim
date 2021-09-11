@@ -1,0 +1,24 @@
+================================================================================
+                                                          *diffview.changelog*
+
+# Changelog
+
+                                                       *diffview.changelog-64*
+
+PR: https://github.com/sindrets/diffview.nvim/pull/64
+
+This PR introduces some small breaking changes in the config, and for plugins
+integrating diffview.nvim.
+
+The `use_icons` config table key has been moved out of the `file_panel` table.
+This has been done because `use_icons` now applies to other contexts than just
+the file panel. The correct way to configure this now is to set `use_icons`
+somewhere from the top level of the config table.
+
+For plugins integrating diffview.nvim:
+Several of the git utilities have been refactored into their own namespace
+(`lua/diffview/git/`). I (STS) felt this was necessary due to the growing
+scope of the plugin. Most notably this means that the `Rev` class now resides
+in `lua/diffview/git/rev.lua`.
+
+ vim:tw=78:ts=8:ft=help:norl:

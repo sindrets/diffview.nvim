@@ -1,23 +1,25 @@
-local Rev = require("diffview.rev").Rev
-local RevType = require("diffview.rev").RevType
+local Rev = require("diffview.git.rev").Rev
+local RevType = require("diffview.git.rev").RevType
 local arg_parser = require("diffview.arg_parser")
-local git = require("diffview.git")
+local git = require("diffview.git.utils")
 local utils = require("diffview.utils")
+local config = require("diffview.config")
 local DiffView = require("diffview.views.diff.diff_view").DiffView
-local a = vim.api
+local FileHistoryView = require("diffview.views.file_history.file_history_view").FileHistoryView
+local api = vim.api
 
 local M = {}
 
 ---@type View[]
 M.views = {}
 
-function M.process_args(args)
+function M.diffview_open(args)
   local argo = arg_parser.parse(args)
   local rev_arg = argo.args[1]
   local paths = {}
 
   for _, path in ipairs(argo.post_args) do
-    table.insert(paths, path)
+    table.insert(paths, vim.fn.expand(path))
   end
 
   local fpath = (
@@ -34,7 +36,9 @@ function M.process_args(args)
 
   local git_root = git.toplevel(p)
   if not git_root then
-    utils.err("Path not a git repo (or any parent): '" .. p .. "'")
+    utils.err(
+      string.format("Path not a git repo (or any parent): '%s'", vim.fn.fnamemodify(p, ":."))
+    )
     return
   end
 
@@ -59,6 +63,57 @@ function M.process_args(args)
     right = right,
     options = options,
   })
+
+  table.insert(M.views, v)
+
+  return v
+end
+
+function M.file_history(args)
+  local argo = arg_parser.parse(args)
+  local paths = {}
+
+  for _, path in ipairs(argo.args) do
+    table.insert(paths, vim.fn.expand(path))
+  end
+
+  if #paths == 0 then
+    if vim.bo.buftype == "" then
+      table.insert(paths, vim.fn.expand("%"))
+    else
+      utils.err("No target!")
+      return
+    end
+  end
+
+  local p
+  if vim.fn.filereadable(paths[1]) then
+    p = vim.fn.isdirectory(paths[1]) ~= 1 and vim.fn.fnamemodify(paths[1], ":h") or paths[1]
+  elseif vim.bo.buftype == "" and vim.fn.filereadable(vim.fn.expand("%")) then
+    p = vim.fn.expand("%:p:h")
+  else
+    p = "."
+  end
+
+  local git_root = git.toplevel(p)
+  if not git_root then
+    utils.err(
+      string.format("Path not a git repo (or any parent): '%s'", vim.fn.fnamemodify(paths[1], ":."))
+    )
+    return
+  end
+
+  ---@type FileHistoryView
+  local v = FileHistoryView({
+    git_root = git_root,
+    path_args = paths,
+    log_options = config.get_config().file_history_panel.log_options,
+  })
+
+  if #v.entries == 0 then
+    utils.info(string.format("Target has no git history: '%s'", table.concat(paths)))
+    return
+  end
 
   table.insert(M.views, v)
 
@@ -125,10 +180,12 @@ function M.parse_revs(git_root, rev_arg, cached)
   return left, right
 end
 
+---@param view View
 function M.add_view(view)
   table.insert(M.views, view)
 end
 
+---@param view View
 function M.dispose_view(view)
   for j, v in ipairs(M.views) do
     if v == view then
@@ -141,7 +198,7 @@ end
 ---Close and dispose of views that have no tabpage.
 function M.dispose_stray_views()
   local tabpage_map = {}
-  for _, id in ipairs(a.nvim_list_tabpages()) do
+  for _, id in ipairs(api.nvim_list_tabpages()) do
     tabpage_map[id] = true
   end
 
@@ -164,7 +221,7 @@ end
 ---Get the currently open Diffview.
 ---@return View
 function M.get_current_view()
-  local tabpage = a.nvim_get_current_tabpage()
+  local tabpage = api.nvim_get_current_tabpage()
   for _, view in ipairs(M.views) do
     if view.tabpage == tabpage then
       return view
@@ -178,6 +235,30 @@ function M.tabpage_to_view(tabpage)
   for _, view in ipairs(M.views) do
     if view.tabpage == tabpage then
       return view
+    end
+  end
+end
+
+---Get the first tabpage that is not a view. Tries the previous tabpage first.
+---If there are no non-view tabpages: returns nil.
+---@return number|nil
+function M.get_prev_non_view_tabpage()
+  local tabs = api.nvim_list_tabpages()
+  if #tabs > 1 then
+    local seen = {}
+    for _, view in ipairs(M.views) do
+      seen[view.tabpage] = true
+    end
+
+    local prev_tab = utils.tabnr_to_id(vim.fn.tabpagenr("#")) or -1
+    if api.nvim_tabpage_is_valid(prev_tab) and not seen[prev_tab] then
+      return prev_tab
+    else
+      for _, id in ipairs(tabs) do
+        if not seen[id] then
+          return id
+        end
+      end
     end
   end
 end

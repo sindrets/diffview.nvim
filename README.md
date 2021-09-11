@@ -3,7 +3,8 @@
 Single tabpage interface for easily cycling through diffs for all modified files
 for any git rev.
 
-![preview](.github/media/screenshot_2.png)
+![preview](https://user-images.githubusercontent.com/2786478/131269942-e34100dd-cbb9-48fe-af31-6e518ce06e9e.png)
+
 
 ## Introduction
 
@@ -23,7 +24,7 @@ for any git rev.
 Install the plugin with your package manager of choice.
 
 ```vim
-" Plug 
+" Plug
 Plug 'sindrets/diffview.nvim'
 ```
 
@@ -40,21 +41,42 @@ local cb = require'diffview.config'.diffview_callback
 
 require'diffview'.setup {
   diff_binaries = false,    -- Show diffs for binaries
+  use_icons = true,         -- Requires nvim-web-devicons
+  enhanced_diff_hl = false, -- See ':h diffview-config-enhanced_diff_hl'
+  signs = {
+    fold_closed = "",
+    fold_open = "",
+  },
   file_panel = {
     position = "left",      -- One of 'left', 'right', 'top', 'bottom'
     width = 35,             -- Only applies when position is 'left' or 'right'
     height = 10,            -- Only applies when position is 'top' or 'bottom'
-    use_icons = true        -- Requires nvim-web-devicons
+  },
+  file_history_panel = {
+    position = "bottom",
+    width = 35,
+    height = 16,
+    log_options = {
+      max_count = 256,      -- Limit the number of commits
+      follow = false,       -- Follow renames (only for single file)
+      all = false,          -- Include all refs under 'refs/' including HEAD
+      merges = false,       -- List only merge commits
+      no_merges = false,    -- List no merge commits
+      reverse = false,      -- List commits in reverse order
+    },
   },
   key_bindings = {
     disable_defaults = false,                   -- Disable the default key bindings
     -- The `view` bindings are active in the diff buffers, only when the current
     -- tabpage is a Diffview.
     view = {
-      ["<tab>"]     = cb("select_next_entry"),  -- Open the diff for the next file 
-      ["<s-tab>"]   = cb("select_prev_entry"),  -- Open the diff for the previous file
-      ["<leader>e"] = cb("focus_files"),        -- Bring focus to the files panel
-      ["<leader>b"] = cb("toggle_files"),       -- Toggle the files panel.
+      ["<tab>"]      = cb("select_next_entry"),  -- Open the diff for the next file
+      ["<s-tab>"]    = cb("select_prev_entry"),  -- Open the diff for the previous file
+      ["gf"]         = cb("goto_file"),          -- Open the file in a new split in previous tabpage
+      ["<C-w><C-f>"] = cb("goto_file_split"),    -- Open the file in a new split
+      ["<C-w>gf"]    = cb("goto_file_tab"),      -- Open the file in a new tabpage
+      ["<leader>e"]  = cb("focus_files"),        -- Bring focus to the files panel
+      ["<leader>b"]  = cb("toggle_files"),       -- Toggle the files panel.
     },
     file_panel = {
       ["j"]             = cb("next_entry"),         -- Bring the cursor to the next file entry
@@ -71,10 +93,37 @@ require'diffview'.setup {
       ["R"]             = cb("refresh_files"),      -- Update stats and entries in the file list.
       ["<tab>"]         = cb("select_next_entry"),
       ["<s-tab>"]       = cb("select_prev_entry"),
+      ["gf"]            = cb("goto_file"),
+      ["<C-w><C-f>"]    = cb("goto_file_split"),
+      ["<C-w>gf"]       = cb("goto_file_tab"),
       ["<leader>e"]     = cb("focus_files"),
       ["<leader>b"]     = cb("toggle_files"),
-    }
-  }
+    },
+    file_history_panel = {
+      ["g!"]            = cb("options"),            -- Open the option panel
+      ["<C-d>"]         = cb("open_in_diffview"),   -- Open the entry under the cursor in a diffview
+      ["zR"]            = cb("open_all_folds"),
+      ["zM"]            = cb("close_all_folds"),
+      ["j"]             = cb("next_entry"),
+      ["<down>"]        = cb("next_entry"),
+      ["k"]             = cb("prev_entry"),
+      ["<up>"]          = cb("prev_entry"),
+      ["<cr>"]          = cb("select_entry"),
+      ["o"]             = cb("select_entry"),
+      ["<2-LeftMouse>"] = cb("select_entry"),
+      ["<tab>"]         = cb("select_next_entry"),
+      ["<s-tab>"]       = cb("select_prev_entry"),
+      ["gf"]            = cb("goto_file"),
+      ["<C-w><C-f>"]    = cb("goto_file_split"),
+      ["<C-w>gf"]       = cb("goto_file_tab"),
+      ["<leader>e"]     = cb("focus_files"),
+      ["<leader>b"]     = cb("toggle_files"),
+    },
+    option_panel = {
+      ["<tab>"] = cb("select"),
+      ["q"]     = cb("close"),
+    },
+  },
 }
 ```
 
@@ -90,6 +139,23 @@ that only really make sense specifically in the file panel, such as
 invoked from the view, these will target the file currently open in the view
 rather than the file under the cursor in the file panel.
 
+### Available Unused Mappings
+
+This section documents key-mappable functions that are not mapped by default.
+
+- `focus_entry`
+  - Like `select_entry`, but open the diff for the selected entry while
+    focusing cursor on the current file. Available in both the file panel and
+    the history panel.
+
+## File History
+
+![file-history-multi](https://user-images.githubusercontent.com/2786478/131269782-f4184640-6d73-4226-b425-feccb5002dd0.png)
+
+The file history view allows you to list all the commits that changed a given
+file or directory, and view the changes made in a diff split. Open a file
+history view for your current file by calling `:DiffviewFileHistory`.
+
 ## Usage
 
 ### `:DiffviewOpen [git rev] [args] [ -- {paths...}]`
@@ -103,6 +169,7 @@ for that rev. Examples:
 - `:DiffviewOpen HEAD~4..HEAD~2`
 - `:DiffviewOpen d4a7b0d`
 - `:DiffviewOpen d4a7b0d..519b30e`
+- `:DiffviewOpen origin/main...HEAD`
 
 You can also provide additional paths to narrow down what files are shown:
 
@@ -120,6 +187,14 @@ Additional commands for convenience:
 
 With a Diffview open and the default key bindings, you can cycle through changed
 files with `<tab>` and `<s-tab>` (see configuration to change the key bindings).
+
+### `:DiffviewFileHistory [paths]`
+
+Opens a new file history view that lists all commits that changed a given file
+or directory. If no `[paths]` are given, defaults to the current file. Multiple
+`[paths]` may be provided. If you want to view the file history for all changed
+files for every commit, simply call `:DiffviewFileHistory .` (assuming your cwd
+is the top level of the git repository).
 
 ## Tips
 

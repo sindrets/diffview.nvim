@@ -1,6 +1,7 @@
 local api = vim.api
 local M = {}
 
+local mapping_callbacks = {}
 local path_sep = package.config:sub(1, 1)
 
 function M._echo_multiline(msg)
@@ -35,6 +36,10 @@ function M.clamp(value, min, max)
     return max
   end
   return value
+end
+
+function M.sign(n)
+  return (n > 0 and 1 or 0) - (n < 0 and 1 or 0)
 end
 
 function M.shell_error()
@@ -191,9 +196,12 @@ function M.str_center_pad(s, min_size, fill)
   return result
 end
 
-function M.str_shorten(s, new_length)
-  if string.len(s) > new_length - 1 then
-    return "…" .. s:sub(string.len(s) - new_length + 1, string.len(s))
+function M.str_shorten(s, max_length, head)
+  if string.len(s) > max_length then
+    if head then
+      return "…" .. s:sub(string.len(s) - max_length + 1, string.len(s))
+    end
+    return s:sub(1, max_length - 1) .. "…"
   end
   return s
 end
@@ -250,6 +258,60 @@ function M.system_list(cmd)
   return lines
 end
 
+---HACK: workaround for inconsistent behavior from `vim.opt_local`.
+---@see [Neovim issue](https://github.com/neovim/neovim/issues/14670)
+---@param winids number[]|number Either a list of winids, or a single winid (0 for current window).
+---@param option string
+---@param value string[]|string
+---@param opt table
+function M.set_local(winids, option, value, opt)
+  local last_winid = api.nvim_get_current_win()
+  local rhs
+
+  opt = vim.tbl_extend("keep", opt or {}, {
+    noautocmd = true,
+    keepjumps = true,
+    restore_cursor = true
+  })
+
+  if type(value) == "boolean" then
+    if value == false then
+      rhs = "no" .. option
+    else
+      rhs = option
+    end
+  else
+    rhs = option .. "=" .. (type(value) == "table" and table.concat(value, ",") or value)
+  end
+
+  if type(winids) ~= "table" then
+    winids = { winids }
+  end
+
+  for _, id in ipairs(winids) do
+    local nr = tostring(api.nvim_win_get_number(id == 0 and last_winid or id))
+    local cmd = string.format(
+      "%s %s %swindo setlocal ",
+      opt.noautocmd and "noautocmd",
+      opt.keepjumps and "keepjumps",
+      nr
+    )
+    vim.cmd(cmd .. rhs)
+  end
+
+  if opt.restore_cursor then
+    api.nvim_set_current_win(last_winid)
+  end
+end
+
+function M.tabnr_to_id(tabnr)
+  for _, id in ipairs(api.nvim_list_tabpages()) do
+    if api.nvim_tabpage_get_number(id) == tabnr then
+      return id
+    end
+  end
+end
+
 ---Create a shallow copy of a portion of a list.
 ---@param t table
 ---@param first integer First index, inclusive
@@ -295,12 +357,66 @@ function M.tbl_deep_clone(t)
   return clone
 end
 
+function M.tbl_deep_equals(t1, t2)
+  if not (t1 and t2) then
+    return false
+  end
+
+  local function recurse(t11, t22)
+    if #t11 ~= #t22 then
+      return false
+    end
+
+    local seen = {}
+    for key, value in pairs(t11) do
+      seen[key] = true
+      if type(value) == "table" then
+        if type(t22[key]) ~= "table" then
+          return false
+        end
+        if not recurse(value, t22[key]) then
+          return false
+        end
+      else
+        if not (value == t22[key]) then
+          return false
+        end
+      end
+    end
+
+    for key, _ in pairs(t22) do
+      if not seen[key] then
+        return false
+      end
+    end
+
+    return true
+  end
+
+  return recurse(t1, t2)
+end
+
 function M.tbl_pack(...)
   return { n = select("#", ...), ... }
 end
 
 function M.tbl_unpack(t, i, j)
   return unpack(t, i or 1, j or t.n or #t)
+end
+
+function M.tbl_indexof(t, v)
+  for i, vt in ipairs(t) do
+    if vt == v then
+      return i
+    end
+  end
+  return -1
+end
+
+function M.tbl_clear(t)
+  for k, _ in pairs(t) do
+    t[k] = nil
+  end
 end
 
 function M.find_named_buffer(name)
@@ -372,6 +488,64 @@ function M.tabpage_win_find_buf(tabpage, bufid)
   return result
 end
 
+function M.clear_prompt()
+  vim.cmd("norm! :esc<CR>")
+end
+
+function M.input_char(prompt)
+  if prompt then
+    print(prompt)
+  end
+  local c
+  while type(c) ~= "number" do
+    c = vim.fn.getchar()
+  end
+  M.clear_prompt()
+  return vim.fn.nr2char(c)
+end
+
+function M.input(prompt, default, completion)
+  local v = vim.fn.input({
+    prompt = prompt,
+    default = default,
+    completion = completion,
+    cancelreturn = "__INPUT_CANCELLED__",
+  })
+  M.clear_prompt()
+  return v
+end
+
+local function prepare_mapping(t)
+  local default_options = { noremap = true, silent = true }
+  if type(t[4]) ~= "table" then
+    t[4] = {}
+  end
+  local opts = vim.tbl_extend("force", default_options, t.opt or t[4])
+  local rhs
+  if type(t[3]) == "function" then
+    mapping_callbacks[#mapping_callbacks + 1] = t[3]
+    rhs = string.format(
+      "<Cmd>lua require('diffview.utils')._mapping_callbacks[%d]()<CR>",
+      #mapping_callbacks
+    )
+  else
+    assert(type(t[3]) == "string", "The rhs of the mapping must be either a string or a function!")
+    rhs = t[3]
+  end
+
+  return { t[1], t[2], rhs, opts }
+end
+
+function M.map(t)
+  local prepared = prepare_mapping(t)
+  vim.api.nvim_set_keymap(prepared[1], prepared[2], prepared[3], prepared[4])
+end
+
+function M.buf_map(bufid, t)
+  local prepared = prepare_mapping(t)
+  vim.api.nvim_buf_set_keymap(bufid, prepared[1], prepared[2], prepared[3], prepared[4])
+end
+
 local function merge(t, first, mid, last, comparator)
   local n1 = mid - first + 1
   local n2 = last - mid
@@ -430,6 +604,7 @@ function M.merge_sort(t, comparator)
   split_merge(t, 1, #t, comparator)
 end
 
+M._mapping_callbacks = mapping_callbacks
 M.path_sep = path_sep
 
 return M

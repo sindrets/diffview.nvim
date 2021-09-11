@@ -1,8 +1,8 @@
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local config = require("diffview.config")
-local RevType = require("diffview.rev").RevType
-local a = vim.api
+local RevType = require("diffview.git.rev").RevType
+local api = vim.api
 local M = {}
 
 local fstat_cache = {}
@@ -21,6 +21,7 @@ local fstat_cache = {}
 ---@field status string
 ---@field stats GitStats
 ---@field kind "working"|"staged"
+---@field commit Commit|nil
 ---@field left_binary boolean|nil
 ---@field right_binary boolean|nil
 ---@field left Rev
@@ -45,6 +46,13 @@ FileEntry.winopts = {
   foldlevel = 0,
 }
 
+FileEntry.bufopts = {
+  buftype = "nofile",
+  modifiable = false,
+  swapfile = false,
+  bufhidden = "hide",
+}
+
 ---FileEntry constructor
 ---@param opt table
 ---@return FileEntry
@@ -58,6 +66,7 @@ function FileEntry:init(opt)
   self.status = opt.status
   self.stats = opt.stats
   self.kind = opt.kind
+  self.commit = opt.commit
   self.left = opt.left
   self.right = opt.right
   self.created_bufs = {}
@@ -77,13 +86,13 @@ end
 function FileEntry:load_buffers(git_root, left_winid, right_winid)
   if not config.get_config().diff_binaries then
     if self.left_binary == nil then
-      local git = require("diffview.git")
+      local git = require("diffview.git.utils")
       self.left_binary = git.is_binary(git_root, self.oldpath or self.path, self.left)
       self.right_binary = git.is_binary(git_root, self.path, self.right)
     end
   end
 
-  local last_winid = a.nvim_get_current_win()
+  local last_winid = api.nvim_get_current_win()
   local splits = {
     {
       winid = left_winid,
@@ -104,17 +113,17 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
   pcall(function()
     vim.opt.eventignore = "WinEnter,WinLeave"
     for _, split in ipairs(splits) do
-      local winnr = vim.fn.win_id2win(split.winid)
+      local winnr = api.nvim_win_get_number(split.winid)
 
-      if not (split.bufid and a.nvim_buf_is_loaded(split.bufid)) then
+      if not (split.bufid and api.nvim_buf_is_loaded(split.bufid)) then
         if split.rev.type == RevType.LOCAL then
           if split.binary or FileEntry.should_null(split.rev, self.status, split.pos) then
             local bn = FileEntry._create_buffer(git_root, split.rev, self.path, true)
-            a.nvim_win_set_buf(split.winid, bn)
+            api.nvim_win_set_buf(split.winid, bn)
             split.bufid = bn
           else
             vim.cmd(winnr .. "windo edit " .. vim.fn.fnameescape(self.absolute_path))
-            split.bufid = a.nvim_get_current_buf()
+            split.bufid = api.nvim_get_current_buf()
           end
         elseif split.rev.type == RevType.COMMIT or split.rev.type == RevType.INDEX then
           local bn
@@ -129,14 +138,14 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
             )
           end
           table.insert(self.created_bufs, bn)
-          a.nvim_win_set_buf(split.winid, bn)
+          api.nvim_win_set_buf(split.winid, bn)
           split.bufid = bn
           vim.cmd(winnr .. "windo filetype detect")
         end
 
         FileEntry._attach_buffer(split.bufid)
       else
-        a.nvim_win_set_buf(split.winid, split.bufid)
+        api.nvim_win_set_buf(split.winid, split.bufid)
         FileEntry._attach_buffer(split.bufid)
       end
     end
@@ -147,7 +156,7 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
   self.right_bufid = splits[2].bufid
 
   FileEntry._update_windows(left_winid, right_winid)
-  a.nvim_set_current_win(last_winid)
+  api.nvim_set_current_win(last_winid)
 end
 
 function FileEntry:attach_buffers()
@@ -172,7 +181,7 @@ end
 function FileEntry:dispose_buffer(split)
   if vim.tbl_contains({ "left", "right" }, split) then
     local bufid = self[split .. "_bufid"]
-    if bufid and a.nvim_buf_is_loaded(bufid) then
+    if bufid and api.nvim_buf_is_loaded(bufid) then
       FileEntry._detach_buffer(bufid)
       FileEntry.safe_delete_buf(bufid)
       self[split .. "_bufid"] = nil
@@ -227,16 +236,17 @@ end
 ---@static Get the bufid of the null buffer. Create it if it's not loaded.
 ---@return integer
 function FileEntry._get_null_buffer()
-  if not (FileEntry._null_buffer and a.nvim_buf_is_loaded(FileEntry._null_buffer)) then
-    local bn = a.nvim_create_buf(false, false)
+  if not (FileEntry._null_buffer and api.nvim_buf_is_loaded(FileEntry._null_buffer)) then
+    local bn = api.nvim_create_buf(false, false)
     local bufname = utils.path_join({ "diffview://", "null" })
-    a.nvim_buf_set_option(bn, "modified", false)
-    a.nvim_buf_set_option(bn, "modifiable", false)
+    for option, value in pairs(FileEntry.bufopts) do
+      api.nvim_buf_set_option(bn, option, value)
+    end
 
-    local ok = pcall(a.nvim_buf_set_name, bn, bufname)
+    local ok = pcall(api.nvim_buf_set_name, bn, bufname)
     if not ok then
       utils.wipe_named_buffer(bufname)
-      a.nvim_buf_set_name(bn, bufname)
+      api.nvim_buf_set_name(bn, bufname)
     end
 
     FileEntry._null_buffer = bn
@@ -255,7 +265,7 @@ function FileEntry._create_buffer(git_root, rev, path, null)
     return FileEntry._get_null_buffer()
   end
 
-  local bn = a.nvim_create_buf(false, false)
+  local bn = api.nvim_create_buf(false, false)
   local cmd = "git -C "
     .. vim.fn.shellescape(git_root)
     .. " show "
@@ -263,7 +273,7 @@ function FileEntry._create_buffer(git_root, rev, path, null)
     .. ":"
     .. vim.fn.shellescape(path)
   local lines = vim.fn.systemlist(cmd)
-  a.nvim_buf_set_lines(bn, 0, -1, false, lines)
+  api.nvim_buf_set_lines(bn, 0, -1, false, lines)
 
   local context
   if rev.type == RevType.COMMIT then
@@ -273,18 +283,19 @@ function FileEntry._create_buffer(git_root, rev, path, null)
   end
 
   -- stylua: ignore
-  local fullname = utils.path_join({ "diffview://", git_root, context, path, })
-  a.nvim_buf_set_option(bn, "modified", false)
-  a.nvim_buf_set_option(bn, "modifiable", false)
+  local fullname = utils.path_join({ "diffview://", git_root, ".git", context, path, })
+  for option, value in pairs(FileEntry.bufopts) do
+    api.nvim_buf_set_option(bn, option, value)
+  end
 
-  local ok = pcall(a.nvim_buf_set_name, bn, fullname)
+  local ok = pcall(api.nvim_buf_set_name, bn, fullname)
   if not ok then
     -- Resolve name conflict
     local i = 1
     while not ok do
       -- stylua: ignore
-      fullname = utils.path_join({ "diffview://", git_root, context, i, path, })
-      ok = pcall(a.nvim_buf_set_name, bn, fullname)
+      fullname = utils.path_join({ "diffview://", git_root, ".git", context, i, path, })
+      ok = pcall(api.nvim_buf_set_name, bn, fullname)
       i = i + 1
     end
   end
@@ -309,7 +320,7 @@ end
 ---@static
 function FileEntry.load_null_buffer(winid)
   local bn = FileEntry._get_null_buffer()
-  a.nvim_win_set_buf(winid, bn)
+  api.nvim_win_set_buf(winid, bn)
   FileEntry._attach_buffer(bn)
 end
 
@@ -321,15 +332,13 @@ function FileEntry.safe_delete_buf(bufid)
   for _, winid in ipairs(utils.tabpage_win_find_buf(0, bufid)) do
     FileEntry.load_null_buffer(winid)
   end
-  pcall(a.nvim_buf_delete, bufid, { force = true })
+  pcall(api.nvim_buf_delete, bufid, { force = true })
 end
 
 ---@static
 function FileEntry._update_windows(left_winid, right_winid)
-  for _, id in ipairs({ left_winid, right_winid }) do
-    for k, v in pairs(FileEntry.winopts) do
-      a.nvim_win_set_option(id, k, v)
-    end
+  for k, v in pairs(FileEntry.winopts) do
+    utils.set_local({ left_winid, right_winid }, k, v)
   end
 
   -- Scroll to trigger the scrollbind and sync the windows. This works more
@@ -341,7 +350,7 @@ end
 function FileEntry._attach_buffer(bufid)
   local conf = config.get_config()
   for lhs, rhs in pairs(conf.key_bindings.view) do
-    a.nvim_buf_set_keymap(bufid, "n", lhs, rhs, { noremap = true, silent = true })
+    api.nvim_buf_set_keymap(bufid, "n", lhs, rhs, { noremap = true, silent = true })
   end
 end
 
@@ -349,7 +358,7 @@ end
 function FileEntry._detach_buffer(bufid)
   local conf = config.get_config()
   for lhs, _ in pairs(conf.key_bindings.view) do
-    pcall(a.nvim_buf_del_keymap, bufid, "n", lhs)
+    pcall(api.nvim_buf_del_keymap, bufid, "n", lhs)
   end
 end
 

@@ -20,7 +20,14 @@ function M.init()
 end
 
 function M.open(...)
-  local view = lib.process_args(utils.tbl_pack(...))
+  local view = lib.diffview_open(utils.tbl_pack(...))
+  if view then
+    view:open()
+  end
+end
+
+function M.file_history(...)
+  local view = lib.file_history(utils.tbl_pack(...))
   if view then
     view:open()
   end
@@ -55,8 +62,8 @@ function M.completion(arg_lead, cmd_line, cur_pos)
         and vim.fn.expand("%:p:h")
       or "."
     )
-  local git_dir = require("diffview.git").git_dir(fpath)
-  local git_root = require("diffview.git").toplevel(fpath)
+  local git_dir = require("diffview.git.utils").git_dir(fpath)
+  local git_root = require("diffview.git.utils").toplevel(fpath)
 
   if argidx >= divideridx then
     return vim.fn.getcompletion(arg_lead, "file", 0)
@@ -96,10 +103,10 @@ function M.update_colors()
   lib.update_colors()
 end
 
-function M.trigger_event(event_name)
+function M.trigger_event(event_name, ...)
   local view = lib.get_current_view()
   if view then
-    view.emitter:emit(event_name)
+    view.emitter:emit(event_name, ...)
   end
 end
 

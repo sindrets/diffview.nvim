@@ -4,10 +4,10 @@ local EventEmitter = require("diffview.events").EventEmitter
 local DiffView = require("diffview.views.diff.diff_view").DiffView
 local CFileEntry = require("diffview.api.views.file_entry").CFileEntry
 local FilePanel = require("diffview.views.diff.file_panel").FilePanel
-local FileDict = require("diffview.git").FileDict
-local Rev = require("diffview.rev").Rev
-local RevType = require("diffview.rev").RevType
-local git = require("diffview.git")
+local FileDict = require("diffview.git.file_dict").FileDict
+local Rev = require("diffview.git.rev").Rev
+local RevType = require("diffview.git.rev").RevType
+local git = require("diffview.git.utils")
 
 local M = {}
 
@@ -34,6 +34,7 @@ function CDiffView:init(opt)
   self.layout_mode = CDiffView.get_layout_mode()
   self.nulled = false
   self.ready = false
+  self.winopts = { left = {}, right = {} }
   self.git_root = opt.git_root
   self.git_dir = git.git_dir(opt.git_root)
   self.rev_arg = opt.rev_arg
