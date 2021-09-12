@@ -359,6 +359,7 @@ local git_status_hl_map = {
   ["D"] = "DiffviewStatusDeleted",
   ["B"] = "DiffviewStatusBroken",
   ["!"] = "DiffviewStatusIgnored",
+  [" "] = "DiffviewStatusNone",
 }
 
 function M.get_git_hl(status)
