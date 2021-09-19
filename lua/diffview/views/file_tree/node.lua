@@ -39,7 +39,10 @@ end
 
 ---@return boolean
 function Node:has_children()
-  return self:count_children() == 0
+  for _ in pairs(self.children) do
+    return true
+  end
+  return false
 end
 
 ---Returns an ordered list of children recursively, with their depths, by pre-order traversal of the
