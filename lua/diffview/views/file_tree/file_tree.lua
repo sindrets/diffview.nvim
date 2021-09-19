@@ -18,19 +18,19 @@ end
 ---@param file FileEntry
 function FileTree:add_file_entry(file)
   local parts = utils.path_explode(file.path)
-  local node = self.root
+  local cur_node = self.root
 
-  for i, basename in ipairs(parts) do
-    local is_file = i == #parts
-
-    -- TODO
-    local node_data = nil
-    if is_file then
-      node_data = file
+  -- Create missing intermediate pathname components
+  for i = 1, #parts - 1 do
+    local name = parts[i]
+    if not cur_node.children[name] then
+      cur_node = cur_node:add_child(Node(name))
+    else
+      cur_node = cur_node.children[name]
     end
-
-    node = node:add_child(Node(basename, file))
   end
+
+  cur_node:add_child(Node(parts[#parts], file))
 end
 
 ---@param file FileEntry[]
