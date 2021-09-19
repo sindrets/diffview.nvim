@@ -17,7 +17,7 @@ end
 
 ---@param file FileEntry
 function FileTree:add_file_entry(file)
-  local parts = utils.path_split(file.path)
+  local parts = utils.path_explode(file.path)
   local node = self.root
 
   for i, basename in ipairs(parts) do

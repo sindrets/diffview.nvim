@@ -79,17 +79,15 @@ function M.path_join(paths)
   return result
 end
 
----Splits the path into an ordered array of strings.
+---Explodes the path into an ordered list of path segments.
 ---@param path string
 ---@return string[]
-function M.path_split(path)
-  path = M.path_remove_trailing(path)
-
-  local dirs = {}
-  for part in string.gmatch(path, "[^" .. "/" .. "]+") do
-    table.insert(dirs, part)
+function M.path_explode(path)
+  local parts = {}
+  for part in path:gmatch(string.format("([^%s]+)%s?", path_sep, path_sep)) do
+    table.insert(parts, part)
   end
-  return dirs
+  return parts
 end
 
 ---Get the basename of the given path.
