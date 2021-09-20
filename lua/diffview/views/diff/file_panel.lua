@@ -238,9 +238,9 @@ local function render_files(comp, files)
 
   local tree_items = tree:list()
 
-  for i, node in ipairs(tree_items) do
+  for _, node in ipairs(tree_items) do
     local depth = node.depth
-    local is_file = i == #tree_items or tree_items[i + 1].depth <= depth
+    local is_file = not node:has_children()
 
     if not is_file then
       local dir_name = node.name

@@ -1,4 +1,5 @@
 local oop = require("diffview.oop")
+local utils = require("diffview.utils")
 local M = {}
 
 ---@class Node
@@ -50,11 +51,22 @@ end
 ---@return Node[]
 function Node:children_recursive(start_depth)
   local nodes = {}
-  for _, child in pairs(self.children) do
+  local children = vim.tbl_values(self.children)
+
+  utils.merge_sort(children, function(a, b)
+    if a:has_children() and not b:has_children() then
+      return true
+    elseif not a:has_children() and b:has_children() then
+      return false
+    end
+    return a.name < b.name
+  end)
+
+  for _, child in ipairs(children) do
     child.depth = start_depth
     table.insert(nodes, child)
 
-    for _, grandchild in pairs(child:children_recursive(start_depth + 1)) do
+    for _, grandchild in ipairs(child:children_recursive(start_depth + 1)) do
       table.insert(nodes, grandchild)
     end
   end

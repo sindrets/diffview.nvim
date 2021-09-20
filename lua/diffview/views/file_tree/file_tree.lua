@@ -33,7 +33,7 @@ function FileTree:add_file_entry(file)
   cur_node:add_child(Node(parts[#parts], file))
 end
 
----@param file FileEntry[]
+---@param files FileEntry[]
 function FileTree:add_file_entries(files)
   for _, file in ipairs(files) do
     self:add_file_entry(file)
