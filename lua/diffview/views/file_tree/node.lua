@@ -1,10 +1,12 @@
 local oop = require("diffview.oop")
+local utils = require("diffview.utils")
 local M = {}
 
 ---@class Node
 ---@field name string
 ---@field children Node[]
 ---@field depth integer|nil
+---@param data any|nil
 local Node = oop.Object
 Node = oop.create_class("Node")
 
@@ -45,16 +47,35 @@ function Node:has_children()
   return false
 end
 
----Returns an ordered list of children recursively, with their depths, by pre-order traversal of the
----tree.
+---Compare against another node alphabetically and case-insensitive by node names.
+---Directory nodes come before file nodes.
+---
+---@param a Node
+---@param b Node
+---@return true if node a comes before node b
+local function compare_nodes(a, b)
+  if a:has_children() == b:has_children() then
+    return string.lower(a.name) < string.lower(b.name)
+  else
+    return a:has_children()
+  end
+end
+
+---Returns a sorted list of children recursively, with their depths.
 ---@return Node[]
 function Node:children_recursive(start_depth)
-  local nodes = {}
+  local children = {}
   for _, child in pairs(self.children) do
+    table.insert(children, child)
+  end
+  utils.merge_sort(children, compare_nodes)
+
+  local nodes = {}
+  for _, child in pairs(children) do
     child.depth = start_depth
     table.insert(nodes, child)
 
-    for _, grandchild in pairs(child:children_recursive(start_depth + 1)) do
+    for _, grandchild in ipairs(child:children_recursive(start_depth + 1)) do
       table.insert(nodes, grandchild)
     end
   end

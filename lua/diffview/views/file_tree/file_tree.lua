@@ -12,7 +12,7 @@ FileTree = oop.create_class("FileTree")
 ---FileTree constructor
 ---@return FileTree
 function FileTree:init()
-  self.root = Node("", nil)
+  self.root = Node("")
 end
 
 ---@param file FileEntry
