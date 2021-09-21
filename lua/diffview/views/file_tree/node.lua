@@ -57,6 +57,38 @@ function Node:sort()
   utils.merge_sort(self.children, Node.comparator)
 end
 
+---@param callback function(node: Node, i: integer, parent: Node)
+function Node:some(callback)
+  for i, child in ipairs(self.children) do
+    if callback(child, i, self) then
+      return
+    end
+  end
+end
+
+function Node:deep_some(callback)
+  local function wrap(node, i, parent)
+    if callback(node, i, parent) then
+      return true
+    else
+      return node:some(wrap)
+    end
+  end
+  self:some(wrap)
+end
+
+function Node:leaves()
+  local leaves = {}
+  self:deep_some(function(node)
+    if #node.children == 0 then
+      leaves[#leaves + 1] = node
+    end
+    return false
+  end)
+
+  return leaves
+end
+
 ---Returns an ordered list of children recursively, with their depths, by
 ---pre-order traversal of the tree.
 ---@return Node[]

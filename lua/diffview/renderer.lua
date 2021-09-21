@@ -165,6 +165,38 @@ function RenderComponent:get_comp_on_line(line)
   return recurse(self)
 end
 
+---@param callback function(comp: RenderComponent, i: integer, parent: RenderComponent)
+function RenderComponent:some(callback)
+  for i, child in ipairs(self.components) do
+    if callback(child, i, self) then
+      return
+    end
+  end
+end
+
+function RenderComponent:deep_some(callback)
+  local function wrap(comp, i, parent)
+    if callback(comp, i, parent) then
+      return true
+    else
+      return comp:some(wrap)
+    end
+  end
+  self:some(wrap)
+end
+
+function RenderComponent:leaves()
+  local leaves = {}
+  self:deep_some(function(comp)
+    if #comp.components == 0 then
+      leaves[#leaves + 1] = comp
+    end
+    return false
+  end)
+
+  return leaves
+end
+
 function RenderComponent:pretty_print()
   local keys = { "name", "lstart", "lend" }
 

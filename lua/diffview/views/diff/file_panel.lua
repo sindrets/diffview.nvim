@@ -1,6 +1,7 @@
 local config = require("diffview.config")
 local oop = require("diffview.oop")
 local renderer = require("diffview.renderer")
+local utils = require("diffview.utils")
 local Panel = require("diffview.ui.panel").Panel
 local api = vim.api
 local M = {}
@@ -10,6 +11,7 @@ local M = {}
 ---@field files FileDict
 ---@field path_args string[]
 ---@field rev_pretty_name string|nil
+---@field cur_file FileEntry
 ---@field width integer
 ---@field bufid integer
 ---@field winid integer
@@ -127,9 +129,59 @@ function FilePanel:update_components()
   })
 end
 
+function FilePanel:ordered_file_list()
+  if self.listing_style == "list" then
+    local list = {}
+    for _, file in self.files:ipairs() do
+      list[#list + 1] = file
+    end
+    return list
+  else
+    local nodes = utils.tbl_concat(
+      self.files.working_tree and self.files.working_tree.root:leaves() or nil,
+      self.files.staged_tree and self.files.staged_tree.root:leaves() or nil
+    )
+    return vim.tbl_map(function(node)
+      return node.data
+    end, nodes)
+  end
+end
+
+function FilePanel:set_cur_file(file)
+  self.cur_file = file
+end
+
+function FilePanel:prev_file()
+  local files = self:ordered_file_list()
+  if not self.cur_file and self.files:size() > 0 then
+    self.cur_file = files[1]
+    return self.cur_file
+  end
+
+  local i = utils.tbl_indexof(files, self.cur_file)
+  if i ~= -1 then
+    self.cur_file = files[(i - 2) % #files + 1]
+    return self.cur_file
+  end
+end
+
+function FilePanel:next_file()
+  local files = self:ordered_file_list()
+  if not self.cur_file and self.files:size() > 0 then
+    self.cur_file = files[1]
+    return self.cur_file
+  end
+
+  local i = utils.tbl_indexof(files, self.cur_file)
+  if i ~= -1 then
+    self.cur_file = files[i % #files + 1]
+    return self.cur_file
+  end
+end
+
 ---Get the file entry under the cursor.
----@return FileEntry|nil
-function FilePanel:get_file_at_cursor()
+---@return FileEntry|any|nil
+function FilePanel:get_item_at_cursor()
   if not (self:is_open() and self:buf_loaded()) then
     return
   end
@@ -137,10 +189,9 @@ function FilePanel:get_file_at_cursor()
   local cursor = api.nvim_win_get_cursor(self.winid)
   local line = cursor[1]
 
-  if line > self.components.working.files.comp.lend then
-    return self.files.staged[line - self.components.staged.files.comp.lstart]
-  else
-    return self.files.working[line - self.components.working.files.comp.lstart]
+  local comp = self.components.comp:get_comp_on_line(line)
+  if comp and (comp.name == "file" or comp.name == "directory") then
+    return comp.context
   end
 end
 
@@ -149,16 +200,41 @@ function FilePanel:highlight_file(file)
     return
   end
 
-  for i, f in self.files:ipairs() do
-    if f == file then
-      local offset
-      if i > #self.files.working then
-        i = i - #self.files.working
-        offset = self.components.staged.files.comp.lstart
-      else
-        offset = self.components.working.files.comp.lstart
+  if self.listing_style == "list" then
+    for _, file_list in ipairs({ self.components.working.files, self.components.staged.files }) do
+      for _, comp_struct in ipairs(file_list) do
+        if file == comp_struct.comp.context then
+          pcall(api.nvim_win_set_cursor, self.winid, { comp_struct.comp.lstart + 1, 0 })
+        end
       end
-      pcall(api.nvim_win_set_cursor, self.winid, { i + offset, 0 })
+    end
+  else
+    -- tree
+    for _, comp_struct in ipairs({ self.components.working.files, self.components.staged.files }) do
+      comp_struct.comp:deep_some(function(cur)
+        if file == cur.context then
+          local was_concealed = false
+          local last = cur.parent
+          while last do
+            -- print(vim.inspect(last, {depth=2}))
+            local dir = last.components[1]
+            if dir.context and dir.context.collapsed then
+              was_concealed = true
+              dir.context.collapsed = false
+            end
+            last = last.parent
+          end
+
+          if was_concealed then
+            self:render()
+            self:redraw()
+          end
+
+          pcall(api.nvim_win_set_cursor, self.winid, { cur.lstart + 1, 0 })
+          return true
+        end
+        return false
+      end)
     end
   end
 end
@@ -177,6 +253,20 @@ function FilePanel:highlight_next_file()
   end
 
   pcall(api.nvim_win_set_cursor, self.winid, { self.constrain_cursor(self.winid, 1), 0 })
+end
+
+function FilePanel:set_item_fold(item, open)
+  if open == item.collapsed then
+    item.collapsed = not open
+    self:render()
+    self:redraw()
+  end
+end
+
+function FilePanel:toggle_item_fold(item)
+  item.collapsed = not item.collapsed
+  self:render()
+  self:redraw()
 end
 
 function FilePanel:render()
