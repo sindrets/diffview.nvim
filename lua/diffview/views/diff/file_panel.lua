@@ -8,9 +8,14 @@ local Panel = require("diffview.ui.panel").Panel
 local api = vim.api
 local M = {}
 
+---@class NodesDict
+---@field working Node[]
+---@field staged Node[]
+
 ---@class FilePanel
 ---@field git_root string
 ---@field files FileDict
+---@field tree_items NodesDict
 ---@field path_args string[]
 ---@field rev_pretty_name string|nil
 ---@field width integer
@@ -56,6 +61,11 @@ function FilePanel:init(git_root, files, path_args, rev_pretty_name)
   self.files = files
   self.path_args = path_args
   self.rev_pretty_name = rev_pretty_name
+
+  self.tree_items = {
+    working = FileTree(self.files.working):list(),
+    staged = FileTree(self.files.staged):list(),
+  }
 end
 
 ---@Override
@@ -151,13 +161,13 @@ function FilePanel:highlight_next_file()
 end
 
 ---@param comp RenderComponent component for staged/working files
----@param files FileEntry[]    file entries
-local function render_files(comp, files)
+---@param tree_items Node[]
+local function render_files(comp, tree_items)
   local conf = config.get_config()
   if conf.file_panel.show_tree then
-    render.render_file_tree(comp, FileTree(files))
+    render.render_file_tree(comp, tree_items)
   else
-    render.render_file_list(comp, files)
+    render.render_file_list(comp, tree_items)
   end
 end
 
@@ -184,7 +194,7 @@ function FilePanel:render()
   s = s .. " " .. change_count
   comp:add_line(s)
 
-  render_files(self.components.working.files.comp, self.files.working)
+  render_files(self.components.working.files.comp, self.tree_items.working)
 
   if #self.files.staged > 0 then
     comp = self.components.staged.title.comp
@@ -198,7 +208,7 @@ function FilePanel:render()
     s = s .. " " .. change_count
     comp:add_line(s)
 
-    render_files(self.components.staged.files.comp, self.files.staged)
+    render_files(self.components.staged.files.comp, self.tree_items.staged)
   end
 
   if self.rev_pretty_name or (self.path_args and #self.path_args > 0) then

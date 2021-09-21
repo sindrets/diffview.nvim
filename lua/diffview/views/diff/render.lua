@@ -73,34 +73,32 @@ local function render_directory(comp, dir, depth, line_idx)
 end
 
 ---@param comp RenderComponent
----@param tree FileTree
-function M.render_file_tree(comp, tree)
-  local tree_items = tree:list()
+---@param tree_items Node[]
+function M.render_file_tree(comp, tree_items)
   local line_idx = 0
-
   for _, node in ipairs(tree_items) do
-    local depth = node.depth
-
     if node:has_children() then
       -- TODO: Proper git status and add git stats for directories
       local dir = DirEntry(node.name, " ", nil)
-      render_directory(comp, dir, depth, line_idx)
+      render_directory(comp, dir, node.depth, line_idx)
     else
       local file = node.data
-      render_file(comp, file, depth, line_idx, false)
+      render_file(comp, file, node.depth, line_idx, false)
     end
-
     line_idx = line_idx + 1
   end
 end
 
 ---@param comp RenderComponent
----@param files FileEntry[]
-function M.render_file_list(comp, files)
+---@param tree_items Node[]
+function M.render_file_list(comp, tree_items)
   local line_idx = 0
-  for _, file in ipairs(files) do
-    render_file(comp, file, 0, line_idx, true)
-    line_idx = line_idx + 1
+  for _, node in ipairs(tree_items) do
+    if not node:has_children() then
+      local file = node.data
+      render_file(comp, file, 0, line_idx, true)
+      line_idx = line_idx + 1
+    end
   end
 end
 
