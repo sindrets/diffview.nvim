@@ -213,7 +213,7 @@ function DiffView:update_files()
         bi = bi + 1
       elseif opr == EditToken.DELETE then
         if cur_file == v.cur_files[ai] then
-          cur_file = self:prev_file()
+          self.panel.cur_file = self:prev_file()
         end
         v.cur_files[ai]:destroy()
         table.remove(v.cur_files, ai)
@@ -223,7 +223,7 @@ function DiffView:update_files()
         bi = bi + 1
       elseif opr == EditToken.REPLACE then
         if cur_file == v.cur_files[ai] then
-          cur_file = self:prev_file()
+          self.panel.cur_file = self:prev_file()
         end
         v.cur_files[ai]:destroy()
         table.remove(v.cur_files, ai)
@@ -239,7 +239,11 @@ function DiffView:update_files()
   self.panel:update_components()
   self.panel:render()
   self.panel:redraw()
-  self:set_file(self.panel.cur_file)
+
+  if utils.tbl_indexof(self.panel:ordered_file_list(), self.panel.cur_file) == -1 then
+    self.panel.cur_file = nil
+  end
+  self:set_file(self.panel.cur_file or self.panel:next_file())
 
   if api.nvim_win_is_valid(last_winid) then
     api.nvim_set_current_win(last_winid)

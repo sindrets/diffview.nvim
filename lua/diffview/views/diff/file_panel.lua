@@ -138,8 +138,8 @@ function FilePanel:ordered_file_list()
     return list
   else
     local nodes = utils.tbl_concat(
-      self.files.working_tree and self.files.working_tree.root:leaves() or nil,
-      self.files.staged_tree and self.files.staged_tree.root:leaves() or nil
+      self.files.working_tree and self.files.working_tree.root:leaves() or {},
+      self.files.staged_tree and self.files.staged_tree.root:leaves() or {}
     )
     return vim.tbl_map(function(node)
       return node.data
