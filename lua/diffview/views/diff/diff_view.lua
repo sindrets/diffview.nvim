@@ -195,7 +195,6 @@ function DiffView:update_files()
       return aa.path == bb.path
     end)
     local script = diff:create_edit_script()
-    local cur_file = self.panel.cur_file
 
     local ai = 1
     local bi = 1
@@ -212,8 +211,8 @@ function DiffView:update_files()
         ai = ai + 1
         bi = bi + 1
       elseif opr == EditToken.DELETE then
-        if cur_file == v.cur_files[ai] then
-          self.panel.cur_file = self:prev_file()
+        if self.panel.cur_file == v.cur_files[ai] then
+          self.panel.cur_file = self.panel:prev_file()
         end
         v.cur_files[ai]:destroy()
         table.remove(v.cur_files, ai)
@@ -222,8 +221,8 @@ function DiffView:update_files()
         ai = ai + 1
         bi = bi + 1
       elseif opr == EditToken.REPLACE then
-        if cur_file == v.cur_files[ai] then
-          self.panel.cur_file = self:prev_file()
+        if self.panel.cur_file == v.cur_files[ai] then
+          self.panel.cur_file = self.panel:prev_file()
         end
         v.cur_files[ai]:destroy()
         table.remove(v.cur_files, ai)
