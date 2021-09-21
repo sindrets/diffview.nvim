@@ -59,7 +59,7 @@ end
 function DiffView:post_open()
   self:init_event_listeners()
   vim.schedule(function()
-    local file = self.panel:next_file()
+    local file = self.panel.cur_file or self.panel:next_file()
     if file then
       self:set_file(file)
     else
