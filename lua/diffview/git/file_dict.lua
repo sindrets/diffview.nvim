@@ -1,9 +1,13 @@
 local oop = require("diffview.oop")
+local FileTree = require("diffview.views.file_tree.file_tree").FileTree
 local M = {}
 
+---@type table<integer, FileEntry>
 ---@class FileDict
 ---@field working FileEntry[]
 ---@field staged FileEntry[]
+---@field working_tree FileTree
+---@field staged_tree FileTree
 local FileDict = oop.Object
 FileDict = oop.create_class("FileDict")
 
@@ -28,6 +32,19 @@ function FileDict:init()
   end
 end
 
+function FileDict:update_file_trees()
+  if #self.working > 0 then
+    self.working_tree = FileTree(self.working)
+  else
+    self.working_tree = nil
+  end
+  if #self.staged > 0 then
+    self.staged_tree = FileTree(self.staged)
+  else
+    self.staged_tree = nil
+  end
+end
+
 function FileDict:size()
   return #self.working + #self.staged
 end
@@ -46,10 +63,10 @@ end
 function FileDict:ipairs()
   local i = 0
   local n = #self.working + #self.staged
+  ---@return integer, FileEntry
   return function()
     i = i + 1
     if i <= n then
-      ---@type integer, FileEntry
       return i, self[i]
     end
   end

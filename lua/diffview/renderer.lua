@@ -12,6 +12,12 @@ local uid_counter = 0
 ---@field first integer 0 indexed, inclusive
 ---@field last integer Exclusive
 
+---@type table<any, CompStruct>
+---@class CompStruct
+---@field _name string
+---@field comp RenderComponent
+local CompStruct
+
 ---@class RenderComponent
 ---@field name string
 ---@field parent RenderComponent
@@ -28,7 +34,7 @@ RenderComponent = oop.create_class("RenderComponent")
 ---RenderComponent constructor.
 ---@return RenderComponent
 function RenderComponent:init(name)
-  self.name = name
+  self.name = name or RenderComponent.next_uid()
   self.lines = {}
   self.hl = {}
   self.components = {}
@@ -61,24 +67,43 @@ function RenderComponent.next_uid()
   return uid
 end
 
----Create and add a new component.
----@param schema any
----@return RenderComponent|any
-function RenderComponent:create_component(schema)
+---Create a new compoenent
+---@param schema table
+---@return RenderComponent, CompStruct
+function RenderComponent.create_static_component(schema)
   local comp_struct
-  local new_comp = RenderComponent(schema and schema.name or RenderComponent.next_uid())
-  table.insert(self.components, new_comp)
+  local new_comp = RenderComponent(schema and schema.name or nil)
 
   if schema then
     new_comp.context = schema.context
     comp_struct = { _name = new_comp.name, comp = new_comp }
     create_subcomponents(new_comp, comp_struct, schema)
+  end
+
+  return new_comp, comp_struct
+end
+
+---Create and add a new component.
+---@param schema table
+---@return RenderComponent|CompStruct
+function RenderComponent:create_component(schema)
+  local new_comp, comp_struct = RenderComponent.create_static_component(schema)
+  self:add_component(new_comp)
+
+  if comp_struct then
     return comp_struct
   end
 
   return new_comp
 end
 
+---@param component RenderComponent
+function RenderComponent:add_component(component)
+  component.parent = self
+  table.insert(self.components, component)
+end
+
+---@param component RenderComponent
 function RenderComponent:remove_component(component)
   for i, c in ipairs(self.components) do
     if c == component then
@@ -90,10 +115,15 @@ function RenderComponent:remove_component(component)
   return false
 end
 
+---@param line string
 function RenderComponent:add_line(line)
   table.insert(self.lines, line)
 end
 
+---@param group string
+---@param line_idx integer
+---@param first integer
+---@param last integer
 function RenderComponent:add_hl(group, line_idx, first, last)
   table.insert(self.hl, {
     group = group,
@@ -154,12 +184,12 @@ function RenderData:init(ns_name)
 end
 
 ---Create and add a new component.
----@param schema any
----@return RenderComponent|any
+---@param schema table
+---@return RenderComponent|CompStruct
 function RenderData:create_component(schema)
   local comp_struct
-  local new_comp = RenderComponent(schema and schema.name or RenderComponent.next_uid())
-  table.insert(self.components, new_comp)
+  local new_comp = RenderComponent(schema and schema.name or nil)
+  self:add_component(new_comp)
 
   if schema then
     new_comp.context = schema.context
@@ -171,6 +201,12 @@ function RenderData:create_component(schema)
   return new_comp
 end
 
+---@param component RenderComponent
+function RenderData:add_component(component)
+  table.insert(self.components, component)
+end
+
+---@param component RenderComponent
 function RenderData:remove_component(component)
   for i, c in ipairs(self.components) do
     if c == component then
@@ -182,6 +218,10 @@ function RenderData:remove_component(component)
   return false
 end
 
+---@param group string
+---@param line_idx integer
+---@param first integer
+---@param last integer
 function RenderData:add_hl(group, line_idx, first, last)
   table.insert(self.hl, {
     group = group,

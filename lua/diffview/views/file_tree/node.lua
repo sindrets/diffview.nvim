@@ -4,6 +4,7 @@ local M = {}
 
 ---@class Node
 ---@field name string
+---@field data any
 ---@field children Node[]
 ---@field depth integer|nil
 local Node = oop.Object
@@ -19,23 +20,26 @@ function Node:init(name, data)
   self.children = {}
 end
 
+---@param a Node
+---@param b Node
+function Node.comparator(a, b)
+  if a:has_children() and not b:has_children() then
+    return true
+  elseif not a:has_children() and b:has_children() then
+    return false
+  end
+  return a.name < b.name
+end
+
 ---Adds a child if it doesn not already exist.
 ---@param child Node
 ---@return Node
 function Node:add_child(child)
-  if self.children[child.name] == nil then
+  if not self.children[child.name] then
     self.children[child.name] = child
+    self.children[#self.children + 1] = child
   end
   return self.children[child.name]
-end
-
----@return integer
-function Node:count_children()
-  local count = 0
-  for _ in pairs(self.children) do
-    count = count + 1
-  end
-  return count
 end
 
 ---@return boolean
@@ -46,21 +50,20 @@ function Node:has_children()
   return false
 end
 
----Returns an ordered list of children recursively, with their depths, by pre-order traversal of the
----tree.
+function Node:sort()
+  for _, child in ipairs(self.children) do
+    child:sort()
+  end
+  utils.merge_sort(self.children, Node.comparator)
+end
+
+---Returns an ordered list of children recursively, with their depths, by
+---pre-order traversal of the tree.
 ---@return Node[]
 function Node:children_recursive(start_depth)
   local nodes = {}
   local children = vim.tbl_values(self.children)
-
-  utils.merge_sort(children, function(a, b)
-    if a:has_children() and not b:has_children() then
-      return true
-    elseif not a:has_children() and b:has_children() then
-      return false
-    end
-    return a.name < b.name
-  end)
+  utils.merge_sort(children, Node.comparator)
 
   for _, child in ipairs(children) do
     child.depth = start_depth

@@ -1,9 +1,6 @@
 local config = require("diffview.config")
 local oop = require("diffview.oop")
-local utils = require("diffview.utils")
 local renderer = require("diffview.renderer")
-local FileEntry = require("diffview.views.file_entry").FileEntry
-local FileTree = require("diffview.views.file_tree.file_tree").FileTree
 local Panel = require("diffview.ui.panel").Panel
 local api = vim.api
 local M = {}
@@ -16,8 +13,9 @@ local M = {}
 ---@field width integer
 ---@field bufid integer
 ---@field winid integer
+---@field listing_style '"list"'|'"tree"'
 ---@field render_data RenderData
----@field components any
+---@field components CompStruct
 ---@field constrain_cursor function
 local FilePanel = Panel
 FilePanel = oop.create_class("FilePanel", Panel)
@@ -56,6 +54,7 @@ function FilePanel:init(git_root, files, path_args, rev_pretty_name)
   self.files = files
   self.path_args = path_args
   self.rev_pretty_name = rev_pretty_name
+  self.listing_style = conf.file_panel.listing_style
 end
 
 ---@Override
@@ -72,18 +71,48 @@ function FilePanel:init_buffer_opts()
 end
 
 function FilePanel:update_components()
-  ---@type any
+  local working_files
+  local staged_files
+
+  if self.listing_style == "list" then
+    working_files = { name = "files" }
+    staged_files = { name = "files" }
+    for _, file in ipairs(self.files.working) do
+      table.insert(working_files, {
+        name = "file",
+        context = file,
+      })
+    end
+    for _, file in ipairs(self.files.staged) do
+      table.insert(staged_files, {
+        name = "file",
+        context = file,
+      })
+    end
+  else
+    -- tree
+    working_files = {
+      name = "files",
+      unpack(self.files.working_tree:create_comp_schema())
+    }
+    staged_files = {
+      name = "files",
+      unpack(self.files.staged_tree:create_comp_schema())
+    }
+  end
+
+  ---@type CompStruct
   self.components = self.render_data:create_component({
     { name = "path" },
     {
       name = "working",
       { name = "title" },
-      { name = "files" },
+      working_files,
     },
     {
       name = "staged",
       { name = "title" },
-      { name = "files" },
+      staged_files,
     },
     {
       name = "info",
@@ -150,180 +179,8 @@ function FilePanel:highlight_next_file()
   pcall(api.nvim_win_set_cursor, self.winid, { self.constrain_cursor(self.winid, 1), 0 })
 end
 
----@param comp RenderComponent
----@param file FileEntry
----@param depth number
----@param line_idx number
----@param show_path number
-local function render_file(comp, file, depth, line_idx, show_path)
-  comp:add_hl(renderer.get_git_hl(file.status), line_idx, 0, 1)
-  local s = file.status .. " "
-  local offset = 0
-
-  local indent = "  "
-  for _ = 1, depth do
-    s = s .. indent
-    offset = offset + #indent
-  end
-
-  local icon = renderer.get_file_icon(file.basename, file.extension, comp, line_idx, offset)
-  offset = offset + #icon
-  comp:add_hl("DiffviewFilePanelFileName", line_idx, offset, offset + #file.basename)
-  s = s .. icon .. file.basename
-
-  if file.stats then
-    offset = #s + 1
-    comp:add_hl(
-      "DiffviewFilePanelInsertions",
-      line_idx,
-      offset,
-      offset + string.len(file.stats.additions)
-    )
-    offset = offset + string.len(file.stats.additions) + 2
-    comp:add_hl(
-      "DiffviewFilePanelDeletions",
-      line_idx,
-      offset,
-      offset + string.len(file.stats.deletions)
-    )
-    s = s .. " " .. file.stats.additions .. ", " .. file.stats.deletions
-  end
-
-  if show_path then
-    offset = #s + 1
-    comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #file.parent_path)
-    s = s .. " " .. file.parent_path
-  end
-
-  comp:add_line(s)
-end
-
----@param comp RenderComponent
----@param dir FileEntry
-local function render_directory(comp, dir, depth, line_idx)
-  comp:add_hl(renderer.get_git_hl(dir.status), line_idx, 0, 1)
-  local s = dir.status .. " "
-  local offset = #s
-
-  local indent = "  "
-  for _ = 1, depth do
-    s = s .. indent
-    offset = offset + #indent
-  end
-
-  local icon = renderer.get_file_icon(dir.basename, dir.extension, comp, line_idx, offset)
-  offset = offset + #icon
-  comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #dir.path)
-  s = s .. icon .. dir.path
-
-  comp:add_line(s)
-end
-
----@param comp RenderComponent
----@param files FileEntry[]
-local function render_files(comp, files)
-  local show_tree = true
-
-  local line_idx = 0
-  if not show_tree then
-    for _, file in ipairs(files) do
-      render_file(comp, file, 0, line_idx, true)
-      line_idx = line_idx + 1
-    end
-    return
-  end
-
-  local tree = FileTree()
-  tree:add_file_entries(files)
-
-  local tree_items = tree:list()
-
-  for _, node in ipairs(tree_items) do
-    local depth = node.depth
-    local is_file = not node:has_children()
-
-    if not is_file then
-      local dir_name = node.name
-      local dir = FileEntry({
-        path = dir_name,
-        status = " ",
-        -- TODO: other properties
-      })
-      render_directory(comp, dir, depth, line_idx)
-    else
-      local file = node.data
-      render_file(comp, file, depth, line_idx, false)
-    end
-
-    line_idx = line_idx + 1
-  end
-end
-
 function FilePanel:render()
-  if not self.render_data then
-    return
-  end
-
-  self.render_data:clear()
-
-  ---@type RenderComponent
-  local comp = self.components.path.comp
-  local line_idx = 0
-  local s = utils.path_shorten(vim.fn.fnamemodify(self.git_root, ":~"), self.width - 6)
-  comp:add_hl("DiffviewFilePanelRootPath", line_idx, 0, #s)
-  comp:add_line(s)
-
-  comp = self.components.working.title.comp
-  line_idx = 0
-  s = "Changes"
-  comp:add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
-  local change_count = "(" .. #self.files.working .. ")"
-  comp:add_hl("DiffviewFilePanelCounter", line_idx, #s + 1, #s + 1 + string.len(change_count))
-  s = s .. " " .. change_count
-  comp:add_line(s)
-
-  render_files(self.components.working.files.comp, self.files.working)
-
-  if #self.files.staged > 0 then
-    comp = self.components.staged.title.comp
-    line_idx = 0
-    comp:add_line("")
-    line_idx = line_idx + 1
-    s = "Staged changes"
-    comp:add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
-    change_count = "(" .. #self.files.staged .. ")"
-    comp:add_hl("DiffviewFilePanelCounter", line_idx, #s + 1, #s + 1 + string.len(change_count))
-    s = s .. " " .. change_count
-    comp:add_line(s)
-
-    render_files(self.components.staged.files.comp, self.files.staged)
-  end
-
-  if self.rev_pretty_name or (self.path_args and #self.path_args > 0) then
-    local extra_info = utils.tbl_concat({ self.rev_pretty_name }, self.path_args or {})
-
-    comp = self.components.info.title.comp
-    line_idx = 0
-    comp:add_line("")
-    line_idx = line_idx + 1
-
-    s = "Showing changes for:"
-    comp:add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
-    comp:add_line(s)
-
-    comp = self.components.info.entries.comp
-    line_idx = 0
-    for _, arg in ipairs(extra_info) do
-      local relpath = utils.path_relative(arg, self.git_root)
-      if relpath == "" then
-        relpath = "."
-      end
-      s = utils.path_shorten(relpath, self.width - 5)
-      comp:add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
-      comp:add_line(s)
-      line_idx = line_idx + 1
-    end
-  end
+  require("diffview.views.diff.render")(self)
 end
 
 M.FilePanel = FilePanel

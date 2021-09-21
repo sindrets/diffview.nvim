@@ -20,6 +20,7 @@ M.defaults = {
     position = "left",
     width = 35,
     height = 10,
+    listing_style = "tree",
   },
   file_history_panel = {
     position = "bottom",

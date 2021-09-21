@@ -246,6 +246,7 @@ function DiffView:update_files()
   end
 
   FileEntry.update_index_stat(self.git_root, self.git_dir, index_stat)
+  self.files:update_file_trees()
   self.panel:update_components()
   self.panel:render()
   self.panel:redraw()
