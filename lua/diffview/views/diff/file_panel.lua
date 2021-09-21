@@ -15,7 +15,7 @@ local M = {}
 ---@field winid integer
 ---@field listing_style '"list"'|'"tree"'
 ---@field render_data RenderData
----@field components CompStruct
+---@field components any
 ---@field constrain_cursor function
 local FilePanel = Panel
 FilePanel = oop.create_class("FilePanel", Panel)
@@ -93,15 +93,15 @@ function FilePanel:update_components()
     -- tree
     working_files = {
       name = "files",
-      unpack(self.files.working_tree:create_comp_schema())
+      unpack(self.files.working_tree and self.files.working_tree:create_comp_schema() or {})
     }
     staged_files = {
       name = "files",
-      unpack(self.files.staged_tree:create_comp_schema())
+      unpack(self.files.staged_tree and self.files.staged_tree:create_comp_schema() or {})
     }
   end
 
-  ---@type CompStruct
+  ---@type any
   self.components = self.render_data:create_component({
     { name = "path" },
     {
@@ -181,6 +181,7 @@ end
 
 function FilePanel:render()
   require("diffview.views.diff.render")(self)
+  -- self.components.comp:pretty_print()
 end
 
 M.FilePanel = FilePanel

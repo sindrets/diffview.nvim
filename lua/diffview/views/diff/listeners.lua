@@ -169,6 +169,16 @@ return function(view)
         vim.cmd("diffoff")
       end
     end,
+    listing_style = function()
+      if view.panel.listing_style == "list" then
+        view.panel.listing_style = "tree"
+      else
+        view.panel.listing_style = "list"
+      end
+      view.panel:update_components()
+      view.panel:render()
+      view.panel:redraw()
+    end,
     focus_files = function()
       view.panel:focus(true)
     end,

@@ -12,7 +12,6 @@ local uid_counter = 0
 ---@field first integer 0 indexed, inclusive
 ---@field last integer Exclusive
 
----@type table<any, CompStruct>
 ---@class CompStruct
 ---@field _name string
 ---@field comp RenderComponent
@@ -164,6 +163,34 @@ function RenderComponent:get_comp_on_line(line)
   end
 
   return recurse(self)
+end
+
+function RenderComponent:pretty_print()
+  local keys = { "name", "lstart", "lend" }
+
+  local function recurse(depth, comp)
+    local outer_padding = string.rep(" ", depth * 2)
+    print(outer_padding .. "{")
+
+    local inner_padding = outer_padding .. "  "
+    for _, k in ipairs(keys) do
+      print(string.format("%s%s = %s,", inner_padding, k, vim.inspect(comp[k])))
+    end
+    if #comp.lines > 0 then
+      print(string.format("%slines = {", inner_padding))
+      for _, line in ipairs(comp.lines) do
+        print(string.format("%s  %s,", inner_padding, vim.inspect(line)))
+      end
+      print(string.format("%s},", inner_padding))
+    end
+    for _, child in ipairs(comp.components) do
+      recurse(depth + 1, child)
+    end
+
+    print(outer_padding .. "},")
+  end
+
+  recurse(0, self)
 end
 
 ---@class RenderData

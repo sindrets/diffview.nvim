@@ -20,11 +20,15 @@ function FileTree:init(files)
 end
 
 function FileTree:create_comp_schema()
+  self.root:sort()
   local schema = {}
 
   local function recurse(parent, node)
     if node:has_children() then
-      local struct = { name = "directory", context = node.data }
+      local struct = {
+        name = "wrapper",
+        { name = "directory", context = node.data }
+      }
       parent[#parent + 1] = struct
       for _, child in ipairs(node.children) do
         recurse(struct, child)
