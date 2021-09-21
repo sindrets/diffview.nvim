@@ -1,5 +1,4 @@
 local DirEntry = require("diffview.views.file_tree.dir_entry").DirEntry
-local FileTree = require("diffview.views.file_tree.file_tree").FileTree
 local renderer = require("diffview.renderer")
 
 local M = {}
@@ -74,11 +73,8 @@ local function render_directory(comp, dir, depth, line_idx)
 end
 
 ---@param comp RenderComponent
----@param files FileEntry[]
-function M.render_file_tree(comp, files)
-  local tree = FileTree()
-  tree:add_file_entries(files)
-
+---@param tree FileTree
+function M.render_file_tree(comp, tree)
   local tree_items = tree:list()
   local line_idx = 0
 

@@ -3,6 +3,7 @@ local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local render = require("diffview.views.diff.render")
 local renderer = require("diffview.renderer")
+local FileTree = require("diffview.views.file_tree.file_tree").FileTree
 local Panel = require("diffview.ui.panel").Panel
 local api = vim.api
 local M = {}
@@ -149,13 +150,13 @@ function FilePanel:highlight_next_file()
   pcall(api.nvim_win_set_cursor, self.winid, { self.constrain_cursor(self.winid, 1), 0 })
 end
 
----@param comp RenderComponent
----@param files FileEntry[]
+---@param comp RenderComponent component for staged/working files
+---@param files FileEntry[]    file entries
 local function render_files(comp, files)
   -- TODO: make option
   local show_tree = true
   if show_tree then
-    render.render_file_tree(comp, files)
+    render.render_file_tree(comp, FileTree(files))
   else
     render.render_file_list(comp, files)
   end
