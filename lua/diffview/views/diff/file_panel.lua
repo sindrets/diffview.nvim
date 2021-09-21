@@ -153,9 +153,8 @@ end
 ---@param comp RenderComponent component for staged/working files
 ---@param files FileEntry[]    file entries
 local function render_files(comp, files)
-  -- TODO: make option
-  local show_tree = true
-  if show_tree then
+  local conf = config.get_config()
+  if conf.file_panel.show_tree then
     render.render_file_tree(comp, FileTree(files))
   else
     render.render_file_list(comp, files)

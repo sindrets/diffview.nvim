@@ -48,6 +48,7 @@ Example configuration with default settings:
         position = "left",      -- One of 'left', 'right', 'top', 'bottom'
         width = 35,             -- Only applies when position is 'left' or 'right'
         height = 10,            -- Only applies when position is 'top' or 'bottom'
+        show_tree = false,      -- Show files in a file tree instead of list.
       },
       file_history_panel = {
         position = "bottom",
