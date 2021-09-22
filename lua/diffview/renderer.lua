@@ -12,6 +12,11 @@ local uid_counter = 0
 ---@field first integer 0 indexed, inclusive
 ---@field last integer Exclusive
 
+---@class CompStruct
+---@field _name string
+---@field comp RenderComponent
+local CompStruct
+
 ---@class RenderComponent
 ---@field name string
 ---@field parent RenderComponent
@@ -28,7 +33,7 @@ RenderComponent = oop.create_class("RenderComponent")
 ---RenderComponent constructor.
 ---@return RenderComponent
 function RenderComponent:init(name)
-  self.name = name
+  self.name = name or RenderComponent.next_uid()
   self.lines = {}
   self.hl = {}
   self.components = {}
@@ -61,24 +66,43 @@ function RenderComponent.next_uid()
   return uid
 end
 
----Create and add a new component.
----@param schema any
----@return RenderComponent|any
-function RenderComponent:create_component(schema)
+---Create a new compoenent
+---@param schema table
+---@return RenderComponent, CompStruct
+function RenderComponent.create_static_component(schema)
   local comp_struct
-  local new_comp = RenderComponent(schema and schema.name or RenderComponent.next_uid())
-  table.insert(self.components, new_comp)
+  local new_comp = RenderComponent(schema and schema.name or nil)
 
   if schema then
     new_comp.context = schema.context
     comp_struct = { _name = new_comp.name, comp = new_comp }
     create_subcomponents(new_comp, comp_struct, schema)
+  end
+
+  return new_comp, comp_struct
+end
+
+---Create and add a new component.
+---@param schema table
+---@return RenderComponent|CompStruct
+function RenderComponent:create_component(schema)
+  local new_comp, comp_struct = RenderComponent.create_static_component(schema)
+  self:add_component(new_comp)
+
+  if comp_struct then
     return comp_struct
   end
 
   return new_comp
 end
 
+---@param component RenderComponent
+function RenderComponent:add_component(component)
+  component.parent = self
+  table.insert(self.components, component)
+end
+
+---@param component RenderComponent
 function RenderComponent:remove_component(component)
   for i, c in ipairs(self.components) do
     if c == component then
@@ -90,10 +114,15 @@ function RenderComponent:remove_component(component)
   return false
 end
 
+---@param line string
 function RenderComponent:add_line(line)
   table.insert(self.lines, line)
 end
 
+---@param group string
+---@param line_idx integer
+---@param first integer
+---@param last integer
 function RenderComponent:add_hl(group, line_idx, first, last)
   table.insert(self.hl, {
     group = group,
@@ -136,6 +165,66 @@ function RenderComponent:get_comp_on_line(line)
   return recurse(self)
 end
 
+---@param callback function(comp: RenderComponent, i: integer, parent: RenderComponent)
+function RenderComponent:some(callback)
+  for i, child in ipairs(self.components) do
+    if callback(child, i, self) then
+      return
+    end
+  end
+end
+
+function RenderComponent:deep_some(callback)
+  local function wrap(comp, i, parent)
+    if callback(comp, i, parent) then
+      return true
+    else
+      return comp:some(wrap)
+    end
+  end
+  self:some(wrap)
+end
+
+function RenderComponent:leaves()
+  local leaves = {}
+  self:deep_some(function(comp)
+    if #comp.components == 0 then
+      leaves[#leaves + 1] = comp
+    end
+    return false
+  end)
+
+  return leaves
+end
+
+function RenderComponent:pretty_print()
+  local keys = { "name", "lstart", "lend" }
+
+  local function recurse(depth, comp)
+    local outer_padding = string.rep(" ", depth * 2)
+    print(outer_padding .. "{")
+
+    local inner_padding = outer_padding .. "  "
+    for _, k in ipairs(keys) do
+      print(string.format("%s%s = %s,", inner_padding, k, vim.inspect(comp[k])))
+    end
+    if #comp.lines > 0 then
+      print(string.format("%slines = {", inner_padding))
+      for _, line in ipairs(comp.lines) do
+        print(string.format("%s  %s,", inner_padding, vim.inspect(line)))
+      end
+      print(string.format("%s},", inner_padding))
+    end
+    for _, child in ipairs(comp.components) do
+      recurse(depth + 1, child)
+    end
+
+    print(outer_padding .. "},")
+  end
+
+  recurse(0, self)
+end
+
 ---@class RenderData
 ---@field lines string[]
 ---@field hl HlData[]
@@ -154,12 +243,12 @@ function RenderData:init(ns_name)
 end
 
 ---Create and add a new component.
----@param schema any
----@return RenderComponent|any
+---@param schema table
+---@return RenderComponent|CompStruct
 function RenderData:create_component(schema)
   local comp_struct
-  local new_comp = RenderComponent(schema and schema.name or RenderComponent.next_uid())
-  table.insert(self.components, new_comp)
+  local new_comp = RenderComponent(schema and schema.name or nil)
+  self:add_component(new_comp)
 
   if schema then
     new_comp.context = schema.context
@@ -171,6 +260,12 @@ function RenderData:create_component(schema)
   return new_comp
 end
 
+---@param component RenderComponent
+function RenderData:add_component(component)
+  table.insert(self.components, component)
+end
+
+---@param component RenderComponent
 function RenderData:remove_component(component)
   for i, c in ipairs(self.components) do
     if c == component then
@@ -182,6 +277,10 @@ function RenderData:remove_component(component)
   return false
 end
 
+---@param group string
+---@param line_idx integer
+---@param first integer
+---@param last integer
 function RenderData:add_hl(group, line_idx, first, last)
   table.insert(self.hl, {
     group = group,

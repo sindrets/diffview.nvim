@@ -15,12 +15,14 @@ M.defaults = {
   signs = {
     fold_closed = "",
     fold_open = "",
+    folder_closed = "",
+    folder_open = "",
   },
   file_panel = {
     position = "left",
     width = 35,
     height = 10,
-    show_tree = false,
+    listing_style = "tree",
   },
   file_history_panel = {
     position = "bottom",
@@ -64,6 +66,7 @@ M.defaults = {
       ["gf"]            = cb("goto_file"),
       ["<C-w><C-f>"]    = cb("goto_file_split"),
       ["<C-w>gf"]       = cb("goto_file_tab"),
+      ["i"]             = cb("listing_style"),
       ["<leader>e"]     = cb("focus_files"),
       ["<leader>b"]     = cb("toggle_files"),
     },

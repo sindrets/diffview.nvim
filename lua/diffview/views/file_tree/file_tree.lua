@@ -10,7 +10,7 @@ local FileTree = oop.Object
 FileTree = oop.create_class("FileTree")
 
 ---FileTree constructor
----@param files FileEntry[]
+---@param files FileEntry[]|nil
 ---@return FileTree
 function FileTree:init(files)
   self.root = Node("")
@@ -18,6 +18,32 @@ function FileTree:init(files)
   for _, file in ipairs(files) do
     self:add_file_entry(file)
   end
+end
+
+function FileTree:create_comp_schema()
+  self.root:sort()
+  local schema = {}
+
+  local function recurse(parent, node)
+    if node:has_children() then
+      local struct = {
+        name = "wrapper",
+        { name = "directory", context = node.data }
+      }
+      parent[#parent + 1] = struct
+      for _, child in ipairs(node.children) do
+        recurse(struct, child)
+      end
+    else
+      parent[#parent + 1] = { name = "file", context = node.data }
+    end
+  end
+
+  for _, node in ipairs(self.root.children) do
+    recurse(schema, node)
+  end
+
+  return schema
 end
 
 ---@param file FileEntry
@@ -29,7 +55,7 @@ function FileTree:add_file_entry(file)
   for i = 1, #parts - 1 do
     local name = parts[i]
     if not cur_node.children[name] then
-      cur_node = cur_node:add_child(Node(name))
+      cur_node = cur_node:add_child(Node(name, { collapsed = false, name = name }))
     else
       cur_node = cur_node.children[name]
     end

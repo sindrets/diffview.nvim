@@ -274,6 +274,7 @@ function M.diff_file_list(git_root, left, right, path_args, opt)
     files.staged = tracked_files(git_root, left_rev, right_rev, "--cached HEAD" .. p_args, "staged")
   end
 
+  files:update_file_trees()
   return files
 end
 

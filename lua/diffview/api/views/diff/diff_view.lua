@@ -43,7 +43,6 @@ function CDiffView:init(opt)
   self.right = opt.right
   self.options = opt.options
   self.files = FileDict()
-  self.file_idx = 1
   self.fetch_files = opt.update_files
   self.get_file_data = opt.get_file_data
   self.panel = FilePanel(
@@ -53,14 +52,14 @@ function CDiffView:init(opt)
     self.rev_arg or git.rev_to_pretty_string(self.left, self.right)
   )
 
-  local files, selected = self:create_file_entries(opt.files)
-  self.file_idx = selected
+  local files = self:create_file_entries(opt.files)
 
   for kind, entries in pairs(files) do
     for _, entry in ipairs(entries) do
       table.insert(self.files[kind], entry)
     end
   end
+  self.files:update_file_trees()
 end
 
 ---@Override
@@ -70,7 +69,6 @@ end
 
 function CDiffView:create_file_entries(files)
   local entries = {}
-  local i, file_idx = 1, 1
 
   local sections = {
     { kind = "working", files = files.working, left = self.left, right = self.right },
@@ -103,13 +101,12 @@ function CDiffView:create_file_entries(files)
       )
 
       if file_data.selected == true then
-        file_idx = i
+        self.panel.cur_file = entries[v.kind][#entries[v.kind]]
       end
-      i = i + 1
     end
   end
 
-  return entries, file_idx
+  return entries
 end
 
 M.CDiffView = CDiffView
