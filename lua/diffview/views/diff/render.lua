@@ -3,12 +3,14 @@ local renderer = require("diffview.renderer")
 
 local M = {}
 
----@param comp RenderComponent
+---@param comp RenderComponent component responsible for rendering an entry
 ---@param file FileEntry
 ---@param depth number
 ---@param line_idx number
 ---@param show_path number
-local function render_file(comp, file, depth, line_idx, show_path)
+local function render_file(comp, file, depth, show_path)
+  local line_idx = 0 -- file rendered on one line
+
   comp:add_hl(renderer.get_git_hl(file.status), line_idx, 0, 1)
   local s = file.status .. " "
   local offset = 0
@@ -51,9 +53,11 @@ local function render_file(comp, file, depth, line_idx, show_path)
   comp:add_line(s)
 end
 
----@param comp RenderComponent
+---@param comp RenderComponent component responsible for rendering an entry
 ---@param dir DirEntry
-local function render_directory(comp, dir, depth, line_idx)
+local function render_directory(comp, dir, depth)
+  local line_idx = 0 -- directory rendered on one line
+
   comp:add_hl(renderer.get_git_hl(dir.status), line_idx, 0, 1)
   local s = dir.status .. " "
   local offset = #s
@@ -64,7 +68,7 @@ local function render_directory(comp, dir, depth, line_idx)
     offset = offset + #indent
   end
 
-  local icon = renderer.get_file_icon(dir.name, "", comp, line_idx, offset)
+  local icon = renderer.get_file_icon(dir.name, nil, comp, line_idx, offset)
   offset = offset + #icon
   comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #dir.name)
   s = s .. icon .. dir.name
@@ -72,32 +76,28 @@ local function render_directory(comp, dir, depth, line_idx)
   comp:add_line(s)
 end
 
----@param comp RenderComponent
+---@param comp RenderComponent parent component containing subcomponents for all entries
 ---@param tree_items Node[]
 function M.render_file_tree(comp, tree_items)
-  local line_idx = 0
-  for _, node in ipairs(tree_items) do
+  for i, node in ipairs(tree_items) do
     if node:has_children() then
       -- TODO: Proper git status and add git stats for directories
       local dir = DirEntry(node.name, " ", nil)
-      render_directory(comp, dir, node.depth, line_idx)
+      render_directory(comp.components[i], dir, node.depth)
     else
       local file = node.data
-      render_file(comp, file, node.depth, line_idx, false)
+      render_file(comp.components[i], file, node.depth, false)
     end
-    line_idx = line_idx + 1
   end
 end
 
 ---@param comp RenderComponent
 ---@param tree_items Node[]
 function M.render_file_list(comp, tree_items)
-  local line_idx = 0
-  for _, node in ipairs(tree_items) do
+  for i, node in ipairs(tree_items) do
     if not node:has_children() then
       local file = node.data
-      render_file(comp, file, 0, line_idx, true)
-      line_idx = line_idx + 1
+      render_file(comp.components[i], file, 0, true)
     end
   end
 end

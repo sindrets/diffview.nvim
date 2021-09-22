@@ -82,18 +82,32 @@ function FilePanel:init_buffer_opts()
 end
 
 function FilePanel:update_components()
+  local node_schema = { working = {}, staged = {} }
+  for _, node in ipairs(self.tree_items.working) do
+    table.insert(node_schema.working, {
+      name = "node",
+      context = node,
+    })
+  end
+  for _, node in ipairs(self.tree_items.staged) do
+    table.insert(node_schema.staged, {
+      name = "node",
+      context = node,
+    })
+  end
+
   ---@type any
   self.components = self.render_data:create_component({
     { name = "path" },
     {
       name = "working",
       { name = "title" },
-      { name = "files" },
+      { name = "entries", unpack(node_schema.working) },
     },
     {
       name = "staged",
       { name = "title" },
-      { name = "files" },
+      { name = "entries", unpack(node_schema.staged) },
     },
     {
       name = "info",
@@ -103,8 +117,8 @@ function FilePanel:update_components()
   })
 
   self.constrain_cursor = renderer.create_cursor_constraint({
-    self.components.working.files.comp,
-    self.components.staged.files.comp,
+    self.components.working.entries.comp,
+    self.components.staged.entries.comp,
   })
 end
 
@@ -118,10 +132,10 @@ function FilePanel:get_file_at_cursor()
   local cursor = api.nvim_win_get_cursor(self.winid)
   local line = cursor[1]
 
-  if line > self.components.working.files.comp.lend then
-    return self.files.staged[line - self.components.staged.files.comp.lstart]
+  if line > self.components.working.entries.comp.lend then
+    return self.files.staged[line - self.components.staged.entries.comp.lstart]
   else
-    return self.files.working[line - self.components.working.files.comp.lstart]
+    return self.files.working[line - self.components.working.entries.comp.lstart]
   end
 end
 
@@ -135,9 +149,9 @@ function FilePanel:highlight_file(file)
       local offset
       if i > #self.files.working then
         i = i - #self.files.working
-        offset = self.components.staged.files.comp.lstart
+        offset = self.components.staged.entries.comp.lstart
       else
-        offset = self.components.working.files.comp.lstart
+        offset = self.components.working.entries.comp.lstart
       end
       pcall(api.nvim_win_set_cursor, self.winid, { i + offset, 0 })
     end
@@ -194,7 +208,7 @@ function FilePanel:render()
   s = s .. " " .. change_count
   comp:add_line(s)
 
-  render_files(self.components.working.files.comp, self.tree_items.working)
+  render_files(self.components.working.entries.comp, self.tree_items.working)
 
   if #self.files.staged > 0 then
     comp = self.components.staged.title.comp
@@ -208,7 +222,7 @@ function FilePanel:render()
     s = s .. " " .. change_count
     comp:add_line(s)
 
-    render_files(self.components.staged.files.comp, self.tree_items.staged)
+    render_files(self.components.staged.entries.comp, self.tree_items.staged)
   end
 
   if self.rev_pretty_name or (self.path_args and #self.path_args > 0) then
