@@ -95,11 +95,11 @@ function FilePanel:update_components()
     -- tree
     working_files = {
       name = "files",
-      unpack(self.files.working_tree and self.files.working_tree:create_comp_schema() or {})
+      unpack(self.files.working_tree:create_comp_schema()),
     }
     staged_files = {
       name = "files",
-      unpack(self.files.staged_tree and self.files.staged_tree:create_comp_schema() or {})
+      unpack(self.files.staged_tree:create_comp_schema()),
     }
   end
 
@@ -138,8 +138,8 @@ function FilePanel:ordered_file_list()
     return list
   else
     local nodes = utils.tbl_concat(
-      self.files.working_tree and self.files.working_tree.root:leaves() or {},
-      self.files.staged_tree and self.files.staged_tree.root:leaves() or {}
+      self.files.working_tree.root:leaves(),
+      self.files.staged_tree.root:leaves()
     )
     return vim.tbl_map(function(node)
       return node.data
@@ -271,7 +271,6 @@ end
 
 function FilePanel:render()
   require("diffview.views.diff.render")(self)
-  -- self.components.comp:pretty_print()
 end
 
 M.FilePanel = FilePanel

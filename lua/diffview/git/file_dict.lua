@@ -33,16 +33,8 @@ function FileDict:init()
 end
 
 function FileDict:update_file_trees()
-  if #self.working > 0 then
-    self.working_tree = FileTree(self.working)
-  else
-    self.working_tree = nil
-  end
-  if #self.staged > 0 then
-    self.staged_tree = FileTree(self.staged)
-  else
-    self.staged_tree = nil
-  end
+  self.working_tree = FileTree(self.working)
+  self.staged_tree = FileTree(self.staged)
 end
 
 function FileDict:size()

@@ -14,7 +14,6 @@ FileTree = oop.create_class("FileTree")
 ---@return FileTree
 function FileTree:init(files)
   self.root = Node("")
-
   for _, file in ipairs(files) do
     self:add_file_entry(file)
   end
@@ -28,7 +27,7 @@ function FileTree:create_comp_schema()
     if node:has_children() then
       local struct = {
         name = "wrapper",
-        { name = "directory", context = node.data }
+        { name = "directory", context = node.data },
       }
       parent[#parent + 1] = struct
       for _, child in ipairs(node.children) do
@@ -62,12 +61,6 @@ function FileTree:add_file_entry(file)
   end
 
   cur_node:add_child(Node(parts[#parts], file))
-end
-
----Lists the nodes in the file tree with depths.
----@return Node[]
-function FileTree:list()
-  return self.root:children_recursive(0)
 end
 
 M.FileTree = FileTree
