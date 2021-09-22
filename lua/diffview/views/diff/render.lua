@@ -63,11 +63,13 @@ local function render_file_tree_recurse(depth, comp)
 
   local dir = comp.components[1]
   local ctx = dir.context
-  -- TODO: git status for dirs
-  s = "  "
-  s = s .. string.rep(" ", depth * 2)
 
+  dir:add_hl(renderer.get_git_hl(ctx.status), 0, 0, 1)
+  s = ctx.status .. " "
+
+  s = s .. string.rep(" ", depth * 2)
   offset = #s
+
   local fold = ctx.collapsed and conf.signs.fold_closed or conf.signs.fold_open
   local folder = ctx.collapsed and conf.signs.folder_closed or conf.signs.folder_open
   dir:add_hl("Whitespace", 0, offset, offset + #fold)

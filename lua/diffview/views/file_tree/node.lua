@@ -41,7 +41,6 @@ end
 
 ---Compare against another node alphabetically and case-insensitive by node names.
 ---Directory nodes come before file nodes.
----
 ---@param a Node
 ---@param b Node
 ---@return true if node a comes before node b
@@ -96,10 +95,10 @@ end
 ---pre-order traversal of the tree.
 ---@return Node[]
 function Node:children_recursive(start_depth)
-  local nodes = {}
   local children = vim.tbl_values(self.children)
   utils.merge_sort(children, Node.comparator)
 
+  local nodes = {}
   for _, child in ipairs(children) do
     child.depth = start_depth
     table.insert(nodes, child)

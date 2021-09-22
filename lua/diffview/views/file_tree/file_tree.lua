@@ -4,6 +4,11 @@ local Node = require("diffview.views.file_tree.node").Node
 
 local M = {}
 
+---@class DirData
+---@field name string
+---@field collapsed boolean
+---@field status string
+
 ---@class FileTree
 ---@field root Node
 local FileTree = oop.Object
@@ -16,6 +21,62 @@ function FileTree:init(files)
   self.root = Node("")
   for _, file in ipairs(files) do
     self:add_file_entry(file)
+  end
+end
+
+---@param file FileEntry
+function FileTree:add_file_entry(file)
+  local parts = utils.path_explode(file.path)
+  local cur_node = self.root
+
+  -- Create missing intermediate pathname components
+  for i = 1, #parts - 1 do
+    local name = parts[i]
+    if not cur_node.children[name] then
+      ---@type DirData
+      local dir_data = {
+        name = name,
+        collapsed = false,
+        status = " ", -- updated later in FileTree:update_statuses()
+      }
+      cur_node = cur_node:add_child(Node(name, dir_data))
+    else
+      cur_node = cur_node.children[name]
+    end
+  end
+
+  cur_node:add_child(Node(parts[#parts], file))
+end
+
+---@param a string
+---@param b string
+---@return string
+local function combine_statuses(a, b)
+  if a == " " or a == "?" or a == "!" or a == b then
+    return b
+  end
+  return "M"
+end
+
+function FileTree:update_statuses()
+  ---@return string the node's status
+  local function recurse(node)
+    if not node:has_children() then
+      return node.data.status
+    end
+
+    local parent_status = " "
+    for _, child in ipairs(node.children) do
+      local child_status = recurse(child)
+      parent_status = combine_statuses(parent_status, child_status)
+    end
+
+    node.data.status = parent_status
+    return parent_status
+  end
+
+  for _, node in ipairs(self.root.children) do
+    recurse(node)
   end
 end
 
@@ -43,24 +104,6 @@ function FileTree:create_comp_schema()
   end
 
   return schema
-end
-
----@param file FileEntry
-function FileTree:add_file_entry(file)
-  local parts = utils.path_explode(file.path)
-  local cur_node = self.root
-
-  -- Create missing intermediate pathname components
-  for i = 1, #parts - 1 do
-    local name = parts[i]
-    if not cur_node.children[name] then
-      cur_node = cur_node:add_child(Node(name, { collapsed = false, name = name }))
-    else
-      cur_node = cur_node.children[name]
-    end
-  end
-
-  cur_node:add_child(Node(parts[#parts], file))
 end
 
 M.FileTree = FileTree

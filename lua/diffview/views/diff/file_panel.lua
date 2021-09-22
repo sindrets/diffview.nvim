@@ -91,8 +91,9 @@ function FilePanel:update_components()
         context = file,
       })
     end
-  else
-    -- tree
+  elseif self.listing_style == "tree" then
+    self.files.working_tree:update_statuses()
+    self.files.staged_tree:update_statuses()
     working_files = {
       name = "files",
       unpack(self.files.working_tree:create_comp_schema()),
