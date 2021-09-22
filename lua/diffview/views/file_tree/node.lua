@@ -4,9 +4,9 @@ local M = {}
 
 ---@class Node
 ---@field name string
+---@field data any
 ---@field children Node[]
 ---@field depth integer|nil
----@param data any|nil
 local Node = oop.Object
 Node = oop.create_class("Node")
 
@@ -24,19 +24,11 @@ end
 ---@param child Node
 ---@return Node
 function Node:add_child(child)
-  if self.children[child.name] == nil then
+  if not self.children[child.name] then
     self.children[child.name] = child
+    self.children[#self.children + 1] = child
   end
   return self.children[child.name]
-end
-
----@return integer
-function Node:count_children()
-  local count = 0
-  for _ in pairs(self.children) do
-    count = count + 1
-  end
-  return count
 end
 
 ---@return boolean
@@ -53,7 +45,7 @@ end
 ---@param a Node
 ---@param b Node
 ---@return true if node a comes before node b
-local function compare_nodes(a, b)
+function Node.comparator(a, b)
   if a:has_children() == b:has_children() then
     return string.lower(a.name) < string.lower(b.name)
   else
@@ -61,17 +53,54 @@ local function compare_nodes(a, b)
   end
 end
 
----Returns a sorted list of children recursively, with their depths.
+function Node:sort()
+  for _, child in ipairs(self.children) do
+    child:sort()
+  end
+  utils.merge_sort(self.children, Node.comparator)
+end
+
+---@param callback function(node: Node, i: integer, parent: Node)
+function Node:some(callback)
+  for i, child in ipairs(self.children) do
+    if callback(child, i, self) then
+      return
+    end
+  end
+end
+
+function Node:deep_some(callback)
+  local function wrap(node, i, parent)
+    if callback(node, i, parent) then
+      return true
+    else
+      return node:some(wrap)
+    end
+  end
+  self:some(wrap)
+end
+
+function Node:leaves()
+  local leaves = {}
+  self:deep_some(function(node)
+    if #node.children == 0 then
+      leaves[#leaves + 1] = node
+    end
+    return false
+  end)
+
+  return leaves
+end
+
+---Returns an ordered list of children recursively, with their depths, by
+---pre-order traversal of the tree.
 ---@return Node[]
 function Node:children_recursive(start_depth)
-  local children = {}
-  for _, child in pairs(self.children) do
-    table.insert(children, child)
-  end
-  utils.merge_sort(children, compare_nodes)
-
   local nodes = {}
-  for _, child in pairs(children) do
+  local children = vim.tbl_values(self.children)
+  utils.merge_sort(children, Node.comparator)
+
+  for _, child in ipairs(children) do
     child.depth = start_depth
     table.insert(nodes, child)
 

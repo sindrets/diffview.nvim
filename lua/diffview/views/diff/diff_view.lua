@@ -47,7 +47,6 @@ function DiffView:init(opt)
   self.right = opt.right
   self.options = opt.options
   self.files = git.diff_file_list(opt.git_root, opt.left, opt.right, opt.path_args, opt.options)
-  self.file_idx = 1
   self.panel = FilePanel(
     self.git_root,
     self.files,
@@ -60,7 +59,7 @@ end
 function DiffView:post_open()
   self:init_event_listeners()
   vim.schedule(function()
-    local file = self:cur_file()
+    local file = self.panel.cur_file or self.panel:next_file()
     if file then
       self:set_file(file)
     else
@@ -78,15 +77,6 @@ function DiffView:close()
   DiffView:super().close(self)
 end
 
----Get the current file.
----@return FileEntry
-function DiffView:cur_file()
-  if self.files:size() > 0 then
-    return self.files[utils.clamp(self.file_idx, 1, self.files:size())]
-  end
-  return nil
-end
-
 function DiffView:next_file()
   self:ensure_layout()
   if self:file_safeguard() then
@@ -94,19 +84,20 @@ function DiffView:next_file()
   end
 
   if self.files:size() > 1 or self.nulled then
-    local cur = self:cur_file()
+    local cur = self.panel.cur_file
     if cur then
       cur:detach_buffers()
     end
-    self.file_idx = self.file_idx % self.files:size() + 1
     vim.cmd("diffoff!")
-    cur = self.files[self.file_idx]
-    cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
-    self:update_windows()
-    self.panel:highlight_file(self:cur_file())
-    self.nulled = false
+    cur = self.panel:next_file()
+    if cur then
+      cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
+      self:update_windows()
+      self.panel:highlight_file(cur)
+      self.nulled = false
 
-    return cur
+      return cur
+    end
   end
 end
 
@@ -117,19 +108,20 @@ function DiffView:prev_file()
   end
 
   if self.files:size() > 1 or self.nulled then
-    local cur = self:cur_file()
+    local cur = self.panel.cur_file
     if cur then
       cur:detach_buffers()
     end
-    self.file_idx = (self.file_idx - 2) % self.files:size() + 1
     vim.cmd("diffoff!")
-    cur = self.files[self.file_idx]
-    cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
-    self:update_windows()
-    self.panel:highlight_file(self:cur_file())
-    self.nulled = false
+    cur = self.panel:prev_file()
+    if cur then
+      cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
+      self:update_windows()
+      self.panel:highlight_file(cur)
+      self.nulled = false
 
-    return cur
+      return cur
+    end
   end
 end
 
@@ -139,17 +131,17 @@ function DiffView:set_file(file, focus)
     return
   end
 
-  for i, f in self.files:ipairs() do
+  for _, f in self.files:ipairs() do
     if f == file then
-      local cur = self:cur_file()
+      local cur = self.panel.cur_file
       if cur then
         cur:detach_buffers()
       end
-      self.file_idx = i
       vim.cmd("diffoff!")
-      self.files[self.file_idx]:load_buffers(self.git_root, self.left_winid, self.right_winid)
+      file:load_buffers(self.git_root, self.left_winid, self.right_winid)
       self:update_windows()
-      self.panel:highlight_file(self:cur_file())
+      self.panel.cur_file = file
+      self.panel:highlight_file(file)
       self.nulled = false
 
       if focus then
@@ -203,7 +195,6 @@ function DiffView:update_files()
       return aa.path == bb.path
     end)
     local script = diff:create_edit_script()
-    local cur_file = self:cur_file()
 
     local ai = 1
     local bi = 1
@@ -220,21 +211,18 @@ function DiffView:update_files()
         ai = ai + 1
         bi = bi + 1
       elseif opr == EditToken.DELETE then
-        if cur_file == v.cur_files[ai] then
-          cur_file = self:prev_file()
+        if self.panel.cur_file == v.cur_files[ai] then
+          self.panel.cur_file = self.panel:prev_file()
         end
         v.cur_files[ai]:destroy()
         table.remove(v.cur_files, ai)
       elseif opr == EditToken.INSERT then
         table.insert(v.cur_files, ai, v.new_files[bi])
-        if ai <= self.file_idx then
-          self.file_idx = self.file_idx + 1
-        end
         ai = ai + 1
         bi = bi + 1
       elseif opr == EditToken.REPLACE then
-        if cur_file == v.cur_files[ai] then
-          cur_file = self:prev_file()
+        if self.panel.cur_file == v.cur_files[ai] then
+          self.panel.cur_file = self.panel:prev_file()
         end
         v.cur_files[ai]:destroy()
         table.remove(v.cur_files, ai)
@@ -246,11 +234,15 @@ function DiffView:update_files()
   end
 
   FileEntry.update_index_stat(self.git_root, self.git_dir, index_stat)
+  self.files:update_file_trees()
   self.panel:update_components()
   self.panel:render()
   self.panel:redraw()
-  self.file_idx = utils.clamp(self.file_idx, 1, self.files:size())
-  self:set_file(self:cur_file())
+
+  if utils.tbl_indexof(self.panel:ordered_file_list(), self.panel.cur_file) == -1 then
+    self.panel.cur_file = nil
+  end
+  self:set_file(self.panel.cur_file or self.panel:next_file())
 
   if api.nvim_win_is_valid(last_winid) then
     api.nvim_set_current_win(last_winid)
@@ -286,14 +278,14 @@ function DiffView:recover_layout(state)
     self.left_winid = api.nvim_get_current_win()
     self.panel:open()
     self:post_layout()
-    self:set_file(self:cur_file())
+    self:set_file(self.panel.cur_file)
   elseif not state.right_win then
     api.nvim_set_current_win(self.left_winid)
     vim.cmd("belowright " .. split_cmd)
     self.right_winid = api.nvim_get_current_win()
     self.panel:open()
     self:post_layout()
-    self:set_file(self:cur_file())
+    self:set_file(self.panel.cur_file)
   end
 
   self.ready = true
@@ -303,7 +295,7 @@ end
 ---@return boolean
 function DiffView:file_safeguard()
   if self.files:size() == 0 then
-    local cur = self:cur_file()
+    local cur = self.panel.cur_file
     if cur then
       cur:detach_buffers()
     end
@@ -333,9 +325,12 @@ end
 ---@return FileEntry|nil
 function DiffView:infer_cur_file()
   if self.panel:is_focused() then
-    return self.panel:get_file_at_cursor()
+    local item = self.panel:get_item_at_cursor()
+    if item.class and item:instanceof(FileEntry) then
+      return item
+    end
   else
-    return self:cur_file()
+    return self.panel.cur_file
   end
 end
 
