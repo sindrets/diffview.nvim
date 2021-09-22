@@ -46,12 +46,14 @@ require'diffview'.setup {
   signs = {
     fold_closed = "",
     fold_open = "",
+    folder_closed = "",
+    folder_open = "",
   },
   file_panel = {
     position = "left",      -- One of 'left', 'right', 'top', 'bottom'
     width = 35,             -- Only applies when position is 'left' or 'right'
     height = 10,            -- Only applies when position is 'top' or 'bottom'
-    show_tree = false,      -- Show files in a file tree instead of list.
+    listing_style = "tree", -- One of 'list' or 'tree'
   },
   file_history_panel = {
     position = "bottom",
@@ -97,6 +99,7 @@ require'diffview'.setup {
       ["gf"]            = cb("goto_file"),
       ["<C-w><C-f>"]    = cb("goto_file_split"),
       ["<C-w>gf"]       = cb("goto_file_tab"),
+      ["i"]             = cb("listing_style"),      -- Toggle between 'list' and 'tree' views
       ["<leader>e"]     = cb("focus_files"),
       ["<leader>b"]     = cb("toggle_files"),
     },
