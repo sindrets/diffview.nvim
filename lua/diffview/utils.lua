@@ -67,6 +67,9 @@ function M.pattern_esc(s)
   return result
 end
 
+---Joins an ordered list of path segments into a path string.
+---@param paths string[]
+---@return string
 function M.path_join(paths)
   local result = paths[1]
   for i = 2, #paths do

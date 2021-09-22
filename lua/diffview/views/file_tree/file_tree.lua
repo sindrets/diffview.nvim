@@ -80,29 +80,47 @@ function FileTree:update_statuses()
   end
 end
 
-function FileTree:create_comp_schema()
+---@param flatten_dirs boolean
+function FileTree:create_comp_schema(flatten_dirs)
   self.root:sort()
   local schema = {}
 
   local function recurse(parent, node)
-    if node:has_children() then
-      local struct = {
-        name = "wrapper",
-        { name = "directory", context = node.data },
-      }
-      parent[#parent + 1] = struct
-      for _, child in ipairs(node.children) do
-        recurse(struct, child)
-      end
-    else
+    if not node:has_children() then
       parent[#parent + 1] = { name = "file", context = node.data }
+      return
+    end
+
+    ---@type DirData
+    local dir_data = node.data
+
+    if flatten_dirs then
+      while #node.children == 1 and node.children[1]:has_children() do
+        ---@type DirData
+        local subdir_data = node.children[1].data
+        dir_data = {
+          name = utils.path_join({ dir_data.name, subdir_data.name }),
+          collapsed = dir_data.collapsed and subdir_data.collapsed,
+          status = dir_data.status,
+        }
+        node = node.children[1]
+      end
+    end
+
+    local struct = {
+      name = "wrapper",
+      { name = "directory", context = dir_data },
+    }
+    parent[#parent + 1] = struct
+
+    for _, child in ipairs(node.children) do
+      recurse(struct, child)
     end
   end
 
   for _, node in ipairs(self.root.children) do
     recurse(schema, node)
   end
-
   return schema
 end
 

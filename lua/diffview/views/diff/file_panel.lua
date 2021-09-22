@@ -16,6 +16,7 @@ local M = {}
 ---@field bufid integer
 ---@field winid integer
 ---@field listing_style '"list"'|'"tree"'
+---@field flatten_dirs boolean
 ---@field render_data RenderData
 ---@field components any
 ---@field constrain_cursor function
@@ -57,6 +58,7 @@ function FilePanel:init(git_root, files, path_args, rev_pretty_name)
   self.path_args = path_args
   self.rev_pretty_name = rev_pretty_name
   self.listing_style = conf.file_panel.listing_style
+  self.flatten_dirs = conf.file_panel.flatten_dirs
 end
 
 ---@Override
@@ -96,11 +98,11 @@ function FilePanel:update_components()
     self.files.staged_tree:update_statuses()
     working_files = {
       name = "files",
-      unpack(self.files.working_tree:create_comp_schema()),
+      unpack(self.files.working_tree:create_comp_schema(self.flatten_dirs)),
     }
     staged_files = {
       name = "files",
-      unpack(self.files.staged_tree:create_comp_schema()),
+      unpack(self.files.staged_tree:create_comp_schema(self.flatten_dirs)),
     }
   end
 
