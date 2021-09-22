@@ -2,44 +2,47 @@ local utils = require("diffview.utils")
 local config = require("diffview.config")
 local renderer = require("diffview.renderer")
 
+---@param comp  RenderComponent
+---@param show_path boolean
+---@param depth integer|nil
+local function render_file(comp, show_path, depth)
+  local file = comp.context
+  local offset = 0
+
+  comp:add_hl(renderer.get_git_hl(file.status), 0, 0, 1)
+  local s = file.status .. " "
+  if depth then
+    s = s .. string.rep(" ", depth * 2 + 2)
+  end
+
+  offset = #s
+  local icon = renderer.get_file_icon(file.basename, file.extension, comp, 0, offset)
+
+  offset = offset + #icon
+  comp:add_hl("DiffviewFilePanelFileName", 0, offset, offset + #file.basename)
+  s = s .. icon .. file.basename
+
+  if file.stats then
+    offset = #s + 1
+    comp:add_hl("DiffviewFilePanelInsertions", 0, offset, offset + string.len(file.stats.additions))
+    offset = offset + string.len(file.stats.additions) + 2
+    comp:add_hl("DiffviewFilePanelDeletions", 0, offset, offset + string.len(file.stats.deletions))
+    s = s .. " " .. file.stats.additions .. ", " .. file.stats.deletions
+  end
+
+  if show_path then
+    offset = #s + 1
+    comp:add_hl("DiffviewFilePanelPath", 0, offset, offset + #file.parent_path)
+    s = s .. " " .. file.parent_path
+  end
+
+  comp:add_line(s)
+end
+
 ---@param comp RenderComponent
 local function render_file_list(comp)
   for _, file_comp in ipairs(comp.components) do
-    ---@type FileEntry
-    local file = file_comp.context
-    local offset = 0
-
-    file_comp:add_hl(renderer.get_git_hl(file.status), 0, 0, 1)
-    local s = file.status .. " "
-    offset = #s
-    local icon = renderer.get_file_icon(file.basename, file.extension, file_comp, 0, offset)
-    offset = offset + #icon
-    file_comp:add_hl("DiffviewFilePanelFileName", 0, offset, offset + #file.basename)
-    s = s .. icon .. file.basename
-
-    if file.stats then
-      offset = #s + 1
-      file_comp:add_hl(
-        "DiffviewFilePanelInsertions",
-        0,
-        offset,
-        offset + string.len(file.stats.additions)
-      )
-      offset = offset + string.len(file.stats.additions) + 2
-      file_comp:add_hl(
-        "DiffviewFilePanelDeletions",
-        0,
-        offset,
-        offset + string.len(file.stats.deletions)
-      )
-      s = s .. " " .. file.stats.additions .. ", " .. file.stats.deletions
-    end
-
-    offset = #s + 1
-    file_comp:add_hl("DiffviewFilePanelPath", 0, offset, offset + #file.parent_path)
-    s = s .. " " .. file.parent_path
-
-    file_comp:add_line(s)
+    render_file(file_comp, true)
   end
 end
 
@@ -49,71 +52,41 @@ local function render_file_tree_recurse(depth, comp)
   -- TODO: Proper highlight groups
   local conf = config.get_config()
   local offset, s
-  -- print(vim.inspect(comp, {depth=1}))
 
-  if comp.name == "wrapper" then
-    local dir = comp.components[1]
-    local ctx = dir.context
-    -- TODO: git status for dirs
-    s = "  "
-    s = s .. string.rep(" ", depth * 2)
+  if comp.name == "file" then
+    render_file(comp, false, depth)
+    return
+  end
+  if comp.name ~= "wrapper" then
+    return
+  end
 
-    offset = #s
-    local fold = ctx.collapsed and conf.signs.fold_closed or conf.signs.fold_open
-    local folder = ctx.collapsed and conf.signs.folder_closed or conf.signs.folder_open
-    dir:add_hl("Whitespace", 0, offset, offset + #fold)
-    dir:add_hl("PreProc", 0, offset + #fold + 1, offset + #fold + 1 + #folder)
-    s = string.format("%s%s %s ", s, fold, folder)
+  local dir = comp.components[1]
+  local ctx = dir.context
+  -- TODO: git status for dirs
+  s = "  "
+  s = s .. string.rep(" ", depth * 2)
 
-    offset = #s
-    dir:add_hl("Directory", 0, offset, offset + #ctx.name)
-    dir:add_line(s .. ctx.name)
+  offset = #s
+  local fold = ctx.collapsed and conf.signs.fold_closed or conf.signs.fold_open
+  local folder = ctx.collapsed and conf.signs.folder_closed or conf.signs.folder_open
+  dir:add_hl("Whitespace", 0, offset, offset + #fold)
+  dir:add_hl("PreProc", 0, offset + #fold + 1, offset + #fold + 1 + #folder)
+  s = string.format("%s%s %s ", s, fold, folder)
 
-    if not ctx.collapsed then
-      for i = 2, #comp.components do
-        render_file_tree_recurse(depth + 1, comp.components[i])
-      end
+  offset = #s
+  dir:add_hl("Directory", 0, offset, offset + #ctx.name)
+  dir:add_line(s .. ctx.name)
+
+  if not ctx.collapsed then
+    for i = 2, #comp.components do
+      render_file_tree_recurse(depth + 1, comp.components[i])
     end
-  elseif comp.name == "file" then
-    ---@type FileEntry
-    local file = comp.context
-
-    comp:add_hl(renderer.get_git_hl(file.status), 0, 0, 1)
-    s = file.status .. " "
-    s = s .. string.rep(" ", depth * 2 + 2)
-
-    offset = #s
-    local icon = renderer.get_file_icon(file.basename, file.extension, comp, 0, offset)
-
-    offset = offset + #icon
-    comp:add_hl("DiffviewFilePanelFileName", 0, offset, offset + #file.basename)
-    s = s .. icon .. file.basename
-
-    if file.stats then
-      offset = #s + 1
-      comp:add_hl(
-        "DiffviewFilePanelInsertions",
-        0,
-        offset,
-        offset + string.len(file.stats.additions)
-      )
-      offset = offset + string.len(file.stats.additions) + 2
-      comp:add_hl(
-        "DiffviewFilePanelDeletions",
-        0,
-        offset,
-        offset + string.len(file.stats.deletions)
-      )
-      s = s .. " " .. file.stats.additions .. ", " .. file.stats.deletions
-    end
-
-    comp:add_line(s)
   end
 end
 
 ---@param comp RenderComponent
 local function render_file_tree(comp)
-  -- print(vim.inspect(comp, {depth = 2}))
   for _, c in ipairs(comp.components) do
     render_file_tree_recurse(0, c)
   end
