@@ -10,16 +10,25 @@ local cb = M.diffview_callback
 -- stylua: ignore start
 M.defaults = {
   diff_binaries = false,
-  use_icons = true,
   enhanced_diff_hl = false,
+  use_icons = true,
+  icons = {
+    folder_closed = "",
+    folder_open = "",
+  },
   signs = {
     fold_closed = "",
     fold_open = "",
   },
   file_panel = {
-    position = "left",
-    width = 35,
-    height = 10,
+    position = "left",            -- One of 'left', 'right', 'top', 'bottom'
+    width = 35,                   -- Only applies when position is 'left' or 'right'
+    height = 10,                  -- Only applies when position is 'top' or 'bottom'
+    listing_style = "tree",       -- One of 'list' or 'tree'
+    tree_options = {              -- Only applies when listing_style is 'tree'
+      flatten_dirs = true,
+      folder_statuses = "always"  -- One of 'never', 'only_folded' or 'always'.
+    }
   },
   file_history_panel = {
     position = "bottom",
@@ -63,6 +72,8 @@ M.defaults = {
       ["gf"]            = cb("goto_file"),
       ["<C-w><C-f>"]    = cb("goto_file_split"),
       ["<C-w>gf"]       = cb("goto_file_tab"),
+      ["i"]             = cb("listing_style"),
+      ["f"]             = cb("toggle_flatten_dirs"),
       ["<leader>e"]     = cb("focus_files"),
       ["<leader>b"]     = cb("toggle_files"),
     },

@@ -30,13 +30,13 @@ return function(view)
         view:update_files()
       end
 
-      local file = view:cur_file()
+      local file = view.panel.cur_file
       if file then
         file:attach_buffers()
       end
     end,
     tab_leave = function()
-      local file = view:cur_file()
+      local file = view.panel.cur_file
       if file then
         file:detach_buffers()
       end
@@ -63,17 +63,23 @@ return function(view)
     end,
     select_entry = function()
       if view.panel:is_open() then
-        local file = view.panel:get_file_at_cursor()
-        if file then
-          view:set_file(file, false)
+        ---@type any
+        local item = view.panel:get_item_at_cursor()
+        if type(item.collapsed) == "boolean" then
+          view.panel:toggle_item_fold(item)
+        else
+          view:set_file(item, false)
         end
       end
     end,
     focus_entry = function()
       if view.panel:is_open() then
-        local file = view.panel:get_file_at_cursor()
-        if file then
-          view:set_file(file, true)
+        ---@type any
+        local item = view.panel:get_item_at_cursor()
+        if type(item.collapsed) == "boolean" then
+          view.panel:toggle_item_fold(item)
+        else
+          view:set_file(item, true)
         end
       end
     end,
@@ -168,6 +174,22 @@ return function(view)
         vim.cmd("tabe " .. vim.fn.fnameescape(file.absolute_path))
         vim.cmd("diffoff")
       end
+    end,
+    listing_style = function()
+      if view.panel.listing_style == "list" then
+        view.panel.listing_style = "tree"
+      else
+        view.panel.listing_style = "list"
+      end
+      view.panel:update_components()
+      view.panel:render()
+      view.panel:redraw()
+    end,
+    toggle_flatten_dirs = function()
+      view.panel.tree_options.flatten_dirs = not view.panel.tree_options.flatten_dirs
+      view.panel:update_components()
+      view.panel:render()
+      view.panel:redraw()
     end,
     focus_files = function()
       view.panel:focus(true)

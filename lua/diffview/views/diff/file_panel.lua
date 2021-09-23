@@ -1,19 +1,26 @@
 local config = require("diffview.config")
 local oop = require("diffview.oop")
-local utils = require("diffview.utils")
 local renderer = require("diffview.renderer")
+local utils = require("diffview.utils")
 local Panel = require("diffview.ui.panel").Panel
 local api = vim.api
 local M = {}
+
+---@class TreeOptions
+---@field flatten_dirs boolean
+---@field folder_statuses "never"|"only_folded"|"always"
 
 ---@class FilePanel
 ---@field git_root string
 ---@field files FileDict
 ---@field path_args string[]
 ---@field rev_pretty_name string|nil
+---@field cur_file FileEntry
 ---@field width integer
 ---@field bufid integer
 ---@field winid integer
+---@field listing_style '"list"'|'"tree"'
+---@field tree_options TreeOptions
 ---@field render_data RenderData
 ---@field components any
 ---@field constrain_cursor function
@@ -54,6 +61,8 @@ function FilePanel:init(git_root, files, path_args, rev_pretty_name)
   self.files = files
   self.path_args = path_args
   self.rev_pretty_name = rev_pretty_name
+  self.listing_style = conf.file_panel.listing_style
+  self.tree_options = conf.file_panel.tree_options
 end
 
 ---@Override
@@ -70,18 +79,50 @@ function FilePanel:init_buffer_opts()
 end
 
 function FilePanel:update_components()
+  local working_files
+  local staged_files
+
+  if self.listing_style == "list" then
+    working_files = { name = "files" }
+    staged_files = { name = "files" }
+    for _, file in ipairs(self.files.working) do
+      table.insert(working_files, {
+        name = "file",
+        context = file,
+      })
+    end
+    for _, file in ipairs(self.files.staged) do
+      table.insert(staged_files, {
+        name = "file",
+        context = file,
+      })
+    end
+  elseif self.listing_style == "tree" then
+    self.files.working_tree:update_statuses()
+    self.files.staged_tree:update_statuses()
+
+    working_files = {
+      name = "files",
+      unpack(self.files.working_tree:create_comp_schema(self.tree_options.flatten_dirs)),
+    }
+    staged_files = {
+      name = "files",
+      unpack(self.files.staged_tree:create_comp_schema(self.tree_options.flatten_dirs)),
+    }
+  end
+
   ---@type any
   self.components = self.render_data:create_component({
     { name = "path" },
     {
       name = "working",
       { name = "title" },
-      { name = "files" },
+      working_files,
     },
     {
       name = "staged",
       { name = "title" },
-      { name = "files" },
+      staged_files,
     },
     {
       name = "info",
@@ -96,9 +137,59 @@ function FilePanel:update_components()
   })
 end
 
+function FilePanel:ordered_file_list()
+  if self.listing_style == "list" then
+    local list = {}
+    for _, file in self.files:ipairs() do
+      list[#list + 1] = file
+    end
+    return list
+  else
+    local nodes = utils.tbl_concat(
+      self.files.working_tree.root:leaves(),
+      self.files.staged_tree.root:leaves()
+    )
+    return vim.tbl_map(function(node)
+      return node.data
+    end, nodes)
+  end
+end
+
+function FilePanel:set_cur_file(file)
+  self.cur_file = file
+end
+
+function FilePanel:prev_file()
+  local files = self:ordered_file_list()
+  if not self.cur_file and self.files:size() > 0 then
+    self.cur_file = files[1]
+    return self.cur_file
+  end
+
+  local i = utils.tbl_indexof(files, self.cur_file)
+  if i ~= -1 then
+    self.cur_file = files[(i - 2) % #files + 1]
+    return self.cur_file
+  end
+end
+
+function FilePanel:next_file()
+  local files = self:ordered_file_list()
+  if not self.cur_file and self.files:size() > 0 then
+    self.cur_file = files[1]
+    return self.cur_file
+  end
+
+  local i = utils.tbl_indexof(files, self.cur_file)
+  if i ~= -1 then
+    self.cur_file = files[i % #files + 1]
+    return self.cur_file
+  end
+end
+
 ---Get the file entry under the cursor.
----@return FileEntry|nil
-function FilePanel:get_file_at_cursor()
+---@return FileEntry|any|nil
+function FilePanel:get_item_at_cursor()
   if not (self:is_open() and self:buf_loaded()) then
     return
   end
@@ -106,10 +197,9 @@ function FilePanel:get_file_at_cursor()
   local cursor = api.nvim_win_get_cursor(self.winid)
   local line = cursor[1]
 
-  if line > self.components.working.files.comp.lend then
-    return self.files.staged[line - self.components.staged.files.comp.lstart]
-  else
-    return self.files.working[line - self.components.working.files.comp.lstart]
+  local comp = self.components.comp:get_comp_on_line(line)
+  if comp and (comp.name == "file" or comp.name == "directory") then
+    return comp.context
   end
 end
 
@@ -118,16 +208,41 @@ function FilePanel:highlight_file(file)
     return
   end
 
-  for i, f in self.files:ipairs() do
-    if f == file then
-      local offset
-      if i > #self.files.working then
-        i = i - #self.files.working
-        offset = self.components.staged.files.comp.lstart
-      else
-        offset = self.components.working.files.comp.lstart
+  if self.listing_style == "list" then
+    for _, file_list in ipairs({ self.components.working.files, self.components.staged.files }) do
+      for _, comp_struct in ipairs(file_list) do
+        if file == comp_struct.comp.context then
+          pcall(api.nvim_win_set_cursor, self.winid, { comp_struct.comp.lstart + 1, 0 })
+        end
       end
-      pcall(api.nvim_win_set_cursor, self.winid, { i + offset, 0 })
+    end
+  else
+    -- tree
+    for _, comp_struct in ipairs({ self.components.working.files, self.components.staged.files }) do
+      comp_struct.comp:deep_some(function(cur)
+        if file == cur.context then
+          local was_concealed = false
+          local last = cur.parent
+          while last do
+            -- print(vim.inspect(last, {depth=2}))
+            local dir = last.components[1]
+            if dir.context and dir.context.collapsed then
+              was_concealed = true
+              dir.context.collapsed = false
+            end
+            last = last.parent
+          end
+
+          if was_concealed then
+            self:render()
+            self:redraw()
+          end
+
+          pcall(api.nvim_win_set_cursor, self.winid, { cur.lstart + 1, 0 })
+          return true
+        end
+        return false
+      end)
     end
   end
 end
@@ -148,114 +263,22 @@ function FilePanel:highlight_next_file()
   pcall(api.nvim_win_set_cursor, self.winid, { self.constrain_cursor(self.winid, 1), 0 })
 end
 
----@param comp RenderComponent
----@param files FileEntry[]
-local function render_files(comp, files)
-  local line_idx = 0
-
-  for _, file in ipairs(files) do
-    local offset = 0
-
-    comp:add_hl(renderer.get_git_hl(file.status), line_idx, 0, 1)
-    local s = file.status .. " "
-    offset = #s
-    local icon = renderer.get_file_icon(file.basename, file.extension, comp, line_idx, offset)
-    offset = offset + #icon
-    comp:add_hl("DiffviewFilePanelFileName", line_idx, offset, offset + #file.basename)
-    s = s .. icon .. file.basename
-
-    if file.stats then
-      offset = #s + 1
-      comp:add_hl(
-        "DiffviewFilePanelInsertions",
-        line_idx,
-        offset,
-        offset + string.len(file.stats.additions)
-      )
-      offset = offset + string.len(file.stats.additions) + 2
-      comp:add_hl(
-        "DiffviewFilePanelDeletions",
-        line_idx,
-        offset,
-        offset + string.len(file.stats.deletions)
-      )
-      s = s .. " " .. file.stats.additions .. ", " .. file.stats.deletions
-    end
-
-    offset = #s + 1
-    comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #file.parent_path)
-    s = s .. " " .. file.parent_path
-
-    comp:add_line(s)
-    line_idx = line_idx + 1
+function FilePanel:set_item_fold(item, open)
+  if open == item.collapsed then
+    item.collapsed = not open
+    self:render()
+    self:redraw()
   end
 end
 
+function FilePanel:toggle_item_fold(item)
+  item.collapsed = not item.collapsed
+  self:render()
+  self:redraw()
+end
+
 function FilePanel:render()
-  if not self.render_data then
-    return
-  end
-
-  self.render_data:clear()
-
-  ---@type RenderComponent
-  local comp = self.components.path.comp
-  local line_idx = 0
-  local s = utils.path_shorten(vim.fn.fnamemodify(self.git_root, ":~"), self.width - 6)
-  comp:add_hl("DiffviewFilePanelRootPath", line_idx, 0, #s)
-  comp:add_line(s)
-
-  comp = self.components.working.title.comp
-  line_idx = 0
-  s = "Changes"
-  comp:add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
-  local change_count = "(" .. #self.files.working .. ")"
-  comp:add_hl("DiffviewFilePanelCounter", line_idx, #s + 1, #s + 1 + string.len(change_count))
-  s = s .. " " .. change_count
-  comp:add_line(s)
-
-  render_files(self.components.working.files.comp, self.files.working)
-
-  if #self.files.staged > 0 then
-    comp = self.components.staged.title.comp
-    line_idx = 0
-    comp:add_line("")
-    line_idx = line_idx + 1
-    s = "Staged changes"
-    comp:add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
-    change_count = "(" .. #self.files.staged .. ")"
-    comp:add_hl("DiffviewFilePanelCounter", line_idx, #s + 1, #s + 1 + string.len(change_count))
-    s = s .. " " .. change_count
-    comp:add_line(s)
-
-    render_files(self.components.staged.files.comp, self.files.staged)
-  end
-
-  if self.rev_pretty_name or (self.path_args and #self.path_args > 0) then
-    local extra_info = utils.tbl_concat({ self.rev_pretty_name }, self.path_args or {})
-
-    comp = self.components.info.title.comp
-    line_idx = 0
-    comp:add_line("")
-    line_idx = line_idx + 1
-
-    s = "Showing changes for:"
-    comp:add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
-    comp:add_line(s)
-
-    comp = self.components.info.entries.comp
-    line_idx = 0
-    for _, arg in ipairs(extra_info) do
-      local relpath = utils.path_relative(arg, self.git_root)
-      if relpath == "" then
-        relpath = "."
-      end
-      s = utils.path_shorten(relpath, self.width - 5)
-      comp:add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
-      comp:add_line(s)
-      line_idx = line_idx + 1
-    end
-  end
+  require("diffview.views.diff.render")(self)
 end
 
 M.FilePanel = FilePanel

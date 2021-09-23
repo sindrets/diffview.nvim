@@ -67,6 +67,9 @@ function M.pattern_esc(s)
   return result
 end
 
+---Joins an ordered list of path segments into a path string.
+---@param paths string[]
+---@return string
 function M.path_join(paths)
   local result = paths[1]
   for i = 2, #paths do
@@ -79,8 +82,15 @@ function M.path_join(paths)
   return result
 end
 
-function M.path_split(path)
-  return path:gmatch("[^" .. path_sep .. "]+" .. path_sep .. "?")
+---Explodes the path into an ordered list of path segments.
+---@param path string
+---@return string[]
+function M.path_explode(path)
+  local parts = {}
+  for part in path:gmatch(string.format("([^%s]+)%s?", path_sep, path_sep)) do
+    table.insert(parts, part)
+  end
+  return parts
 end
 
 ---Get the basename of the given path.
