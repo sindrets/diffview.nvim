@@ -186,7 +186,7 @@ return function(view)
       view.panel:redraw()
     end,
     toggle_flatten_dirs = function()
-      view.panel.flatten_dirs = not view.panel.flatten_dirs
+      view.panel.tree_options.flatten_dirs = not view.panel.tree_options.flatten_dirs
       view.panel:update_components()
       view.panel:render()
       view.panel:redraw()

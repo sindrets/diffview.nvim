@@ -6,6 +6,10 @@ local Panel = require("diffview.ui.panel").Panel
 local api = vim.api
 local M = {}
 
+---@class TreeOptions
+---@field flatten_dirs boolean
+---@field folder_statuses "never"|"only_folded"|"always"
+
 ---@class FilePanel
 ---@field git_root string
 ---@field files FileDict
@@ -16,7 +20,7 @@ local M = {}
 ---@field bufid integer
 ---@field winid integer
 ---@field listing_style '"list"'|'"tree"'
----@field flatten_dirs boolean
+---@field tree_options TreeOptions
 ---@field render_data RenderData
 ---@field components any
 ---@field constrain_cursor function
@@ -58,7 +62,7 @@ function FilePanel:init(git_root, files, path_args, rev_pretty_name)
   self.path_args = path_args
   self.rev_pretty_name = rev_pretty_name
   self.listing_style = conf.file_panel.listing_style
-  self.flatten_dirs = conf.file_panel.flatten_dirs
+  self.tree_options = conf.file_panel.tree_options
 end
 
 ---@Override
@@ -96,13 +100,14 @@ function FilePanel:update_components()
   elseif self.listing_style == "tree" then
     self.files.working_tree:update_statuses()
     self.files.staged_tree:update_statuses()
+
     working_files = {
       name = "files",
-      unpack(self.files.working_tree:create_comp_schema(self.flatten_dirs)),
+      unpack(self.files.working_tree:create_comp_schema(self.tree_options.flatten_dirs)),
     }
     staged_files = {
       name = "files",
-      unpack(self.files.staged_tree:create_comp_schema(self.flatten_dirs)),
+      unpack(self.files.staged_tree:create_comp_schema(self.tree_options.flatten_dirs)),
     }
   end
 

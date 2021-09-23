@@ -46,6 +46,17 @@ local function render_file_list(comp)
   end
 end
 
+---@param ctx DirData
+---@param tree_options TreeOptions
+---@return string
+local function get_dir_status_text(ctx, tree_options)
+  local folder_statuses = tree_options.folder_statuses
+  if folder_statuses == "always" or (folder_statuses == "only_folded" and ctx.collapsed) then
+    return ctx.status
+  end
+  return " "
+end
+
 ---@param depth integer
 ---@param comp RenderComponent
 local function render_file_tree_recurse(depth, comp)
@@ -64,7 +75,7 @@ local function render_file_tree_recurse(depth, comp)
   local ctx = dir.context
 
   dir:add_hl(renderer.get_git_hl(ctx.status), 0, 0, 1)
-  s = ctx.status .. " "
+  s = get_dir_status_text(ctx, conf.file_panel.tree_options) .. " "
 
   s = s .. string.rep(" ", depth * 2)
   offset = #s
@@ -93,6 +104,15 @@ local function render_file_tree(comp)
   end
 end
 
+---@param listing_style "list"|"tree"
+---@param comp RenderComponent
+local function render_files(listing_style, comp)
+  if listing_style == "list" then
+    return render_file_list(comp)
+  end
+  render_file_tree(comp)
+end
+
 ---@param panel FilePanel
 return function(panel)
   if not panel.render_data then
@@ -117,11 +137,7 @@ return function(panel)
   s = s .. " " .. change_count
   comp:add_line(s)
 
-  if panel.listing_style == "list" then
-    render_file_list(panel.components.working.files.comp)
-  else
-    render_file_tree(panel.components.working.files.comp)
-  end
+  render_files(panel.listing_style, panel.components.working.files.comp)
 
   if #panel.files.staged > 0 then
     comp = panel.components.staged.title.comp
@@ -135,11 +151,7 @@ return function(panel)
     s = s .. " " .. change_count
     comp:add_line(s)
 
-    if panel.listing_style == "list" then
-      render_file_list(panel.components.staged.files.comp)
-    else
-      render_file_tree(panel.components.staged.files.comp)
-    end
+    render_files(panel.listing_style, panel.components.staged.files.comp)
   end
 
   if panel.rev_pretty_name or (panel.path_args and #panel.path_args > 0) then
