@@ -91,26 +91,6 @@ function Node:leaves()
   return leaves
 end
 
----Returns an ordered list of children recursively, with their depths, by
----pre-order traversal of the tree.
----@return Node[]
-function Node:children_recursive(start_depth)
-  local children = vim.tbl_values(self.children)
-  utils.merge_sort(children, Node.comparator)
-
-  local nodes = {}
-  for _, child in ipairs(children) do
-    child.depth = start_depth
-    table.insert(nodes, child)
-
-    for _, grandchild in ipairs(child:children_recursive(start_depth + 1)) do
-      table.insert(nodes, grandchild)
-    end
-  end
-
-  return nodes
-end
-
 M.Node = Node
 
 return M
