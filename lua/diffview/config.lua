@@ -10,13 +10,15 @@ local cb = M.diffview_callback
 -- stylua: ignore start
 M.defaults = {
   diff_binaries = false,
-  use_icons = true,
   enhanced_diff_hl = false,
+  use_icons = true,
+  icons = {
+    folder_closed = "",
+    folder_open = "",
+  },
   signs = {
     fold_closed = "",
     fold_open = "",
-    folder_closed = "",
-    folder_open = "",
   },
   file_panel = {
     position = "left",            -- One of 'left', 'right', 'top', 'bottom'

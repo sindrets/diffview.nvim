@@ -81,10 +81,13 @@ local function render_file_tree_recurse(depth, comp)
   offset = #s
 
   local fold = ctx.collapsed and conf.signs.fold_closed or conf.signs.fold_open
-  local folder = ctx.collapsed and conf.signs.folder_closed or conf.signs.folder_open
+  local icon = ""
+  if conf.use_icons then
+    icon = " " .. (ctx.collapsed and conf.icons.folder_closed or conf.icons.folder_open)
+  end
   dir:add_hl("DiffviewNonText", 0, offset, offset + #fold)
-  dir:add_hl("DiffviewFolderSign", 0, offset + #fold + 1, offset + #fold + 1 + #folder)
-  s = string.format("%s%s %s ", s, fold, folder)
+  dir:add_hl("DiffviewFolderSign", 0, offset + #fold + 1, offset + #fold + 1 + #icon)
+  s = string.format("%s%s%s ", s, fold, icon)
 
   offset = #s
   dir:add_hl("DiffviewFolderName", 0, offset, offset + #ctx.name)

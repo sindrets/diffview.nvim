@@ -41,13 +41,15 @@ local cb = require'diffview.config'.diffview_callback
 
 require'diffview'.setup {
   diff_binaries = false,    -- Show diffs for binaries
-  use_icons = true,         -- Requires nvim-web-devicons
   enhanced_diff_hl = false, -- See ':h diffview-config-enhanced_diff_hl'
+  use_icons = true,         -- Requires nvim-web-devicons
+  icons = {                 -- Only applies when use_icons is true.
+    folder_closed = "",
+    folder_open = "",
+  },
   signs = {
     fold_closed = "",
     fold_open = "",
-    folder_closed = "",
-    folder_open = "",
   },
   file_panel = {
     position = "left",            -- One of 'left', 'right', 'top', 'bottom'
