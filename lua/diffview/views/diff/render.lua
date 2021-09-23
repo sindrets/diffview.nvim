@@ -49,7 +49,6 @@ end
 ---@param depth integer
 ---@param comp RenderComponent
 local function render_file_tree_recurse(depth, comp)
-  -- TODO: Proper highlight groups
   local conf = config.get_config()
   local offset, s
 
@@ -72,12 +71,12 @@ local function render_file_tree_recurse(depth, comp)
 
   local fold = ctx.collapsed and conf.signs.fold_closed or conf.signs.fold_open
   local folder = ctx.collapsed and conf.signs.folder_closed or conf.signs.folder_open
-  dir:add_hl("Whitespace", 0, offset, offset + #fold)
-  dir:add_hl("PreProc", 0, offset + #fold + 1, offset + #fold + 1 + #folder)
+  dir:add_hl("DiffviewNonText", 0, offset, offset + #fold)
+  dir:add_hl("DiffviewFilePanelFolderSign", 0, offset + #fold + 1, offset + #fold + 1 + #folder)
   s = string.format("%s%s %s ", s, fold, folder)
 
   offset = #s
-  dir:add_hl("Directory", 0, offset, offset + #ctx.name)
+  dir:add_hl("DiffviewFilePanelFolderName", 0, offset, offset + #ctx.name)
   dir:add_line(s .. ctx.name)
 
   if not ctx.collapsed then
