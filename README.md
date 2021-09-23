@@ -54,7 +54,7 @@ require'diffview'.setup {
     width = 35,             -- Only applies when position is 'left' or 'right'
     height = 10,            -- Only applies when position is 'top' or 'bottom'
     listing_style = "tree", -- One of 'list' or 'tree'
-    flatten_dirs = false,   -- Only applies when listing_style is 'tree'
+    flatten_dirs = true,    -- Only applies when listing_style is 'tree'
   },
   file_history_panel = {
     position = "bottom",

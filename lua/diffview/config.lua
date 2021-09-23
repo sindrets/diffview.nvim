@@ -23,7 +23,7 @@ M.defaults = {
     width = 35,
     height = 10,
     listing_style = "tree",
-    flatten_dirs = false,
+    flatten_dirs = true,
   },
   file_history_panel = {
     position = "bottom",
