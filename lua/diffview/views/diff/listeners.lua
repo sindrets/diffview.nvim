@@ -185,6 +185,12 @@ return function(view)
       view.panel:render()
       view.panel:redraw()
     end,
+    toggle_flatten_dirs = function()
+      view.panel.flatten_dirs = not view.panel.flatten_dirs
+      view.panel:update_components()
+      view.panel:render()
+      view.panel:redraw()
+    end,
     focus_files = function()
       view.panel:focus(true)
     end,

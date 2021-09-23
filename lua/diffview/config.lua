@@ -68,6 +68,7 @@ M.defaults = {
       ["<C-w><C-f>"]    = cb("goto_file_split"),
       ["<C-w>gf"]       = cb("goto_file_tab"),
       ["i"]             = cb("listing_style"),
+      ["f"]             = cb("toggle_flatten_dirs"),
       ["<leader>e"]     = cb("focus_files"),
       ["<leader>b"]     = cb("toggle_files"),
     },
