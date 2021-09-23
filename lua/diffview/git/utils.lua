@@ -381,6 +381,19 @@ function M.git_dir(path)
   return vim.trim(out)
 end
 
+---Get the path of the given file relative to the project .git directory.
+---@param path string
+---@return string|nil
+function M.git_relpath(path)
+  local out = vim.fn.system(
+    "git ls-tree --full-name --name-only HEAD " .. vim.fn.shellescape(path)
+  )
+  if utils.shell_error() then
+    return nil
+  end
+  return vim.trim(out)
+end
+
 ---Check if any of the given revs are LOCAL.
 ---@param left Rev
 ---@param right Rev

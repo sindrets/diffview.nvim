@@ -103,6 +103,11 @@ function M.file_history(args)
     return
   end
 
+  -- Use paths relative to git root
+  for i, path in ipairs(paths) do
+    paths[i] = git.git_relpath(path)
+  end
+
   ---@type FileHistoryView
   local v = FileHistoryView({
     git_root = git_root,
