@@ -51,18 +51,11 @@ end
 
 function StandardView:post_layout()
   if config.get_config().enhanced_diff_hl then
-    local curhl = vim.wo[self.left_winid].winhl
     self.winopts.left.winhl = table.concat({
         "DiffAdd:DiffviewDiffAddAsDelete",
         "DiffDelete:DiffviewDiffDelete",
-        curhl ~= "" and curhl or nil
       }, ",")
-
-    curhl = vim.wo[self.right_winid].winhl
-    self.winopts.right.winhl = table.concat({
-        "DiffDelete:DiffviewDiffDelete",
-        curhl ~= "" and curhl or nil
-      }, ",")
+    self.winopts.right.winhl = "DiffDelete:DiffviewDiffDelete"
   end
 end
 

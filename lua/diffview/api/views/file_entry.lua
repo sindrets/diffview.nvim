@@ -47,11 +47,8 @@ function CFileEntry:load_buffers(git_root, left_winid, right_winid)
     },
   }
 
-  pcall(function()
-    vim.opt.eventignore = "WinEnter,WinLeave"
+  utils.no_win_event_call(function()
     for _, split in ipairs(splits) do
-      local winnr = api.nvim_win_get_number(split.winid)
-
       if not (split.bufid and api.nvim_buf_is_loaded(split.bufid)) then
         if split.rev.type == RevType.LOCAL then
           if split.null or CFileEntry.should_null(split.rev, self.status, split.pos) then
@@ -59,8 +56,10 @@ function CFileEntry:load_buffers(git_root, left_winid, right_winid)
             api.nvim_win_set_buf(split.winid, bn)
             split.bufid = bn
           else
-            vim.cmd(winnr .. "windo edit " .. vim.fn.fnameescape(self.absolute_path))
-            split.bufid = api.nvim_get_current_buf()
+            api.nvim_win_call(split.winid, function()
+              vim.cmd("edit " .. vim.fn.fnameescape(self.absolute_path))
+              split.bufid = api.nvim_get_current_buf()
+            end)
           end
         elseif
           vim.tbl_contains({ RevType.COMMIT, RevType.INDEX, RevType.CUSTOM }, split.rev.type)
@@ -86,7 +85,7 @@ function CFileEntry:load_buffers(git_root, left_winid, right_winid)
           table.insert(self.created_bufs, bn)
           api.nvim_win_set_buf(split.winid, bn)
           split.bufid = bn
-          vim.cmd(winnr .. "windo filetype detect")
+          api.nvim_win_call(split.winid, function() vim.cmd("filetype detect") end)
         end
 
         CFileEntry._attach_buffer(split.bufid)
@@ -97,7 +96,6 @@ function CFileEntry:load_buffers(git_root, left_winid, right_winid)
     end
   end)
 
-  vim.opt.eventignore = ""
   self.left_bufid = splits[1].bufid
   self.right_bufid = splits[2].bufid
 

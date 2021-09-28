@@ -3,6 +3,11 @@ local M = {}
 
 local mapping_callbacks = {}
 local path_sep = package.config:sub(1, 1)
+local setlocal_opr_templates = {
+  set = [[setl ${option}=${value}]],
+  append = [[exe 'setl ${option}=' . (&${option} == "" ? "" : &${option} . ",") . '${value}']],
+  prepend = [[exe 'setl ${option}=${value}' . (&${option} == "" ? "" : "," . &${option})]]
+}
 
 function M._echo_multiline(msg)
   for _, s in ipairs(vim.fn.split(msg, "\n")) do
@@ -26,6 +31,21 @@ function M.err(msg)
   vim.cmd("echohl ErrorMsg")
   M._echo_multiline("[Diffview.nvim] " .. msg)
   vim.cmd("echohl None")
+end
+
+---Call the function `f`, ignoring most of the window and buffer related
+---events. The function is called in protected mode.
+---@param f function
+---@return boolean success
+---@return any result Return value
+function M.no_win_event_call(f)
+  local last = vim.opt.eventignore._value
+  vim.opt.eventignore:prepend(
+    "WinEnter,WinLeave,WinNew,WinClosed,BufWinEnter,BufWinLeave,BufEnter,BufLeave"
+  )
+  local ok, err = pcall(f)
+  vim.opt.eventignore = last
+  return ok, err
 end
 
 function M.clamp(value, min, max)
@@ -232,6 +252,16 @@ function M.str_split(s, sep)
   return result
 end
 
+---Simple string templating
+---Example template: "${name} is ${value}"
+---@param str string Template string
+---@param table table Key-value pairs to replace in the string
+function M.str_template(str, table)
+  return (str:gsub("($%b{})", function(w)
+    return table[w:sub(3, -2)] or w
+  end))
+end
+
 ---Get the output of a system command.
 ---WARN: As of NVIM v0.5.0-dev+1320-gba04b3d83, `io.popen` causes rendering
 ---artifacts if the command fails.
@@ -274,43 +304,42 @@ end
 ---@param option string
 ---@param value string[]|string
 ---@param opt table
+---`opt` fields:
+---   - `restore_cursor` (boolean) Return the cursor to the initial window. (default: `true`)
+---   - `method` ("set"|"append"|"prepend") Assignment method. (default: "set")
 function M.set_local(winids, option, value, opt)
   local last_winid = api.nvim_get_current_win()
-  local rhs
-
+  local cmd
   opt = vim.tbl_extend("keep", opt or {}, {
-    noautocmd = true,
-    keepjumps = true,
-    restore_cursor = true
+    restore_cursor = true,
+    method = "set",
   })
 
   if type(value) == "boolean" then
-    if value == false then
-      rhs = "no" .. option
-    else
-      rhs = option
-    end
+    cmd = string.format("setl %s%s", value and "" or "no", option)
   else
-    rhs = option .. "=" .. (type(value) == "table" and table.concat(value, ",") or value)
+    value = (type(value) == "table" and table.concat(value, ",") or tostring(value)):gsub("'", "''")
+    cmd = M.str_template(setlocal_opr_templates[opt.method], { option = option, value = value })
   end
 
   if type(winids) ~= "table" then
     winids = { winids }
   end
 
-  for _, id in ipairs(winids) do
-    local nr = tostring(api.nvim_win_get_number(id == 0 and last_winid or id))
-    local cmd = string.format(
-      "%s %s %swindo setlocal ",
-      opt.noautocmd and "noautocmd",
-      opt.keepjumps and "keepjumps",
-      nr
-    )
-    vim.cmd(cmd .. rhs)
-  end
+  local ok, err = M.no_win_event_call(function()
+    for _, id in ipairs(winids) do
+      api.nvim_win_call(id, function()
+        vim.cmd(cmd)
+      end)
+    end
 
-  if opt.restore_cursor then
-    api.nvim_set_current_win(last_winid)
+    if opt.restore_cursor then
+      api.nvim_set_current_win(last_winid)
+    end
+  end)
+
+  if not ok then
+    error(err)
   end
 end
 

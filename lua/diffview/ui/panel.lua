@@ -157,10 +157,11 @@ function Panel:open()
 
   self.winid = api.nvim_get_current_win()
   self:resize()
-  vim.cmd("buffer " .. self.bufid)
+  api.nvim_win_set_buf(self.winid, self.bufid)
 
   for k, v in pairs(self.class().winopts) do
-    utils.set_local(self.winid, k, v)
+    local opt = type(v) == "table" and v[2] or nil
+    utils.set_local(self.winid, k, type(v) == "table" and v[1] or v, opt)
   end
 end
 
@@ -192,15 +193,15 @@ end
 function Panel:init_buffer()
   local bn = api.nvim_create_buf(false, false)
 
-  for k, v in pairs(self.class().bufopts) do
-    api.nvim_buf_set_option(bn, k, v)
-  end
-
   local bufname = string.format("diffview:///panels/%d/%s", Panel.next_uid(), self.bufname)
   local ok = pcall(api.nvim_buf_set_name, bn, bufname)
   if not ok then
     utils.wipe_named_buffer(bufname)
     api.nvim_buf_set_name(bn, bufname)
+  end
+
+  for k, v in pairs(self.class().bufopts) do
+    api.nvim_buf_set_option(bn, k, v)
   end
 
   self.bufid = bn

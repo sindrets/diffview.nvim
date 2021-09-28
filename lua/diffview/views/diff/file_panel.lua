@@ -29,15 +29,18 @@ FilePanel = oop.create_class("FilePanel", Panel)
 
 FilePanel.winopts = vim.tbl_extend("force", Panel.winopts, {
   cursorline = true,
-  winhl = table.concat({
-    "EndOfBuffer:DiffviewEndOfBuffer",
-    "Normal:DiffviewNormal",
-    "CursorLine:DiffviewCursorLine",
-    "VertSplit:DiffviewVertSplit",
-    "SignColumn:DiffviewNormal",
-    "StatusLine:DiffviewStatusLine",
-    "StatusLineNC:DiffviewStatuslineNC",
-  }, ","),
+  winhl = {
+    table.concat({
+        "EndOfBuffer:DiffviewEndOfBuffer",
+        "Normal:DiffviewNormal",
+        "CursorLine:DiffviewCursorLine",
+        "VertSplit:DiffviewVertSplit",
+        "SignColumn:DiffviewNormal",
+        "StatusLine:DiffviewStatusLine",
+        "StatusLineNC:DiffviewStatuslineNC",
+    }, ","),
+    { method = "prepend" }
+  },
 })
 
 FilePanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
