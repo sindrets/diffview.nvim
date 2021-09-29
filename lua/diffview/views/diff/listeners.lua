@@ -11,10 +11,12 @@ local function prepare_goto_file(view)
     if not file.right.type == RevType.LOCAL then
       -- Ensure file exists
       if vim.fn.filereadable(file.absolute_path) ~= 1 then
-        utils.err(string.format(
-          "File does not exist on disk: '%s'",
-          vim.fn.fnamemodify(file.absolute_path, ":.")
-        ))
+        utils.err(
+          string.format(
+            "File does not exist on disk: '%s'",
+            vim.fn.fnamemodify(file.absolute_path, ":.")
+          )
+        )
         return
       end
     end

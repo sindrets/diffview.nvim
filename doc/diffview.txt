@@ -146,10 +146,9 @@ AVAILABLE UNUSED MAPPINGS                 *diffview-available-unused-mappings*
 
 This section documents key-mappable functions that are not mapped by default.
 
-focus_entry                                     *diffview-config-focus-entry*
-        Like select_entry, but open the diff for the selected entry while
-        focusing cursor on the current file. Available in both the file panel
-        and the history panel.
+focus_entry                                     *diffview-config-focus_entry*
+        Like select_entry, but also bring the cursor to the right diff split.
+        Available in both the file panel and the file history panel.
 
 LAYOUT                                                     *diffview-layout*
 

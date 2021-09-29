@@ -84,7 +84,9 @@ function CFileEntry:load_buffers(git_root, left_winid, right_winid)
           table.insert(self.created_bufs, bn)
           api.nvim_win_set_buf(split.winid, bn)
           split.bufid = bn
-          api.nvim_win_call(split.winid, function() vim.cmd("filetype detect") end)
+          api.nvim_win_call(split.winid, function()
+            vim.cmd("filetype detect")
+          end)
         end
 
         CFileEntry._attach_buffer(split.bufid)

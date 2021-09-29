@@ -7,7 +7,7 @@ local path_sep = package.config:sub(1, 1)
 local setlocal_opr_templates = {
   set = [[setl ${option}=${value}]],
   append = [[exe 'setl ${option}=' . (&${option} == "" ? "" : &${option} . ",") . '${value}']],
-  prepend = [[exe 'setl ${option}=${value}' . (&${option} == "" ? "" : "," . &${option})]]
+  prepend = [[exe 'setl ${option}=${value}' . (&${option} == "" ? "" : "," . &${option})]],
 }
 
 function M._echo_multiline(msg)

@@ -21,7 +21,7 @@ StandardView = oop.create_class("StandardView", View)
 ---StandardView constructor
 ---@return StandardView
 function StandardView:init()
- StandardView:super().init(self)
+  StandardView:super().init(self)
   self.nulled = false
   self.panel = Panel()
   self.winopts = { left = {}, right = {} }
@@ -52,9 +52,9 @@ end
 function StandardView:post_layout()
   if config.get_config().enhanced_diff_hl then
     self.winopts.left.winhl = table.concat({
-        "DiffAdd:DiffviewDiffAddAsDelete",
-        "DiffDelete:DiffviewDiffDelete",
-      }, ",")
+      "DiffAdd:DiffviewDiffAddAsDelete",
+      "DiffDelete:DiffviewDiffDelete",
+    }, ",")
     self.winopts.right.winhl = "DiffDelete:DiffviewDiffDelete"
   end
 end
