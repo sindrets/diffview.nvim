@@ -396,7 +396,9 @@ end
 ---@param rev Rev
 ---@return boolean -- True if the file was binary for the given rev, or it didn't exist.
 function M.is_binary(git_root, path, rev)
-  local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " grep -I --name-only -e . "
+  local cmd = "git -c submodule.recurse=false -C "
+    .. vim.fn.shellescape(git_root)
+    .. " grep -I --name-only -e . "
   if rev.type == RevType.LOCAL then
     cmd = cmd .. "--untracked"
   elseif rev.type == RevType.INDEX then
