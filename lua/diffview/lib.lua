@@ -24,7 +24,7 @@ function M.diffview_open(args)
 
   local fpath = (
       vim.bo.buftype == ""
-        and vim.fn.filereadable(vim.fn.expand("%"))
+        and vim.fn.filereadable(vim.fn.expand("%")) == 1
         and vim.fn.expand("%:p:h")
       or "."
     )
@@ -79,7 +79,7 @@ function M.file_history(args)
 
   if #paths == 0 then
     if vim.bo.buftype == "" then
-      table.insert(paths, vim.fn.expand("%"))
+      table.insert(paths, vim.fn.expand("%:p"))
     else
       utils.err("No target!")
       return
@@ -87,9 +87,9 @@ function M.file_history(args)
   end
 
   local p
-  if vim.fn.filereadable(paths[1]) then
+  if vim.fn.filereadable(paths[1]) == 1 then
     p = vim.fn.isdirectory(paths[1]) ~= 1 and vim.fn.fnamemodify(paths[1], ":h") or paths[1]
-  elseif vim.bo.buftype == "" and vim.fn.filereadable(vim.fn.expand("%")) then
+  elseif vim.bo.buftype == "" and vim.fn.filereadable(vim.fn.expand("%")) == 1 then
     p = vim.fn.expand("%:p:h")
   else
     p = "."
@@ -102,6 +102,11 @@ function M.file_history(args)
     )
     return
   end
+
+  local cwd = vim.loop.cwd()
+  paths = vim.tbl_map(function(pathspec)
+    return git.expand_pathspec(git_root, cwd, pathspec)
+  end, paths)
 
   ---@type FileHistoryView
   local v = FileHistoryView({

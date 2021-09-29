@@ -24,11 +24,13 @@ local function render_files(comp, files)
     offset = #s
     local icon = renderer.get_file_icon(file.basename, file.extension, comp, line_idx, offset)
     offset = offset + #icon
-    comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #file.parent_path + 1)
+    if #file.parent_path > 0 then
+      comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #file.parent_path + 1)
+    end
     comp:add_hl(
       "DiffviewFilePanelFileName",
       line_idx,
-      offset + #file.parent_path + 1,
+      offset + #file.path - #file.basename,
       offset + #file.basename
     )
     s = s .. icon .. file.path

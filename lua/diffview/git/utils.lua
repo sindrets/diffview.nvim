@@ -85,7 +85,6 @@ function M.file_history_list(git_root, path_args, opt)
   ---@type LogEntry[]
   local entries = {}
   local base_cmd = string.format("git -C %s ", vim.fn.shellescape(git_root))
-  local single_file = #path_args == 1 and vim.fn.isdirectory(path_args[1]) == 0
 
   local p_args = ""
   if path_args and #path_args > 0 then
@@ -94,6 +93,10 @@ function M.file_history_list(git_root, path_args, opt)
       p_args = p_args .. " " .. vim.fn.shellescape(arg)
     end
   end
+
+  local single_file = #path_args == 1
+    and vim.fn.isdirectory(path_args[1]) == 0
+    and #vim.fn.systemlist(base_cmd .. "ls-files -- " .. p_args) < 2
 
   local options = string.format(
     "%s %s %s %s %s %s %s %s",
@@ -380,6 +383,15 @@ function M.git_dir(path)
     return nil
   end
   return vim.trim(out)
+end
+
+function M.expand_pathspec(git_root, cwd, pathspec)
+  local magic = pathspec:match("^:[/!^]*:?") or pathspec:match("^:%b()") or ""
+  local pattern = pathspec:sub(1 + #magic, -1)
+  if not utils.path_is_abs(pattern) then
+    pattern = utils.path_join({ utils.path_relative(cwd, git_root), pattern })
+  end
+  return magic .. pattern
 end
 
 ---Check if any of the given revs are LOCAL.

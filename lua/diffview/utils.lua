@@ -1,6 +1,7 @@
 local api = vim.api
 local M = {}
 
+local is_windows = jit.os == "Windows"
 local mapping_callbacks = {}
 local path_sep = package.config:sub(1, 1)
 local setlocal_opr_templates = {
@@ -85,6 +86,17 @@ function M.pattern_esc(s)
     ["$"] = "%$",
   })
   return result
+end
+
+---Check if a given path is absolute.
+---@param path string
+---@return boolean
+function M.path_is_abs(path)
+  if is_windows then
+    return path:match([[^%a:\]]) ~= nil
+  else
+    return path:sub(1, 1) == "/"
+  end
 end
 
 ---Joins an ordered list of path segments into a path string.
