@@ -27,7 +27,6 @@ end
 
 ---@Override
 function CFileEntry:load_buffers(git_root, left_winid, right_winid)
-  local last_winid = api.nvim_get_current_win()
   local splits = {
     {
       winid = left_winid,
@@ -100,7 +99,7 @@ function CFileEntry:load_buffers(git_root, left_winid, right_winid)
   self.right_bufid = splits[2].bufid
 
   CFileEntry._update_windows(left_winid, right_winid)
-  api.nvim_set_current_win(last_winid)
+  vim.cmd("do WinEnter")
 end
 
 ---@static

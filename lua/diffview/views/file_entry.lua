@@ -92,7 +92,6 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
     end
   end
 
-  local last_winid = api.nvim_get_current_win()
   local splits = {
     {
       winid = left_winid,
@@ -154,7 +153,7 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
   self.right_bufid = splits[2].bufid
 
   FileEntry._update_windows(left_winid, right_winid)
-  api.nvim_set_current_win(last_winid)
+  vim.cmd("do WinEnter")
 end
 
 function FileEntry:attach_buffers()
@@ -341,7 +340,9 @@ function FileEntry._update_windows(left_winid, right_winid)
 
   -- Scroll to trigger the scrollbind and sync the windows. This works more
   -- consistently than calling `:syncbind`.
-  vim.cmd([[exec "normal! \<c-y>"]])
+  vim.api.nvim_win_call(right_winid, function()
+    vim.cmd([[exe "norm! \<c-y>"]])
+  end)
 end
 
 ---@static
