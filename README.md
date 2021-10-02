@@ -155,9 +155,8 @@ rather than the file under the cursor in the file panel.
 This section documents key-mappable functions that are not mapped by default.
 
 - `focus_entry`
-  - Like `select_entry`, but open the diff for the selected entry while
-    focusing cursor on the current file. Available in both the file panel and
-    the history panel.
+  - Like `select_entry`, but also bring the cursor to the right diff split.
+    Available in both the file panel and the file history panel.
 
 ## File History
 

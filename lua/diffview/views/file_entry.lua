@@ -340,9 +340,17 @@ function FileEntry._update_windows(left_winid, right_winid)
     utils.set_local({ left_winid, right_winid }, k, v)
   end
 
+  for _, id in ipairs({ left_winid, right_winid }) do
+    if id ~= api.nvim_get_current_win() then
+      api.nvim_win_call(id, function()
+        vim.cmd("do WinLeave")
+      end)
+    end
+  end
+
   -- Scroll to trigger the scrollbind and sync the windows. This works more
   -- consistently than calling `:syncbind`.
-  vim.api.nvim_win_call(right_winid, function()
+  api.nvim_win_call(right_winid, function()
     vim.cmd([[exe "norm! \<c-y>"]])
   end)
 end
