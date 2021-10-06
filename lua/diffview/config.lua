@@ -96,6 +96,7 @@ M.defaults = {
       ["<C-w>gf"]       = cb("goto_file_tab"),
       ["<leader>e"]     = cb("focus_files"),
       ["<leader>b"]     = cb("toggle_files"),
+      ["y"]             = cb("copy_hash"),
     },
     option_panel = {
       ["<tab>"] = cb("select"),
