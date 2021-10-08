@@ -122,6 +122,13 @@ local function render_entries(parent, entries)
     end
 
     offset = #s + 1
+    if entry.commit.hash then
+      local hash = entry.commit.hash:sub(0, 8)
+      comp:add_hl("Constant", line_idx, offset, offset + #hash)
+      s = s .. " " .. hash
+    end
+
+    offset = #s + 1
     local subject = #entry.files > 0
         and entry.files[1].right.type == RevType.LOCAL
         and "[Not Committed Yet]"

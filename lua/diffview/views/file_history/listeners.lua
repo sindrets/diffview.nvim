@@ -196,5 +196,14 @@ return function(view)
         end
       end
     end,
+    copy_hash = function()
+      if view.panel:is_cur_win() then
+        local item = view.panel:get_item_at_cursor()
+        if item then
+          vim.fn.setreg("+", item.commit.hash)
+          vim.api.nvim_echo({{"Copied " .. item.commit.hash .. " to the system clipboard."}}, false, {})
+        end
+      end
+    end,
   }
 end

@@ -129,6 +129,7 @@ require'diffview'.setup {
       ["<C-w>gf"]       = cb("goto_file_tab"),
       ["<leader>e"]     = cb("focus_files"),
       ["<leader>b"]     = cb("toggle_files"),
+      ["y"]             = cb("copy_hash"),          -- Copy the commit hash of the entry under the cursor
     },
     option_panel = {
       ["<tab>"] = cb("select"),
