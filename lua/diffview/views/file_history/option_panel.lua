@@ -95,8 +95,9 @@ end
 
 function FHOptionPanel:init_buffer_opts()
   local conf = config.get_config()
+  local opt = { noremap = true, silent = true, nowait = true }
   for lhs, rhs in pairs(conf.key_bindings.option_panel) do
-    api.nvim_buf_set_keymap(self.bufid, "n", lhs, rhs, { noremap = true, silent = true })
+    api.nvim_buf_set_keymap(self.bufid, "n", lhs, rhs, opt)
   end
 
   for group, _ in pairs(FHOptionPanel.flags) do

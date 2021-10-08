@@ -112,7 +112,8 @@ require'diffview'.setup {
     },
     file_history_panel = {
       ["g!"]            = cb("options"),            -- Open the option panel
-      ["<C-d>"]         = cb("open_in_diffview"),   -- Open the entry under the cursor in a diffview
+      ["<C-A-d>"]       = cb("open_in_diffview"),   -- Open the entry under the cursor in a diffview
+      ["y"]             = cb("copy_hash"),          -- Copy the commit hash of the entry under the cursor
       ["zR"]            = cb("open_all_folds"),
       ["zM"]            = cb("close_all_folds"),
       ["j"]             = cb("next_entry"),
@@ -129,7 +130,6 @@ require'diffview'.setup {
       ["<C-w>gf"]       = cb("goto_file_tab"),
       ["<leader>e"]     = cb("focus_files"),
       ["<leader>b"]     = cb("toggle_files"),
-      ["y"]             = cb("copy_hash"),          -- Copy the commit hash of the entry under the cursor
     },
     option_panel = {
       ["<tab>"] = cb("select"),

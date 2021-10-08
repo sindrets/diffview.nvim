@@ -79,7 +79,8 @@ M.defaults = {
     },
     file_history_panel = {
       ["g!"]            = cb("options"),
-      ["<C-d>"]         = cb("open_in_diffview"),
+      ["<C-A-d>"]       = cb("open_in_diffview"),
+      ["y"]             = cb("copy_hash"),
       ["zR"]            = cb("open_all_folds"),
       ["zM"]            = cb("close_all_folds"),
       ["j"]             = cb("next_entry"),
@@ -96,7 +97,6 @@ M.defaults = {
       ["<C-w>gf"]       = cb("goto_file_tab"),
       ["<leader>e"]     = cb("focus_files"),
       ["<leader>b"]     = cb("toggle_files"),
-      ["y"]             = cb("copy_hash"),
     },
     option_panel = {
       ["<tab>"] = cb("select"),

@@ -320,10 +320,8 @@ end
 ---   - `restore_cursor` (boolean) Return the cursor to the initial window. (default: `true`)
 ---   - `method` ("set"|"append"|"prepend") Assignment method. (default: "set")
 function M.set_local(winids, option, value, opt)
-  local last_winid = api.nvim_get_current_win()
   local cmd
   opt = vim.tbl_extend("keep", opt or {}, {
-    restore_cursor = true,
     method = "set",
   })
 
@@ -343,10 +341,6 @@ function M.set_local(winids, option, value, opt)
       api.nvim_win_call(id, function()
         vim.cmd(cmd)
       end)
-    end
-
-    if opt.restore_cursor then
-      api.nvim_set_current_win(last_winid)
     end
   end)
 

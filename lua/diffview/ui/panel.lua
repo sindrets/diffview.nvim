@@ -123,12 +123,11 @@ function Panel:resize()
     return
   end
 
-  local winnr = api.nvim_win_get_number(self.winid)
   local cmd
   if self.form == Form.COLUMN and self.width then
-    cmd = string.format("vert %dres %d", winnr, self.width)
+    api.nvim_win_set_width(self.winid, self.width)
   elseif self.height then
-    cmd = string.format("%dres %d", winnr, self.height)
+    api.nvim_win_set_height(self.winid, self.height)
   end
 
   if cmd then

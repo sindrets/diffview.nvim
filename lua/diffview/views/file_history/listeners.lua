@@ -201,7 +201,7 @@ return function(view)
         local item = view.panel:get_item_at_cursor()
         if item then
           vim.fn.setreg("+", item.commit.hash)
-          vim.api.nvim_echo({{"Copied " .. item.commit.hash .. " to the system clipboard."}}, false, {})
+          utils.info(string.format("Copied '%s' to the clipboard.", item.commit.hash))
         end
       end
     end,

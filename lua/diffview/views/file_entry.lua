@@ -358,8 +358,9 @@ end
 ---@static
 function FileEntry._attach_buffer(bufid)
   local conf = config.get_config()
+  local opt = { noremap = true, silent = true, nowait = true }
   for lhs, rhs in pairs(conf.key_bindings.view) do
-    api.nvim_buf_set_keymap(bufid, "n", lhs, rhs, { noremap = true, silent = true })
+    api.nvim_buf_set_keymap(bufid, "n", lhs, rhs, opt)
   end
 end
 

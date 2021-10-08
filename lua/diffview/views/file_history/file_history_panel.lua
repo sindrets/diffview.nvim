@@ -96,11 +96,12 @@ end
 function FileHistoryPanel:init_buffer_opts()
   local conf = config.get_config()
   local option_rhs = config.diffview_callback("options")
+  local opt = { noremap = true, silent = true, nowait = true }
   for lhs, rhs in pairs(conf.key_bindings.file_history_panel) do
     if rhs == option_rhs then
       self.option_mapping = lhs
     end
-    api.nvim_buf_set_keymap(self.bufid, "n", lhs, rhs, { noremap = true, silent = true })
+    api.nvim_buf_set_keymap(self.bufid, "n", lhs, rhs, opt)
   end
 end
 
