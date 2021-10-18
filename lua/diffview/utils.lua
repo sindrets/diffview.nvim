@@ -371,6 +371,19 @@ function M.tbl_concat(...)
   return result
 end
 
+function M.tbl_clone(t)
+  if not t then
+    return
+  end
+  local clone = {}
+
+  for k, v in pairs(t) do
+    clone[k] = v
+  end
+
+  return clone
+end
+
 function M.tbl_deep_clone(t)
   if not t then
     return

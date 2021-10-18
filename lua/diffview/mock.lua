@@ -12,7 +12,7 @@ function mock_mt.__index(_, key)
   return mock_mt[key]
 end
 
-function mock_mt.__call(internals)
+function mock_mt.__call(_, internals)
   local mt = {
     __index = function(self, k)
       if Mock[k] then
@@ -25,7 +25,7 @@ function mock_mt.__call(internals)
       return
     end,
   }
-  local this = setmetatable(utils.tbl_slice(internals or {}), mt)
+  local this = setmetatable(utils.tbl_clone(internals or {}), mt)
   return this
 end
 
