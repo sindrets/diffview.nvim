@@ -18,13 +18,22 @@ PerfTimer = oop.create_class("PerfTimer")
 ---@return PerfTimer
 function PerfTimer:init(subject)
   self.subject = subject
-  self.first = luv.hrtime()
   self.laps = {}
+  self.first = luv.hrtime()
+end
+
+function PerfTimer:reset()
+  self.laps = {}
+  self.first = luv.hrtime()
 end
 
 ---Record a lap time.
-function PerfTimer:lap()
-  table.insert(self.laps, (luv.hrtime() - self.first) / 1000000)
+---@param subject string|nil
+function PerfTimer:lap(subject)
+  self.laps[#self.laps + 1] = {
+    subject or #self.laps + 1,
+    (luv.hrtime() - self.first) / 1000000,
+  }
 end
 
 ---Set final time.
@@ -35,26 +44,36 @@ function PerfTimer:time()
   return self.final_time
 end
 
-function PerfTimer:print_result()
+function PerfTimer.__tostring(self)
   if not self.final_time then
     self:time()
   end
 
   if #self.laps == 0 then
-    print(
-      string.format(
-        "%s %.2fms",
-        utils.str_right_pad((self.subject or "TIME") .. ":", 24),
-        self.final_time
-      )
+    return string.format(
+      "%s %.3f ms",
+      utils.str_right_pad((self.subject or "TIME") .. ":", 24),
+      self.final_time
     )
   else
-    print((self.subject or "LAPS") .. ":")
-    for i, lap in ipairs(self.laps) do
-      print(string.format("%s %.2fms", utils.str_right_pad(i, 16), lap))
+    local s = (self.subject or "LAPS") .. ":\n"
+    local last = 0
+    for _, lap in ipairs(self.laps) do
+      s = s
+        .. string.format(
+          "%s %.3f ms\t(%.3f ms)\n",
+          utils.str_right_pad(lap[1], 16),
+          lap[2],
+          lap[2] - last
+        )
+      last = lap[2]
     end
-    print(string.format("%s %.2fms", utils.str_right_pad("FINAL TIME:", 16), self.final_time))
+    return s .. string.format("%s %.3f ms", utils.str_right_pad("FINAL TIME:", 16), self.final_time)
   end
+end
+
+function PerfTimer:print()
+  utils._echo_multiline(tostring(self))
 end
 
 ---Get the relative performance difference in percent.

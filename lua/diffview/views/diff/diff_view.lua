@@ -83,7 +83,7 @@ function DiffView:next_file()
     return
   end
 
-  if self.files:size() > 1 or self.nulled then
+  if self.files:len() > 1 or self.nulled then
     local cur = self.panel.cur_file
     if cur then
       cur:detach_buffers()
@@ -107,7 +107,7 @@ function DiffView:prev_file()
     return
   end
 
-  if self.files:size() > 1 or self.nulled then
+  if self.files:len() > 1 or self.nulled then
     local cur = self.panel.cur_file
     if cur then
       cur:detach_buffers()
@@ -294,7 +294,7 @@ end
 ---Ensures there are files to load, and loads the null buffer otherwise.
 ---@return boolean
 function DiffView:file_safeguard()
-  if self.files:size() == 0 then
+  if self.files:len() == 0 then
     local cur = self.panel.cur_file
     if cur then
       cur:detach_buffers()

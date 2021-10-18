@@ -1,9 +1,14 @@
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local renderer = require("diffview.renderer")
+local logger = require("diffview.logger")
+local PerfTimer = require("diffview.perf").PerfTimer
 local api = vim.api
 local M = {}
 local uid_counter = 0
+
+---@type PerfTimer
+local perf = PerfTimer("[Panel] redraw")
 
 ---@class Form
 
@@ -222,7 +227,12 @@ function Panel:redraw()
   if not self.render_data then
     return
   end
+  perf:reset()
   renderer.render(self.bufid, self.render_data)
+  perf:time()
+  if DiffviewGlobal.debug_level >= 10 then
+    logger.s_debug(perf)
+  end
 end
 
 M.Form = Form

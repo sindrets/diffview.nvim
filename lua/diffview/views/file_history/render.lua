@@ -1,8 +1,20 @@
 local utils = require("diffview.utils")
 local config = require("diffview.config")
 local renderer = require("diffview.renderer")
+local logger = require("diffview.logger")
 local Form = require("diffview.ui.panel").Form
 local RevType = require("diffview.git.rev").RevType
+local PerfTimer = require("diffview.perf").PerfTimer
+local Mock = require("diffview.mock").Mock
+
+if DiffviewGlobal.debug_level < 10 then
+  logger = Mock()
+end
+
+---@type PerfTimer
+local perf = PerfTimer("[FileHistoryPanel] Render internal")
+
+local cache = setmetatable({}, { __mode = "k" })
 
 ---@param comp RenderComponent
 ---@param files FileEntry[]
@@ -56,6 +68,8 @@ local function render_files(comp, files)
     comp:add_line(s)
     line_idx = line_idx + 1
   end
+
+  perf:lap("files")
 end
 
 ---@param parent any RenderComponent struct
@@ -123,7 +137,7 @@ local function render_entries(parent, entries)
 
     offset = #s + 1
     if entry.commit.hash then
-      local hash = entry.commit.hash:sub(0, 8)
+      local hash = entry.commit.hash:sub(1, 8)
       comp:add_hl("DiffviewSecondary", line_idx, offset, offset + #hash)
       s = s .. " " .. hash
     end
@@ -152,10 +166,25 @@ local function render_entries(parent, entries)
     comp:add_line(s)
     line_idx = line_idx + 1
 
+    perf:lap("entry " .. entry.commit.hash:sub(1, 7))
+
     if not entry.single_file and not entry.folded then
       render_files(entry_struct.files.comp, entry.files)
     end
   end
+end
+
+---@param panel FileHistoryPanel
+local function prepare_panel_cache(panel)
+  local c = {}
+  cache[panel] = c
+  c.root_path = panel.form == Form.COLUMN
+      and utils.path_shorten(
+        vim.fn.fnamemodify(panel.git_root, ":~"),
+        panel.width - 6
+      )
+    or vim.fn.fnamemodify(panel.git_root, ":~")
+  c.args = table.concat(panel.raw_args, " ")
 end
 
 return {
@@ -165,20 +194,21 @@ return {
       return
     end
 
+    perf:reset()
     panel.render_data:clear()
+    if not cache[panel] then
+      prepare_panel_cache(panel)
+    end
 
     ---@type RenderComponent
     local comp = panel.components.header.comp
+    local cached = cache[panel]
     local line_idx = 0
+    local s
 
     -- root path
-    local s = (
-        panel.form == Form.COLUMN
-          and utils.path_shorten(vim.fn.fnamemodify(panel.git_root, ":~"), panel.width - 6)
-        or vim.fn.fnamemodify(panel.git_root, ":~")
-      )
-    comp:add_hl("DiffviewFilePanelRootPath", line_idx, 0, #s)
-    comp:add_line(s)
+    comp:add_hl("DiffviewFilePanelRootPath", line_idx, 0, #cached.root_path)
+    comp:add_line(cached.root_path)
     line_idx = line_idx + 1
 
     local offset
@@ -201,7 +231,7 @@ return {
       s = "Showing history for: "
       comp:add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
       offset = #s
-      local paths = table.concat(panel.path_args, " ")
+      local paths = cached.args
       comp:add_hl("DiffviewFilePanelFileName", line_idx, offset, offset + #paths)
       comp:add_line(s .. paths)
     end
@@ -226,9 +256,14 @@ return {
     s = s .. " " .. change_count
     comp:add_line(s)
 
+    perf:lap("header")
+
     if #panel.entries > 0 then
       render_entries(panel.components.log.entries, panel.entries)
     end
+
+    perf:time()
+    logger.s_debug(perf)
   end,
 
   ---@param panel FHOptionPanel

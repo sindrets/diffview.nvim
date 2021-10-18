@@ -1,3 +1,12 @@
+DiffviewGlobal = {}
+--[[
+Debug Levels:
+0:    NOTHING
+1:    NORMAL
+10:   RENDERING
+--]]
+DiffviewGlobal.debug_level = tonumber(os.getenv("DEBUG_DIFFVIEW")) or 0
+
 local arg_parser = require("diffview.arg_parser")
 local lib = require("diffview.lib")
 local config = require("diffview.config")

@@ -112,6 +112,7 @@ function M.file_history(args)
   local v = FileHistoryView({
     git_root = git_root,
     path_args = paths,
+    raw_args = argo.args,
     log_options = config.get_config().file_history_panel.log_options,
   })
 

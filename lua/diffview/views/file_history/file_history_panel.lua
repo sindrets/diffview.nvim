@@ -3,11 +3,16 @@ local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local git = require("diffview.git.utils")
 local renderer = require("diffview.renderer")
+local logger = require("diffview.logger")
+local PerfTimer = require("diffview.perf").PerfTimer
 local Panel = require("diffview.ui.panel").Panel
 local LogEntry = require("diffview.git.log_entry").LogEntry
 local FHOptionPanel = require("diffview.views.file_history.option_panel").FHOptionPanel
 local api = vim.api
 local M = {}
+
+---@type PerfTimer
+local perf = PerfTimer("[FileHistoryPanel] render")
 
 ---@class LogOptions
 ---@field follow boolean
@@ -23,6 +28,7 @@ local M = {}
 ---@field git_root string
 ---@field entries LogEntry[]
 ---@field path_args string[]
+---@field raw_args string[]
 ---@field log_options LogOptions
 ---@field cur_item {[1]: LogEntry, [2]: FileEntry}
 ---@field single_file boolean
@@ -61,7 +67,7 @@ FileHistoryPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 ---@param path_args string[]
 ---@param log_options LogOptions
 ---@return FileHistoryPanel
-function FileHistoryPanel:init(git_root, entries, path_args, log_options)
+function FileHistoryPanel:init(git_root, entries, path_args, raw_args, log_options)
   local conf = config.get_config()
   FileHistoryPanel:super().init(self, {
     position = conf.file_history_panel.position,
@@ -72,6 +78,7 @@ function FileHistoryPanel:init(git_root, entries, path_args, log_options)
   self.git_root = git_root
   self.entries = entries
   self.path_args = path_args
+  self.raw_args = raw_args
   self.cur_item = {}
   self.single_file = entries[1] and entries[1].single_file
   self.option_panel = FHOptionPanel(self)
@@ -293,7 +300,11 @@ function FileHistoryPanel:highlight_prev_item()
     return
   end
 
-  pcall(api.nvim_win_set_cursor, self.winid, { self.constrain_cursor(self.winid, -1), 0 })
+  pcall(
+    api.nvim_win_set_cursor,
+    self.winid,
+    { self.constrain_cursor(self.winid, -vim.v.count1), 0 }
+  )
 end
 
 function FileHistoryPanel:highlight_next_file()
@@ -301,7 +312,10 @@ function FileHistoryPanel:highlight_next_file()
     return
   end
 
-  pcall(api.nvim_win_set_cursor, self.winid, { self.constrain_cursor(self.winid, 1), 0 })
+  pcall(api.nvim_win_set_cursor, self.winid, {
+    self.constrain_cursor(self.winid, vim.v.count1),
+    0,
+  })
 end
 
 function FileHistoryPanel:set_entry_fold(entry, open)
@@ -321,7 +335,12 @@ function FileHistoryPanel:toggle_entry_fold(entry)
 end
 
 function FileHistoryPanel:render()
+  perf:reset()
   require("diffview.views.file_history.render").file_history_panel(self)
+  perf:time()
+  if DiffviewGlobal.debug_level >= 10 then
+    logger.s_debug(perf)
+  end
 end
 
 M.FileHistoryPanel = FileHistoryPanel

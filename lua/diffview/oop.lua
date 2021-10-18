@@ -98,9 +98,6 @@ local function secure_cast(class, inst)
   return casted
 end
 
-local callup_store = {}
-setmetatable(callup_store, { __mode = "k" })
-
 local function inst_init_def(inst)
   inst.super:init()
 end

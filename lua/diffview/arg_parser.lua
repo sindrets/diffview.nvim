@@ -44,6 +44,8 @@ function FlagValueMap:init()
   self.map = {}
 end
 
+---@param flag_synonyms string[]
+---@param values string[]
 function FlagValueMap:put(flag_synonyms, values)
   for _, flag in ipairs(flag_synonyms) do
     if flag:sub(1, 1) ~= "-" then

@@ -10,28 +10,23 @@ local setlocal_opr_templates = {
   prepend = [[exe 'setl ${option}=${value}' . (&${option} == "" ? "" : "," . &${option})]],
 }
 
-function M._echo_multiline(msg)
-  for _, s in ipairs(vim.fn.split(msg, "\n")) do
-    vim.cmd("echom '" .. s:gsub("'", "''") .. "'")
-  end
+function M._echo_multiline(msg, hl)
+  local chunks = vim.tbl_map(function(line)
+    return { line, hl }
+  end, vim.split(msg, "\n"))
+  vim.api.nvim_echo(chunks, true, {})
 end
 
 function M.info(msg)
-  vim.cmd("echohl Directory")
-  M._echo_multiline("[Diffview.nvim] " .. msg)
-  vim.cmd("echohl None")
+  M._echo_multiline("[Diffview.nvim] " .. msg, "Directory")
 end
 
 function M.warn(msg)
-  vim.cmd("echohl WarningMsg")
-  M._echo_multiline("[Diffview.nvim] " .. msg)
-  vim.cmd("echohl None")
+  M._echo_multiline("[Diffview.nvim] " .. msg, "WarningMsg")
 end
 
 function M.err(msg)
-  vim.cmd("echohl ErrorMsg")
-  M._echo_multiline("[Diffview.nvim] " .. msg)
-  vim.cmd("echohl None")
+  M._echo_multiline("[Diffview.nvim] " .. msg, "ErrorMsg")
 end
 
 ---Call the function `f`, ignoring most of the window and buffer related
@@ -196,46 +191,38 @@ function M.path_shorten(path, max_length)
 end
 
 function M.str_right_pad(s, min_size, fill)
-  local result = s
+  s = tostring(s)
+  if #s >= min_size then
+    return s
+  end
   if not fill then
     fill = " "
   end
-
-  while #result < min_size do
-    result = result .. fill
-  end
-
-  return result
+  return s .. string.rep(fill, math.ceil((min_size - #s) / #fill))
 end
 
 function M.str_left_pad(s, min_size, fill)
-  local result = s
+  s = tostring(s)
+  if #s >= min_size then
+    return s
+  end
   if not fill then
     fill = " "
   end
-
-  while #result < min_size do
-    result = fill .. result
-  end
-
-  return result
+  return string.rep(fill, math.ceil((min_size - #s) / #fill)) .. s
 end
 
 function M.str_center_pad(s, min_size, fill)
-  local result = s
+  s = tostring(s)
+  if #s >= min_size then
+    return s
+  end
   if not fill then
     fill = " "
   end
-
-  while #result < min_size do
-    if #result % 2 == 0 then
-      result = result .. fill
-    else
-      result = fill .. result
-    end
-  end
-
-  return result
+  local left_len = math.floor((min_size - #s) / #fill / 2)
+  local right_len = math.ceil((min_size - #s) / #fill / 2)
+  return string.rep(fill, left_len) .. s .. string.rep(fill, right_len)
 end
 
 function M.str_shorten(s, max_length, head)
@@ -317,7 +304,6 @@ end
 ---@param value string[]|string
 ---@param opt table
 ---`opt` fields:
----   - `restore_cursor` (boolean) Return the cursor to the initial window. (default: `true`)
 ---   - `method` ("set"|"append"|"prepend") Assignment method. (default: "set")
 function M.set_local(winids, option, value, opt)
   local cmd
@@ -364,7 +350,7 @@ end
 ---@return any[]
 function M.tbl_slice(t, first, last)
   local slice = {}
-  for i = first, last or #t, 1 do
+  for i = first or 1, last or #t do
     table.insert(slice, t[i])
   end
 

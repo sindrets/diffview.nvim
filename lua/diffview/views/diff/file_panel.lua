@@ -165,7 +165,7 @@ end
 
 function FilePanel:prev_file()
   local files = self:ordered_file_list()
-  if not self.cur_file and self.files:size() > 0 then
+  if not self.cur_file and self.files:len() > 0 then
     self.cur_file = files[1]
     return self.cur_file
   end
@@ -179,7 +179,7 @@ end
 
 function FilePanel:next_file()
   local files = self:ordered_file_list()
-  if not self.cur_file and self.files:size() > 0 then
+  if not self.cur_file and self.files:len() > 0 then
     self.cur_file = files[1]
     return self.cur_file
   end
@@ -252,19 +252,26 @@ function FilePanel:highlight_file(file)
 end
 
 function FilePanel:highlight_prev_file()
-  if not (self:is_open() and self:buf_loaded()) or self.files:size() == 0 then
+  if not (self:is_open() and self:buf_loaded()) or self.files:len() == 0 then
     return
   end
 
-  pcall(api.nvim_win_set_cursor, self.winid, { self.constrain_cursor(self.winid, -1), 0 })
+  pcall(
+    api.nvim_win_set_cursor,
+    self.winid,
+    { self.constrain_cursor(self.winid, -vim.v.count1), 0 }
+  )
 end
 
 function FilePanel:highlight_next_file()
-  if not (self:is_open() and self:buf_loaded()) or self.files:size() == 0 then
+  if not (self:is_open() and self:buf_loaded()) or self.files:len() == 0 then
     return
   end
 
-  pcall(api.nvim_win_set_cursor, self.winid, { self.constrain_cursor(self.winid, 1), 0 })
+  pcall(api.nvim_win_set_cursor, self.winid, {
+    self.constrain_cursor(self.winid, vim.v.count1),
+    0,
+  })
 end
 
 function FilePanel:set_item_fold(item, open)
