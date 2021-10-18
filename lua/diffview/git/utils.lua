@@ -394,6 +394,12 @@ function M.expand_pathspec(git_root, cwd, pathspec)
   return magic .. pattern
 end
 
+function M.pathspec_modify(pathspec, mods)
+  local magic = pathspec:match("^:[/!^]*:?") or pathspec:match("^:%b()") or ""
+  local pattern = pathspec:sub(1 + #magic, -1)
+  return magic .. vim.fn.fnamemodify(pattern, mods)
+end
+
 ---Check if any of the given revs are LOCAL.
 ---@param left Rev
 ---@param right Rev

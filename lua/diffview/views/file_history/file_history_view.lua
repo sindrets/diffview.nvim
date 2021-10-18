@@ -15,6 +15,7 @@ local M = {}
 ---@field git_dir string
 ---@field panel FileHistoryPanel
 ---@field path_args string[]
+---@field raw_args string[]
 ---@field entries LogEntry[]
 ---@field file_idx integer
 local FileHistoryView = StandardView
@@ -29,9 +30,16 @@ function FileHistoryView:init(opt)
   self.git_root = opt.git_root
   self.git_dir = git.git_dir(self.git_root)
   self.path_args = opt.path_args
+  self.raw_args = opt.raw_args
   self.entries = git.file_history_list(self.git_root, self.path_args, opt.log_options)
   self.file_idx = 1
-  self.panel = FileHistoryPanel(self.git_root, self.entries, self.path_args, opt.log_options)
+  self.panel = FileHistoryPanel(
+    self.git_root,
+    self.entries,
+    self.path_args,
+    self.raw_args,
+    opt.log_options
+  )
 end
 
 function FileHistoryView:post_open()

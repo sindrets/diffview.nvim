@@ -16,18 +16,19 @@ FileDict = oop.create_class("FileDict")
 function FileDict:init()
   self.working = {}
   self.staged = {}
+end
 
-  local mt = getmetatable(self)
-  local old_index = mt.__index
-  mt.__index = function(t, k)
+do
+  local __index = FileDict.__index
+  function FileDict.__index(self, k)
     if type(k) == "number" then
-      if k > #t.working then
-        return t.staged[k - #t.working]
+      if k > #self.working then
+        return self.staged[k - #self.working]
       else
-        return t.working[k]
+        return self.working[k]
       end
     else
-      return old_index(t, k)
+      return __index(self, k)
     end
   end
 end
@@ -37,7 +38,7 @@ function FileDict:update_file_trees()
   self.staged_tree = FileTree(self.staged)
 end
 
-function FileDict:size()
+function FileDict:len()
   return #self.working + #self.staged
 end
 

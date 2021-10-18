@@ -43,7 +43,7 @@ end
 ---Directory nodes come before file nodes.
 ---@param a Node
 ---@param b Node
----@return true if node a comes before node b
+---@return boolean true if node a comes before node b
 function Node.comparator(a, b)
   if a:has_children() == b:has_children() then
     return string.lower(a.name) < string.lower(b.name)

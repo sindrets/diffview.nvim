@@ -26,6 +26,8 @@ local CompStruct
 ---@field lstart integer 0 indexed, Inclusive
 ---@field lend integer Exclusive
 ---@field height integer
+---@field leaf boolean
+---@field data_root RenderData
 ---@field context any
 local RenderComponent = oop.Object
 RenderComponent = oop.create_class("RenderComponent")
@@ -40,6 +42,7 @@ function RenderComponent:init(name)
   self.lstart = -1
   self.lend = -1
   self.height = 0
+  self.leaf = false
 end
 
 local function create_subcomponents(parent, comp_struct, schema)
@@ -56,6 +59,8 @@ local function create_subcomponents(parent, comp_struct, schema)
     comp_struct[v.name] = comp_struct[i]
     if #v > 0 then
       create_subcomponents(sub_comp, comp_struct[i], v)
+    else
+      sub_comp.leaf = true
     end
   end
 end
@@ -87,6 +92,7 @@ end
 ---@return RenderComponent|CompStruct
 function RenderComponent:create_component(schema)
   local new_comp, comp_struct = RenderComponent.create_static_component(schema)
+  new_comp.data_root = self.data_root
   self:add_component(new_comp)
 
   if comp_struct then
@@ -99,7 +105,7 @@ end
 ---@param component RenderComponent
 function RenderComponent:add_component(component)
   component.parent = self
-  table.insert(self.components, component)
+  self.components[#self.components + 1] = component
 end
 
 ---@param component RenderComponent
@@ -116,7 +122,7 @@ end
 
 ---@param line string
 function RenderComponent:add_line(line)
-  table.insert(self.lines, line)
+  self.lines[#self.lines + 1] = line
 end
 
 ---@param group string
@@ -124,12 +130,12 @@ end
 ---@param first integer
 ---@param last integer
 function RenderComponent:add_hl(group, line_idx, first, last)
-  table.insert(self.hl, {
+  self.hl[#self.hl + 1] = {
     group = group,
     line_idx = line_idx,
     first = first,
     last = last,
-  })
+  }
 end
 
 function RenderComponent:clear()
@@ -248,6 +254,7 @@ end
 function RenderData:create_component(schema)
   local comp_struct
   local new_comp = RenderComponent(schema and schema.name or nil)
+  new_comp.data_root = self
   self:add_component(new_comp)
 
   if schema then
@@ -262,7 +269,7 @@ end
 
 ---@param component RenderComponent
 function RenderData:add_component(component)
-  table.insert(self.components, component)
+  self.components[#self.components + 1] = component
 end
 
 ---@param component RenderComponent
@@ -282,12 +289,12 @@ end
 ---@param first integer
 ---@param last integer
 function RenderData:add_hl(group, line_idx, first, last)
-  table.insert(self.hl, {
+  self.hl[#self.hl + 1] = {
     group = group,
     line_idx = line_idx,
     first = first,
     last = last,
-  })
+  }
 end
 
 function RenderData:clear()
@@ -388,17 +395,11 @@ local function process_component(line_idx, lines, hl_data, component)
     return line_idx
   else
     for _, line in ipairs(component.lines) do
-      table.insert(lines, line)
+      lines[#lines + 1] = line
     end
 
-    for _, hl in ipairs(component.hl) do
-      table.insert(hl_data, {
-        group = hl.group,
-        line_idx = hl.line_idx + line_idx,
-        first = hl.first,
-        last = hl.last,
-      })
-    end
+    component.hl.offset = line_idx
+    hl_data[#hl_data + 1] = component.hl
     component.height = #component.lines
 
     if component.height > 0 then
@@ -434,13 +435,22 @@ function M.render(bufid, data)
     end
   else
     lines = data.lines
-    hl_data = data.hl
+    hl_data = { data.hl }
   end
 
   api.nvim_buf_set_lines(bufid, 0, -1, false, lines)
   api.nvim_buf_clear_namespace(bufid, data.namespace, 0, -1)
-  for _, hl in ipairs(hl_data) do
-    api.nvim_buf_add_highlight(bufid, data.namespace, hl.group, hl.line_idx, hl.first, hl.last)
+  for _, t in ipairs(hl_data) do
+    for _, hl in ipairs(t) do
+      api.nvim_buf_add_highlight(
+        bufid,
+        data.namespace,
+        hl.group,
+        hl.line_idx + (t.offset or 0),
+        hl.first,
+        hl.last
+      )
+    end
   end
 
   api.nvim_buf_set_option(bufid, "modifiable", was_modifiable)
@@ -458,12 +468,13 @@ local git_status_hl_map = {
   ["D"] = "DiffviewStatusDeleted",
   ["B"] = "DiffviewStatusBroken",
   ["!"] = "DiffviewStatusIgnored",
-  [" "] = "DiffviewStatusNone",
 }
 
 function M.get_git_hl(status)
   return git_status_hl_map[status]
 end
+
+local icon_cache = {}
 
 function M.get_file_icon(name, ext, render_data, line_idx, offset)
   if not config.get_config().use_icons then
@@ -482,7 +493,14 @@ function M.get_file_icon(name, ext, render_data, line_idx, offset)
     end
   end
 
-  local icon, hl = web_devicons.get_icon(name, ext, { default = true })
+  local icon, hl
+  local icon_key = (name or "") .. "|&|" .. (ext or "")
+  if icon_cache[icon_key] then
+    icon, hl = unpack(icon_cache[icon_key])
+  else
+    icon, hl = web_devicons.get_icon(name, ext, { default = true })
+    icon_cache[icon_key] = { icon, hl }
+  end
 
   if icon then
     if hl then
