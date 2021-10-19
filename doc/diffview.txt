@@ -58,6 +58,10 @@ Example configuration with default settings:
           folder_statuses = "always"  -- One of 'never', 'only_folded' or 'always'.
         }
       },
+      default_args = {    -- Default args prepended to the arg-list for the listed commands
+        DiffviewOpen = {},
+        DiffviewFileHistory = {},
+      },
       file_history_panel = {
         position = "bottom",
         width = 35,
@@ -143,6 +147,16 @@ enhanced_diff_hl                            *diffview-config-enhanced_diff_hl*
         in the left diff buffer will be highlighted as |hl-DiffDelete|, and
         the delete fill-chars will be highlighted more subtly.
 
+default_args                                    *diffview-config-default_args*
+        This table allows you to define the default args that will always be
+        prepended to the arg-list for the commands specified by the table
+        keys.
+
+        Examples: >
+                default_args = {
+                  DiffviewOpen = { "--untracked-files=no", "--imply-local" }
+                }
+
 AVAILABLE UNUSED MAPPINGS                 *diffview-available-unused-mappings*
 
 This section documents key-mappable functions that are not mapped by default.
@@ -189,6 +203,14 @@ COMMANDS                                                 *diffview-commands*
         --cached, --staged
                         Diff staged changes against [git-rev]. If no [git-rev]
                         is given, defaults to `HEAD`.
+
+        --imply-local   If a range rev is provided and either end of the range
+                        points to `HEAD`: point that end to local files
+                        instead (not created from git). This can be useful
+                        i.e. when using symmetric difference ranges
+                        (triple-dot), but you want to be able to utilize the
+                        LSP features that are not available while you're
+                        viewing files created from git.
 
         -C{path}        Run as if git was started in {path} instead of the
                         current working directory.

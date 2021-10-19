@@ -14,7 +14,8 @@ local M = {}
 M.views = {}
 
 function M.diffview_open(args)
-  local argo = arg_parser.parse(args)
+  local default_args = config.get_config().default_args.DiffviewOpen
+  local argo = arg_parser.parse({ unpack(default_args), unpack(args) })
   local rev_arg = argo.args[1]
   local paths = {}
 
@@ -76,7 +77,8 @@ function M.diffview_open(args)
 end
 
 function M.file_history(args)
-  local argo = arg_parser.parse(args)
+  local default_args = config.get_config().default_args.DiffviewFileHistory
+  local argo = arg_parser.parse({ unpack(default_args), unpack(args) })
   local paths = {}
 
   for _, path in ipairs(argo.args) do
