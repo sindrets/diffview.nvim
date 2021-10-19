@@ -18,6 +18,7 @@ local M = {}
 local flag_value_completion = arg_parser.FlagValueMap()
 flag_value_completion:put({ "u", "untracked-files" }, { "true", "normal", "all", "false", "no" })
 flag_value_completion:put({ "cached", "staged" }, { "true", "false" })
+flag_value_completion:put({ "imply-local" }, { "true", "false" })
 flag_value_completion:put({ "C" }, {})
 
 function M.setup(user_config)
@@ -73,10 +74,19 @@ function M.completion(arg_lead, cmd_line, cur_pos)
     )
   local git_dir = require("diffview.git.utils").git_dir(fpath)
   local git_root = require("diffview.git.utils").toplevel(fpath)
+  local has_rev_arg = false
+
+  for i = 2, math.min(#args, divideridx) do
+    if args[i]:sub(1, 1) ~= "-" then
+      has_rev_arg = true
+      goto continue
+    end
+  end
+  ::continue::
 
   if argidx >= divideridx then
     return vim.fn.getcompletion(arg_lead, "file", 0)
-  elseif argidx == 2 and arg_lead:sub(1, 1) ~= "-" and git_dir and git_root then
+  elseif not has_rev_arg and arg_lead:sub(1, 1) ~= "-" and git_dir and git_root then
     -- stylua: ignore start
     local targets = {
       "HEAD", "FETCH_HEAD", "ORIG_HEAD", "MERGE_HEAD",

@@ -43,6 +43,10 @@ M.defaults = {
       reverse = false,
     }
   },
+  default_args = {
+    DiffviewOpen = {},
+    DiffviewFileHistory = {},
+  },
   key_bindings = {
     disable_defaults = false,
     view = {

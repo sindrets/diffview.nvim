@@ -14,7 +14,8 @@ local M = {}
 M.views = {}
 
 function M.diffview_open(args)
-  local argo = arg_parser.parse(args)
+  local default_args = config.get_config().default_args.DiffviewOpen
+  local argo = arg_parser.parse({ unpack(default_args), unpack(args) })
   local rev_arg = argo.args[1]
   local paths = {}
 
@@ -42,8 +43,14 @@ function M.diffview_open(args)
     return
   end
 
-  local cached = argo:get_flag("cached", "staged") == "true"
-  local left, right = M.parse_revs(git_root, rev_arg, cached)
+  local left, right = M.parse_revs(
+    git_root,
+    rev_arg,
+    {
+      cached = argo:get_flag("cached", "staged") == "true",
+      imply_local = argo:get_flag("imply-local") == "true",
+    }
+  )
 
   ---@type DiffViewOptions
   local options = {
@@ -70,7 +77,8 @@ function M.diffview_open(args)
 end
 
 function M.file_history(args)
-  local argo = arg_parser.parse(args)
+  local default_args = config.get_config().default_args.DiffviewFileHistory
+  local argo = arg_parser.parse({ unpack(default_args), unpack(args) })
   local paths = {}
 
   for _, path in ipairs(argo.args) do
@@ -129,10 +137,10 @@ end
 ---Parse a given rev arg.
 ---@param git_root string
 ---@param rev_arg string
----@param cached boolean
+---@param opt table
 ---@return Rev left
 ---@return Rev right
-function M.parse_revs(git_root, rev_arg, cached)
+function M.parse_revs(git_root, rev_arg, opt)
   ---@type Rev
   local left
   ---@type Rev
@@ -140,10 +148,11 @@ function M.parse_revs(git_root, rev_arg, cached)
 
   local e_git_root = vim.fn.shellescape(git_root)
   local base_cmd = "git -C " .. e_git_root .. " "
+  local head = git.head_rev(git_root)
 
   if not rev_arg then
-    if cached then
-      left = git.head_rev(git_root)
+    if opt.cached then
+      left = head
       right = Rev(RevType.INDEX)
     else
       left = Rev(RevType.INDEX)
@@ -153,6 +162,8 @@ function M.parse_revs(git_root, rev_arg, cached)
     left, right = git.symmetric_diff_revs(git_root, rev_arg)
     if not (left or right) then
       return
+    elseif opt.imply_local then
+      left, right = M.imply_local(left, right, head)
     end
   else
     local rev_strings = vim.fn.systemlist(
@@ -172,10 +183,13 @@ function M.parse_revs(git_root, rev_arg, cached)
       local right_hash = rev_strings[1]:gsub("^%^", "")
       left = Rev(RevType.COMMIT, left_hash)
       right = Rev(RevType.COMMIT, right_hash)
+      if opt.imply_local then
+        left, right = M.imply_local(left, right, head)
+      end
     else
       local hash = rev_strings[1]:gsub("^%^", "")
       left = Rev(RevType.COMMIT, hash)
-      if cached then
+      if opt.cached then
         right = Rev(RevType.INDEX)
       else
         right = Rev(RevType.LOCAL)
@@ -183,6 +197,20 @@ function M.parse_revs(git_root, rev_arg, cached)
     end
   end
 
+  return left, right
+end
+
+---@param left Rev
+---@param right Rev
+---@param head Rev
+---@return Rev, Rev
+function M.imply_local(left, right, head)
+  if left.commit == head.commit then
+    left = Rev(RevType.LOCAL)
+  end
+  if right.commit == head.commit then
+    right = Rev(RevType.LOCAL)
+  end
   return left, right
 end
 
