@@ -317,6 +317,7 @@ function M.rev_to_pretty_string(left, right)
   return nil
 end
 
+---@return Rev
 function M.head_rev(git_root)
   local cmd = "git -C " .. vim.fn.shellescape(git_root) .. " rev-parse HEAD"
   local rev_string = vim.fn.system(cmd)

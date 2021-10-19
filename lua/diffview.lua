@@ -18,6 +18,7 @@ local M = {}
 local flag_value_completion = arg_parser.FlagValueMap()
 flag_value_completion:put({ "u", "untracked-files" }, { "true", "normal", "all", "false", "no" })
 flag_value_completion:put({ "cached", "staged" }, { "true", "false" })
+flag_value_completion:put({ "imply-local" }, { "true", "false" })
 flag_value_completion:put({ "C" }, {})
 
 function M.setup(user_config)
