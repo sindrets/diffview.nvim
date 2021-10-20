@@ -24,7 +24,26 @@ function M.get_bg(hl_group_name)
 end
 
 function M.get_gui(hl_group_name)
-  return M.get_hl_attr(hl_group_name, "gui")
+  local hls = {}
+  local attributes = {
+    "bold",
+    "italic",
+    "reverse",
+    "standout",
+    "underline",
+    "undercurl",
+    "strikethrough"
+  }
+
+  for _, attr in ipairs(attributes) do
+    if M.get_hl_attr(hl_group_name, attr) == "1" then
+      table.insert(hls, attr)
+    end
+  end
+
+  if #hls > 0 then
+    return table.concat(hls, ",")
+  end
 end
 
 function M.get_colors()
