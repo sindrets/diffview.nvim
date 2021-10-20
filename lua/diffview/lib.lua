@@ -15,7 +15,7 @@ M.views = {}
 
 function M.diffview_open(args)
   local default_args = config.get_config().default_args.DiffviewOpen
-  local argo = arg_parser.parse({ unpack(default_args), unpack(args) })
+  local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
   local rev_arg = argo.args[1]
   local paths = {}
 
@@ -78,7 +78,7 @@ end
 
 function M.file_history(args)
   local default_args = config.get_config().default_args.DiffviewFileHistory
-  local argo = arg_parser.parse({ unpack(default_args), unpack(args) })
+  local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
   local paths = {}
 
   for _, path in ipairs(argo.args) do
