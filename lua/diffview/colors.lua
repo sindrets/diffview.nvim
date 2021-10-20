@@ -1,8 +1,14 @@
-local a = vim.api
+local api = vim.api
 local M = {}
 
-function M.get_hl_attr(hl_group_name, attr)
-  local id = a.nvim_get_hl_id_by_name(hl_group_name)
+---@param name string Syntax group name.
+---@param attr string Attribute name.
+---@param trans boolean Translate the syntax group (follows links).
+function M.get_hl_attr(name, attr, trans)
+  local id = api.nvim_get_hl_id_by_name(name)
+  if id and trans then
+    id = vim.fn.synIDtrans(id)
+  end
   if not id then
     return
   end
@@ -15,15 +21,24 @@ function M.get_hl_attr(hl_group_name, attr)
   return value
 end
 
-function M.get_fg(hl_group_name)
-  return M.get_hl_attr(hl_group_name, "fg")
+---@param group_name string Syntax group name.
+---@param trans boolean Translate the syntax group (follows links). True by default.
+function M.get_fg(group_name, trans)
+  if type(trans) ~= "boolean" then trans = true end
+  return M.get_hl_attr(group_name, "fg", trans)
 end
 
-function M.get_bg(hl_group_name)
-  return M.get_hl_attr(hl_group_name, "bg")
+---@param group_name string Syntax group name.
+---@param trans boolean Translate the syntax group (follows links). True by default.
+function M.get_bg(group_name, trans)
+  if type(trans) ~= "boolean" then trans = true end
+  return M.get_hl_attr(group_name, "bg", trans)
 end
 
-function M.get_gui(hl_group_name)
+---@param group_name string Syntax group name.
+---@param trans boolean Translate the syntax group (follows links). True by default.
+function M.get_gui(group_name, trans)
+  if type(trans) ~= "boolean" then trans = true end
   local hls = {}
   local attributes = {
     "bold",
@@ -36,7 +51,7 @@ function M.get_gui(hl_group_name)
   }
 
   for _, attr in ipairs(attributes) do
-    if M.get_hl_attr(hl_group_name, attr) == "1" then
+    if M.get_hl_attr(group_name, attr, trans) == "1" then
       table.insert(hls, attr)
     end
   end
@@ -103,10 +118,10 @@ M.hl_links = {
 }
 
 function M.update_diff_hl()
-  local fg = M.get_fg("DiffDelete") or "NONE"
-  local bg = M.get_bg("DiffDelete") or "red"
-  local gui = M.get_gui("DiffDelete") or "NONE"
-  vim.cmd(string.format("hi def DiffviewDiffAddAsDelete guifg=%s guibg=%s gui=%s", fg, bg, gui))
+  local fg = M.get_fg("DiffDelete", false) or "NONE"
+  local bg = M.get_bg("DiffDelete", false) or "NONE"
+  local gui = M.get_gui("DiffDelete", false) or "NONE"
+  vim.cmd(string.format("hi! DiffviewDiffAddAsDelete guifg=%s guibg=%s gui=%s", fg, bg, gui))
   vim.cmd("hi def link DiffviewDiffDelete Comment")
 end
 
