@@ -77,7 +77,7 @@ function M.completion(arg_lead, cmd_line, cur_pos)
   local has_rev_arg = false
 
   for i = 2, math.min(#args, divideridx) do
-    if args[i]:sub(1, 1) ~= "-" then
+    if args[i]:sub(1, 1) ~= "-" and i ~= argidx then
       has_rev_arg = true
       goto continue
     end

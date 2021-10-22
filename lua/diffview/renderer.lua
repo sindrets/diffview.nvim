@@ -334,22 +334,24 @@ function M.create_cursor_constraint(components)
     local min, max = math.min(line_from, line_to), math.max(line_from, line_to)
     local nearest_dist, dist, target = math.huge, nil, {}
     local top, bot
+    local fstack = {}
 
-    for i, comp in ipairs(stack) do
+    for _, comp in ipairs(stack) do
       if comp.height > 0 then
+        fstack[#fstack + 1] = comp
         if min <= comp.lend and max >= comp.lstart then
           if not top then
-            top = { idx = i, comp = comp }
+            top = { idx = #fstack, comp = comp }
             bot = top
           else
-            bot = { idx = i, comp = comp }
+            bot = { idx = #fstack, comp = comp }
           end
         end
 
         dist = math.min(math.abs(line_to - comp.lstart), math.abs(line_to - comp.lend))
         if dist < nearest_dist then
           nearest_dist = dist
-          target = { idx = i, comp = comp }
+          target = { idx = #fstack, comp = comp }
         end
       end
     end
@@ -358,15 +360,17 @@ function M.create_cursor_constraint(components)
       return utils.clamp(line_to + 1, target.comp.lstart + 1, target.comp.lend)
     elseif top then
       if line_to < line_from then
+        -- moving up
         if line_to < top.comp.lstart and top.idx > 1 then
-          target = { idx = top.idx - 1, comp = stack[top.idx - 1] }
+          target = { idx = top.idx - 1, comp = fstack[top.idx - 1] }
         else
           target = top
         end
         return utils.clamp(line_to + 1, target.comp.lstart + 1, target.comp.lend)
       else
-        if line_to >= bot.comp.lend and bot.idx < #stack then
-          target = { idx = bot.idx + 1, comp = stack[bot.idx + 1] }
+        -- moving down
+        if line_to >= bot.comp.lend and bot.idx < #fstack then
+          target = { idx = bot.idx + 1, comp = fstack[bot.idx + 1] }
         else
           target = bot
         end

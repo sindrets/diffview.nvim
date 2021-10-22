@@ -20,7 +20,7 @@ local fstat_cache = {}
 ---@field extension string
 ---@field status string
 ---@field stats GitStats
----@field kind "working"|"staged"
+---@field kind '"working"'|'"staged"'
 ---@field commit Commit|nil
 ---@field left_binary boolean|nil
 ---@field right_binary boolean|nil

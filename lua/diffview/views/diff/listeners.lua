@@ -89,21 +89,22 @@ return function(view)
       if not (view.left.type == RevType.INDEX and view.right.type == RevType.LOCAL) then
         return
       end
-      local file = view:infer_cur_file()
-      if file then
-        if file.kind == "working" then
+
+      local item = view:infer_cur_file(true)
+      if item then
+        if item.kind == "working" then
           vim.fn.system(
             "git -C "
               .. vim.fn.shellescape(view.git_root)
               .. " add "
-              .. vim.fn.shellescape(file.absolute_path)
+              .. vim.fn.shellescape(item.path)
           )
-        elseif file.kind == "staged" then
+        elseif item.kind == "staged" then
           vim.fn.system(
             "git -C "
               .. vim.fn.shellescape(view.git_root)
               .. " reset -- "
-              .. vim.fn.shellescape(file.absolute_path)
+              .. vim.fn.shellescape(item.path)
           )
         end
 
@@ -114,7 +115,7 @@ return function(view)
     stage_all = function()
       local args = ""
       for _, file in ipairs(view.files.working) do
-        args = args .. " " .. vim.fn.shellescape(file.absolute_path)
+        args = args .. " " .. vim.fn.shellescape(file.path)
       end
       if #args > 0 then
         vim.fn.system("git -C " .. vim.fn.shellescape(view.git_root) .. " add" .. args)

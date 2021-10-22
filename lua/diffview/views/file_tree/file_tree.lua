@@ -30,12 +30,20 @@ function FileTree:add_file_entry(file)
   local cur_node = self.root
 
   -- Create missing intermediate pathname components
+  local path = parts[1]
   for i = 1, #parts - 1 do
     local name = parts[i]
+
+    if i > 1 then
+      path = utils.path_join({ path, parts[i] })
+    end
+
     if not cur_node.children[name] then
       ---@type DirData
       local dir_data = {
         name = name,
+        path = path,
+        kind = file.kind,
         collapsed = false,
         status = " ", -- updated later in FileTree:update_statuses()
       }
