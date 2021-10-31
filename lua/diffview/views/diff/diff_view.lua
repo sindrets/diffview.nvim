@@ -239,7 +239,7 @@ function DiffView:update_files()
   self.panel:render()
   self.panel:redraw()
 
-  if utils.tbl_indexof(self.panel:ordered_file_list(), self.panel.cur_file) == -1 then
+  if utils.vec_indexof(self.panel:ordered_file_list(), self.panel.cur_file) == -1 then
     self.panel.cur_file = nil
   end
   self:set_file(self.panel.cur_file or self.panel:next_file())

@@ -309,7 +309,7 @@ end
 ---components.
 ---@param components RenderComponent[]
 function M.create_cursor_constraint(components)
-  local stack = utils.tbl_slice(components, 1)
+  local stack = utils.vec_slice(components, 1)
   utils.merge_sort(stack, function(a, b)
     return a.lstart <= b.lstart
   end)

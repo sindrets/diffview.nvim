@@ -1,6 +1,8 @@
 local api = vim.api
 local M = {}
 
+---@alias vector any[]
+
 local is_windows = jit.os == "Windows"
 local mapping_callbacks = {}
 local path_sep = package.config:sub(1, 1)
@@ -347,34 +349,6 @@ function M.tabnr_to_id(tabnr)
   end
 end
 
----Create a shallow copy of a portion of a list.
----@param t table
----@param first integer First index, inclusive
----@param last integer Last index, inclusive
----@return any[]
-function M.tbl_slice(t, first, last)
-  local slice = {}
-  for i = first or 1, last or #t do
-    table.insert(slice, t[i])
-  end
-
-  return slice
-end
-
-function M.tbl_concat(...)
-  local result = {}
-  local n = 0
-
-  for _, t in ipairs({ ... }) do
-    for i, v in ipairs(t) do
-      result[n + i] = v
-    end
-    n = n + #t
-  end
-
-  return result
-end
-
 function M.tbl_clone(t)
   if not t then
     return
@@ -413,7 +387,57 @@ function M.tbl_unpack(t, i, j)
   return unpack(t, i or 1, j or t.n or #t)
 end
 
-function M.tbl_indexof(t, v)
+function M.tbl_clear(t)
+  for k, _ in pairs(t) do
+    t[k] = nil
+  end
+end
+
+---Create a shallow copy of a portion of a vector.
+---@param t vector
+---@param first integer (Optional) First index, inclusive
+---@param last integer (Optional) Last index, inclusive
+---@return vector
+function M.vec_slice(t, first, last)
+  local slice = {}
+  for i = first or 1, last or #t do
+    table.insert(slice, t[i])
+  end
+
+  return slice
+end
+
+---Join multiple vectors into one.
+---@vararg vector
+---@return vector
+function M.vec_join(...)
+  local result = {}
+  local args = {...}
+  local n = 0
+
+  for i = 1, select("#", ...) do
+    if type(args[i]) ~= "nil" then
+      if type(args[i]) ~= "table" then
+        result[n + 1] = args[i]
+        n = n + 1
+      else
+        for j, v in ipairs(args[i]) do
+          result[n + j] = v
+        end
+        n = n + #args[i]
+      end
+    end
+  end
+
+  return result
+end
+
+---Return the first index a given object can be found in a vector, or -1 if
+---it's not present.
+---@param t vector
+---@param v any
+---@return integer
+function M.vec_indexof(t, v)
   for i, vt in ipairs(t) do
     if vt == v then
       return i
@@ -422,17 +446,13 @@ function M.tbl_indexof(t, v)
   return -1
 end
 
-function M.tbl_clear(t)
-  for k, _ in pairs(t) do
-    t[k] = nil
-  end
-end
-
-function M.tbl_push(t, ...)
-  local args = M.tbl_pack(...)
-  local l = #t
-  for i, v in ipairs(args) do
-    t[l + i] = v
+---Append any number of objects to the end of a vector. Pushing `nil`
+---effectively does nothing.
+---@param t vector
+---@return vector t
+function M.vec_push(t, ...)
+  for _, v in ipairs({...}) do
+    t[#t + 1] = v
   end
   return t
 end
@@ -567,8 +587,8 @@ end
 local function merge(t, first, mid, last, comparator)
   local n1 = mid - first + 1
   local n2 = last - mid
-  local ls = M.tbl_slice(t, first, mid)
-  local rs = M.tbl_slice(t, mid + 1, last)
+  local ls = M.vec_slice(t, first, mid)
+  local rs = M.vec_slice(t, mid + 1, last)
   local i = 1
   local j = 1
   local k = first

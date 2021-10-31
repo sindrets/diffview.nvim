@@ -149,7 +149,7 @@ function FilePanel:ordered_file_list()
     end
     return list
   else
-    local nodes = utils.tbl_concat(
+    local nodes = utils.vec_join(
       self.files.working_tree.root:leaves(),
       self.files.staged_tree.root:leaves()
     )
@@ -170,7 +170,7 @@ function FilePanel:prev_file()
     return self.cur_file
   end
 
-  local i = utils.tbl_indexof(files, self.cur_file)
+  local i = utils.vec_indexof(files, self.cur_file)
   if i ~= -1 then
     self.cur_file = files[(i - 2) % #files + 1]
     return self.cur_file
@@ -184,7 +184,7 @@ function FilePanel:next_file()
     return self.cur_file
   end
 
-  local i = utils.tbl_indexof(files, self.cur_file)
+  local i = utils.vec_indexof(files, self.cur_file)
   if i ~= -1 then
     self.cur_file = files[i % #files + 1]
     return self.cur_file

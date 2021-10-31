@@ -139,7 +139,7 @@ end
 
 function FileHistoryPanel:update_entries()
   local throttled_update = debounce.throttle_trailing(100, vim.schedule_wrap(function(entries)
-    self.entries = utils.tbl_slice(entries)
+    self.entries = utils.vec_slice(entries)
     self:update_components()
     self:render()
     self:redraw()
@@ -227,8 +227,8 @@ function FileHistoryPanel:prev_file()
   end
 
   if self:num_items() > 1 then
-    local entry_idx = utils.tbl_indexof(self.entries, entry)
-    local file_idx = utils.tbl_indexof(entry.files, file)
+    local entry_idx = utils.vec_indexof(self.entries, entry)
+    local file_idx = utils.vec_indexof(entry.files, file)
     if entry_idx ~= -1 and file_idx ~= -1 then
       if file_idx == 1 and #self.entries > 1 then
         -- go to prev entry
@@ -259,8 +259,8 @@ function FileHistoryPanel:next_file()
   end
 
   if self:num_items() > 1 then
-    local entry_idx = utils.tbl_indexof(self.entries, entry)
-    local file_idx = utils.tbl_indexof(entry.files, file)
+    local entry_idx = utils.vec_indexof(self.entries, entry)
+    local file_idx = utils.vec_indexof(entry.files, file)
     if entry_idx ~= -1 and file_idx ~= -1 then
       if file_idx == #entry.files and #self.entries > 1 then
         -- go to next entry
@@ -294,7 +294,7 @@ function FileHistoryPanel:highlight_item(item)
     end
   else
     for _, comp_struct in ipairs(self.components.log.entries) do
-      local i = utils.tbl_indexof(comp_struct.comp.context.files, item)
+      local i = utils.vec_indexof(comp_struct.comp.context.files, item)
       if i ~= -1 then
         if self.single_file then
           pcall(api.nvim_win_set_cursor, self.winid, { comp_struct.comp.lstart + 1, 0 })

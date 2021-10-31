@@ -103,7 +103,7 @@ function M.completion(arg_lead, cmd_line, cur_pos)
     local revs = vim.fn.systemlist(cmd .. "rev-parse --symbolic --branches --tags --remotes")
     local stashes = vim.fn.systemlist(cmd .. "stash list --pretty=format:%gd")
 
-    return filter_completion(arg_lead, utils.tbl_concat(heads, revs, stashes))
+    return filter_completion(arg_lead, utils.vec_join(heads, revs, stashes))
   else
     local flag_completion = flag_value_completion:get_completion(arg_lead)
     if flag_completion then

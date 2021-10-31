@@ -103,33 +103,26 @@ M.file_history_list = function(git_root, path_args, opt, callback)
       and vim.fn.isdirectory(path_args[1]) == 0
       and #vim.fn.systemlist(base_cmd .. "ls-files -- " .. p_args) < 2
 
-    --stylua: ignore start
-    local options = {}
-    if opt.follow and single_file then
-      utils.tbl_push(options, "--follow", "--first-parent")
-    else
-      utils.tbl_push(options, "-m", "-c")
-    end
-    if opt.all then utils.tbl_push(options, "--all") end
-    if opt.merges then utils.tbl_push(options, "--merges", "--first-parent") end
-    if opt.no_merges then utils.tbl_push(options, "--no-merges") end
-    if opt.reverse then utils.tbl_push(options, "--reverse") end
-    if opt.max_count then utils.tbl_push(options, "-n" .. opt.max_count) end
-    if opt.author then utils.tbl_push(options, "--author=" .. opt.author) end
-    if opt.grep then utils.tbl_push(options, "--grep=" .. opt.grep) end
-    --stylua: ignore end
+    local options = utils.vec_join(
+      (opt.follow and single_file) and { "--follow", "--first-parent" } or { "-m", "-c" },
+      opt.all and { "--all" } or nil,
+      opt.merges and { "--merges", "--first-parent" } or nil,
+      opt.no_merges and { "--no-merges" } or nil,
+      opt.reverse and { "--reverse" } or nil,
+      opt.max_count and { "-n" .. opt.max_count } or nil,
+      opt.author and { "--author=" .. opt.author } or nil,
+      opt.grep and { "--grep=" .. opt.grep } or nil
+    )
 
     local namestat = Job:new({
       command = "git",
-      args = utils.tbl_concat(
-        {
-          "log",
-          "--pretty=format:%H %P%n%an%n%ad%n%ar%n%s",
-          "--date=raw",
-          "--name-status",
-        },
+      args = utils.vec_join(
+        "log",
+        "--pretty=format:%H %P%n%an%n%ad%n%ar%n%s",
+        "--date=raw",
+        "--name-status",
         options,
-        { "--" },
+        "--",
         path_args
       ),
       cwd = git_root,
@@ -137,15 +130,13 @@ M.file_history_list = function(git_root, path_args, opt, callback)
 
     local numstat = Job:new({
       command = "git",
-      args = utils.tbl_concat(
-        {
-          "log",
-          "--pretty=format:%H %P%n%an%n%ad%n%ar%n%s",
-          "--date=raw",
-          "--numstat",
-        },
+      args = utils.vec_join(
+        "log",
+        "--pretty=format:%H %P%n%an%n%ad%n%ar%n%s",
+        "--date=raw",
+        "--numstat",
         options,
-        { "--" },
+        "--",
         path_args
       ),
       cwd = git_root,
@@ -195,7 +186,7 @@ M.file_history_list = function(git_root, path_args, opt, callback)
               "--name-status",
               right_hash,
               "--",
-              old_path or unpack(path_args)
+              old_path or unpack(path_args),
             },
             cwd = git_root,
             on_exit = function(j)
@@ -280,7 +271,7 @@ M.file_history_list = function(git_root, path_args, opt, callback)
 
   thread = coroutine.create(work)
   local _, _, entries = coroutine.resume(thread)
-  return utils.tbl_slice(entries)
+  return utils.vec_slice(entries)
 end
 
 ---Get a list of files modified between two revs.
@@ -314,7 +305,7 @@ function M.diff_file_list(git_root, left, right, path_args, opt)
     local untracked = untracked_files(git_root, left, right)
 
     if #untracked > 0 then
-      files.working = utils.tbl_concat(files.working, untracked)
+      files.working = utils.vec_join(files.working, untracked)
 
       utils.merge_sort(files.working, function(a, b)
         return a.path:lower() < b.path:lower()
