@@ -84,6 +84,7 @@ local function render_entries(parent, entries)
   end
 
   for i, entry in ipairs(entries) do
+    if i > #parent then break end
     if not entry.status then
       print(vim.inspect(entry, { depth = 2 }))
     end

@@ -17,7 +17,6 @@ local M = {}
 ---@field path_args string[]
 ---@field raw_args string[]
 ---@field entries LogEntry[]
----@field file_idx integer
 local FileHistoryView = StandardView
 FileHistoryView = oop.create_class("FileHistoryView", StandardView)
 
@@ -31,11 +30,10 @@ function FileHistoryView:init(opt)
   self.git_dir = git.git_dir(self.git_root)
   self.path_args = opt.path_args
   self.raw_args = opt.raw_args
-  self.entries = git.file_history_list(self.git_root, self.path_args, opt.log_options)
-  self.file_idx = 1
+  self.entries = {}
   self.panel = FileHistoryPanel(
     self.git_root,
-    self.entries,
+    {},
     self.path_args,
     self.raw_args,
     opt.log_options
@@ -45,6 +43,9 @@ end
 function FileHistoryView:post_open()
   self:init_event_listeners()
   vim.schedule(function()
+    self.panel:update_entries()
+    self.entries = self.panel.entries
+    vim.cmd("redraw")
     local file = self.panel:next_file()
     if file then
       self:set_file(file)

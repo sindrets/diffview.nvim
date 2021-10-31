@@ -1,4 +1,5 @@
 local utils = require("diffview.utils")
+local Job = require("plenary.job")
 local FileDict = require("diffview.git.file_dict").FileDict
 local Rev = require("diffview.git.rev").Rev
 local RevType = require("diffview.git.rev").RevType
@@ -80,156 +81,206 @@ end
 ---@param git_root string
 ---@param path_args string[]
 ---@param opt LogOptions
+---@param callback function
 ---@return LogEntry[]
-function M.file_history_list(git_root, path_args, opt)
-  ---@type LogEntry[]
-  local entries = {}
-  local base_cmd = string.format("git -C %s ", vim.fn.shellescape(git_root))
+M.file_history_list = function(git_root, path_args, opt, callback)
+  local thread
 
-  local p_args = ""
-  if path_args and #path_args > 0 then
-    p_args = ""
-    for _, arg in ipairs(path_args) do
-      p_args = p_args .. " " .. vim.fn.shellescape(arg)
-    end
-  end
+  local function work()
+    ---@type LogEntry[]
+    local entries = {}
+    local base_cmd = string.format("git -C %s ", vim.fn.shellescape(git_root))
 
-  local single_file = #path_args == 1
-    and vim.fn.isdirectory(path_args[1]) == 0
-    and #vim.fn.systemlist(base_cmd .. "ls-files -- " .. p_args) < 2
-
-  local options = string.format(
-    "%s %s %s %s %s %s %s %s",
-    opt.follow and single_file and "--follow --first-parent" or "-m -c",
-    opt.all and "--all" or "",
-    opt.merges and "--merges --first-parent" or "",
-    opt.no_merges and "--no-merges" or "",
-    opt.reverse and "--reverse" or "",
-    opt.max_count and ("-n" .. vim.fn.shellescape(opt.max_count)) or "",
-    opt.author and ("--author=" .. vim.fn.shellescape(opt.author)) or "",
-    opt.grep and ("--grep=" .. vim.fn.shellescape(opt.grep)) or ""
-  )
-
-  local cmd = string.format(
-    "%s log --pretty='format:%%H %%P%%n%%an%%n%%ad%%n%%ar%%n%%s' "
-      .. "--date=raw --name-status %s -- %s",
-    base_cmd,
-    options,
-    p_args
-  )
-  local status_data = vim.fn.systemlist(cmd)
-
-  cmd = string.format(
-    "%s log --pretty='format:%%H %%P%%n%%an%%n%%ad%%n%%ar%%n%%s' "
-      .. "--date=raw --numstat %s -- %s",
-    base_cmd,
-    options,
-    p_args
-  )
-  local num_data = vim.fn.systemlist(cmd)
-
-  if not utils.shell_error() then
-    local i = 1
-    local offset = 0
-    local old_path
-    while i <= #num_data do
-      local right_hash, left_hash, merge_hash = unpack(utils.str_split(status_data[offset + i]))
-      local time, time_offset = unpack(utils.str_split(status_data[offset + i + 2]))
-      local commit = Commit({
-        hash = right_hash,
-        author = status_data[offset + i + 1],
-        time = tonumber(time),
-        time_offset = time_offset,
-        rel_date = status_data[offset + i + 3],
-        subject = status_data[offset + i + 4],
-      })
-
-      -- 'git log --name-status' doesn't work properly for merge commits. It
-      -- lists only an incomplete list of files at best. We need to use 'git
-      -- show' to get file statuses for merge commits. And merges do not always
-      -- have changes.
-      local sdata = status_data
-      if merge_hash then
-        while sdata[offset + i + 5] and sdata[offset + i + 5] ~= "" do
-          offset = offset + 1
-        end
-        sdata = {}
-        local lines = vim.fn.systemlist(
-          string.format(
-            "%s show --format= -m --first-parent --name-status %s -- %s",
-            base_cmd,
-            right_hash,
-            old_path or p_args
-          )
-        )
-        if #lines == 0 then
-          -- Give up: something has been renamed. We can no longer track the
-          -- history.
-          goto escape
-        end
-        offset = offset - #lines
-        for k = 1, #lines do
-          sdata[offset + i + 4 + k] = lines[k]
-        end
+    local p_args = ""
+    if path_args and #path_args > 0 then
+      p_args = ""
+      for _, arg in ipairs(path_args) do
+        p_args = p_args .. " " .. vim.fn.shellescape(arg)
       end
+    end
 
-      local files = {}
-      local j = 5
-      while i + j <= #num_data and num_data[i + j] ~= "" do
-        local status = sdata[offset + i + j]:sub(1, 1):gsub("%s", " ")
-        local name = sdata[offset + i + j]:match("[%a%s][^%s]*\t(.*)")
-        local oldname
+    local single_file = #path_args == 1
+      and vim.fn.isdirectory(path_args[1]) == 0
+      and #vim.fn.systemlist(base_cmd .. "ls-files -- " .. p_args) < 2
 
-        if name:match("\t") ~= nil then
-          oldname = name:match("(.*)\t")
-          name = name:gsub("^.*\t", "")
-          if single_file then
-            old_path = oldname
+    --stylua: ignore start
+    local options = {}
+    if opt.follow and single_file then
+      utils.tbl_push(options, "--follow", "--first-parent")
+    else
+      utils.tbl_push(options, "-m", "-c")
+    end
+    if opt.all then utils.tbl_push(options, "--all") end
+    if opt.merges then utils.tbl_push(options, "--merges", "--first-parent") end
+    if opt.no_merges then utils.tbl_push(options, "--no-merges") end
+    if opt.reverse then utils.tbl_push(options, "--reverse") end
+    if opt.max_count then utils.tbl_push(options, "-n" .. opt.max_count) end
+    if opt.author then utils.tbl_push(options, "--author=" .. opt.author) end
+    if opt.grep then utils.tbl_push(options, "--grep=" .. opt.grep) end
+    --stylua: ignore end
+
+    local namestat = Job:new({
+      command = "git",
+      args = utils.tbl_concat(
+        {
+          "log",
+          "--pretty=format:%H %P%n%an%n%ad%n%ar%n%s",
+          "--date=raw",
+          "--name-status",
+        },
+        options,
+        { "--" },
+        path_args
+      ),
+      cwd = git_root,
+    })
+
+    local numstat = Job:new({
+      command = "git",
+      args = utils.tbl_concat(
+        {
+          "log",
+          "--pretty=format:%H %P%n%an%n%ad%n%ar%n%s",
+          "--date=raw",
+          "--numstat",
+        },
+        options,
+        { "--" },
+        path_args
+      ),
+      cwd = git_root,
+    })
+
+    namestat:start()
+    numstat:start()
+    Job.join(namestat, numstat)
+    local status_data = namestat:result()
+    local num_data = numstat:result()
+
+    if not utils.shell_error() then
+      local i = 1
+      local offset = 0
+      local old_path
+      while i <= #num_data do
+        local right_hash, left_hash, merge_hash = unpack(utils.str_split(status_data[offset + i]))
+        local time, time_offset = unpack(utils.str_split(status_data[offset + i + 2]))
+        local commit = Commit({
+          hash = right_hash,
+          author = status_data[offset + i + 1],
+          time = tonumber(time),
+          time_offset = time_offset,
+          rel_date = status_data[offset + i + 3],
+          subject = status_data[offset + i + 4],
+        })
+
+        -- 'git log --name-status' doesn't work properly for merge commits. It
+        -- lists only an incomplete list of files at best. We need to use 'git
+        -- show' to get file statuses for merge commits. And merges do not always
+        -- have changes.
+        local sdata = status_data
+        if merge_hash then
+          while sdata[offset + i + 5] and sdata[offset + i + 5] ~= "" do
+            offset = offset + 1
+          end
+
+          sdata = {}
+          local lines
+          local job = Job:new({
+            command = "git",
+            args = {
+              "show",
+              "--format=",
+              "-m",
+              "--first-parent",
+              "--name-status",
+              right_hash,
+              "--",
+              old_path or unpack(path_args)
+            },
+            cwd = git_root,
+            on_exit = function(j)
+              lines = j:result()
+              coroutine.resume(thread)
+              callback(1, entries)
+            end,
+          })
+
+          job:start()
+          coroutine.yield(1, entries)
+
+          if #lines == 0 then
+            -- Give up: something has been renamed. We can no longer track the
+            -- history.
+            break
+          end
+          offset = offset - #lines
+          for k = 1, #lines do
+            sdata[offset + i + 4 + k] = lines[k]
           end
         end
 
-        local stats = {
-          additions = tonumber(num_data[i + j]:match("^%d+")),
-          deletions = tonumber(num_data[i + j]:match("^%d+%s+(%d+)")),
-        }
+        local files = {}
+        local j = 5
+        while i + j <= #num_data and num_data[i + j] ~= "" do
+          local status = sdata[offset + i + j]:sub(1, 1):gsub("%s", " ")
+          local name = sdata[offset + i + j]:match("[%a%s][^%s]*\t(.*)")
+          local oldname
 
-        if not stats.additions or not stats.deletions then
-          stats = nil
+          if name:match("\t") ~= nil then
+            oldname = name:match("(.*)\t")
+            name = name:gsub("^.*\t", "")
+            if single_file then
+              old_path = oldname
+            end
+          end
+
+          local stats = {
+            additions = tonumber(num_data[i + j]:match("^%d+")),
+            deletions = tonumber(num_data[i + j]:match("^%d+%s+(%d+)")),
+          }
+
+          if not stats.additions or not stats.deletions then
+            stats = nil
+          end
+
+          table.insert(
+            files,
+            FileEntry({
+              path = name,
+              oldpath = oldname,
+              absolute_path = utils.path_join({ git_root, name }),
+              status = status,
+              stats = stats,
+              kind = "working",
+              commit = commit,
+              left = Rev(RevType.COMMIT, left_hash),
+              right = Rev(RevType.COMMIT, right_hash),
+            })
+          )
+          j = j + 1
         end
 
         table.insert(
-          files,
-          FileEntry({
-            path = name,
-            oldpath = oldname,
-            absolute_path = utils.path_join({ git_root, name }),
-            status = status,
-            stats = stats,
-            kind = "working",
+          entries,
+          LogEntry({
+            path_args = path_args,
             commit = commit,
-            left = Rev(RevType.COMMIT, left_hash),
-            right = Rev(RevType.COMMIT, right_hash),
+            files = files,
+            single_file = single_file,
           })
         )
-        j = j + 1
+
+        i = i + j + 1
       end
-
-      table.insert(
-        entries,
-        LogEntry({
-          path_args = path_args,
-          commit = commit,
-          files = files,
-          single_file = single_file,
-        })
-      )
-
-      i = i + j + 1
     end
+
+    callback(0, entries)
+    return 0, entries
   end
 
-  ::escape::
-  return entries
+  thread = coroutine.create(work)
+  local _, _, entries = coroutine.resume(thread)
+  return utils.tbl_slice(entries)
 end
 
 ---Get a list of files modified between two revs.

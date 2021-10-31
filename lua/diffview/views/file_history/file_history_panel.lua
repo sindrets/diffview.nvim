@@ -1,6 +1,7 @@
 local config = require("diffview.config")
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
+local debounce = require("diffview.debounce")
 local git = require("diffview.git.utils")
 local renderer = require("diffview.renderer")
 local logger = require("diffview.logger")
@@ -137,11 +138,26 @@ function FileHistoryPanel:update_components()
 end
 
 function FileHistoryPanel:update_entries()
+  local throttled_update = debounce.throttle_trailing(100, vim.schedule_wrap(function(entries)
+    self.entries = utils.tbl_slice(entries)
+    self:update_components()
+    self:render()
+    self:redraw()
+  end))
+
   for _, entry in ipairs(self.entries) do
     entry:destroy()
   end
+
   self.cur_item = {}
-  self.entries = git.file_history_list(self.git_root, self.path_args, self.log_options)
+  self.entries = git.file_history_list(
+    self.git_root,
+    self.path_args,
+    self.log_options,
+    function(status, entries)
+      throttled_update(entries)
+    end
+  )
   self.single_file = self.entries[1] and self.entries[1].single_file
   self:update_components()
   self:render()

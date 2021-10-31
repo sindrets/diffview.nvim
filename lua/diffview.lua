@@ -79,10 +79,9 @@ function M.completion(arg_lead, cmd_line, cur_pos)
   for i = 2, math.min(#args, divideridx) do
     if args[i]:sub(1, 1) ~= "-" and i ~= argidx then
       has_rev_arg = true
-      goto continue
+      break
     end
   end
-  ::continue::
 
   if argidx >= divideridx then
     return vim.fn.getcompletion(arg_lead, "file", 0)

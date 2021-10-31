@@ -124,10 +124,11 @@ function M.file_history(args)
     log_options = config.get_config().file_history_panel.log_options,
   })
 
-  if #v.entries == 0 then
-    utils.info(string.format("Target has no git history: '%s'", table.concat(paths)))
-    return
-  end
+  -- TODO: Find new way to do this now that entries are gathered asynchronously
+  -- if #v.entries == 0 then
+  --   utils.info(string.format("Target has no git history: '%s'", table.concat(paths)))
+  --   return
+  -- end
 
   table.insert(M.views, v)
 
