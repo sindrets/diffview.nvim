@@ -16,7 +16,6 @@ local M = {}
 ---@field panel FileHistoryPanel
 ---@field path_args string[]
 ---@field raw_args string[]
----@field entries LogEntry[]
 local FileHistoryView = StandardView
 FileHistoryView = oop.create_class("FileHistoryView", StandardView)
 
@@ -30,7 +29,6 @@ function FileHistoryView:init(opt)
   self.git_dir = git.git_dir(self.git_root)
   self.path_args = opt.path_args
   self.raw_args = opt.raw_args
-  self.entries = {}
   self.panel = FileHistoryPanel(
     self.git_root,
     {},
@@ -45,7 +43,6 @@ function FileHistoryView:post_open()
   vim.schedule(function()
     self:file_safeguard()
     self.panel:update_entries(function(entries, status)
-      self.entries = self.panel.entries
       if not self.panel:cur_file() then
         local file = self.panel:next_file()
         if file then
@@ -59,7 +56,7 @@ end
 
 ---@Override
 function FileHistoryView:close()
-  for _, entry in ipairs(self.entries) do
+  for _, entry in ipairs(self.panel.entries) do
     entry:destroy()
   end
   FileHistoryView:super().close(self)

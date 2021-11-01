@@ -102,6 +102,19 @@ function FileHistoryPanel:open()
   vim.cmd("wincmd =")
 end
 
+---@Override
+function FileHistoryPanel:destroy()
+  self.entries = nil
+  self.cur_item = nil
+  self.option_panel:destroy()
+  self.option_panel = nil
+  self.render_data:destroy()
+  if self.components then
+    renderer.destroy_comp_struct(self.components)
+  end
+  FileHistoryPanel:super().destroy(self)
+end
+
 function FileHistoryPanel:init_buffer_opts()
   local conf = config.get_config()
   local option_rhs = config.diffview_callback("options")
@@ -115,6 +128,11 @@ function FileHistoryPanel:init_buffer_opts()
 end
 
 function FileHistoryPanel:update_components()
+  self.render_data:destroy()
+  if self.components then
+    renderer.destroy_comp_struct(self.components)
+  end
+
   local entry_schema = {}
   for _, entry in ipairs(self.entries) do
     table.insert(entry_schema, {

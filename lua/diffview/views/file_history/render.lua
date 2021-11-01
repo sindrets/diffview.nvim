@@ -85,7 +85,7 @@ local function render_entries(parent, entries, updating)
   end
 
   for i, entry in ipairs(entries) do
-    if i > #parent or (updating and i > 200) then
+    if i > #parent or (updating and i > 128) then
       break
     end
     if not entry.status then

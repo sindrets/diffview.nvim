@@ -153,6 +153,18 @@ function RenderComponent:clear()
   end
 end
 
+function RenderComponent:destroy()
+  self.lines = nil
+  self.hl = nil
+  self.parent = nil
+  self.context = nil
+  self.data_root = nil
+  for _, c in ipairs(self.components) do
+    c:destroy()
+  end
+  self.components = nil
+end
+
 function RenderComponent:get_comp_on_line(line)
   line = line - 1
 
@@ -306,6 +318,25 @@ function RenderData:clear()
   self.hl = {}
   for _, c in ipairs(self.components) do
     c:clear()
+  end
+end
+
+function RenderData:destroy()
+  self.lines = nil
+  self.hl = nil
+  for _, c in ipairs(self.components) do
+    c:destroy()
+  end
+  self.components = {}
+end
+
+function M.destroy_comp_struct(schema)
+  schema.comp = nil
+  for k, v in pairs(schema) do
+    if type(v) == "table" then
+      M.destroy_comp_struct(v)
+      schema[k] = nil
+    end
   end
 end
 

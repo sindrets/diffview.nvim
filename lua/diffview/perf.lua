@@ -25,6 +25,7 @@ end
 function PerfTimer:reset()
   self.laps = {}
   self.first = luv.hrtime()
+  self.final_time = nil
 end
 
 ---Record a lap time.

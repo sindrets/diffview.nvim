@@ -18,8 +18,7 @@ end
 
 -- associations between an object an its meta-informations
 -- e.g its class, its "lower" object (if any), ...
-local meta_obj = {}
-setmetatable(meta_obj, { __mode = "k" })
+local meta_obj = setmetatable({}, { __mode = "k" })
 
 --- Return a shallow copy of table t
 local function duplicate(t)
@@ -34,12 +33,11 @@ local function new_instance(class, ...)
   ---@diagnostic disable-next-line: redefined-local
   local function make_instance(class, virtuals)
     local inst = duplicate(virtuals)
-    meta_obj[inst] = { obj = inst, class = class }
+    inst.__class = class
 
     if class:super() ~= nil then
       inst.super = make_instance(class:super(), virtuals)
-      meta_obj[inst].super = meta_obj[inst.super] -- meta-info about inst
-      meta_obj[inst.super].lower = meta_obj[inst]
+      rawset(inst.super, "__lower", inst)
     else
       inst.super = {}
     end
@@ -66,24 +64,24 @@ end
 
 --- Try to cast an instance into an instance of one of its super- or subclasses
 local function try_cast(class, inst)
-  local meta = meta_obj[inst]
-  if meta.class == class then
+  if inst.__class == class then
     return inst
   end -- is it already the right class?
 
-  while meta ~= nil do -- search lower in the hierarchy
-    if meta.class == class then
-      return meta.obj
+  local cur = inst.__lower
+  while cur ~= nil do -- search lower in the hierarchy
+    if cur.__class == class then
+      return cur
     end
-    meta = meta.lower
+    cur = cur.__lower
   end
 
-  meta = meta_obj[inst].super -- not found, search through the superclasses
-  while meta ~= nil do
-    if meta.class == class then
-      return meta.obj
+  cur = inst.super -- not found, search through the superclasses
+  while cur ~= nil do
+    if cur.__class == class then
+      return cur
     end
-    meta = meta.super
+    cur = cur.super
   end
 
   return nil -- could not execute casting
@@ -192,7 +190,7 @@ local function subclass(base_class, name)
       return class_internals[key] or class_internals.static[key] or base_class[key]
     end,
     __tostring = function()
-      return "class " .. name
+      return "<class " .. name .. ">"
     end,
     __newindex = newmethod,
     __call = new_instance,
@@ -201,6 +199,7 @@ local function subclass(base_class, name)
   return the_class
 end
 
+---@diagnostic disable-next-line: duplicate-doc-class
 ---@class Object
 ---@field init function
 ---@field class function
@@ -215,7 +214,7 @@ end
 local obj_inst_internals = {
   __newindex = obj_newitem,
   __tostring = function(inst)
-    return "a " .. inst:class():name()
+    return "<a " .. inst:class():name() .. ">"
   end,
   init = function() end,
   class = function()
@@ -247,7 +246,7 @@ meta_obj[Object] = { virtuals = {} }
 
 setmetatable(Object, {
   __tostring = function()
-    return "class Object"
+    return "<class Object>"
   end,
   __newindex = obj_newitem,
   __index = obj_class_internals,
