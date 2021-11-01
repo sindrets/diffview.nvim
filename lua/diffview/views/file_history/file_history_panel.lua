@@ -33,6 +33,7 @@ local perf = PerfTimer("[FileHistoryPanel] render")
 ---@field log_options LogOptions
 ---@field cur_item {[1]: LogEntry, [2]: FileEntry}
 ---@field single_file boolean
+---@field updating boolean
 ---@field width integer
 ---@field height integer
 ---@field bufid integer
@@ -137,28 +138,73 @@ function FileHistoryPanel:update_components()
   self.constrain_cursor = renderer.create_cursor_constraint({ self.components.log.entries.comp })
 end
 
-function FileHistoryPanel:update_entries()
-  local throttled_update = debounce.throttle_trailing(100, vim.schedule_wrap(function(entries)
-    self.entries = utils.vec_slice(entries)
-    self:update_components()
-    self:render()
-    self:redraw()
-  end))
+function FileHistoryPanel:update_entries(callback)
+  local c = 0
+  local timeout = 64
+  local ldt = 0
+  local lock = false
+
+  local update = debounce.throttle_trailing(
+    timeout,
+    function(entries, status)
+      if status > 0 and (#entries <= c or lock) then
+        return
+      end
+
+      lock = true
+
+      vim.schedule(function()
+        c = #entries
+        if ldt > timeout then
+          if DiffviewGlobal.debug_level >= 10 then
+            logger.debug(
+              string.format(
+                "[FH_PANEL] Rendering is slower than throttle timeout (%.3f ms). Skipping update.",
+                ldt
+              )
+            )
+          end
+          ldt = ldt - timeout
+          lock = false
+          return
+        end
+
+        local was_empty = #self.entries == 0
+        self.entries = utils.vec_slice(entries)
+
+        if was_empty then
+          self.single_file = self.entries[1] and self.entries[1].single_file
+        end
+
+        if status == 0 then self.updating = false end
+        self:update_components()
+        self:render()
+        self:redraw()
+        ldt = renderer.last_draw_time
+
+        if (was_empty or status == 0) and type(callback) == "function" then
+          vim.cmd("redraw")
+          callback(entries, status)
+        end
+
+        lock = false
+      end)
+    end
+  )
 
   for _, entry in ipairs(self.entries) do
     entry:destroy()
   end
 
   self.cur_item = {}
-  self.entries = git.file_history_list(
+  self.entries = {}
+  self.updating = true
+  git.file_history(
     self.git_root,
     self.path_args,
     self.log_options,
-    function(status, entries)
-      throttled_update(entries)
-    end
+    update
   )
-  self.single_file = self.entries[1] and self.entries[1].single_file
   self:update_components()
   self:render()
   self:redraw()
@@ -216,6 +262,10 @@ function FileHistoryPanel:set_cur_file(item)
       self.cur_item = { entry, file }
     end
   end
+end
+
+function FileHistoryPanel:cur_file()
+  return self.cur_item[2]
 end
 
 function FileHistoryPanel:prev_file()

@@ -43,16 +43,17 @@ end
 function FileHistoryView:post_open()
   self:init_event_listeners()
   vim.schedule(function()
-    self.panel:update_entries()
-    self.entries = self.panel.entries
-    vim.cmd("redraw")
-    local file = self.panel:next_file()
-    if file then
-      self:set_file(file)
-    else
-      self:file_safeguard()
-    end
-    self.ready = true
+    self:file_safeguard()
+    self.panel:update_entries(function(entries, status)
+      self.entries = self.panel.entries
+      if not self.panel:cur_file() then
+        local file = self.panel:next_file()
+        if file then
+          self:set_file(file)
+        end
+        self.ready = true
+      end
+    end)
   end)
 end
 

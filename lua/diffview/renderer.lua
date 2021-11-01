@@ -2,9 +2,13 @@ local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local config = require("diffview.config")
 local api = vim.api
+
 local M = {}
 local web_devicons
 local uid_counter = 0
+
+---Duration of the last redraw in ms.
+M.last_draw_time = 0
 
 ---@class HlData
 ---@field group string
@@ -426,6 +430,7 @@ function M.render(bufid, data)
     return
   end
 
+  local last = vim.loop.hrtime()
   local was_modifiable = api.nvim_buf_get_option(bufid, "modifiable")
   api.nvim_buf_set_option(bufid, "modifiable", true)
 
@@ -458,6 +463,7 @@ function M.render(bufid, data)
   end
 
   api.nvim_buf_set_option(bufid, "modifiable", was_modifiable)
+  M.last_draw_time = (vim.loop.hrtime() - last) / 1000000
 end
 
 local git_status_hl_map = {

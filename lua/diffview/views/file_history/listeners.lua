@@ -46,9 +46,11 @@ return function(view)
           vim.schedule(function ()
             op.option_state = nil
             view.panel.option_panel.winid = nil
-            view.panel:update_entries()
-            vim.cmd("redraw")
-            view:next_item()
+            view.panel:update_entries(function(entries, status)
+              if not view.panel:cur_file() then
+                view:next_item()
+              end
+            end)
           end)
         end
       end

@@ -1,4 +1,5 @@
 local utils = require("diffview.utils")
+local logger = require("diffview.logger")
 local Job = require("plenary.job")
 local FileDict = require("diffview.git.file_dict").FileDict
 local Rev = require("diffview.git.rev").Rev
@@ -83,8 +84,9 @@ end
 ---@param opt LogOptions
 ---@param callback function
 ---@return LogEntry[]
-M.file_history_list = function(git_root, path_args, opt, callback)
+M.file_history = function(git_root, path_args, opt, callback)
   local thread
+  local lec = 0 -- Last entry count
 
   local function work()
     ---@type LogEntry[]
@@ -114,7 +116,15 @@ M.file_history_list = function(git_root, path_args, opt, callback)
       opt.grep and { "--grep=" .. opt.grep } or nil
     )
 
-    local namestat = Job:new({
+    local done = 0
+    local on_exit = function()
+      done = done + 1
+      if done == 2 then
+        coroutine.resume(thread)
+      end
+    end
+
+    local namestat_job = Job:new({
       command = "git",
       args = utils.vec_join(
         "log",
@@ -126,9 +136,10 @@ M.file_history_list = function(git_root, path_args, opt, callback)
         path_args
       ),
       cwd = git_root,
+      on_exit = on_exit,
     })
 
-    local numstat = Job:new({
+    local numstat_job = Job:new({
       command = "git",
       args = utils.vec_join(
         "log",
@@ -140,138 +151,151 @@ M.file_history_list = function(git_root, path_args, opt, callback)
         path_args
       ),
       cwd = git_root,
+      on_exit = on_exit,
     })
 
-    namestat:start()
-    numstat:start()
-    Job.join(namestat, numstat)
-    local status_data = namestat:result()
-    local num_data = numstat:result()
+    namestat_job:start()
+    numstat_job:start()
+    coroutine.yield()
 
-    if not utils.shell_error() then
-      local i = 1
-      local offset = 0
-      local old_path
-      while i <= #num_data do
-        local right_hash, left_hash, merge_hash = unpack(utils.str_split(status_data[offset + i]))
-        local time, time_offset = unpack(utils.str_split(status_data[offset + i + 2]))
-        local commit = Commit({
-          hash = right_hash,
-          author = status_data[offset + i + 1],
-          time = tonumber(time),
-          time_offset = time_offset,
-          rel_date = status_data[offset + i + 3],
-          subject = status_data[offset + i + 4],
+    if namestat_job.code ~= 0 or numstat_job.code ~= 0 then
+      logger.error("[Git] File history job(s) exited with non-zero status!")
+      logger.error(table.concat(namestat_job:stderr_result(), "\n"))
+      logger.error(table.concat(numstat_job:stderr_result(), "\n"))
+      -- TODO: Should have different status code here
+      callback({}, 0)
+      return
+    end
+
+    local status_data = namestat_job:result()
+    local num_data = numstat_job:result()
+
+    local i = 1
+    local offset = 0
+    local old_path
+    while i <= #num_data do
+      local right_hash, left_hash, merge_hash = unpack(utils.str_split(status_data[offset + i]))
+      local time, time_offset = unpack(utils.str_split(status_data[offset + i + 2]))
+      local commit = Commit({
+        hash = right_hash,
+        author = status_data[offset + i + 1],
+        time = tonumber(time),
+        time_offset = time_offset,
+        rel_date = status_data[offset + i + 3],
+        subject = status_data[offset + i + 4],
+      })
+
+      -- 'git log --name-status' doesn't work properly for merge commits. It
+      -- lists only an incomplete list of files at best. We need to use 'git
+      -- show' to get file statuses for merge commits. And merges do not always
+      -- have changes.
+      local sdata = status_data
+      if merge_hash then
+        while sdata[offset + i + 5] and sdata[offset + i + 5] ~= "" do
+          offset = offset + 1
+        end
+
+        sdata = {}
+        local lines
+        local job = Job:new({
+          command = "git",
+          args = {
+            "show",
+            "--format=",
+            "-m",
+            "--first-parent",
+            "--name-status",
+            right_hash,
+            "--",
+            old_path or unpack(path_args),
+          },
+          cwd = git_root,
+          on_exit = function(j)
+            lines = j:result()
+            lec = #entries
+            callback(entries, 1)
+            coroutine.resume(thread)
+          end,
         })
 
-        -- 'git log --name-status' doesn't work properly for merge commits. It
-        -- lists only an incomplete list of files at best. We need to use 'git
-        -- show' to get file statuses for merge commits. And merges do not always
-        -- have changes.
-        local sdata = status_data
-        if merge_hash then
-          while sdata[offset + i + 5] and sdata[offset + i + 5] ~= "" do
-            offset = offset + 1
-          end
+        job:start()
+        coroutine.yield(1, entries)
 
-          sdata = {}
-          local lines
-          local job = Job:new({
-            command = "git",
-            args = {
-              "show",
-              "--format=",
-              "-m",
-              "--first-parent",
-              "--name-status",
-              right_hash,
-              "--",
-              old_path or unpack(path_args),
-            },
-            cwd = git_root,
-            on_exit = function(j)
-              lines = j:result()
-              coroutine.resume(thread)
-              callback(1, entries)
-            end,
-          })
+        if #lines == 0 then
+          -- Give up: something has been renamed. We can no longer track the
+          -- history.
+          break
+        end
+        offset = offset - #lines
+        for k = 1, #lines do
+          sdata[offset + i + 4 + k] = lines[k]
+        end
+      end
 
-          job:start()
-          coroutine.yield(1, entries)
+      local files = {}
+      local j = 5
+      while i + j <= #num_data and num_data[i + j] ~= "" do
+        local status = sdata[offset + i + j]:sub(1, 1):gsub("%s", " ")
+        local name = sdata[offset + i + j]:match("[%a%s][^%s]*\t(.*)")
+        local oldname
 
-          if #lines == 0 then
-            -- Give up: something has been renamed. We can no longer track the
-            -- history.
-            break
-          end
-          offset = offset - #lines
-          for k = 1, #lines do
-            sdata[offset + i + 4 + k] = lines[k]
+        if name:match("\t") ~= nil then
+          oldname = name:match("(.*)\t")
+          name = name:gsub("^.*\t", "")
+          if single_file then
+            old_path = oldname
           end
         end
 
-        local files = {}
-        local j = 5
-        while i + j <= #num_data and num_data[i + j] ~= "" do
-          local status = sdata[offset + i + j]:sub(1, 1):gsub("%s", " ")
-          local name = sdata[offset + i + j]:match("[%a%s][^%s]*\t(.*)")
-          local oldname
+        local stats = {
+          additions = tonumber(num_data[i + j]:match("^%d+")),
+          deletions = tonumber(num_data[i + j]:match("^%d+%s+(%d+)")),
+        }
 
-          if name:match("\t") ~= nil then
-            oldname = name:match("(.*)\t")
-            name = name:gsub("^.*\t", "")
-            if single_file then
-              old_path = oldname
-            end
-          end
-
-          local stats = {
-            additions = tonumber(num_data[i + j]:match("^%d+")),
-            deletions = tonumber(num_data[i + j]:match("^%d+%s+(%d+)")),
-          }
-
-          if not stats.additions or not stats.deletions then
-            stats = nil
-          end
-
-          table.insert(
-            files,
-            FileEntry({
-              path = name,
-              oldpath = oldname,
-              absolute_path = utils.path_join({ git_root, name }),
-              status = status,
-              stats = stats,
-              kind = "working",
-              commit = commit,
-              left = Rev(RevType.COMMIT, left_hash),
-              right = Rev(RevType.COMMIT, right_hash),
-            })
-          )
-          j = j + 1
+        if not stats.additions or not stats.deletions then
+          stats = nil
         end
 
         table.insert(
-          entries,
-          LogEntry({
-            path_args = path_args,
+          files,
+          FileEntry({
+            path = name,
+            oldpath = oldname,
+            absolute_path = utils.path_join({ git_root, name }),
+            status = status,
+            stats = stats,
+            kind = "working",
             commit = commit,
-            files = files,
-            single_file = single_file,
+            left = Rev(RevType.COMMIT, left_hash),
+            right = Rev(RevType.COMMIT, right_hash),
           })
         )
-
-        i = i + j + 1
+        j = j + 1
       end
+
+      table.insert(
+        entries,
+        LogEntry({
+          path_args = path_args,
+          commit = commit,
+          files = files,
+          single_file = single_file,
+        })
+      )
+
+      if #entries > 0 and #entries % 50 == 0 and #entries > lec then
+        lec = #entries
+        callback(entries, 1)
+      end
+
+      i = i + j + 1
     end
 
-    callback(0, entries)
-    return 0, entries
+    callback(entries, 0)
   end
 
   thread = coroutine.create(work)
-  local _, _, entries = coroutine.resume(thread)
-  return utils.vec_slice(entries)
+  coroutine.resume(thread)
 end
 
 ---Get a list of files modified between two revs.
