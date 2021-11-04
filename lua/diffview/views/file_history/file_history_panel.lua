@@ -165,7 +165,12 @@ function FileHistoryPanel:update_entries(callback)
   local update = debounce.throttle_trailing(
     timeout,
     function(entries, status)
-      if status > 0 and (#entries <= c or lock) then
+      if status == 2 then
+        utils.err("Updating file history failed!")
+        self.updating = false
+        callback(nil, 2)
+        return
+      elseif status == 1 and (#entries <= c or lock) then
         return
       end
 

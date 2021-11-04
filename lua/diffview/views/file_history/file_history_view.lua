@@ -42,8 +42,9 @@ function FileHistoryView:post_open()
   self:init_event_listeners()
   vim.schedule(function()
     self:file_safeguard()
+    ---@diagnostic disable-next-line: unused-local
     self.panel:update_entries(function(entries, status)
-      if not self.panel:cur_file() then
+      if status < 2 and not self.panel:cur_file() then
         local file = self.panel:next_file()
         if file then
           self:set_file(file)

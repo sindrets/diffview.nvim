@@ -1,3 +1,4 @@
+local Job = require("plenary.job")
 local api = vim.api
 local M = {}
 
@@ -265,39 +266,25 @@ function M.str_template(str, table)
 end
 
 ---Get the output of a system command.
----WARN: As of NVIM v0.5.0-dev+1320-gba04b3d83, `io.popen` causes rendering
----artifacts if the command fails.
----@param cmd string
----@return string
-function M.system(cmd)
-  local pfile = io.popen(cmd)
-  if not pfile then
-    return
-  end
-  local data = pfile:read("*a")
-  io.close(pfile)
-
-  return data
-end
-
----Get the output of a system command as a list of lines.
----WARN: As of NVIM v0.5.0-dev+1320-gba04b3d83, `io.popen` causes rendering
----artifacts if the command fails.
----@param cmd string
----@return string[]
-function M.system_list(cmd)
-  local pfile = io.popen(cmd)
-  if not pfile then
-    return
-  end
-
-  local lines = {}
-  for line in pfile:lines() do
-    table.insert(lines, line)
-  end
-  io.close(pfile)
-
-  return lines
+---@param cmd string[]
+---@param cwd? string
+---@return string[] stdout
+---@return integer code
+---@return string[] stderr
+function M.system_list(cmd, cwd)
+  local command = table.remove(cmd, 1)
+  local stderr = {}
+  local stdout, code = Job
+    :new({
+      command = command,
+      args = cmd,
+      cwd = cwd,
+      on_stderr = function(_, data)
+        table.insert(stderr, data)
+      end,
+    })
+    :sync()
+  return stdout, code, stderr
 end
 
 ---HACK: workaround for inconsistent behavior from `vim.opt_local`.
@@ -349,6 +336,9 @@ function M.tabnr_to_id(tabnr)
   end
 end
 
+---@generic T
+---@param t `T`
+---@return T
 function M.tbl_clone(t)
   if not t then
     return
@@ -395,8 +385,8 @@ end
 
 ---Create a shallow copy of a portion of a vector.
 ---@param t vector
----@param first integer (Optional) First index, inclusive
----@param last integer (Optional) Last index, inclusive
+---@param first? integer First index, inclusive
+---@param last? integer Last index, inclusive
 ---@return vector
 function M.vec_slice(t, first, last)
   local slice = {}
