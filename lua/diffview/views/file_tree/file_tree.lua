@@ -9,10 +9,9 @@ local M = {}
 ---@field collapsed boolean
 ---@field status string
 
----@class FileTree
+---@class FileTree : Object
 ---@field root Node
-local FileTree = oop.Object
-FileTree = oop.create_class("FileTree")
+local FileTree = oop.create_class("FileTree")
 
 ---FileTree constructor
 ---@param files FileEntry[]|nil

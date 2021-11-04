@@ -9,14 +9,13 @@ local api = vim.api
 
 local M = {}
 
----@class StandardView
+---@class StandardView : View
 ---@field panel Panel
 ---@field winopts table
 ---@field left_winid integer
 ---@field right_winid integer
 ---@field nulled boolean
-local StandardView = View
-StandardView = oop.create_class("StandardView", View)
+local StandardView = oop.create_class("StandardView", View)
 
 ---StandardView constructor
 ---@return StandardView

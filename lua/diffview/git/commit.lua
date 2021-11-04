@@ -2,7 +2,7 @@ local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local M = {}
 
----@class Commit
+---@class Commit : Object
 ---@field hash string
 ---@field author string
 ---@field time number
@@ -11,8 +11,7 @@ local M = {}
 ---@field rel_date string
 ---@field subject string
 ---@field body string
-local Commit = oop.Object
-Commit = oop.create_class("Commit")
+local Commit = oop.create_class("Commit")
 
 function Commit:init(opt)
   self.hash = opt.hash

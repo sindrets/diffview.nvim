@@ -29,6 +29,9 @@ local function duplicate(t)
   return t2
 end
 
+---@generic T
+---@param class `T`
+---@return T
 local function new_instance(class, ...)
   ---@diagnostic disable-next-line: redefined-local
   local function make_instance(class, virtuals)

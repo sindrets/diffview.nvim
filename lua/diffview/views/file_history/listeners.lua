@@ -46,6 +46,7 @@ return function(view)
           vim.schedule(function ()
             op.option_state = nil
             view.panel.option_panel.winid = nil
+            ---@diagnostic disable-next-line: unused-local
             view.panel:update_entries(function(entries, status)
               if not view.panel:cur_file() then
                 view:next_item()

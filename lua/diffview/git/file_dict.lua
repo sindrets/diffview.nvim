@@ -3,13 +3,12 @@ local FileTree = require("diffview.views.file_tree.file_tree").FileTree
 local M = {}
 
 ---@type table<integer, FileEntry>
----@class FileDict
+---@class FileDict : Object
 ---@field working FileEntry[]
 ---@field staged FileEntry[]
 ---@field working_tree FileTree
 ---@field staged_tree FileTree
-local FileDict = oop.Object
-FileDict = oop.create_class("FileDict")
+local FileDict = oop.create_class("FileDict")
 
 ---FileDict constructor.
 ---@return FileDict

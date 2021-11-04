@@ -25,7 +25,7 @@ local perf = PerfTimer("[FileHistoryPanel] render")
 ---@field author string
 ---@field grep string
 
----@class FileHistoryPanel
+---@class FileHistoryPanel : Panel
 ---@field git_root string
 ---@field entries LogEntry[]
 ---@field path_args string[]
@@ -43,8 +43,7 @@ local perf = PerfTimer("[FileHistoryPanel] render")
 ---@field option_mapping string
 ---@field components any
 ---@field constrain_cursor function
-local FileHistoryPanel = Panel
-FileHistoryPanel = oop.create_class("FileHistoryPanel", Panel)
+local FileHistoryPanel = oop.create_class("FileHistoryPanel", Panel)
 
 FileHistoryPanel.winopts = vim.tbl_extend("force", Panel.winopts, {
   cursorline = true,

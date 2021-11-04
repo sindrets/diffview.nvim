@@ -20,7 +20,7 @@ local Form = oop.enum({
   "ROW",
 })
 
----@class Panel
+---@class Panel : Object
 ---@field position string
 ---@field form Form
 ---@field relative string
@@ -34,8 +34,7 @@ local Form = oop.enum({
 ---@field init_buffer_opts function Abstract
 ---@field update_components function Abstract
 ---@field render function Abstract
-local Panel = oop.Object
-Panel = oop.create_class("Panel")
+local Panel = oop.create_class("Panel")
 
 Panel.winopts = {
   relativenumber = false,

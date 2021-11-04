@@ -11,7 +11,7 @@ local fstat_cache = {}
 ---@field additions integer
 ---@field deletions integer
 
----@class FileEntry
+---@class FileEntry : Object
 ---@field path string
 ---@field oldpath string
 ---@field absolute_path string
@@ -29,8 +29,7 @@ local fstat_cache = {}
 ---@field left_bufid integer
 ---@field right_bufid integer
 ---@field created_bufs integer[]
-local FileEntry = oop.Object
-FileEntry = oop.create_class("FileEntry")
+local FileEntry = oop.create_class("FileEntry")
 
 ---@static
 ---@type integer|nil

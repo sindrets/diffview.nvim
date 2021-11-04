@@ -17,7 +17,7 @@ local M = {}
 ---@class DiffViewOptions
 ---@field show_untracked boolean|nil
 
----@class DiffView
+---@class DiffView : StandardView
 ---@field git_root string Absolute path the root of the git directory.
 ---@field git_dir string Absolute path to the '.git' directory.
 ---@field rev_arg string
@@ -28,8 +28,7 @@ local M = {}
 ---@field panel FilePanel
 ---@field files FileDict
 ---@field file_idx integer
-local DiffView = StandardView
-DiffView = oop.create_class("DiffView", StandardView)
+local DiffView = oop.create_class("DiffView", StandardView)
 
 ---DiffView constructor
 ---@return DiffView

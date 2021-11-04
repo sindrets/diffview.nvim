@@ -10,7 +10,7 @@ local M = {}
 ---@field flatten_dirs boolean
 ---@field folder_statuses "never"|"only_folded"|"always"
 
----@class FilePanel
+---@class FilePanel : Panel
 ---@field git_root string
 ---@field files FileDict
 ---@field path_args string[]
@@ -24,8 +24,7 @@ local M = {}
 ---@field render_data RenderData
 ---@field components any
 ---@field constrain_cursor function
-local FilePanel = Panel
-FilePanel = oop.create_class("FilePanel", Panel)
+local FilePanel = oop.create_class("FilePanel", Panel)
 
 FilePanel.winopts = vim.tbl_extend("force", Panel.winopts, {
   cursorline = true,

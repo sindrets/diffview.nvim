@@ -21,7 +21,7 @@ M.last_draw_time = 0
 ---@field comp RenderComponent
 local CompStruct
 
----@class RenderComponent
+---@class RenderComponent : Object
 ---@field name string
 ---@field parent RenderComponent
 ---@field lines string[]
@@ -33,8 +33,7 @@ local CompStruct
 ---@field leaf boolean
 ---@field data_root RenderData
 ---@field context any
-local RenderComponent = oop.Object
-RenderComponent = oop.create_class("RenderComponent")
+local RenderComponent = oop.create_class("RenderComponent")
 
 ---RenderComponent constructor.
 ---@return RenderComponent
@@ -247,13 +246,12 @@ function RenderComponent:pretty_print()
   recurse(0, self)
 end
 
----@class RenderData
+---@class RenderData : Object
 ---@field lines string[]
 ---@field hl HlData[]
 ---@field components RenderComponent[]
 ---@field namespace integer
-local RenderData = oop.Object
-RenderData = oop.create_class("RenderData")
+local RenderData = oop.create_class("RenderData")
 
 ---RenderData constructor.
 ---@return RenderData

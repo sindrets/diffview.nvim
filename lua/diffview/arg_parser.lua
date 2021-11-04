@@ -5,12 +5,11 @@ local M = {}
 local short_flag_pat = "^%-(%a)=?(.*)"
 local long_flag_pat = "^%-%-(%a[%a%d-]*)=?(.*)"
 
----@class ArgObject
+---@class ArgObject : Object
 ---@field flags table<string, string>
 ---@field args string[]
 ---@field post_args string[]
-local ArgObject = oop.Object
-ArgObject = oop.create_class("ArgObject")
+local ArgObject = oop.create_class("ArgObject")
 
 ---ArgObject constructor.
 ---@param flags table<string, string>
@@ -33,10 +32,9 @@ function ArgObject:get_flag(...)
   end
 end
 
----@class FlagValueMap
+---@class FlagValueMap : Object
 ---@field map table<string, string[]>
-local FlagValueMap = oop.Object
-FlagValueMap = oop.create_class("FlagValueMap")
+local FlagValueMap = oop.create_class("FlagValueMap")
 
 ---FlagValueMap constructor
 ---@return FlagValueMap

@@ -10,14 +10,13 @@ local api = vim.api
 
 local M = {}
 
----@class FileHistoryView
+---@class FileHistoryView : StandardView
 ---@field git_root string
 ---@field git_dir string
 ---@field panel FileHistoryPanel
 ---@field path_args string[]
 ---@field raw_args string[]
-local FileHistoryView = StandardView
-FileHistoryView = oop.create_class("FileHistoryView", StandardView)
+local FileHistoryView = oop.create_class("FileHistoryView", StandardView)
 
 function FileHistoryView:init(opt)
   self.emitter = EventEmitter()
