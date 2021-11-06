@@ -335,9 +335,7 @@ end
 
 ---@static
 function FileEntry._update_windows(left_winid, right_winid)
-  for k, v in pairs(FileEntry.winopts) do
-    utils.set_local({ left_winid, right_winid }, k, v)
-  end
+  utils.set_local({ left_winid, right_winid }, FileEntry.winopts)
 
   for _, id in ipairs({ left_winid, right_winid }) do
     if id ~= api.nvim_get_current_win() then

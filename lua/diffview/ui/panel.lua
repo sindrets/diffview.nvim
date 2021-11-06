@@ -161,11 +161,7 @@ function Panel:open()
   self.winid = api.nvim_get_current_win()
   self:resize()
   api.nvim_win_set_buf(self.winid, self.bufid)
-
-  for k, v in pairs(self.class().winopts) do
-    local opt = type(v) == "table" and v[2] or nil
-    utils.set_local(self.winid, k, type(v) == "table" and v[1] or v, opt)
-  end
+  utils.set_local(self.winid, self.class().winopts)
 end
 
 function Panel:close()

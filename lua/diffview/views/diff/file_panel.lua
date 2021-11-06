@@ -38,7 +38,7 @@ FilePanel.winopts = vim.tbl_extend("force", Panel.winopts, {
       "StatusLine:DiffviewStatusLine",
       "StatusLineNC:DiffviewStatuslineNC",
     }, ","),
-    { method = "prepend" },
+    opt = { method = "prepend" },
   },
 })
 

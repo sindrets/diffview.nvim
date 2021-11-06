@@ -59,13 +59,8 @@ function StandardView:post_layout()
 end
 
 function StandardView:update_windows()
-  for k, v in pairs(self.winopts.left) do
-    utils.set_local(self.left_winid, k, v)
-  end
-
-  for k, v in pairs(self.winopts.right) do
-    utils.set_local(self.right_winid, k, v)
-  end
+  utils.set_local(self.left_winid, self.winopts.left)
+  utils.set_local(self.right_winid, self.winopts.right)
 end
 
 ---@Override
