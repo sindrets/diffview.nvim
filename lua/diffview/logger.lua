@@ -1,15 +1,5 @@
 local utils = require("diffview.utils")
-local Mock = require("diffview.mock").Mock
-
--- If plenary is not installed: mock the logger object
-local ok, log = pcall(require, "plenary.log")
-if not ok then
-  log = Mock({
-    new = function()
-      return log
-    end,
-  })
-end
+local log = require("plenary.log")
 
 local logger = log.new({
   plugin = "diffview",
@@ -20,18 +10,15 @@ local logger = log.new({
 
 -- Add scheduled variants of the different log methods.
 for _, kind in ipairs({ "trace", "debug", "info", "warn", "error", "fatal" }) do
-  logger["s_" .. kind] = function(...)
-    local args = utils.tbl_pack(...)
-    vim.schedule(function()
-      args = vim.tbl_map(function(v)
-        if type(v) == "table" and type(v.__tostring) == "function" then
-          return tostring(v)
-        end
-        return v
-      end, args)
-      logger[kind](utils.tbl_unpack(args))
-    end)
-  end
+  logger["s_" .. kind] = vim.schedule_wrap(function (...)
+    local args = vim.tbl_map(function(v)
+      if type(v) == "table" and type(v.__tostring) == "function" then
+        return tostring(v)
+      end
+      return v
+    end, utils.tbl_pack(...))
+    logger[kind](utils.tbl_unpack(args))
+  end)
 end
 
 return logger
