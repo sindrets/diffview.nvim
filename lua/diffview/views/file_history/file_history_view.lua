@@ -23,6 +23,7 @@ function FileHistoryView:init(opt)
   self.emitter = EventEmitter()
   self.layout_mode = FileHistoryView.get_layout_mode()
   self.ready = false
+  self.closing = false
   self.nulled = false
   self.winopts = { left = {}, right = {} }
   self.git_root = opt.git_root
@@ -57,7 +58,8 @@ end
 
 ---@Override
 function FileHistoryView:close()
-  for _, entry in ipairs(self.panel.entries) do
+  self.closing = true
+  for _, entry in ipairs(self.panel.entries or {}) do
     entry:destroy()
   end
   FileHistoryView:super().close(self)

@@ -36,6 +36,7 @@ function DiffView:init(opt)
   self.emitter = EventEmitter()
   self.layout_mode = DiffView.get_layout_mode()
   self.ready = false
+  self.closing = false
   self.nulled = false
   self.winopts = { left = {}, right = {} }
   self.git_root = opt.git_root
@@ -70,6 +71,7 @@ end
 
 ---@Override
 function DiffView:close()
+  self.closing = true
   for _, file in self.files:ipairs() do
     file:destroy()
   end

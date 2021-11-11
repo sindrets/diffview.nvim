@@ -118,7 +118,7 @@ end
 
 function M.trigger_event(event_name, ...)
   local view = lib.get_current_view()
-  if view then
+  if view and not view.closing then
     view.emitter:emit(event_name, ...)
   end
 end

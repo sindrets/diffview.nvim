@@ -19,6 +19,7 @@ local LayoutMode = oop.enum({
 ---@field emitter EventEmitter
 ---@field layout_mode LayoutMode
 ---@field ready boolean
+---@field closing boolean
 ---@field init_layout function Abstract
 ---@field post_open function Abstract
 ---@field validate_layout function Abstract
@@ -36,6 +37,7 @@ function View:init()
   self.emitter = EventEmitter()
   self.layout_mode = View.get_layout_mode()
   self.ready = false
+  self.closing = false
 end
 
 function View:open()
@@ -46,6 +48,7 @@ function View:open()
 end
 
 function View:close()
+  self.closing = true
   if self.tabpage and api.nvim_tabpage_is_valid(self.tabpage) then
     local pagenr = api.nvim_tabpage_get_number(self.tabpage)
     vim.cmd("tabclose " .. pagenr)

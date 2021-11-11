@@ -33,6 +33,7 @@ function CDiffView:init(opt)
   self.layout_mode = CDiffView.get_layout_mode()
   self.nulled = false
   self.ready = false
+  self.closing = false
   self.winopts = { left = {}, right = {} }
   self.git_root = opt.git_root
   self.git_dir = git.git_dir(opt.git_root)
