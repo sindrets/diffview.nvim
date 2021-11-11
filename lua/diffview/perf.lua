@@ -4,14 +4,13 @@ local utils = require("diffview.utils")
 local luv = vim.loop
 local M = {}
 
----@class PerfTimer
+---@class PerfTimer : Object
 ---@field subject string|nil
 ---@field first integer Start time (ns)
 ---@field last integer Stop time (ns)
 ---@field final_time number Final time (ms)
 ---@field laps number[] List of lap times (ms)
-local PerfTimer = oop.Object
-PerfTimer = oop.create_class("PerfTimer")
+local PerfTimer = oop.create_class("PerfTimer")
 
 ---PerfTimer constructor.
 ---@param subject string|nil
@@ -25,6 +24,7 @@ end
 function PerfTimer:reset()
   self.laps = {}
   self.first = luv.hrtime()
+  self.final_time = nil
 end
 
 ---Record a lap time.
@@ -70,10 +70,6 @@ function PerfTimer.__tostring(self)
     end
     return s .. string.format("%s %.3f ms", utils.str_right_pad("FINAL TIME:", 16), self.final_time)
   end
-end
-
-function PerfTimer:print()
-  utils._echo_multiline(tostring(self))
 end
 
 ---Get the relative performance difference in percent.

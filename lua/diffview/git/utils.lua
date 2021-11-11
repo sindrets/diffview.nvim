@@ -1,4 +1,8 @@
 local utils = require("diffview.utils")
+local oop = require("diffview.oop")
+local logger = require("diffview.logger")
+local async = require("plenary.async")
+local Job = require("plenary.job")
 local FileDict = require("diffview.git.file_dict").FileDict
 local Rev = require("diffview.git.rev").Rev
 local RevType = require("diffview.git.rev").RevType
@@ -6,6 +10,21 @@ local Commit = require("diffview.git.commit").Commit
 local LogEntry = require("diffview.git.log_entry").LogEntry
 local FileEntry = require("diffview.views.file_entry").FileEntry
 local M = {}
+
+---@class JobStatus
+---@field SUCCESS integer
+---@field ERROR integer
+---@field PROGRESS integer
+---@field KILLED integer
+local JobStatus = oop.enum({
+  "SUCCESS",
+  "PROGRESS",
+  "ERROR",
+  "KILLED",
+})
+
+---@type Job[]
+local file_history_jobs = {}
 
 local function tracked_files(git_root, left, right, args, kind)
   local files = {}
@@ -77,159 +96,350 @@ local function untracked_files(git_root, left, right)
   return files
 end
 
+---@param log_options LogOptions
+---@param single_file boolean
+---@return string[]
+local function prepare_file_history_options(log_options, single_file)
+  local o = log_options
+  return utils.vec_join(
+    (o.follow and single_file) and { "--follow", "--first-parent" } or { "-m", "-c" },
+    o.all and { "--all" } or nil,
+    o.merges and { "--merges", "--first-parent" } or nil,
+    o.no_merges and { "--no-merges" } or nil,
+    o.reverse and { "--reverse" } or nil,
+    o.max_count and { "-n" .. o.max_count } or nil,
+    o.author and { "--author=" .. o.author } or nil,
+    o.grep and { "--grep=" .. o.grep } or nil
+  )
+end
+
+local function structure_fh_data(namestat_data, numstat_data)
+  local right_hash, left_hash, merge_hash = unpack(utils.str_split(namestat_data[1]))
+  local time, time_offset = unpack(utils.str_split(namestat_data[3]))
+
+  return {
+    left_hash = left_hash,
+    right_hash = right_hash,
+    merge_hash = merge_hash,
+    author = namestat_data[2],
+    time = tonumber(time),
+    time_offset = time_offset,
+    rel_date = namestat_data[4],
+    subject = namestat_data[5],
+    namestat = utils.vec_slice(namestat_data, 6),
+    numstat = numstat_data,
+  }
+end
+
+---@param git_root string
+---@param path_args string[]
+---@param single_file boolean
+---@param opt LogOptions
+---@param callback function
+local incremental_fh_data = async.void(function(git_root, path_args, single_file, opt, callback)
+  local options = prepare_file_history_options(opt, single_file)
+  local raw = {}
+  local namestat_job, numstat_job
+
+  local namestat_state = {
+    data = {},
+    key = "namestat",
+    idx = 0,
+  }
+  local numstat_state = {
+    data = {},
+    key = "numstat",
+    idx = 0,
+  }
+
+  local function on_stdout(_, line, j)
+    local state = j == namestat_job and namestat_state or numstat_state
+
+    if line == "\0" then
+      if state.idx > 0 then
+        if not raw[state.idx] then
+          raw[state.idx] = {}
+        end
+
+        raw[state.idx][state.key] = state.data
+
+        if raw[state.idx].namestat and raw[state.idx].numstat then
+          callback(
+            JobStatus.PROGRESS,
+            structure_fh_data(raw[state.idx].namestat, raw[state.idx].numstat)
+          )
+        end
+      end
+      state.idx = state.idx + 1
+      state.data = {}
+    elseif line ~= "" then
+      table.insert(state.data, line)
+    end
+  end
+
+  local done = 0
+  local function on_exit(j, code)
+    if code == 0 then
+      on_stdout(nil, "\0", j)
+    end
+    done = done + 1
+    if done == 2 then
+      if namestat_job.code ~= 0 or numstat_job.code ~= 0 then
+        logger.error("[Git] File history job(s) exited with non-zero status!")
+        logger.error(string.format("Cmd: %s %s", namestat_job.command, table.concat(namestat_job.args, " ")))
+        logger.error("[stderr] " .. table.concat(namestat_job:stderr_result(), "\n"))
+        logger.error(string.format("Cmd: %s %s", numstat_job.command, table.concat(numstat_job.args, " ")))
+        logger.error("[stderr] " .. table.concat(numstat_job:stderr_result(), "\n"))
+        callback(JobStatus.ERROR)
+      else
+        callback(JobStatus.SUCCESS)
+      end
+    end
+  end
+
+  namestat_job = Job:new({
+    command = "git",
+    args = utils.vec_join(
+      "log",
+      "--pretty=format:%x00%n%H %P%n%an%n%ad%n%ar%n%s",
+      "--date=raw",
+      "--name-status",
+      options,
+      "--",
+      path_args
+    ),
+    cwd = git_root,
+    on_stdout = on_stdout,
+    on_exit = on_exit,
+  })
+
+  numstat_job = Job:new({
+    command = "git",
+    args = utils.vec_join(
+      "log",
+      "--pretty=format:%x00",
+      "--date=raw",
+      "--numstat",
+      options,
+      "--",
+      path_args
+    ),
+    cwd = git_root,
+    on_stdout = on_stdout,
+    on_exit = on_exit,
+  })
+
+  table.insert(file_history_jobs, namestat_job)
+  table.insert(file_history_jobs, numstat_job)
+  namestat_job:start()
+  numstat_job:start()
+end)
+
+---@param thread thread
 ---@param git_root string
 ---@param path_args string[]
 ---@param opt LogOptions
----@return LogEntry[]
-function M.file_history_list(git_root, path_args, opt)
+---@param callback function
+local function process_file_history(thread, git_root, path_args, opt, callback)
   ---@type LogEntry[]
   local entries = {}
-  local base_cmd = string.format("git -C %s ", vim.fn.shellescape(git_root))
-
-  local p_args = ""
-  if path_args and #path_args > 0 then
-    p_args = ""
-    for _, arg in ipairs(path_args) do
-      p_args = p_args .. " " .. vim.fn.shellescape(arg)
-    end
-  end
+  local lec = 0 -- Last entry count
+  local data = {}
+  local data_idx = 1
+  local last_status
+  local resume_lock = false
+  local old_path
 
   local single_file = #path_args == 1
     and vim.fn.isdirectory(path_args[1]) == 0
-    and #vim.fn.systemlist(base_cmd .. "ls-files -- " .. p_args) < 2
+    and #utils.system_list({ "git", "ls-files", "--", unpack(path_args) }, git_root) < 2
 
-  local options = string.format(
-    "%s %s %s %s %s %s %s %s",
-    opt.follow and single_file and "--follow --first-parent" or "-m -c",
-    opt.all and "--all" or "",
-    opt.merges and "--merges --first-parent" or "",
-    opt.no_merges and "--no-merges" or "",
-    opt.reverse and "--reverse" or "",
-    opt.max_count and ("-n" .. vim.fn.shellescape(opt.max_count)) or "",
-    opt.author and ("--author=" .. vim.fn.shellescape(opt.author)) or "",
-    opt.grep and ("--grep=" .. vim.fn.shellescape(opt.grep)) or ""
+  incremental_fh_data(
+    git_root,
+    path_args,
+    single_file,
+    opt,
+    function(status, d)
+      if status == JobStatus.PROGRESS then
+        data[#data+1] = d
+      end
+
+      last_status = status
+      if not resume_lock and coroutine.status(thread) == "suspended" then
+        coroutine.resume(thread)
+      end
+    end
   )
 
-  local cmd = string.format(
-    "%s log --pretty='format:%%H %%P%%n%%an%%n%%ad%%n%%ar%%n%%s' "
-      .. "--date=raw --name-status %s -- %s",
-    base_cmd,
-    options,
-    p_args
-  )
-  local status_data = vim.fn.systemlist(cmd)
+  while true do
+    if not (last_status == JobStatus.SUCCESS or last_status == JobStatus.ERROR)
+        and not data[data_idx] then
+      coroutine.yield()
+    end
 
-  cmd = string.format(
-    "%s log --pretty='format:%%H %%P%%n%%an%%n%%ad%%n%%ar%%n%%s' "
-      .. "--date=raw --numstat %s -- %s",
-    base_cmd,
-    options,
-    p_args
-  )
-  local num_data = vim.fn.systemlist(cmd)
+    if last_status == JobStatus.ERROR then
+      callback(entries, JobStatus.ERROR)
+      return
+    elseif last_status == JobStatus.SUCCESS and data_idx > #data then
+      break
+    end
 
-  if not utils.shell_error() then
-    local i = 1
-    local offset = 0
-    local old_path
-    while i <= #num_data do
-      local right_hash, left_hash, merge_hash = unpack(utils.str_split(status_data[offset + i]))
-      local time, time_offset = unpack(utils.str_split(status_data[offset + i + 2]))
-      local commit = Commit({
-        hash = right_hash,
-        author = status_data[offset + i + 1],
-        time = tonumber(time),
-        time_offset = time_offset,
-        rel_date = status_data[offset + i + 3],
-        subject = status_data[offset + i + 4],
+    local cur = data[data_idx]
+
+    local commit = Commit({
+      hash = cur.right_hash,
+      author = cur.author,
+      time = tonumber(cur.time),
+      time_offset = cur.time_offset,
+      rel_date = cur.rel_date,
+      subject = cur.subject,
+    })
+
+    -- 'git log --name-status' doesn't work properly for merge commits. It
+    -- lists only an incomplete list of files at best. We need to use 'git
+    -- show' to get file statuses for merge commits. And merges do not always
+    -- have changes.
+    if cur.merge_hash then
+      local job = Job:new({
+        command = "git",
+        args = {
+          "show",
+          "--format=",
+          "-m",
+          "--first-parent",
+          "--name-status",
+          cur.right_hash,
+          "--",
+          old_path or unpack(path_args),
+        },
+        cwd = git_root,
+        on_exit = function(j)
+          if j.code == 0 then
+            cur.namestat = j:result()
+          end
+          coroutine.resume(thread)
+        end,
       })
 
-      -- 'git log --name-status' doesn't work properly for merge commits. It
-      -- lists only an incomplete list of files at best. We need to use 'git
-      -- show' to get file statuses for merge commits. And merges do not always
-      -- have changes.
-      local sdata = status_data
-      if merge_hash then
-        while sdata[offset + i + 5] and sdata[offset + i + 5] ~= "" do
-          offset = offset + 1
-        end
-        sdata = {}
-        local lines = vim.fn.systemlist(
-          string.format(
-            "%s show --format= -m --first-parent --name-status %s -- %s",
-            base_cmd,
-            right_hash,
-            old_path or p_args
-          )
-        )
-        if #lines == 0 then
-          -- Give up: something has been renamed. We can no longer track the
-          -- history.
-          goto escape
-        end
-        offset = offset - #lines
-        for k = 1, #lines do
-          sdata[offset + i + 4 + k] = lines[k]
+      table.insert(file_history_jobs, job)
+      resume_lock = true
+      job:start()
+      coroutine.yield()
+      resume_lock = false
+
+      if job.code ~= 0 then
+        logger.error("[Git] Failed to get name-status for merge commit!")
+        logger.error(string.format("Cmd: %s %s", job.command, table.concat(job.args, " ")))
+        logger.error("[stderr] " .. table.concat(job:stderr_result(), "\n"))
+        callback({}, JobStatus.ERROR)
+        return
+      end
+
+      if #cur.namestat == 0 then
+        -- Give up: something has been renamed. We can no longer track the
+        -- history.
+        break
+      end
+    end
+
+    local files = {}
+    for i = 1, #cur.numstat do
+      local status = cur.namestat[i]:sub(1, 1):gsub("%s", " ")
+      local name = cur.namestat[i]:match("[%a%s][^%s]*\t(.*)")
+      local oldname
+
+      if name:match("\t") ~= nil then
+        oldname = name:match("(.*)\t")
+        name = name:gsub("^.*\t", "")
+        if single_file then
+          old_path = oldname
         end
       end
 
-      local files = {}
-      local j = 5
-      while i + j <= #num_data and num_data[i + j] ~= "" do
-        local status = sdata[offset + i + j]:sub(1, 1):gsub("%s", " ")
-        local name = sdata[offset + i + j]:match("[%a%s][^%s]*\t(.*)")
-        local oldname
+      local stats = {
+        additions = tonumber(cur.numstat[i]:match("^%d+")),
+        deletions = tonumber(cur.numstat[i]:match("^%d+%s+(%d+)")),
+      }
 
-        if name:match("\t") ~= nil then
-          oldname = name:match("(.*)\t")
-          name = name:gsub("^.*\t", "")
-          if single_file then
-            old_path = oldname
-          end
-        end
-
-        local stats = {
-          additions = tonumber(num_data[i + j]:match("^%d+")),
-          deletions = tonumber(num_data[i + j]:match("^%d+%s+(%d+)")),
-        }
-
-        if not stats.additions or not stats.deletions then
-          stats = nil
-        end
-
-        table.insert(
-          files,
-          FileEntry({
-            path = name,
-            oldpath = oldname,
-            absolute_path = utils.path_join({ git_root, name }),
-            status = status,
-            stats = stats,
-            kind = "working",
-            commit = commit,
-            left = Rev(RevType.COMMIT, left_hash),
-            right = Rev(RevType.COMMIT, right_hash),
-          })
-        )
-        j = j + 1
+      if not stats.additions or not stats.deletions then
+        stats = nil
       end
 
       table.insert(
-        entries,
-        LogEntry({
-          path_args = path_args,
+        files,
+        FileEntry({
+          path = name,
+          oldpath = oldname,
+          absolute_path = utils.path_join({ git_root, name }),
+          status = status,
+          stats = stats,
+          kind = "working",
           commit = commit,
-          files = files,
-          single_file = single_file,
+          left = Rev(RevType.COMMIT, cur.left_hash),
+          right = Rev(RevType.COMMIT, cur.right_hash),
         })
       )
-
-      i = i + j + 1
     end
+
+    table.insert(
+      entries,
+      LogEntry({
+        path_args = path_args,
+        commit = commit,
+        files = files,
+        single_file = single_file,
+      })
+    )
+
+    if #entries > 0 and #entries > lec then
+      lec = #entries
+      callback(entries, JobStatus.PROGRESS)
+    end
+
+    data_idx = data_idx + 1
   end
 
-  ::escape::
-  return entries
+  callback(entries, JobStatus.SUCCESS)
+end
+
+---@param git_root string
+---@param path_args string[]
+---@param opt LogOptions
+---@param callback function
+function M.file_history(git_root, path_args, opt, callback)
+  local thread
+
+  for _, job in ipairs(file_history_jobs) do
+    if not job.is_shutdown then
+      job:shutdown(JobStatus.KILLED)
+    end
+  end
+  file_history_jobs = {}
+
+  thread = coroutine.create(function()
+    process_file_history(thread, git_root, path_args, opt, callback)
+  end)
+
+  coroutine.resume(thread)
+end
+
+---@param git_root string
+---@param path_args string[]
+---@param log_options LogOptions
+function M.file_history_dry_run(git_root, path_args, log_options)
+  local single_file = #path_args == 1
+    and vim.fn.isdirectory(path_args[1]) == 0
+    and #utils.system_list({ "git", "ls-files", "--", unpack(path_args) }, git_root) < 2
+
+  log_options = utils.tbl_clone(log_options)
+  log_options.max_count = 1
+  local options = prepare_file_history_options(log_options, single_file)
+  local out, code = utils.system_list(
+    utils.vec_join("git", "log", "--pretty=format:%H", "--name-status", options, "--", path_args),
+    git_root
+  )
+
+  return code == 0 and #out > 0
 end
 
 ---Get a list of files modified between two revs.
@@ -263,7 +473,7 @@ function M.diff_file_list(git_root, left, right, path_args, opt)
     local untracked = untracked_files(git_root, left, right)
 
     if #untracked > 0 then
-      files.working = utils.tbl_concat(files.working, untracked)
+      files.working = utils.vec_join(files.working, untracked)
 
       utils.merge_sort(files.working, function(a, b)
         return a.path:lower() < b.path:lower()
@@ -521,5 +731,16 @@ function M.restore_file(git_root, path, kind, commit)
   utils.info(("File restored from %s. Undo with %s"):format(rev_name, undo))
 end
 
+---@class NextLogSectionSpec
+---@field git_root string
+---@field path_args string[]
+---@field opt LogOptions
+---@field single_file boolean
+---@field last_commit string
+---@field i integer
+---@field max integer
+---@field callback function
+
+M.JobStatus = JobStatus
 M.FileDict = FileDict
 return M

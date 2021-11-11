@@ -25,12 +25,13 @@ Install the plugin with your package manager of choice.
 
 ```vim
 " Plug
+Plug 'nvim-lua/plenary.nvim'
 Plug 'sindrets/diffview.nvim'
 ```
 
 ```lua
 -- Packer
-use 'sindrets/diffview.nvim'
+use { 'sindrets/diffview.nvim', requires = 'nvim-lua/plenary.nvim' }
 ```
 
 ## Configuration

@@ -1,5 +1,9 @@
 if !has('nvim-0.5') || exists('g:diffview_nvim_loaded') | finish | endif
 
+if !luaeval("require('diffview.bootstrap')")
+    finish
+endif
+
 command! -complete=customlist,s:completion -nargs=* DiffviewOpen lua require'diffview'.open(<f-args>)
 command! -complete=file -nargs=* DiffviewFileHistory lua require'diffview'.file_history(<f-args>)
 command! -bar -nargs=0 DiffviewClose lua require'diffview'.close()

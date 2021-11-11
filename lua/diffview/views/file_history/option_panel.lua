@@ -6,14 +6,13 @@ local EventEmitter = require("diffview.events").EventEmitter
 local api = vim.api
 local M = {}
 
----@class FHOptionPanel
+---@class FHOptionPanel : Panel
 ---@field parent FileHistoryPanel
 ---@field emitter EventEmitter
 ---@field render_data RenderData
 ---@field option_state LogOptions
 ---@field components any
-local FHOptionPanel = Panel
-FHOptionPanel = oop.create_class("FHOptionPanel", Panel)
+local FHOptionPanel = oop.create_class("FHOptionPanel", Panel)
 
 FHOptionPanel.winopts = vim.tbl_extend("force", Panel.winopts, {
   cursorline = true,

@@ -10,10 +10,9 @@ local Event = oop.enum({
   "FILES_STAGED",
 })
 
----@class EventEmitter
+---@class EventEmitter : Object
 ---@field listeners table<Event, function[]>
-local EventEmitter = oop.Object
-EventEmitter = oop.create_class("EventEmitter")
+local EventEmitter = oop.create_class("EventEmitter")
 
 ---EventEmitter constructor.
 ---@return EventEmitter

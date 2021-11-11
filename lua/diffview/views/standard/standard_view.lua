@@ -9,14 +9,13 @@ local api = vim.api
 
 local M = {}
 
----@class StandardView
+---@class StandardView : View
 ---@field panel Panel
 ---@field winopts table
 ---@field left_winid integer
 ---@field right_winid integer
 ---@field nulled boolean
-local StandardView = View
-StandardView = oop.create_class("StandardView", View)
+local StandardView = oop.create_class("StandardView", View)
 
 ---StandardView constructor
 ---@return StandardView
@@ -60,13 +59,8 @@ function StandardView:post_layout()
 end
 
 function StandardView:update_windows()
-  for k, v in pairs(self.winopts.left) do
-    utils.set_local(self.left_winid, k, v)
-  end
-
-  for k, v in pairs(self.winopts.right) do
-    utils.set_local(self.right_winid, k, v)
-  end
+  utils.set_local(self.left_winid, self.winopts.left)
+  utils.set_local(self.right_winid, self.winopts.right)
 end
 
 ---@Override

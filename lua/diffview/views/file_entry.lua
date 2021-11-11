@@ -11,7 +11,7 @@ local fstat_cache = {}
 ---@field additions integer
 ---@field deletions integer
 
----@class FileEntry
+---@class FileEntry : Object
 ---@field path string
 ---@field oldpath string
 ---@field absolute_path string
@@ -29,8 +29,7 @@ local fstat_cache = {}
 ---@field left_bufid integer
 ---@field right_bufid integer
 ---@field created_bufs integer[]
-local FileEntry = oop.Object
-FileEntry = oop.create_class("FileEntry")
+local FileEntry = oop.create_class("FileEntry")
 
 ---@static
 ---@type integer|nil
@@ -336,9 +335,7 @@ end
 
 ---@static
 function FileEntry._update_windows(left_winid, right_winid)
-  for k, v in pairs(FileEntry.winopts) do
-    utils.set_local({ left_winid, right_winid }, k, v)
-  end
+  utils.set_local({ left_winid, right_winid }, FileEntry.winopts)
 
   for _, id in ipairs({ left_winid, right_winid }) do
     if id ~= api.nvim_get_current_win() then
@@ -351,7 +348,7 @@ function FileEntry._update_windows(left_winid, right_winid)
   -- Scroll to trigger the scrollbind and sync the windows. This works more
   -- consistently than calling `:syncbind`.
   api.nvim_win_call(right_winid, function()
-    vim.cmd([[exe "norm! \<c-y>"]])
+    vim.cmd([[exe "norm! \<c-e>\<c-y>"]])
   end)
 end
 

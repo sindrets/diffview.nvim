@@ -1,6 +1,7 @@
 local config = require("diffview.config")
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
+local debounce = require("diffview.debounce")
 local git = require("diffview.git.utils")
 local renderer = require("diffview.renderer")
 local logger = require("diffview.logger")
@@ -8,11 +9,14 @@ local PerfTimer = require("diffview.perf").PerfTimer
 local Panel = require("diffview.ui.panel").Panel
 local LogEntry = require("diffview.git.log_entry").LogEntry
 local FHOptionPanel = require("diffview.views.file_history.option_panel").FHOptionPanel
+local JobStatus = git.JobStatus
 local api = vim.api
 local M = {}
 
 ---@type PerfTimer
-local perf = PerfTimer("[FileHistoryPanel] render")
+local perf_render = PerfTimer("[FileHistoryPanel] render")
+---@type PerfTimer
+local perf_update = PerfTimer("[FileHistoryPanel] update")
 
 ---@class LogOptions
 ---@field follow boolean
@@ -24,7 +28,7 @@ local perf = PerfTimer("[FileHistoryPanel] render")
 ---@field author string
 ---@field grep string
 
----@class FileHistoryPanel
+---@class FileHistoryPanel : Panel
 ---@field git_root string
 ---@field entries LogEntry[]
 ---@field path_args string[]
@@ -32,6 +36,7 @@ local perf = PerfTimer("[FileHistoryPanel] render")
 ---@field log_options LogOptions
 ---@field cur_item {[1]: LogEntry, [2]: FileEntry}
 ---@field single_file boolean
+---@field updating boolean
 ---@field width integer
 ---@field height integer
 ---@field bufid integer
@@ -41,8 +46,7 @@ local perf = PerfTimer("[FileHistoryPanel] render")
 ---@field option_mapping string
 ---@field components any
 ---@field constrain_cursor function
-local FileHistoryPanel = Panel
-FileHistoryPanel = oop.create_class("FileHistoryPanel", Panel)
+local FileHistoryPanel = oop.create_class("FileHistoryPanel", Panel)
 
 FileHistoryPanel.winopts = vim.tbl_extend("force", Panel.winopts, {
   cursorline = true,
@@ -100,6 +104,19 @@ function FileHistoryPanel:open()
   vim.cmd("wincmd =")
 end
 
+---@Override
+function FileHistoryPanel:destroy()
+  self.entries = nil
+  self.cur_item = nil
+  self.option_panel:destroy()
+  self.option_panel = nil
+  self.render_data:destroy()
+  if self.components then
+    renderer.destroy_comp_struct(self.components)
+  end
+  FileHistoryPanel:super().destroy(self)
+end
+
 function FileHistoryPanel:init_buffer_opts()
   local conf = config.get_config()
   local option_rhs = config.diffview_callback("options")
@@ -113,6 +130,11 @@ function FileHistoryPanel:init_buffer_opts()
 end
 
 function FileHistoryPanel:update_components()
+  self.render_data:destroy()
+  if self.components then
+    renderer.destroy_comp_struct(self.components)
+  end
+
   local entry_schema = {}
   for _, entry in ipairs(self.entries) do
     table.insert(entry_schema, {
@@ -136,13 +158,90 @@ function FileHistoryPanel:update_components()
   self.constrain_cursor = renderer.create_cursor_constraint({ self.components.log.entries.comp })
 end
 
-function FileHistoryPanel:update_entries()
+function FileHistoryPanel:update_entries(callback)
+  perf_update:reset()
+  local c = 0
+  local timeout = 64
+  local ldt = 0 -- Last draw time
+  local lock = false
+
+  local update = debounce.throttle_trailing(
+    timeout,
+    function(entries, status)
+      if status == JobStatus.ERROR then
+        utils.err("Updating file history failed!", true)
+        self.updating = false
+        self:render()
+        self:redraw()
+        callback(nil, JobStatus.ERROR)
+        return
+      elseif status == JobStatus.PROGRESS and (#entries <= c or lock) then
+        return
+      end
+
+      lock = true
+
+      vim.schedule(function()
+        c = #entries
+        if ldt > timeout then
+          if DiffviewGlobal.debug_level >= 10 then
+            logger.debug(
+              string.format(
+                "[FH_PANEL] Rendering is slower than throttle timeout (%.3f ms). Skipping update.",
+                ldt
+              )
+            )
+          end
+          ldt = ldt - timeout
+          lock = false
+          return
+        end
+
+        local was_empty = #self.entries == 0
+        self.entries = utils.vec_slice(entries)
+
+        if was_empty then
+          self.single_file = self.entries[1] and self.entries[1].single_file
+        end
+
+        if status == JobStatus.SUCCESS then self.updating = false end
+        self:update_components()
+        self:render()
+        self:redraw()
+        ldt = renderer.last_draw_time
+
+        if status == JobStatus.SUCCESS then
+          perf_update:time()
+          logger.s_debug(string.format(
+            "[FileHistory] Completed update for %d entries successfully (%.3f ms).",
+            #self.entries,
+            perf_update.final_time
+          ))
+        end
+
+        if (was_empty or status == JobStatus.SUCCESS) and type(callback) == "function" then
+          vim.cmd("redraw")
+          callback(entries, status)
+        end
+
+        lock = false
+      end)
+    end
+  )
+
   for _, entry in ipairs(self.entries) do
     entry:destroy()
   end
+
   self.cur_item = {}
-  self.entries = git.file_history_list(self.git_root, self.path_args, self.log_options)
-  self.single_file = self.entries[1] and self.entries[1].single_file
+  self.entries = {}
+  self.updating = true
+  git.file_history(
+    self.git_root,
+    self.path_args,
+    self.log_options,
+    update
+  )
   self:update_components()
   self:render()
   self:redraw()
@@ -202,6 +301,10 @@ function FileHistoryPanel:set_cur_file(item)
   end
 end
 
+function FileHistoryPanel:cur_file()
+  return self.cur_item[2]
+end
+
 function FileHistoryPanel:prev_file()
   local entry, file = self.cur_item[1], self.cur_item[2]
 
@@ -211,8 +314,8 @@ function FileHistoryPanel:prev_file()
   end
 
   if self:num_items() > 1 then
-    local entry_idx = utils.tbl_indexof(self.entries, entry)
-    local file_idx = utils.tbl_indexof(entry.files, file)
+    local entry_idx = utils.vec_indexof(self.entries, entry)
+    local file_idx = utils.vec_indexof(entry.files, file)
     if entry_idx ~= -1 and file_idx ~= -1 then
       if file_idx == 1 and #self.entries > 1 then
         -- go to prev entry
@@ -243,8 +346,8 @@ function FileHistoryPanel:next_file()
   end
 
   if self:num_items() > 1 then
-    local entry_idx = utils.tbl_indexof(self.entries, entry)
-    local file_idx = utils.tbl_indexof(entry.files, file)
+    local entry_idx = utils.vec_indexof(self.entries, entry)
+    local file_idx = utils.vec_indexof(entry.files, file)
     if entry_idx ~= -1 and file_idx ~= -1 then
       if file_idx == #entry.files and #self.entries > 1 then
         -- go to next entry
@@ -278,7 +381,7 @@ function FileHistoryPanel:highlight_item(item)
     end
   else
     for _, comp_struct in ipairs(self.components.log.entries) do
-      local i = utils.tbl_indexof(comp_struct.comp.context.files, item)
+      local i = utils.vec_indexof(comp_struct.comp.context.files, item)
       if i ~= -1 then
         if self.single_file then
           pcall(api.nvim_win_set_cursor, self.winid, { comp_struct.comp.lstart + 1, 0 })
@@ -335,11 +438,11 @@ function FileHistoryPanel:toggle_entry_fold(entry)
 end
 
 function FileHistoryPanel:render()
-  perf:reset()
+  perf_render:reset()
   require("diffview.views.file_history.render").file_history_panel(self)
-  perf:time()
+  perf_render:time()
   if DiffviewGlobal.debug_level >= 10 then
-    logger.s_debug(perf)
+    logger.s_debug(perf_render)
   end
 end
 

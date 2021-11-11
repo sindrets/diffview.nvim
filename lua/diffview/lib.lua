@@ -80,6 +80,7 @@ function M.file_history(args)
   local default_args = config.get_config().default_args.DiffviewFileHistory
   local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
   local paths = {}
+  local rel_paths
 
   for _, path in ipairs(argo.args) do
     table.insert(paths, vim.fn.expand(path))
@@ -94,6 +95,10 @@ function M.file_history(args)
     end
   end
 
+  rel_paths = vim.tbl_map(function(v)
+    return vim.fn.fnamemodify(v, ":.")
+  end, paths)
+
   local p
   if vim.fn.filereadable(paths[1]) == 1 then
     p = vim.fn.isdirectory(paths[1]) ~= 1 and vim.fn.fnamemodify(paths[1], ":h") or paths[1]
@@ -105,9 +110,7 @@ function M.file_history(args)
 
   local git_root = git.toplevel(p)
   if not git_root then
-    utils.err(
-      string.format("Path not a git repo (or any parent): '%s'", vim.fn.fnamemodify(paths[1], ":."))
-    )
+    utils.err( string.format("Path not a git repo (or any parent): '%s'", rel_paths[1]))
     return
   end
 
@@ -116,18 +119,21 @@ function M.file_history(args)
     return git.expand_pathspec(git_root, cwd, pathspec)
   end, paths)
 
+  local log_options = config.get_config().file_history_panel.log_options
+  local ok = git.file_history_dry_run(git_root, paths, log_options)
+
+  if not ok then
+    utils.info(string.format("No git history for target(s): '%s'", table.concat(rel_paths, ", ")))
+    return
+  end
+
   ---@type FileHistoryView
   local v = FileHistoryView({
     git_root = git_root,
     path_args = paths,
     raw_args = argo.args,
-    log_options = config.get_config().file_history_panel.log_options,
+    log_options = log_options,
   })
-
-  if #v.entries == 0 then
-    utils.info(string.format("Target has no git history: '%s'", table.concat(paths)))
-    return
-  end
 
   table.insert(M.views, v)
 

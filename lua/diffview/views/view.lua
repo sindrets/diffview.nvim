@@ -14,7 +14,7 @@ local LayoutMode = oop.enum({
   "VERTICAL",
 })
 
----@class View
+---@class View : Object
 ---@field tabpage integer
 ---@field emitter EventEmitter
 ---@field layout_mode LayoutMode
@@ -23,8 +23,7 @@ local LayoutMode = oop.enum({
 ---@field post_open function Abstract
 ---@field validate_layout function Abstract
 ---@field recover_layout function Abstract
-local View = oop.Object
-View = oop.create_class("View")
+local View = oop.create_class("View")
 
 View:virtual("init_layout")
 View:virtual("post_open")

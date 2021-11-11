@@ -20,7 +20,7 @@ local Form = oop.enum({
   "ROW",
 })
 
----@class Panel
+---@class Panel : Object
 ---@field position string
 ---@field form Form
 ---@field relative string
@@ -34,8 +34,7 @@ local Form = oop.enum({
 ---@field init_buffer_opts function Abstract
 ---@field update_components function Abstract
 ---@field render function Abstract
-local Panel = oop.Object
-Panel = oop.create_class("Panel")
+local Panel = oop.create_class("Panel")
 
 Panel.winopts = {
   relativenumber = false,
@@ -162,11 +161,7 @@ function Panel:open()
   self.winid = api.nvim_get_current_win()
   self:resize()
   api.nvim_win_set_buf(self.winid, self.bufid)
-
-  for k, v in pairs(self.class().winopts) do
-    local opt = type(v) == "table" and v[2] or nil
-    utils.set_local(self.winid, k, type(v) == "table" and v[1] or v, opt)
-  end
+  utils.set_local(self.winid, self.class().winopts)
 end
 
 function Panel:close()

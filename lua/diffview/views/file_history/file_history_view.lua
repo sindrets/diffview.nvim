@@ -6,20 +6,18 @@ local StandardView = require("diffview.views.standard.standard_view").StandardVi
 local LayoutMode = require("diffview.views.view").LayoutMode
 local FileEntry = require("diffview.views.file_entry").FileEntry
 local FileHistoryPanel = require("diffview.views.file_history.file_history_panel").FileHistoryPanel
+local JobStatus = git.JobStatus
 local api = vim.api
 
 local M = {}
 
----@class FileHistoryView
+---@class FileHistoryView : StandardView
 ---@field git_root string
 ---@field git_dir string
 ---@field panel FileHistoryPanel
 ---@field path_args string[]
 ---@field raw_args string[]
----@field entries LogEntry[]
----@field file_idx integer
-local FileHistoryView = StandardView
-FileHistoryView = oop.create_class("FileHistoryView", StandardView)
+local FileHistoryView = oop.create_class("FileHistoryView", StandardView)
 
 function FileHistoryView:init(opt)
   self.emitter = EventEmitter()
@@ -31,11 +29,9 @@ function FileHistoryView:init(opt)
   self.git_dir = git.git_dir(self.git_root)
   self.path_args = opt.path_args
   self.raw_args = opt.raw_args
-  self.entries = git.file_history_list(self.git_root, self.path_args, opt.log_options)
-  self.file_idx = 1
   self.panel = FileHistoryPanel(
     self.git_root,
-    self.entries,
+    {},
     self.path_args,
     self.raw_args,
     opt.log_options
@@ -45,19 +41,23 @@ end
 function FileHistoryView:post_open()
   self:init_event_listeners()
   vim.schedule(function()
-    local file = self.panel:next_file()
-    if file then
-      self:set_file(file)
-    else
-      self:file_safeguard()
-    end
+    self:file_safeguard()
+    ---@diagnostic disable-next-line: unused-local
+    self.panel:update_entries(function(entries, status)
+      if status < JobStatus.ERROR and not self.panel:cur_file() then
+        local file = self.panel:next_file()
+        if file then
+          self:set_file(file)
+        end
+      end
+    end)
     self.ready = true
   end)
 end
 
 ---@Override
 function FileHistoryView:close()
-  for _, entry in ipairs(self.entries) do
+  for _, entry in ipairs(self.panel.entries) do
     entry:destroy()
   end
   FileHistoryView:super().close(self)

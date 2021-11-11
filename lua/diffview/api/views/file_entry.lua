@@ -6,12 +6,11 @@ local api = vim.api
 
 local M = {}
 
----@class CFileEntry
+---@class CFileEntry : FileEntry
 ---@field left_null boolean
 ---@field right_null boolean
 ---@field get_file_data function
-local CFileEntry = FileEntry
-CFileEntry = oop.create_class("CFileEntry", FileEntry)
+local CFileEntry = oop.create_class("CFileEntry", FileEntry)
 
 ---CFileEntry constructor.
 ---@param opt any

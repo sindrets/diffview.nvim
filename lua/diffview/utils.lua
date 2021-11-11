@@ -1,32 +1,50 @@
+local Job = require("plenary.job")
 local api = vim.api
 local M = {}
+
+---@alias vector any[]
 
 local is_windows = jit.os == "Windows"
 local mapping_callbacks = {}
 local path_sep = package.config:sub(1, 1)
 local setlocal_opr_templates = {
   set = [[setl ${option}=${value}]],
+  remove = [[exe 'setl ${option}-=${value}']],
   append = [[exe 'setl ${option}=' . (&${option} == "" ? "" : &${option} . ",") . '${value}']],
   prepend = [[exe 'setl ${option}=${value}' . (&${option} == "" ? "" : "," . &${option})]],
 }
 
-function M._echo_multiline(msg, hl)
-  local chunks = vim.tbl_map(function(line)
-    return { line, hl }
-  end, vim.split(msg, "\n"))
-  vim.api.nvim_echo(chunks, true, {})
+function M._echo_multiline(msg, hl, schedule)
+  if schedule then
+    vim.schedule(function()
+      M._echo_multiline(msg, hl, false)
+    end)
+    return
+  end
+
+  vim.cmd("echohl " .. (hl or "None"))
+  for _, line in ipairs(vim.split(msg, "\n")) do
+    vim.cmd(string.format('echom "%s"', vim.fn.escape(line, [["\]])))
+  end
+  vim.cmd("echohl None")
 end
 
-function M.info(msg)
-  M._echo_multiline("[Diffview.nvim] " .. msg, "Directory")
+---@param msg string
+---@param schedule? boolean Schedule the echo call.
+function M.info(msg, schedule)
+  M._echo_multiline("[Diffview.nvim] " .. msg, "Directory", schedule)
 end
 
-function M.warn(msg)
-  M._echo_multiline("[Diffview.nvim] " .. msg, "WarningMsg")
+---@param msg string
+---@param schedule? boolean Schedule the echo call.
+function M.warn(msg, schedule)
+  M._echo_multiline("[Diffview.nvim] " .. msg, "WarningMsg", schedule)
 end
 
-function M.err(msg)
-  M._echo_multiline("[Diffview.nvim] " .. msg, "ErrorMsg")
+---@param msg string
+---@param schedule? boolean Schedule the echo call.
+function M.err(msg, schedule)
+  M._echo_multiline("[Diffview.nvim] " .. msg, "ErrorMsg", schedule)
 end
 
 ---Call the function `f`, ignoring most of the window and buffer related
@@ -262,70 +280,74 @@ function M.str_template(str, table)
 end
 
 ---Get the output of a system command.
----WARN: As of NVIM v0.5.0-dev+1320-gba04b3d83, `io.popen` causes rendering
----artifacts if the command fails.
----@param cmd string
----@return string
-function M.system(cmd)
-  local pfile = io.popen(cmd)
-  if not pfile then
-    return
-  end
-  local data = pfile:read("*a")
-  io.close(pfile)
-
-  return data
-end
-
----Get the output of a system command as a list of lines.
----WARN: As of NVIM v0.5.0-dev+1320-gba04b3d83, `io.popen` causes rendering
----artifacts if the command fails.
----@param cmd string
----@return string[]
-function M.system_list(cmd)
-  local pfile = io.popen(cmd)
-  if not pfile then
-    return
-  end
-
-  local lines = {}
-  for line in pfile:lines() do
-    table.insert(lines, line)
-  end
-  io.close(pfile)
-
-  return lines
+---@param cmd string[]
+---@param cwd? string
+---@return string[] stdout
+---@return integer code
+---@return string[] stderr
+function M.system_list(cmd, cwd)
+  local command = table.remove(cmd, 1)
+  local stderr = {}
+  local stdout, code = Job
+    :new({
+      command = command,
+      args = cmd,
+      cwd = cwd,
+      on_stderr = function(_, data)
+        table.insert(stderr, data)
+      end,
+    })
+    :sync()
+  return stdout, code, stderr
 end
 
 ---HACK: workaround for inconsistent behavior from `vim.opt_local`.
 ---@see [Neovim issue](https://github.com/neovim/neovim/issues/14670)
 ---@param winids number[]|number Either a list of winids, or a single winid (0 for current window).
----@param option string
----@param value string[]|string
----@param opt table
 ---`opt` fields:
----   - `method` ("set"|"append"|"prepend") Assignment method. (default: "set")
-function M.set_local(winids, option, value, opt)
-  local cmd
-  opt = vim.tbl_extend("keep", opt or {}, {
-    method = "set",
-  })
-
-  if type(value) == "boolean" then
-    cmd = string.format("setl %s%s", value and "" or "no", option)
-  else
-    value = (type(value) == "table" and table.concat(value, ",") or tostring(value)):gsub("'", "''")
-    cmd = M.str_template(setlocal_opr_templates[opt.method], { option = option, value = value })
-  end
-
+---   @tfield method '"set"'|'"remove"'|'"append"'|'"prepend"' Assignment method. (default: "set")
+---@overload fun(winids: number[]|number, option: string, value: string[]|string|boolean, opt?: any)
+---@overload fun(winids: number[]|number, map: table<string, string[]|string|boolean>, opt?: table)
+function M.set_local(winids, x, y, z)
   if type(winids) ~= "table" then
     winids = { winids }
   end
 
+  local map, opt
+  if y == nil or type(y) == "table" then
+    map = x
+    opt = y
+  else
+    map = { [x] = y }
+    opt = z
+  end
+
+  opt = vim.tbl_extend("keep", opt or {}, { method = "set" })
+
+  local cmd
   local ok, err = M.no_win_event_call(function()
     for _, id in ipairs(winids) do
       api.nvim_win_call(id, function()
-        vim.cmd(cmd)
+        for option, value in pairs(map) do
+          local o = opt
+
+          if type(value) == "boolean" then
+            cmd = string.format("setl %s%s", value and "" or "no", option)
+          else
+            if type(value) == "table" then
+              ---@diagnostic disable-next-line: undefined-field
+              o = vim.tbl_extend("force", opt, value.opt or {})
+              value = table.concat(value, ",")
+            end
+
+            cmd = M.str_template(
+              setlocal_opr_templates[o.method],
+              { option = option, value = tostring(value):gsub("'", "''") }
+            )
+          end
+
+          vim.cmd(cmd)
+        end
       end)
     end
   end)
@@ -343,34 +365,9 @@ function M.tabnr_to_id(tabnr)
   end
 end
 
----Create a shallow copy of a portion of a list.
----@param t table
----@param first integer First index, inclusive
----@param last integer Last index, inclusive
----@return any[]
-function M.tbl_slice(t, first, last)
-  local slice = {}
-  for i = first or 1, last or #t do
-    table.insert(slice, t[i])
-  end
-
-  return slice
-end
-
-function M.tbl_concat(...)
-  local result = {}
-  local n = 0
-
-  for _, t in ipairs({ ... }) do
-    for i, v in ipairs(t) do
-      result[n + i] = v
-    end
-    n = n + #t
-  end
-
-  return result
-end
-
+---@generic T
+---@param t `T`
+---@return T
 function M.tbl_clone(t)
   if not t then
     return
@@ -401,45 +398,6 @@ function M.tbl_deep_clone(t)
   return clone
 end
 
-function M.tbl_deep_equals(t1, t2)
-  if not (t1 and t2) then
-    return false
-  end
-
-  local function recurse(t11, t22)
-    if #t11 ~= #t22 then
-      return false
-    end
-
-    local seen = {}
-    for key, value in pairs(t11) do
-      seen[key] = true
-      if type(value) == "table" then
-        if type(t22[key]) ~= "table" then
-          return false
-        end
-        if not recurse(value, t22[key]) then
-          return false
-        end
-      else
-        if not (value == t22[key]) then
-          return false
-        end
-      end
-    end
-
-    for key, _ in pairs(t22) do
-      if not seen[key] then
-        return false
-      end
-    end
-
-    return true
-  end
-
-  return recurse(t1, t2)
-end
-
 function M.tbl_pack(...)
   return { n = select("#", ...), ... }
 end
@@ -448,7 +406,57 @@ function M.tbl_unpack(t, i, j)
   return unpack(t, i or 1, j or t.n or #t)
 end
 
-function M.tbl_indexof(t, v)
+function M.tbl_clear(t)
+  for k, _ in pairs(t) do
+    t[k] = nil
+  end
+end
+
+---Create a shallow copy of a portion of a vector.
+---@param t vector
+---@param first? integer First index, inclusive
+---@param last? integer Last index, inclusive
+---@return vector
+function M.vec_slice(t, first, last)
+  local slice = {}
+  for i = first or 1, last or #t do
+    table.insert(slice, t[i])
+  end
+
+  return slice
+end
+
+---Join multiple vectors into one.
+---@vararg vector
+---@return vector
+function M.vec_join(...)
+  local result = {}
+  local args = {...}
+  local n = 0
+
+  for i = 1, select("#", ...) do
+    if type(args[i]) ~= "nil" then
+      if type(args[i]) ~= "table" then
+        result[n + 1] = args[i]
+        n = n + 1
+      else
+        for j, v in ipairs(args[i]) do
+          result[n + j] = v
+        end
+        n = n + #args[i]
+      end
+    end
+  end
+
+  return result
+end
+
+---Return the first index a given object can be found in a vector, or -1 if
+---it's not present.
+---@param t vector
+---@param v any
+---@return integer
+function M.vec_indexof(t, v)
   for i, vt in ipairs(t) do
     if vt == v then
       return i
@@ -457,10 +465,15 @@ function M.tbl_indexof(t, v)
   return -1
 end
 
-function M.tbl_clear(t)
-  for k, _ in pairs(t) do
-    t[k] = nil
+---Append any number of objects to the end of a vector. Pushing `nil`
+---effectively does nothing.
+---@param t vector
+---@return vector t
+function M.vec_push(t, ...)
+  for _, v in ipairs({...}) do
+    t[#t + 1] = v
   end
+  return t
 end
 
 function M.find_named_buffer(name)
@@ -593,8 +606,8 @@ end
 local function merge(t, first, mid, last, comparator)
   local n1 = mid - first + 1
   local n2 = last - mid
-  local ls = M.tbl_slice(t, first, mid)
-  local rs = M.tbl_slice(t, mid + 1, last)
+  local ls = M.vec_slice(t, first, mid)
+  local rs = M.vec_slice(t, mid + 1, last)
   local i = 1
   local j = 1
   local k = first

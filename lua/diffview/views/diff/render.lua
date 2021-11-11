@@ -158,7 +158,7 @@ return function(panel)
   end
 
   if panel.rev_pretty_name or (panel.path_args and #panel.path_args > 0) then
-    local extra_info = utils.tbl_concat({ panel.rev_pretty_name }, panel.path_args or {})
+    local extra_info = utils.vec_join({ panel.rev_pretty_name }, panel.path_args or {})
 
     comp = panel.components.info.title.comp
     line_idx = 0

@@ -10,7 +10,7 @@ local M = {}
 ---@field flatten_dirs boolean
 ---@field folder_statuses "never"|"only_folded"|"always"
 
----@class FilePanel
+---@class FilePanel : Panel
 ---@field git_root string
 ---@field files FileDict
 ---@field path_args string[]
@@ -24,8 +24,7 @@ local M = {}
 ---@field render_data RenderData
 ---@field components any
 ---@field constrain_cursor function
-local FilePanel = Panel
-FilePanel = oop.create_class("FilePanel", Panel)
+local FilePanel = oop.create_class("FilePanel", Panel)
 
 FilePanel.winopts = vim.tbl_extend("force", Panel.winopts, {
   cursorline = true,
@@ -39,7 +38,7 @@ FilePanel.winopts = vim.tbl_extend("force", Panel.winopts, {
       "StatusLine:DiffviewStatusLine",
       "StatusLineNC:DiffviewStatuslineNC",
     }, ","),
-    { method = "prepend" },
+    opt = { method = "prepend" },
   },
 })
 
@@ -149,7 +148,7 @@ function FilePanel:ordered_file_list()
     end
     return list
   else
-    local nodes = utils.tbl_concat(
+    local nodes = utils.vec_join(
       self.files.working_tree.root:leaves(),
       self.files.staged_tree.root:leaves()
     )
@@ -170,7 +169,7 @@ function FilePanel:prev_file()
     return self.cur_file
   end
 
-  local i = utils.tbl_indexof(files, self.cur_file)
+  local i = utils.vec_indexof(files, self.cur_file)
   if i ~= -1 then
     self.cur_file = files[(i - 2) % #files + 1]
     return self.cur_file
@@ -184,7 +183,7 @@ function FilePanel:next_file()
     return self.cur_file
   end
 
-  local i = utils.tbl_indexof(files, self.cur_file)
+  local i = utils.vec_indexof(files, self.cur_file)
   if i ~= -1 then
     self.cur_file = files[i % #files + 1]
     return self.cur_file

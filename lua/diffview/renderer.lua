@@ -2,9 +2,13 @@ local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local config = require("diffview.config")
 local api = vim.api
+
 local M = {}
 local web_devicons
 local uid_counter = 0
+
+---Duration of the last redraw in ms.
+M.last_draw_time = 0
 
 ---@class HlData
 ---@field group string
@@ -17,7 +21,7 @@ local uid_counter = 0
 ---@field comp RenderComponent
 local CompStruct
 
----@class RenderComponent
+---@class RenderComponent : Object
 ---@field name string
 ---@field parent RenderComponent
 ---@field lines string[]
@@ -29,8 +33,7 @@ local CompStruct
 ---@field leaf boolean
 ---@field data_root RenderData
 ---@field context any
-local RenderComponent = oop.Object
-RenderComponent = oop.create_class("RenderComponent")
+local RenderComponent = oop.create_class("RenderComponent")
 
 ---RenderComponent constructor.
 ---@return RenderComponent
@@ -149,6 +152,18 @@ function RenderComponent:clear()
   end
 end
 
+function RenderComponent:destroy()
+  self.lines = nil
+  self.hl = nil
+  self.parent = nil
+  self.context = nil
+  self.data_root = nil
+  for _, c in ipairs(self.components) do
+    c:destroy()
+  end
+  self.components = nil
+end
+
 function RenderComponent:get_comp_on_line(line)
   line = line - 1
 
@@ -231,13 +246,12 @@ function RenderComponent:pretty_print()
   recurse(0, self)
 end
 
----@class RenderData
+---@class RenderData : Object
 ---@field lines string[]
 ---@field hl HlData[]
 ---@field components RenderComponent[]
 ---@field namespace integer
-local RenderData = oop.Object
-RenderData = oop.create_class("RenderData")
+local RenderData = oop.create_class("RenderData")
 
 ---RenderData constructor.
 ---@return RenderData
@@ -305,11 +319,30 @@ function RenderData:clear()
   end
 end
 
+function RenderData:destroy()
+  self.lines = nil
+  self.hl = nil
+  for _, c in ipairs(self.components) do
+    c:destroy()
+  end
+  self.components = {}
+end
+
+function M.destroy_comp_struct(schema)
+  schema.comp = nil
+  for k, v in pairs(schema) do
+    if type(v) == "table" then
+      M.destroy_comp_struct(v)
+      schema[k] = nil
+    end
+  end
+end
+
 ---Create a function to enable easily contraining the cursor to a given list of
 ---components.
 ---@param components RenderComponent[]
 function M.create_cursor_constraint(components)
-  local stack = utils.tbl_slice(components, 1)
+  local stack = utils.vec_slice(components, 1)
   utils.merge_sort(stack, function(a, b)
     return a.lstart <= b.lstart
   end)
@@ -426,6 +459,7 @@ function M.render(bufid, data)
     return
   end
 
+  local last = vim.loop.hrtime()
   local was_modifiable = api.nvim_buf_get_option(bufid, "modifiable")
   api.nvim_buf_set_option(bufid, "modifiable", true)
 
@@ -458,6 +492,7 @@ function M.render(bufid, data)
   end
 
   api.nvim_buf_set_option(bufid, "modifiable", was_modifiable)
+  M.last_draw_time = (vim.loop.hrtime() - last) / 1000000
 end
 
 local git_status_hl_map = {

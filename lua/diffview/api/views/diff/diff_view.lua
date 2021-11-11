@@ -20,12 +20,11 @@ local M = {}
 ---@field right_null boolean Indicates that the right buffer should be represented by the null buffer.
 ---@field selected boolean|nil Indicates that this should be the initially selected file.
 
----@class CDiffView
+---@class CDiffView : DiffView
 ---@field files any
 ---@field fetch_files function A function that should return an updated list of files.
 ---@field get_file_data function A function that is called with parameters `path: string` and `split: string`, and should return a list of lines that should make up the buffer.
-local CDiffView = DiffView
-CDiffView = oop.create_class("CDiffView", DiffView)
+local CDiffView = oop.create_class("CDiffView", DiffView)
 
 ---CDiffView constructor.
 ---@param opt any

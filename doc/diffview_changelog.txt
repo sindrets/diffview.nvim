@@ -1,7 +1,24 @@
 ================================================================================
                                                           *diffview.changelog*
 
-# Changelog
+CHANGELOG
+
+                                                       *diffview.changelog-93*
+
+PR: https://github.com/sindrets/diffview.nvim/pull/93
+
+The plugin will from here on out require `plenary.nvim`:
+https://github.com/nvim-lua/plenary.nvim
+
+I'm using plenary for it's async utilities as well as job management. To
+update, just make sure plenary is loaded before diffview. Examples:
+
+        Packer:~
+            `use { 'sindrets/diffview.nvim', requires = 'nvim-lua/plenary.nvim' }`
+
+        Plug:~
+            `Plug 'nvim-lua/plenary.nvim'`
+            `Plug 'sindrets/diffview.nvim'`
 
                                                        *diffview.changelog-64*
 

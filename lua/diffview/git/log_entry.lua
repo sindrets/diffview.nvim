@@ -1,7 +1,7 @@
 local oop = require("diffview.oop")
 local M = {}
 
----@class LogEntry
+---@class LogEntry : Object
 ---@field path_args string[]
 ---@field commit Commit
 ---@field files FileEntry[]
@@ -9,8 +9,7 @@ local M = {}
 ---@field stats GitStats
 ---@field single_file boolean
 ---@field folded boolean
-local LogEntry = oop.Object
-LogEntry = oop.create_class("LogEntry")
+local LogEntry = oop.create_class("LogEntry")
 
 function LogEntry:init(opt)
   self.path_args = opt.path_args

@@ -74,7 +74,8 @@ end
 
 ---@param parent any RenderComponent struct
 ---@param entries LogEntry[]
-local function render_entries(parent, entries)
+---@param updating boolean
+local function render_entries(parent, entries, updating)
   local c = config.get_config()
   local max_num_files = -1
   for _, entry in ipairs(entries) do
@@ -84,6 +85,9 @@ local function render_entries(parent, entries)
   end
 
   for i, entry in ipairs(entries) do
+    if i > #parent or (updating and i > 128) then
+      break
+    end
     if not entry.status then
       print(vim.inspect(entry, { depth = 2 }))
     end
@@ -218,7 +222,9 @@ return {
       -- file path
       local icon = renderer.get_file_icon(file.basename, file.extension, comp, line_idx, 0)
       offset = #icon
-      comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #file.parent_path + 1)
+      if #file.parent_path > 0 then
+        comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #file.parent_path + 1)
+      end
       comp:add_hl(
         "DiffviewFilePanelFileName",
         line_idx,
@@ -254,12 +260,18 @@ return {
     local change_count = "(" .. #panel.entries .. ")"
     comp:add_hl("DiffviewFilePanelCounter", line_idx, #s + 1, #s + 1 + string.len(change_count))
     s = s .. " " .. change_count
+    if panel.updating then
+      offset = #s
+      local status = " (Updating...)"
+      comp:add_hl("DiffviewDim1", line_idx, offset, offset + #status)
+      s = s .. status
+    end
     comp:add_line(s)
 
     perf:lap("header")
 
     if #panel.entries > 0 then
-      render_entries(panel.components.log.entries, panel.entries)
+      render_entries(panel.components.log.entries, panel.entries, panel.updating)
     end
 
     perf:time()
