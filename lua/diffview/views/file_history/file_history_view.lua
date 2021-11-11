@@ -6,6 +6,7 @@ local StandardView = require("diffview.views.standard.standard_view").StandardVi
 local LayoutMode = require("diffview.views.view").LayoutMode
 local FileEntry = require("diffview.views.file_entry").FileEntry
 local FileHistoryPanel = require("diffview.views.file_history.file_history_panel").FileHistoryPanel
+local JobStatus = git.JobStatus
 local api = vim.api
 
 local M = {}
@@ -43,14 +44,14 @@ function FileHistoryView:post_open()
     self:file_safeguard()
     ---@diagnostic disable-next-line: unused-local
     self.panel:update_entries(function(entries, status)
-      if status < 2 and not self.panel:cur_file() then
+      if status < JobStatus.ERROR and not self.panel:cur_file() then
         local file = self.panel:next_file()
         if file then
           self:set_file(file)
         end
-        self.ready = true
       end
     end)
+    self.ready = true
   end)
 end
 

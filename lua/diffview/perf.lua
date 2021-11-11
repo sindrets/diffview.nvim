@@ -72,10 +72,6 @@ function PerfTimer.__tostring(self)
   end
 end
 
-function PerfTimer:print()
-  utils._echo_multiline(tostring(self))
-end
-
 ---Get the relative performance difference in percent.
 ---@static
 ---@param a PerfTimer

@@ -14,23 +14,37 @@ local setlocal_opr_templates = {
   prepend = [[exe 'setl ${option}=${value}' . (&${option} == "" ? "" : "," . &${option})]],
 }
 
-function M._echo_multiline(msg, hl)
-  local chunks = vim.tbl_map(function(line)
-    return { line, hl }
-  end, vim.split(msg, "\n"))
-  vim.api.nvim_echo(chunks, true, {})
+function M._echo_multiline(msg, hl, schedule)
+  if schedule then
+    vim.schedule(function()
+      M._echo_multiline(msg, hl, false)
+    end)
+    return
+  end
+
+  vim.cmd("echohl " .. (hl or "None"))
+  for _, line in ipairs(vim.split(msg, "\n")) do
+    vim.cmd(string.format('echom "%s"', vim.fn.escape(line, [["\]])))
+  end
+  vim.cmd("echohl None")
 end
 
-function M.info(msg)
-  M._echo_multiline("[Diffview.nvim] " .. msg, "Directory")
+---@param msg string
+---@param schedule? boolean Schedule the echo call.
+function M.info(msg, schedule)
+  M._echo_multiline("[Diffview.nvim] " .. msg, "Directory", schedule)
 end
 
-function M.warn(msg)
-  M._echo_multiline("[Diffview.nvim] " .. msg, "WarningMsg")
+---@param msg string
+---@param schedule? boolean Schedule the echo call.
+function M.warn(msg, schedule)
+  M._echo_multiline("[Diffview.nvim] " .. msg, "WarningMsg", schedule)
 end
 
-function M.err(msg)
-  M._echo_multiline("[Diffview.nvim] " .. msg, "ErrorMsg")
+---@param msg string
+---@param schedule? boolean Schedule the echo call.
+function M.err(msg, schedule)
+  M._echo_multiline("[Diffview.nvim] " .. msg, "ErrorMsg", schedule)
 end
 
 ---Call the function `f`, ignoring most of the window and buffer related

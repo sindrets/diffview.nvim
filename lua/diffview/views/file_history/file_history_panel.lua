@@ -9,11 +9,14 @@ local PerfTimer = require("diffview.perf").PerfTimer
 local Panel = require("diffview.ui.panel").Panel
 local LogEntry = require("diffview.git.log_entry").LogEntry
 local FHOptionPanel = require("diffview.views.file_history.option_panel").FHOptionPanel
+local JobStatus = git.JobStatus
 local api = vim.api
 local M = {}
 
 ---@type PerfTimer
-local perf = PerfTimer("[FileHistoryPanel] render")
+local perf_render = PerfTimer("[FileHistoryPanel] render")
+---@type PerfTimer
+local perf_update = PerfTimer("[FileHistoryPanel] update")
 
 ---@class LogOptions
 ---@field follow boolean
@@ -156,20 +159,23 @@ function FileHistoryPanel:update_components()
 end
 
 function FileHistoryPanel:update_entries(callback)
+  perf_update:reset()
   local c = 0
   local timeout = 64
-  local ldt = 0
+  local ldt = 0 -- Last draw time
   local lock = false
 
   local update = debounce.throttle_trailing(
     timeout,
     function(entries, status)
-      if status == 2 then
-        utils.err("Updating file history failed!")
+      if status == JobStatus.ERROR then
+        utils.err("Updating file history failed!", true)
         self.updating = false
-        callback(nil, 2)
+        self:render()
+        self:redraw()
+        callback(nil, JobStatus.ERROR)
         return
-      elseif status == 1 and (#entries <= c or lock) then
+      elseif status == JobStatus.PROGRESS and (#entries <= c or lock) then
         return
       end
 
@@ -198,13 +204,22 @@ function FileHistoryPanel:update_entries(callback)
           self.single_file = self.entries[1] and self.entries[1].single_file
         end
 
-        if status == 0 then self.updating = false end
+        if status == JobStatus.SUCCESS then self.updating = false end
         self:update_components()
         self:render()
         self:redraw()
         ldt = renderer.last_draw_time
 
-        if (was_empty or status == 0) and type(callback) == "function" then
+        if status == JobStatus.SUCCESS then
+          perf_update:time()
+          logger.s_debug(string.format(
+            "[FileHistory] Completed update for %d entries successfully (%.3f ms).",
+            #self.entries,
+            perf_update.final_time
+          ))
+        end
+
+        if (was_empty or status == JobStatus.SUCCESS) and type(callback) == "function" then
           vim.cmd("redraw")
           callback(entries, status)
         end
@@ -423,11 +438,11 @@ function FileHistoryPanel:toggle_entry_fold(entry)
 end
 
 function FileHistoryPanel:render()
-  perf:reset()
+  perf_render:reset()
   require("diffview.views.file_history.render").file_history_panel(self)
-  perf:time()
+  perf_render:time()
   if DiffviewGlobal.debug_level >= 10 then
-    logger.s_debug(perf)
+    logger.s_debug(perf_render)
   end
 end
 
