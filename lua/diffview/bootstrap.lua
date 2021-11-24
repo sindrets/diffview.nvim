@@ -26,9 +26,10 @@ end
 
 _G.DiffviewGlobal = {
   ---Debug Levels:
-  ---0:    NOTHING
-  ---1:    NORMAL
-  ---10:   RENDERING
+  ---0:     NOTHING
+  ---1:     NORMAL
+  ---5:     LOADING
+  ---10:    RENDERING
   debug_level = tonumber(os.getenv("DEBUG_DIFFVIEW")) or 0,
   bootstrap_done = true,
   bootstrap_ok = true,

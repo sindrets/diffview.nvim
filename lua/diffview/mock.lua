@@ -22,7 +22,7 @@ function mock_mt.__call(_, internals)
       end
     end,
     __call = function()
-      return
+      return nil
     end,
   }
   local this = setmetatable(utils.tbl_clone(internals or {}), mt)

@@ -106,6 +106,9 @@ end
 
 ---@Override
 function FileHistoryPanel:destroy()
+  for _, entry in ipairs(self.entries) do
+    entry:destroy()
+  end
   self.entries = nil
   self.cur_item = nil
   self.option_panel:destroy()
@@ -184,14 +187,12 @@ function FileHistoryPanel:update_entries(callback)
       vim.schedule(function()
         c = #entries
         if ldt > timeout then
-          if DiffviewGlobal.debug_level >= 10 then
-            logger.debug(
-              string.format(
-                "[FH_PANEL] Rendering is slower than throttle timeout (%.3f ms). Skipping update.",
-                ldt
-              )
+          logger.lvl(10).debug(
+            string.format(
+              "[FH_PANEL] Rendering is slower than throttle timeout (%.3f ms). Skipping update.",
+              ldt
             )
-          end
+          )
           ldt = ldt - timeout
           lock = false
           return
@@ -212,7 +213,7 @@ function FileHistoryPanel:update_entries(callback)
 
         if status == JobStatus.SUCCESS then
           perf_update:time()
-          logger.s_debug(string.format(
+          logger.s_info(string.format(
             "[FileHistory] Completed update for %d entries successfully (%.3f ms).",
             #self.entries,
             perf_update.final_time
@@ -289,14 +290,24 @@ function FileHistoryPanel:get_item_at_cursor()
   end
 end
 
+function FileHistoryPanel:update_active_item(new_item)
+  if self.cur_item[2] then
+    self.cur_item[2].active = false
+  end
+  self.cur_item = new_item
+  if self.cur_item[2] then
+    self.cur_item[2].active = true
+  end
+end
+
 function FileHistoryPanel:set_cur_file(item)
   local file = self.cur_item[2]
   if item:instanceof(LogEntry) then
-    self.cur_item = { item, item.files[1] }
+    self:update_active_item({ item, item.files[1] })
   else
     local entry = self:find_entry(file)
     if entry then
-      self.cur_item = { entry, file }
+      self:update_active_item({ entry, file })
     end
   end
 end
@@ -309,7 +320,7 @@ function FileHistoryPanel:prev_file()
   local entry, file = self.cur_item[1], self.cur_item[2]
 
   if not (entry and file) and self:num_items() > 0 then
-    self.cur_item = { self.entries[1], self.entries[1].files[1] }
+    self:update_active_item({ self.entries[1], self.entries[1].files[1] })
     return self.cur_item[2]
   end
 
@@ -321,18 +332,18 @@ function FileHistoryPanel:prev_file()
         -- go to prev entry
         local next_entry_idx = (entry_idx - 2) % #self.entries + 1
         local next_entry = self.entries[next_entry_idx]
-        self.cur_item = { next_entry, next_entry.files[#next_entry.files] }
+        self:update_active_item({ next_entry, next_entry.files[#next_entry.files] })
         self:set_entry_fold(entry, false)
         return self.cur_item[2]
       else
         -- go to prev file in cur entry
         local next_file_idx = (file_idx - 2) % #entry.files + 1
-        self.cur_item = { entry, entry.files[next_file_idx] }
+        self:update_active_item({ entry, entry.files[next_file_idx] })
         return self.cur_item[2]
       end
     end
   else
-    self.cur_item = { self.entries[1], self.entries[1].files[1] }
+    self:update_active_item({ self.entries[1], self.entries[1].files[1] })
     return self.cur_item[2]
   end
 end
@@ -341,7 +352,7 @@ function FileHistoryPanel:next_file()
   local entry, file = self.cur_item[1], self.cur_item[2]
 
   if not (entry and file) and self:num_items() > 0 then
-    self.cur_item = { self.entries[1], self.entries[1].files[1] }
+    self:update_active_item({ self.entries[1], self.entries[1].files[1] })
     return self.cur_item[2]
   end
 
@@ -352,18 +363,18 @@ function FileHistoryPanel:next_file()
       if file_idx == #entry.files and #self.entries > 1 then
         -- go to next entry
         local next_entry_idx = entry_idx % #self.entries + 1
-        self.cur_item = { self.entries[next_entry_idx], self.entries[next_entry_idx].files[1] }
+        self:update_active_item({ self.entries[next_entry_idx], self.entries[next_entry_idx].files[1] })
         self:set_entry_fold(entry, false)
         return self.cur_item[2]
       else
         -- go to next file in cur entry
         local next_file_idx = file_idx % #entry.files + 1
-        self.cur_item = { entry, entry.files[next_file_idx] }
+        self:update_active_item({ entry, entry.files[next_file_idx] })
         return self.cur_item[2]
       end
     end
   else
-    self.cur_item = { self.entries[1], self.entries[1].files[1] }
+    self:update_active_item({ self.entries[1], self.entries[1].files[1] })
     return self.cur_item[2]
   end
 end
@@ -441,9 +452,7 @@ function FileHistoryPanel:render()
   perf_render:reset()
   require("diffview.views.file_history.render").file_history_panel(self)
   perf_render:time()
-  if DiffviewGlobal.debug_level >= 10 then
-    logger.s_debug(perf_render)
-  end
+  logger.lvl(10).s_debug(perf_render)
 end
 
 M.FileHistoryPanel = FileHistoryPanel

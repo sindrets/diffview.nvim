@@ -1,7 +1,9 @@
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local config = require("diffview.config")
+local logger = require("diffview.logger")
 local RevType = require("diffview.git.rev").RevType
+local PerfTimer = require("diffview.perf").PerfTimer
 local api = vim.api
 local M = {}
 
@@ -22,12 +24,15 @@ local fstat_cache = {}
 ---@field stats GitStats
 ---@field kind '"working"'|'"staged"'
 ---@field commit Commit|nil
----@field left_binary boolean|nil
----@field right_binary boolean|nil
+---@field active boolean
 ---@field left Rev
 ---@field right Rev
+---@field left_binary boolean|nil
+---@field right_binary boolean|nil
 ---@field left_bufid integer
 ---@field right_bufid integer
+---@field left_ready boolean
+---@field right_ready boolean
 ---@field created_bufs integer[]
 local FileEntry = oop.create_class("FileEntry")
 
@@ -66,12 +71,16 @@ function FileEntry:init(opt)
   self.stats = opt.stats
   self.kind = opt.kind
   self.commit = opt.commit
+  self.active = false
   self.left = opt.left
   self.right = opt.right
+  self.left_ready = false
+  self.right_ready = true
   self.created_bufs = {}
 end
 
 function FileEntry:destroy()
+  self.active = false
   self:detach_buffers()
   for _, bn in ipairs(self.created_bufs) do
     FileEntry.safe_delete_buf(bn)
@@ -82,12 +91,17 @@ end
 ---@param git_root string
 ---@param left_winid integer
 ---@param right_winid integer
-function FileEntry:load_buffers(git_root, left_winid, right_winid)
+---@param callback function
+function FileEntry:load_buffers(git_root, left_winid, right_winid, callback)
+  ---@type PerfTimer
+  local perf = PerfTimer("[FileEntry] Buffer load")
+
   if not config.get_config().diff_binaries then
     if self.left_binary == nil then
       local git = require("diffview.git.utils")
       self.left_binary = git.is_binary(git_root, self.oldpath or self.path, self.left)
       self.right_binary = git.is_binary(git_root, self.path, self.right)
+      perf:lap("binary check")
     end
   end
 
@@ -98,6 +112,7 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
       rev = self.left,
       pos = "left",
       binary = self.left_binary == true,
+      ready = false,
     },
     {
       winid = right_winid,
@@ -105,56 +120,105 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid)
       rev = self.right,
       pos = "right",
       binary = self.right_binary == true,
+      ready = false,
     },
   }
 
+  local function on_ready_factory(split)
+    return function()
+      split.ready = true
+      self[split.pos .. "_ready"] = true
+      if splits[1].ready and splits[2].ready and self.active then
+        perf:lap("both buffers ready")
+        for _, sp in ipairs(splits) do
+          if sp.load then
+            sp.load()
+          else
+            api.nvim_win_set_buf(sp.winid, sp.bufid)
+          end
+        end
+        FileEntry._update_windows(left_winid, right_winid)
+        perf:lap("view updated")
+        perf:time()
+        logger.lvl(5).s_debug(perf)
+        if type(callback) == "function" then
+          callback()
+        end
+      end
+    end
+  end
+
+  self.left_ready = self.left_bufid and api.nvim_buf_is_loaded(self.left_bufid)
+  self.right_ready = self.right_bufid and api.nvim_buf_is_loaded(self.right_bufid)
+
+  if not (self.left_ready and self.right_ready) then
+    utils.no_win_event_call(function()
+      FileEntry.load_null_buffer(left_winid)
+      FileEntry.load_null_buffer(right_winid)
+    end)
+    perf:lap("null buffers loaded")
+  end
+
   utils.no_win_event_call(function()
     for _, split in ipairs(splits) do
+      local on_ready = on_ready_factory(split)
+
       if not (split.bufid and api.nvim_buf_is_loaded(split.bufid)) then
         if split.rev.type == RevType.LOCAL then
           if split.binary or FileEntry.should_null(split.rev, self.status, split.pos) then
-            local bn = FileEntry._create_buffer(git_root, split.rev, self.path, true)
-            api.nvim_win_set_buf(split.winid, bn)
+            local bn = FileEntry._create_buffer(git_root, split.rev, self.path, true, on_ready)
             split.bufid = bn
+            FileEntry._attach_buffer(split.bufid)
           else
-            api.nvim_win_call(split.winid, function()
-              vim.cmd("edit " .. vim.fn.fnameescape(self.absolute_path))
-              split.bufid = api.nvim_get_current_buf()
-            end)
+            -- Load local file
+            split.load = function()
+              api.nvim_win_call(split.winid, function()
+                vim.cmd("edit " .. vim.fn.fnameescape(self.absolute_path))
+                split.bufid = api.nvim_get_current_buf()
+                self[split.pos .. "_bufid"] = split.bufid
+                FileEntry._attach_buffer(split.bufid)
+                perf:lap("edit call")
+              end)
+            end
+            on_ready()
           end
         elseif split.rev.type == RevType.COMMIT or split.rev.type == RevType.INDEX then
+          -- Create file from git
           local bn
           if self.oldpath and split.pos == "left" then
-            bn = FileEntry._create_buffer(git_root, split.rev, self.oldpath, split.binary)
+            bn = FileEntry._create_buffer(
+              git_root, split.rev, self.oldpath, split.binary, on_ready
+            )
           else
             bn = FileEntry._create_buffer(
               git_root,
               split.rev,
               self.path,
-              split.binary or FileEntry.should_null(split.rev, self.status, split.pos)
+              split.binary or FileEntry.should_null(split.rev, self.status, split.pos),
+              on_ready
             )
           end
           table.insert(self.created_bufs, bn)
-          api.nvim_win_set_buf(split.winid, bn)
           split.bufid = bn
-          api.nvim_win_call(split.winid, function()
-            vim.cmd("filetype detect")
-          end)
-        end
 
-        FileEntry._attach_buffer(split.bufid)
+          FileEntry._attach_buffer(split.bufid)
+        end
       else
-        api.nvim_win_set_buf(split.winid, split.bufid)
+        -- Buffer already exists
         FileEntry._attach_buffer(split.bufid)
+        on_ready()
       end
+      perf:lap("split done")
     end
   end)
 
+  perf:lap("buffers attached")
+
   self.left_bufid = splits[1].bufid
   self.right_bufid = splits[2].bufid
-
-  FileEntry._update_windows(left_winid, right_winid)
   vim.cmd("do WinEnter")
+
+  perf:lap("load done")
 end
 
 function FileEntry:attach_buffers()
@@ -258,20 +322,14 @@ end
 ---@param rev Rev
 ---@param path string
 ---@param null boolean
-function FileEntry._create_buffer(git_root, rev, path, null)
+---@param callback function
+function FileEntry._create_buffer(git_root, rev, path, null, callback)
   if null then
+    callback()
     return FileEntry._get_null_buffer()
   end
 
   local bn = api.nvim_create_buf(false, false)
-  local cmd = "git -C "
-    .. vim.fn.shellescape(git_root)
-    .. " show "
-    .. (rev.commit or "")
-    .. ":"
-    .. vim.fn.shellescape(path)
-  local lines = vim.fn.systemlist(cmd)
-  api.nvim_buf_set_lines(bn, 0, -1, false, lines)
 
   local context
   if rev.type == RevType.COMMIT then
@@ -290,13 +348,34 @@ function FileEntry._create_buffer(git_root, rev, path, null)
   if not ok then
     -- Resolve name conflict
     local i = 1
-    while not ok do
+    repeat
       -- stylua: ignore
       fullname = utils.path_join({ "diffview://", git_root, ".git", context, i, path, })
       ok = pcall(api.nvim_buf_set_name, bn, fullname)
       i = i + 1
-    end
+    until ok
   end
+
+  local git = require("diffview.git.utils")
+  git.show(git_root, { (rev.commit or "") .. ":" .. path }, function(err, result)
+    if not err then
+      vim.schedule(function()
+        if api.nvim_buf_is_valid(bn) then
+          vim.bo[bn].modifiable = true
+          api.nvim_buf_set_lines(bn, 0, -1, false, result)
+          vim.bo[bn].modifiable = false
+          vim.api.nvim_buf_call(bn, function()
+            vim.cmd("filetype detect")
+          end)
+          callback()
+        end
+      end)
+    else
+      logger.error("[git] Failed to show file content.")
+      logger.error("[stderr] " .. table.concat(err, "\n"))
+      utils.err(string.format("Failed to create diff buffer: '%s'", fullname), true)
+    end
+  end)
 
   return bn
 end
@@ -337,19 +416,19 @@ end
 function FileEntry._update_windows(left_winid, right_winid)
   utils.set_local({ left_winid, right_winid }, FileEntry.winopts)
 
+  local cur_winid = api.nvim_get_current_win()
   for _, id in ipairs({ left_winid, right_winid }) do
-    if id ~= api.nvim_get_current_win() then
+    if id ~= cur_winid then
       api.nvim_win_call(id, function()
+        if id == right_winid then
+          -- Scroll to trigger the scrollbind and sync the windows. This works more
+          -- consistently than calling `:syncbind`.
+          vim.cmd([[exe "norm! \<c-e>\<c-y>"]])
+        end
         vim.cmd("do WinLeave")
       end)
     end
   end
-
-  -- Scroll to trigger the scrollbind and sync the windows. This works more
-  -- consistently than calling `:syncbind`.
-  api.nvim_win_call(right_winid, function()
-    vim.cmd([[exe "norm! \<c-e>\<c-y>"]])
-  end)
 end
 
 ---@static

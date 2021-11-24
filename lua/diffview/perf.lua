@@ -61,14 +61,14 @@ function PerfTimer.__tostring(self)
     for _, lap in ipairs(self.laps) do
       s = s
         .. string.format(
-          "%s %.3f ms\t(%.3f ms)\n",
-          utils.str_right_pad(lap[1], 16),
+          ">> %s %.3f ms\t(%.3f ms)\n",
+          utils.str_right_pad(lap[1], 36),
           lap[2],
           lap[2] - last
         )
       last = lap[2]
     end
-    return s .. string.format("%s %.3f ms", utils.str_right_pad("FINAL TIME:", 16), self.final_time)
+    return s .. string.format("== %s %.3f ms", utils.str_right_pad("FINAL TIME", 36), self.final_time)
   end
 end
 

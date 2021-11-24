@@ -14,10 +14,14 @@ local setlocal_opr_templates = {
   prepend = [[exe 'setl ${option}=${value}' . (&${option} == "" ? "" : "," . &${option})]],
 }
 
-function M._echo_multiline(msg, hl, schedule)
+---Echo string with multiple lines.
+---@param msg string
+---@param hl? string Highlight group name.
+---@param schedule? boolean Schedule the echo call.
+function M.echo_multiln(msg, hl, schedule)
   if schedule then
     vim.schedule(function()
-      M._echo_multiline(msg, hl, false)
+      M.echo_multiln(msg, hl, false)
     end)
     return
   end
@@ -32,19 +36,19 @@ end
 ---@param msg string
 ---@param schedule? boolean Schedule the echo call.
 function M.info(msg, schedule)
-  M._echo_multiline("[Diffview.nvim] " .. msg, "Directory", schedule)
+  M.echo_multiln("[Diffview.nvim] " .. msg, "Directory", schedule)
 end
 
 ---@param msg string
 ---@param schedule? boolean Schedule the echo call.
 function M.warn(msg, schedule)
-  M._echo_multiline("[Diffview.nvim] " .. msg, "WarningMsg", schedule)
+  M.echo_multiln("[Diffview.nvim] " .. msg, "WarningMsg", schedule)
 end
 
 ---@param msg string
 ---@param schedule? boolean Schedule the echo call.
 function M.err(msg, schedule)
-  M._echo_multiline("[Diffview.nvim] " .. msg, "ErrorMsg", schedule)
+  M.echo_multiln("[Diffview.nvim] " .. msg, "ErrorMsg", schedule)
 end
 
 ---Call the function `f`, ignoring most of the window and buffer related
@@ -279,6 +283,26 @@ function M.str_template(str, table)
   end))
 end
 
+---@param job Job
+function M.handle_failed_job(job)
+  if job.code == 0 then
+    return
+  end
+
+  local logger = require("diffview.logger")
+  local args = vim.tbl_map(function(arg)
+    return ("'%s'"):format(arg:gsub("'", [['"'"']]))
+  end, job.args)
+
+  logger.s_error(("Job exited with a non-zero exit status! Code: %s"):format(job.code))
+  logger.s_error(("[cmd] %s %s"):format(job.command, table.concat(args, " ")))
+
+  local stderr = job:stderr_result()
+  if #stderr > 0 then
+    logger.s_error("[stderr] " .. table.concat(stderr, "\n"))
+  end
+end
+
 ---Get the output of a system command.
 ---@param cmd string[]
 ---@param cwd? string
@@ -288,7 +312,7 @@ end
 function M.system_list(cmd, cwd)
   local command = table.remove(cmd, 1)
   local stderr = {}
-  local stdout, code = Job
+  local job = Job
     :new({
       command = command,
       args = cmd,
@@ -297,7 +321,8 @@ function M.system_list(cmd, cwd)
         table.insert(stderr, data)
       end,
     })
-    :sync()
+  local stdout, code = job:sync()
+  M.handle_failed_job(job)
   return stdout, code, stderr
 end
 
@@ -593,7 +618,7 @@ local function prepare_mapping(t)
   return { t[1], t[2], rhs, opts }
 end
 
-function M.map(t)
+function M.key_map(t)
   local prepared = prepare_mapping(t)
   vim.api.nvim_set_keymap(prepared[1], prepared[2], prepared[3], prepared[4])
 end

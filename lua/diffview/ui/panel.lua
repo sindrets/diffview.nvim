@@ -225,9 +225,7 @@ function Panel:redraw()
   perf:reset()
   renderer.render(self.bufid, self.render_data)
   perf:time()
-  if DiffviewGlobal.debug_level >= 10 then
-    logger.s_debug(perf)
-  end
+  logger.lvl(10).s_debug(perf)
 end
 
 M.Form = Form

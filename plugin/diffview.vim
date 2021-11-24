@@ -10,6 +10,7 @@ command! -bar -nargs=0 DiffviewClose lua require'diffview'.close()
 command! -bar -nargs=0 DiffviewFocusFiles lua require'diffview'.trigger_event("focus_files")
 command! -bar -nargs=0 DiffviewToggleFiles lua require'diffview'.trigger_event("toggle_files")
 command! -bar -nargs=0 DiffviewRefresh lua require'diffview'.trigger_event("refresh_files")
+command! -bar -nargs=0 DiffviewLog exe 'sp ' . fnameescape(stdpath("cache") . '/diffview.log')
 
 function s:completion(argLead, cmdLine, curPos)
     return luaeval("require'diffview'.completion("

@@ -25,6 +25,30 @@ local JobStatus = oop.enum({
 
 ---@type Job[]
 local file_history_jobs = {}
+---@type Job[]
+local sync_jobs = {}
+
+---@param job Job
+local resume_sync_queue = function(job)
+  local idx = utils.vec_indexof(sync_jobs, job)
+  if idx > -1 then
+    table.remove(sync_jobs, idx)
+  end
+  if sync_jobs[1] and not sync_jobs[1].handle then
+    sync_jobs[1]:start()
+  end
+end
+
+---@param job Job
+local function queue_sync_job(job)
+  job:add_on_exit_callback(function()
+    resume_sync_queue(job)
+  end)
+  table.insert(sync_jobs, job)
+  if #sync_jobs == 1 then
+    job:start()
+  end
+end
 
 local function tracked_files(git_root, left, right, args, kind)
   local files = {}
@@ -99,7 +123,7 @@ end
 ---@param log_options LogOptions
 ---@param single_file boolean
 ---@return string[]
-local function prepare_file_history_options(log_options, single_file)
+local function prepare_fh_options(log_options, single_file)
   local o = log_options
   return utils.vec_join(
     (o.follow and single_file) and { "--follow", "--first-parent" } or { "-m", "-c" },
@@ -137,7 +161,7 @@ end
 ---@param opt LogOptions
 ---@param callback function
 local incremental_fh_data = async.void(function(git_root, path_args, single_file, opt, callback)
-  local options = prepare_file_history_options(opt, single_file)
+  local options = prepare_fh_options(opt, single_file)
   local raw = {}
   local namestat_job, numstat_job
 
@@ -185,11 +209,8 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
     done = done + 1
     if done == 2 then
       if namestat_job.code ~= 0 or numstat_job.code ~= 0 then
-        logger.error("[Git] File history job(s) exited with non-zero status!")
-        logger.error(string.format("Cmd: %s %s", namestat_job.command, table.concat(namestat_job.args, " ")))
-        logger.error("[stderr] " .. table.concat(namestat_job:stderr_result(), "\n"))
-        logger.error(string.format("Cmd: %s %s", numstat_job.command, table.concat(numstat_job.args, " ")))
-        logger.error("[stderr] " .. table.concat(numstat_job:stderr_result(), "\n"))
+        utils.handle_failed_job(namestat_job)
+        utils.handle_failed_job(numstat_job)
         callback(JobStatus.ERROR)
       else
         callback(JobStatus.SUCCESS)
@@ -300,7 +321,8 @@ local function process_file_history(thread, git_root, path_args, opt, callback)
     -- show' to get file statuses for merge commits. And merges do not always
     -- have changes.
     if cur.merge_hash then
-      local job = Job:new({
+      local job
+      local job_spec = {
         command = "git",
         args = {
           "show",
@@ -319,18 +341,35 @@ local function process_file_history(thread, git_root, path_args, opt, callback)
           end
           coroutine.resume(thread)
         end,
-      })
+      }
 
-      table.insert(file_history_jobs, job)
+      local max_retries = 1
       resume_lock = true
-      job:start()
-      coroutine.yield()
+
+      for i = 0, max_retries do
+        -- Git sometimes fails this job silently (exit code 0). Not sure why,
+        -- possibly because we are running multiple git opeartions on the same
+        -- repo concurrently. Retrying the job usually solves this.
+        job = Job:new(job_spec)
+        table.insert(file_history_jobs, job)
+        job:start()
+        coroutine.yield()
+        utils.handle_failed_job(job)
+
+        if #cur.namestat == 0 then
+          logger.warn("[git] 'git-show' returned nothing for merge commit!")
+          logger.log_job(job, logger.warn)
+          if i < max_retries then
+            logger.warn(("[git] Retrying %d more time(s).") :format(max_retries - i))
+          end
+        else
+          break
+        end
+      end
+
       resume_lock = false
 
       if job.code ~= 0 then
-        logger.error("[Git] Failed to get name-status for merge commit!")
-        logger.error(string.format("Cmd: %s %s", job.command, table.concat(job.args, " ")))
-        logger.error("[stderr] " .. table.concat(job:stderr_result(), "\n"))
         callback({}, JobStatus.ERROR)
         return
       end
@@ -338,6 +377,8 @@ local function process_file_history(thread, git_root, path_args, opt, callback)
       if #cur.namestat == 0 then
         -- Give up: something has been renamed. We can no longer track the
         -- history.
+        logger.warn("[git] Giving up.")
+        utils.warn("Displayed history may be incomplete. Check ':DiffviewLog' for details.", true)
         break
       end
     end
@@ -433,7 +474,7 @@ function M.file_history_dry_run(git_root, path_args, log_options)
 
   log_options = utils.tbl_clone(log_options)
   log_options.max_count = 1
-  local options = prepare_file_history_options(log_options, single_file)
+  local options = prepare_fh_options(log_options, single_file)
   local out, code = utils.system_list(
     utils.vec_join("git", "log", "--pretty=format:%H", "--name-status", options, "--", path_args),
     git_root
@@ -596,6 +637,29 @@ function M.git_dir(path)
   return vim.trim(out)
 end
 
+M.show = async.wrap(function(git_root, args, callback)
+  local job = Job:new({
+    command = "git",
+    cwd = git_root,
+    args = utils.vec_join(
+      "show",
+      args
+    ),
+    ---@type Job
+    on_exit = function(j)
+      if j.code ~= 0 then
+        utils.handle_failed_job(j)
+        callback(j:stderr_result(), nil)
+      else
+        callback(nil, j:result())
+      end
+    end,
+  })
+  -- NOTE: Running multiple 'show' jobs simultaneously may cause them to fail
+  -- silently. Solution: queue them and run them one after another.
+  queue_sync_job(job)
+end, 3)
+
 function M.expand_pathspec(git_root, cwd, pathspec)
   local magic = pathspec:match("^:[/!^]*:?") or pathspec:match("^:%b()") or ""
   local pattern = pathspec:sub(1 + #magic, -1)
@@ -625,18 +689,19 @@ end
 ---@param rev Rev
 ---@return boolean -- True if the file was binary for the given rev, or it didn't exist.
 function M.is_binary(git_root, path, rev)
-  local cmd = "git -c submodule.recurse=false -C "
-    .. vim.fn.shellescape(git_root)
-    .. " grep -I --name-only -e . "
+  local cmd = { "git", "-c", "submodule.recurse=false", "grep", "-I", "--name-only", "-e", "." }
   if rev.type == RevType.LOCAL then
-    cmd = cmd .. "--untracked"
+    cmd[#cmd+1] = "--untracked"
   elseif rev.type == RevType.INDEX then
-    cmd = cmd .. "--cached"
+    cmd[#cmd+1] = "--cached"
   else
-    cmd = cmd .. rev.commit
+    cmd[#cmd+1] = rev.commit
   end
-  vim.fn.system(cmd .. " -- " .. vim.fn.shellescape(path))
-  return vim.v.shell_error ~= 0
+
+  utils.vec_push(cmd, "--", path)
+
+  local _, code = utils.system_list(cmd, git_root)
+  return code ~= 0
 end
 
 ---Check if status for untracked files is disabled for a given git repo.

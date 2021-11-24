@@ -5,11 +5,6 @@ local logger = require("diffview.logger")
 local Form = require("diffview.ui.panel").Form
 local RevType = require("diffview.git.rev").RevType
 local PerfTimer = require("diffview.perf").PerfTimer
-local Mock = require("diffview.mock").Mock
-
-if DiffviewGlobal.debug_level < 10 then
-  logger = Mock()
-end
 
 ---@type PerfTimer
 local perf = PerfTimer("[FileHistoryPanel] Render internal")
@@ -275,7 +270,7 @@ return {
     end
 
     perf:time()
-    logger.s_debug(perf)
+    logger.lvl(10).s_debug(perf)
   end,
 
   ---@param panel FHOptionPanel

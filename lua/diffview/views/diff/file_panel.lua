@@ -159,19 +159,23 @@ function FilePanel:ordered_file_list()
 end
 
 function FilePanel:set_cur_file(file)
+  if self.cur_file then
+    self.cur_file.active = false
+  end
   self.cur_file = file
+  self.cur_file.active = true
 end
 
 function FilePanel:prev_file()
   local files = self:ordered_file_list()
   if not self.cur_file and self.files:len() > 0 then
-    self.cur_file = files[1]
+    self:set_cur_file(files[1])
     return self.cur_file
   end
 
   local i = utils.vec_indexof(files, self.cur_file)
   if i ~= -1 then
-    self.cur_file = files[(i - 2) % #files + 1]
+    self:set_cur_file(files[(i - 2) % #files + 1])
     return self.cur_file
   end
 end
@@ -179,13 +183,13 @@ end
 function FilePanel:next_file()
   local files = self:ordered_file_list()
   if not self.cur_file and self.files:len() > 0 then
-    self.cur_file = files[1]
+    self:set_cur_file(files[1])
     return self.cur_file
   end
 
   local i = utils.vec_indexof(files, self.cur_file)
   if i ~= -1 then
-    self.cur_file = files[i % #files + 1]
+    self:set_cur_file(files[i % #files + 1])
     return self.cur_file
   end
 end

@@ -92,10 +92,11 @@ function DiffView:next_file()
     vim.cmd("diffoff!")
     cur = self.panel:next_file()
     if cur then
-      cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
-      self:update_windows()
       self.panel:highlight_file(cur)
       self.nulled = false
+      cur:load_buffers(self.git_root, self.left_winid, self.right_winid, function()
+        self:update_windows()
+      end)
 
       return cur
     end
@@ -116,10 +117,11 @@ function DiffView:prev_file()
     vim.cmd("diffoff!")
     cur = self.panel:prev_file()
     if cur then
-      cur:load_buffers(self.git_root, self.left_winid, self.right_winid)
-      self:update_windows()
       self.panel:highlight_file(cur)
       self.nulled = false
+      cur:load_buffers(self.git_root, self.left_winid, self.right_winid, function()
+        self:update_windows()
+      end)
 
       return cur
     end
@@ -139,11 +141,12 @@ function DiffView:set_file(file, focus)
         cur:detach_buffers()
       end
       vim.cmd("diffoff!")
-      file:load_buffers(self.git_root, self.left_winid, self.right_winid)
-      self:update_windows()
-      self.panel.cur_file = file
+      self.panel:set_cur_file(file)
       self.panel:highlight_file(file)
       self.nulled = false
+      file:load_buffers(self.git_root, self.left_winid, self.right_winid, function()
+        self:update_windows()
+      end)
 
       if focus then
         api.nvim_set_current_win(self.right_winid)
