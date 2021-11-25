@@ -3,6 +3,7 @@ local utils = require("diffview.utils")
 local renderer = require("diffview.renderer")
 local logger = require("diffview.logger")
 local PerfTimer = require("diffview.perf").PerfTimer
+local FileEntry = require("diffview.views.file_entry").FileEntry
 local api = vim.api
 local M = {}
 local uid_counter = 0
@@ -166,6 +167,12 @@ end
 
 function Panel:close()
   if self:is_open() then
+    local num_wins = api.nvim_tabpage_list_wins(api.nvim_win_get_tabpage(self.winid))
+    if #num_wins == 1 then
+      -- Ensure that the tabpage doesn't close if the panel is the last window.
+      vim.cmd("sp")
+      FileEntry.load_null_buffer(0)
+    end
     api.nvim_win_hide(self.winid)
   end
 end

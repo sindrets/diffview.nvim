@@ -3,6 +3,7 @@ local git = require("diffview.git.utils")
 local lib = require("diffview.lib")
 local RevType = require("diffview.git.rev").RevType
 local DiffView = require("diffview.views.diff.diff_view").DiffView
+local FileEntry = require("diffview.views.file_entry").FileEntry
 local api = vim.api
 
 local function prepare_goto_file(view)
@@ -37,6 +38,17 @@ return function(view)
       local file = view.panel.cur_item[2]
       if file then
         file:detach_buffers()
+      end
+      local cur_winid = api.nvim_get_current_win()
+      if cur_winid == view.left_winid or cur_winid == view.right_winid then
+        -- Change the current buffer such that 'restore_winopts()' will work
+        -- correctly.
+        FileEntry.load_null_buffer(cur_winid)
+      end
+      for _, entry in ipairs(view.panel.entries) do
+        for _, f in ipairs(entry.files) do
+          f:restore_winopts()
+        end
       end
     end,
     win_closed = function(winid)

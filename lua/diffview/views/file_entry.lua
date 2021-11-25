@@ -41,10 +41,15 @@ local FileEntry = oop.create_class("FileEntry")
 FileEntry._null_buffer = nil
 
 ---@static
+---@type table<integer, table>
+FileEntry.winopt_store = {}
+
+---@static
 FileEntry.winopts = {
   diff = true,
   scrollbind = true,
   cursorbind = true,
+  scrollopt = { "ver", "hor", "jump" },
   foldmethod = "diff",
   foldcolumn = "1",
   foldlevel = 0,
@@ -82,6 +87,7 @@ end
 function FileEntry:destroy()
   self.active = false
   self:detach_buffers()
+  self:restore_winopts()
   for _, bn in ipairs(self.created_bufs) do
     FileEntry.safe_delete_buf(bn)
   end
@@ -135,6 +141,9 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid, callback)
             sp.load()
           else
             api.nvim_win_set_buf(sp.winid, sp.bufid)
+          end
+          if sp.rev.type == RevType.LOCAL and not FileEntry.winopt_store[sp.bufid] then
+            FileEntry._save_winopts(sp.bufid, sp.winid)
           end
         end
         FileEntry._update_windows(left_winid, right_winid)
@@ -295,6 +304,14 @@ function FileEntry:compare(other)
   return (self.path == other.path and self.status == other.status)
 end
 
+function FileEntry:restore_winopts()
+  for _, bufid in ipairs({ self.left_bufid, self.right_bufid }) do
+    if bufid then
+      FileEntry._restore_winopts(bufid)
+    end
+  end
+end
+
 ---@static Get the bufid of the null buffer. Create it if it's not loaded.
 ---@return integer
 function FileEntry._get_null_buffer()
@@ -410,6 +427,28 @@ function FileEntry.safe_delete_buf(bufid)
     FileEntry.load_null_buffer(winid)
   end
   pcall(api.nvim_buf_delete, bufid, { force = true })
+end
+
+---@static
+function FileEntry._save_winopts(bufid, winid)
+  FileEntry.winopt_store[bufid] = {}
+  api.nvim_win_call(winid, function()
+    for option, _ in pairs(FileEntry.winopts) do
+      FileEntry.winopt_store[bufid][option] = vim.o[option]
+    end
+  end)
+end
+
+---@static
+function FileEntry._restore_winopts(bufid)
+  if FileEntry.winopt_store[bufid] then
+    utils.no_win_event_call(function()
+      vim.cmd("sp")
+      api.nvim_win_set_buf(0, bufid)
+      utils.set_local(0, FileEntry.winopt_store[bufid])
+      api.nvim_win_close(0, true)
+    end)
+  end
 end
 
 ---@static
