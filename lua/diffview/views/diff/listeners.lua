@@ -51,6 +51,13 @@ return function(view)
         end
       end
     end,
+    close = function()
+      if view.panel:is_cur_win() then
+        view.panel:close()
+      elseif view:is_cur_tabpage() then
+        view:close()
+      end
+    end,
     select_next_entry = function()
       view:next_file()
     end,
