@@ -212,22 +212,24 @@ return {
 
     local offset
     if panel.single_file then
-      local file = panel.entries[1].files[1]
+      if #panel.entries > 0 then
+        local file = panel.entries[1].files[1]
 
-      -- file path
-      local icon = renderer.get_file_icon(file.basename, file.extension, comp, line_idx, 0)
-      offset = #icon
-      if #file.parent_path > 0 then
-        comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #file.parent_path + 1)
+        -- file path
+        local icon = renderer.get_file_icon(file.basename, file.extension, comp, line_idx, 0)
+        offset = #icon
+        if #file.parent_path > 0 then
+          comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #file.parent_path + 1)
+        end
+        comp:add_hl(
+          "DiffviewFilePanelFileName",
+          line_idx,
+          offset + #file.parent_path + 1,
+          offset + #file.basename
+        )
+        s = icon .. file.path
+        comp:add_line(s)
       end
-      comp:add_hl(
-        "DiffviewFilePanelFileName",
-        line_idx,
-        offset + #file.parent_path + 1,
-        offset + #file.basename
-      )
-      s = icon .. file.path
-      comp:add_line(s)
     else
       s = "Showing history for: "
       comp:add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
