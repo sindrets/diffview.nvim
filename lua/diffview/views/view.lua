@@ -45,6 +45,7 @@ function View:open()
   self.tabpage = api.nvim_get_current_tabpage()
   self:init_layout()
   self:post_open()
+  DiffviewGlobal.emitter:emit("view_opened", self)
 end
 
 function View:close()
@@ -53,6 +54,7 @@ function View:close()
     local pagenr = api.nvim_tabpage_get_number(self.tabpage)
     vim.cmd("tabclose " .. pagenr)
   end
+  DiffviewGlobal.emitter:emit("view_closed", self)
 end
 
 function View:is_cur_tabpage()
