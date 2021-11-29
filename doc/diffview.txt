@@ -163,7 +163,8 @@ hooks                                                  *diffview-config-hooks*
 
         This is a table of event names mapped to callback functions. The
         callbacks are called when the related events are emitted from
-        Diffview.
+        Diffview. The hook events are also available as User autocommands. See
+        |diffview-user-autocmds| for more details.
 
         Available Events:~
                 {view_opened} (`fun(view: View)`)
@@ -300,6 +301,26 @@ COMMANDS                                                 *diffview-commands*
                                                         *:DiffviewRefresh*
 :DiffviewRefresh        Update stats and entries in the file list of the
                         current Diffview.
+
+USER AUTOCOMMANDS                                     *diffview-user-autocmds*
+
+For information on how to use User autocommands, see |User|.
+
+`DiffviewViewOpened`    Fires after a new view has been opened. It's called
+                      after initializing the layout in the new tabpage (all
+                      windows are ready).
+
+`DiffviewViewClosed`    Fires after a view is closed.
+
+`DiffviewDiffBufRead`   Fires after a new diff buffer is ready (the first
+                      time it's created and loaded into a window). Diff
+                      buffers are all buffers with |diff-mode| enabled. That
+                      includes buffers of local files (not created from git).
+
+                      This is always called with the new buffer as the current
+                      buffer and the correct diff window as the current window
+                      such that |:setlocal| will apply settings to the
+                      relevant buffer / window.
 
 MAPS                                                           *diffview-maps*
 

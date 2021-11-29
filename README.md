@@ -161,7 +161,8 @@ rather than the file under the cursor in the file panel.
 
 The `hooks` table allows you to define callbacks for various events emitted from
 Diffview. The available hooks are documented in detail in
-`:h diffview-config-hooks`.
+`:h diffview-config-hooks`. The hook events are also available as User
+autocommands. See `:h diffview-user-autocmds` for more details.
 
 Examples:
 
