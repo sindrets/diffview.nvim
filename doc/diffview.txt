@@ -62,6 +62,7 @@ Example configuration with default settings:
         DiffviewOpen = {},
         DiffviewFileHistory = {},
       },
+      hooks = {},         -- See |diffview-config-hooks|
       file_history_panel = {
         position = "bottom",
         width = 35,
@@ -200,13 +201,14 @@ hooks                                                  *diffview-config-hooks*
         Examples: >
                 hooks = {
                   diff_buf_read = function(bufnr)
+                    -- Change local options in diff buffers
                     vim.opt_local.wrap = false
                     vim.opt_local.list = false
                     vim.opt_local.colorcolumn = { 80 }
                   end,
                   view_opened = function(view)
                     print(
-                      ("A new %s was opened on tabpage %d!")
+                      ("A new %s was opened on tab page %d!")
                       :format(view:class():name(), view.tabpage)
                     )
                   end,
