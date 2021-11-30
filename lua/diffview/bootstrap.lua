@@ -31,8 +31,15 @@ _G.DiffviewGlobal = {
   ---5:     LOADING
   ---10:    RENDERING
   debug_level = tonumber(os.getenv("DEBUG_DIFFVIEW")) or 0,
+  ---@type EventEmitter
+  emitter = require("diffview.events").EventEmitter(),
   bootstrap_done = true,
   bootstrap_ok = true,
 }
+
+DiffviewGlobal.emitter:on_any(function(event, args)
+  local utils = require("diffview.utils")
+  require("diffview.config").user_emitter:_nore_emit(event, utils.tbl_unpack(args))
+end)
 
 return true

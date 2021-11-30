@@ -1,4 +1,5 @@
 local oop = require("diffview.oop")
+local utils = require("diffview.utils")
 
 local M = {}
 
@@ -12,12 +13,14 @@ local Event = oop.enum({
 
 ---@class EventEmitter : Object
 ---@field listeners table<Event, function[]>
+---@field any_listeners function[]
 local EventEmitter = oop.create_class("EventEmitter")
 
 ---EventEmitter constructor.
 ---@return EventEmitter
 function EventEmitter:init()
   self.listeners = {}
+  self.any_listeners = {}
 end
 
 function EventEmitter:on(event, callback)
@@ -25,7 +28,7 @@ function EventEmitter:on(event, callback)
     self.listeners[event] = {}
   end
   table.insert(self.listeners[event], function(args)
-    callback(unpack(args))
+    callback(utils.tbl_unpack(args))
   end)
 end
 
@@ -37,13 +40,41 @@ function EventEmitter:once(event, callback)
   table.insert(self.listeners[event], function(args)
     if not emitted then
       emitted = true
-      callback(unpack(args))
+      callback(utils.tbl_unpack(args))
+    end
+  end)
+end
+
+function EventEmitter:on_any(callback)
+  table.insert(self.any_listeners, function(event, args)
+    callback(event, args)
+  end)
+end
+
+function EventEmitter:once_any(callback)
+  local emitted = false
+  table.insert(self.any_listeners, function(event, args)
+    if not emitted then
+      emitted = true
+      callback(event, utils.tbl_unpack(args))
     end
   end)
 end
 
 function EventEmitter:emit(event, ...)
-  local args = { ... }
+  local args = utils.tbl_pack(...)
+  if type(self.listeners[event]) == "table" then
+    for _, cb in ipairs(self.listeners[event]) do
+      cb(args)
+    end
+  end
+  for _, cb in ipairs(self.any_listeners) do
+    cb(event, args)
+  end
+end
+
+function EventEmitter:_nore_emit(event, ...)
+  local args = utils.tbl_pack(...)
   if type(self.listeners[event]) == "table" then
     for _, cb in ipairs(self.listeners[event]) do
       cb(args)

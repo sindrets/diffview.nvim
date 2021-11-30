@@ -1,4 +1,5 @@
 local utils = require("diffview.utils")
+local EventEmitter = require("diffview.events").EventEmitter
 local M = {}
 
 function M.diffview_callback(cb_name)
@@ -47,6 +48,7 @@ M.defaults = {
     DiffviewOpen = {},
     DiffviewFileHistory = {},
   },
+  hooks = {},
   key_bindings = {
     disable_defaults = false,
     view = {
@@ -110,6 +112,8 @@ M.defaults = {
 }
 -- stylua: ignore end
 
+---@type EventEmitter
+M.user_emitter = EventEmitter()
 M._config = M.defaults
 
 function M.get_config()
@@ -121,10 +125,18 @@ function M.setup(user_config)
 
   M._config = utils.tbl_deep_clone(M.defaults)
   M._config = vim.tbl_deep_extend("force", M._config, user_config)
+  ---@type EventEmitter
+  M.user_emitter = EventEmitter()
 
   -- deprecation notices
   if type(M._config.file_panel.use_icons) ~= "nil" then
     utils.warn("'file_panel.use_icons' has been deprecated. See ':h diffview.changelog-64'.")
+  end
+
+  for event, callback in pairs(M._config.hooks) do
+    if type(callback) == "function" then
+      M.user_emitter:on(event, callback)
+    end
   end
 
   if M._config.key_bindings.disable_defaults then

@@ -133,6 +133,7 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid, callback)
   local function on_ready_factory(split)
     return function()
       split.ready = true
+      local was_ready = self[split.pos .. "_ready"]
       self[split.pos .. "_ready"] = true
       if splits[1].ready and splits[2].ready and self.active then
         perf:lap("both buffers ready")
@@ -142,8 +143,10 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid, callback)
           else
             api.nvim_win_set_buf(sp.winid, sp.bufid)
           end
-          if sp.rev.type == RevType.LOCAL and not FileEntry.winopt_store[sp.bufid] then
-            FileEntry._save_winopts(sp.bufid, sp.winid)
+          if not was_ready then
+            api.nvim_win_call(sp.winid, function()
+              DiffviewGlobal.emitter:emit("diff_buf_read", sp.bufid)
+            end)
           end
         end
         FileEntry._update_windows(left_winid, right_winid)
@@ -184,6 +187,7 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid, callback)
               api.nvim_win_call(split.winid, function()
                 vim.cmd("edit " .. vim.fn.fnameescape(self.absolute_path))
                 split.bufid = api.nvim_get_current_buf()
+                FileEntry._save_winopts(split.bufid, split.winid)
                 self[split.pos .. "_bufid"] = split.bufid
                 FileEntry._attach_buffer(split.bufid)
                 perf:lap("edit call")

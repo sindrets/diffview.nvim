@@ -79,6 +79,7 @@ require'diffview'.setup {
     DiffviewOpen = {},
     DiffviewFileHistory = {},
   },
+  hooks = {},         -- See ':h diffview-config-hooks'
   key_bindings = {
     disable_defaults = false,                   -- Disable the default key bindings
     -- The `view` bindings are active in the diff buffers, only when the current
@@ -155,6 +156,32 @@ that only really make sense specifically in the file panel, such as
 `toggle_stage_entry` and `restore_entry` work just fine from the view. When
 invoked from the view, these will target the file currently open in the view
 rather than the file under the cursor in the file panel.
+
+### Hooks
+
+The `hooks` table allows you to define callbacks for various events emitted from
+Diffview. The available hooks are documented in detail in
+`:h diffview-config-hooks`. The hook events are also available as User
+autocommands. See `:h diffview-user-autocmds` for more details.
+
+Examples:
+
+```lua
+hooks = {
+  diff_buf_read = function(bufnr)
+    -- Change local options in diff buffers
+    vim.opt_local.wrap = false
+    vim.opt_local.list = false
+    vim.opt_local.colorcolumn = { 80 }
+  end,
+  view_opened = function(view)
+    print(
+      ("A new %s was opened on tab page %d!")
+      :format(view:class():name(), view.tabpage)
+    )
+  end,
+}
+```
 
 ### Available Unused Mappings
 

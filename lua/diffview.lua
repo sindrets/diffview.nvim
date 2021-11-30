@@ -22,6 +22,17 @@ end
 
 function M.init()
   colors.setup()
+
+  -- Set up autocommand emitters
+  DiffviewGlobal.emitter:on("view_opened", function(_)
+    vim.cmd("do <nomodeline> User DiffviewViewOpened")
+  end)
+  DiffviewGlobal.emitter:on("view_closed", function(_)
+    vim.cmd("do <nomodeline> User DiffviewViewClosed")
+  end)
+  DiffviewGlobal.emitter:on("diff_buf_read", function(_)
+    vim.cmd("do User DiffviewDiffBufRead")
+  end)
 end
 
 function M.open(...)

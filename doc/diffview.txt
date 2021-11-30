@@ -62,6 +62,7 @@ Example configuration with default settings:
         DiffviewOpen = {},
         DiffviewFileHistory = {},
       },
+      hooks = {},         -- See |diffview-config-hooks|
       file_history_panel = {
         position = "bottom",
         width = 35,
@@ -157,6 +158,63 @@ default_args                                    *diffview-config-default_args*
                   DiffviewOpen = { "--untracked-files=no", "--imply-local" }
                 }
 
+hooks                                                  *diffview-config-hooks*
+        Type: `table<string, function>`, Default: `{}`
+
+        This is a table of event names mapped to callback functions. The
+        callbacks are called when the related events are emitted from
+        Diffview. The hook events are also available as User autocommands. See
+        |diffview-user-autocmds| for more details.
+
+        Available Events:~
+                {view_opened} (`fun(view: View)`)
+                        Emitted after a new view has been opened. It's called
+                        after initializing the layout in the new tabpage (all
+                        windows are ready).
+
+                        Callback Parameters:~
+                                {view} (`View`)
+                                        The `View` instance that was opened.
+
+                {view_closed} (`fun(view: View)`)
+                        Emitted after closing a view.
+
+                        Callback Parameters:~
+                                {view} (`View`)
+                                        The `View` instance that was closed.
+
+                {diff_buf_read} (`fun(bufnr: integer)`)
+                        Emitted after a new diff buffer is ready (the first
+                        time it's created and loaded into a window). Diff
+                        buffers are all buffers with |diff-mode| enabled. That
+                        includes buffers of local files (not created from
+                        git).
+
+                        This is always called with the new buffer as the
+                        current buffer and the correct diff window as the
+                        current window such that |:setlocal| will apply
+                        settings to the relevant buffer / window.
+
+                        Callback Parameters:~
+                                {bufnr} (`integer`)
+                                        The buffer number of the new buffer.
+
+        Examples: >
+                hooks = {
+                  diff_buf_read = function(bufnr)
+                    -- Change local options in diff buffers
+                    vim.opt_local.wrap = false
+                    vim.opt_local.list = false
+                    vim.opt_local.colorcolumn = { 80 }
+                  end,
+                  view_opened = function(view)
+                    print(
+                      ("A new %s was opened on tab page %d!")
+                      :format(view:class():name(), view.tabpage)
+                    )
+                  end,
+                }
+
 AVAILABLE UNUSED MAPPINGS                 *diffview-available-unused-mappings*
 
 This section documents key-mappable functions that are not mapped by default.
@@ -243,6 +301,26 @@ COMMANDS                                                 *diffview-commands*
                                                         *:DiffviewRefresh*
 :DiffviewRefresh        Update stats and entries in the file list of the
                         current Diffview.
+
+USER AUTOCOMMANDS                                     *diffview-user-autocmds*
+
+For information on how to use User autocommands, see |User|.
+
+`DiffviewViewOpened`    Fires after a new view has been opened. It's called
+                      after initializing the layout in the new tabpage (all
+                      windows are ready).
+
+`DiffviewViewClosed`    Fires after a view is closed.
+
+`DiffviewDiffBufRead`   Fires after a new diff buffer is ready (the first
+                      time it's created and loaded into a window). Diff
+                      buffers are all buffers with |diff-mode| enabled. That
+                      includes buffers of local files (not created from git).
+
+                      This is always called with the new buffer as the current
+                      buffer and the correct diff window as the current window
+                      such that |:setlocal| will apply settings to the
+                      relevant buffer / window.
 
 MAPS                                                           *diffview-maps*
 
