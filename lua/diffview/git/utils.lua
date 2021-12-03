@@ -1,16 +1,16 @@
-local utils = require("diffview.utils")
-local oop = require("diffview.oop")
-local logger = require("diffview.logger")
-local async = require("plenary.async")
-local Job = require("plenary.job")
+local Commit = require("diffview.git.commit").Commit
 local CountDownLatch = require("diffview.control").CountDownLatch
-local Semaphore = require("diffview.control").Semaphore
 local FileDict = require("diffview.git.file_dict").FileDict
+local FileEntry = require("diffview.views.file_entry").FileEntry
+local Job = require("plenary.job")
+local LogEntry = require("diffview.git.log_entry").LogEntry
 local Rev = require("diffview.git.rev").Rev
 local RevType = require("diffview.git.rev").RevType
-local Commit = require("diffview.git.commit").Commit
-local LogEntry = require("diffview.git.log_entry").LogEntry
-local FileEntry = require("diffview.views.file_entry").FileEntry
+local Semaphore = require("diffview.control").Semaphore
+local async = require("plenary.async")
+local logger = require("diffview.logger")
+local oop = require("diffview.oop")
+local utils = require("diffview.utils")
 local M = {}
 
 ---@class JobStatus
@@ -735,14 +735,14 @@ function M.git_dir(path)
   return out[1] and vim.trim(out[1])
 end
 
-M.show = async.wrap(function(git_root, args, callback)
+M.show = async.void(function(git_root, args, callback)
   local job = Job:new({
     command = "git",
-    cwd = git_root,
     args = utils.vec_join(
       "show",
       args
     ),
+    cwd = git_root,
     ---@type Job
     on_exit = function(j)
       if j.code ~= 0 then
@@ -756,7 +756,7 @@ M.show = async.wrap(function(git_root, args, callback)
   -- NOTE: Running multiple 'show' jobs simultaneously may cause them to fail
   -- silently. Solution: queue them and run them one after another.
   queue_sync_job(job)
-end, 3)
+end)
 
 function M.expand_pathspec(git_root, cwd, pathspec)
   local magic = pathspec:match("^:[/!^]*:?") or pathspec:match("^:%b()") or ""

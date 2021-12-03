@@ -62,7 +62,9 @@ function DiffView:post_open()
   self:init_event_listeners()
   vim.schedule(function()
     self:file_safeguard()
-    self:update_files()
+    if self.files:len() == 0 then
+      self:update_files()
+    end
     self.ready = true
   end)
 end
@@ -188,8 +190,10 @@ function DiffView:update_files(callback)
   local last_winid = api.nvim_get_current_win()
   self:get_updated_files(function(err, new_files)
     if err then
-      utils.err("Failed to update files in diff view!", true)
-      callback(err)
+      utils.err("Failed to update files in a diff view!", true)
+      if type(callback) == "function" then
+        callback(err)
+      end
       return
     else
       local files = {
