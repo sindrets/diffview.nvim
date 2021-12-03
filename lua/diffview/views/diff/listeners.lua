@@ -109,20 +109,16 @@ return function(view)
 
       local item = view:infer_cur_file(true)
       if item then
+        local code
         if item.kind == "working" then
-          vim.fn.system(
-            "git -C "
-              .. vim.fn.shellescape(view.git_root)
-              .. " add "
-              .. vim.fn.shellescape(item.path)
-          )
+          _, code = utils.system_list({ "git", "add", item.path }, view.git_root)
         elseif item.kind == "staged" then
-          vim.fn.system(
-            "git -C "
-              .. vim.fn.shellescape(view.git_root)
-              .. " reset -- "
-              .. vim.fn.shellescape(item.path)
-          )
+          _, code = utils.system_list({ "git", "reset", "--", item.path }, view.git_root)
+        end
+
+        if code ~= 0 then
+          utils.err(("Failed to stage/unstage file: '%s'"):format(item.path))
+          return
         end
 
         view:update_files()
@@ -130,19 +126,29 @@ return function(view)
       end
     end,
     stage_all = function()
-      local args = ""
-      for _, file in ipairs(view.files.working) do
-        args = args .. " " .. vim.fn.shellescape(file.path)
-      end
+      local args = vim.tbl_map(function(file)
+        return file.path
+      end, view.files.working)
+
       if #args > 0 then
-        vim.fn.system("git -C " .. vim.fn.shellescape(view.git_root) .. " add" .. args)
+        local _, code = utils.system_list(utils.vec_join("git", "add", args), view.git_root)
+
+        if code ~= 0 then
+          utils.err("Failed to stage files!")
+          return
+        end
 
         view:update_files()
         view.emitter:emit(Event.FILES_STAGED, view)
       end
     end,
     unstage_all = function()
-      vim.fn.system("git -C " .. vim.fn.shellescape(view.git_root) .. " reset")
+      local _, code = utils.system_list({ "git", "reset" }, view.git_root)
+
+      if code ~= 0 then
+        utils.err("Failed to unstage files!")
+        return
+      end
 
       view:update_files()
       view.emitter:emit(Event.FILES_STAGED, view)

@@ -6,6 +6,8 @@ local M = {}
 
 ---@class DirData
 ---@field name string
+---@field path string
+---@field kind '"working"'|'"staged"'
 ---@field collapsed boolean
 ---@field status string
 
@@ -107,6 +109,8 @@ function FileTree:create_comp_schema(flatten_dirs)
         local subdir_data = node.children[1].data
         dir_data = {
           name = utils.path_join({ dir_data.name, subdir_data.name }),
+          path = subdir_data.path,
+          kind = subdir_data.kind,
           collapsed = dir_data.collapsed and subdir_data.collapsed,
           status = dir_data.status,
         }
