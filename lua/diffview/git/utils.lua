@@ -178,6 +178,7 @@ M.diff_file_list = async.void(function(git_root, left, right, path_args, opt, ca
   ---@type CountDownLatch
   local latch = CountDownLatch(2)
   local rev_arg = M.rev_to_arg(left, right)
+  local errors = {}
 
   tracked_files(
     git_root,
@@ -191,7 +192,7 @@ M.diff_file_list = async.void(function(git_root, left, right, path_args, opt, ca
     "working",
     function (err, tfiles)
       if err then
-        -- TODO
+        errors[#errors+1] = err
         utils.err("Failed to get git status for tracked files!", true)
         latch:count_down()
       else
@@ -205,7 +206,7 @@ M.diff_file_list = async.void(function(git_root, left, right, path_args, opt, ca
           ---@diagnostic disable-next-line: redefined-local
           untracked_files(git_root, left, right, function(err, ufiles)
             if err then
-              -- TODO
+              errors[#errors+1] = err
               utils.err("Failed to get git status for untracked files!", true)
               latch:count_down()
             else
@@ -240,7 +241,7 @@ M.diff_file_list = async.void(function(git_root, left, right, path_args, opt, ca
       "staged",
       function(err, tfiles)
         if err then
-          -- TODO
+          errors[#errors+1] = err
           utils.err("Failed to get git status for staged files!", true)
           latch:count_down()
         else
@@ -254,6 +255,11 @@ M.diff_file_list = async.void(function(git_root, left, right, path_args, opt, ca
   end
 
   latch:await()
+  if #errors > 0 then
+    callback(utils.vec_join(unpack(errors)), nil)
+    return
+  end
+
   files:update_file_trees()
   callback(nil, files)
 end)
@@ -500,9 +506,12 @@ local function process_file_history(thread, git_root, path_args, opt, callback)
           logger.warn("[git] 'git-show' returned nothing for merge commit!")
           logger.log_job(job, logger.warn)
           if i < max_retries then
-            logger.warn(("[git] Retrying %d more time(s).") :format(max_retries - i))
+            logger.warn(("[git] Retrying %d more time(s)."):format(max_retries - i))
           end
         else
+          if i > 0 then
+            logger.info("[git] Success!")
+          end
           break
         end
       end

@@ -188,7 +188,9 @@ function DiffView:update_files(callback)
   local last_winid = api.nvim_get_current_win()
   self:get_updated_files(function(err, new_files)
     if err then
-      -- TODO
+      utils.err("Failed to update files in diff view!", true)
+      callback(err)
+      return
     else
       local files = {
         { cur_files = self.files.working, new_files = new_files.working },
