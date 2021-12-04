@@ -6,14 +6,16 @@ local FileDict = require("diffview.git.file_dict").FileDict
 local FileEntry = require("diffview.views.file_entry").FileEntry
 local FilePanel = require("diffview.views.diff.file_panel").FilePanel
 local LayoutMode = require("diffview.views.view").LayoutMode
+local PerfTimer = require("diffview.perf").PerfTimer
 local RevType = require("diffview.git.rev").RevType
 local StandardView = require("diffview.views.standard.standard_view").StandardView
 local async = require("plenary.async")
 local git = require("diffview.git.utils")
+local logger = require("diffview.logger")
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
-local api = vim.api
 
+local api = vim.api
 local M = {}
 
 ---@class DiffViewOptions
@@ -167,12 +169,14 @@ end
 
 ---Get an updated list of files.
 ---@return FileDict
-function DiffView:get_updated_files(callback)
+DiffView.get_updated_files = async.wrap(function(self, callback)
   git.diff_file_list(self.git_root, self.left, self.right, self.path_args, self.options, callback)
-end
+end, 2)
 
 ---Update the file list, including stats and status for all files.
 function DiffView:update_files(callback)
+  ---@type PerfTimer
+  local perf = PerfTimer("[DiffView] Status Update")
   self:ensure_layout()
 
   -- If left is tracking HEAD and right is LOCAL: Update HEAD rev.
@@ -184,6 +188,7 @@ function DiffView:update_files(callback)
     else
       new_head = nil
     end
+    perf:lap("updated head rev")
   end
 
   local index_stat = vim.loop.fs_stat(utils.path_join({ self.git_dir, "index" }))
@@ -191,11 +196,13 @@ function DiffView:update_files(callback)
   self:get_updated_files(function(err, new_files)
     if err then
       utils.err("Failed to update files in a diff view!", true)
+      logger.s_error("[DiffView] Failed to update files!")
       if type(callback) == "function" then
         callback(err)
       end
       return
     else
+      perf:lap("received new file list")
       local files = {
         { cur_files = self.files.working, new_files = new_files.working },
         { cur_files = self.files.staged, new_files = new_files.staged },
@@ -246,11 +253,13 @@ function DiffView:update_files(callback)
         end
       end
 
+      perf:lap("updated file list")
       FileEntry.update_index_stat(self.git_root, self.git_dir, index_stat)
       self.files:update_file_trees()
       self.panel:update_components()
       self.panel:render()
       self.panel:redraw()
+      perf:lap("panel redrawn")
 
       if utils.vec_indexof(self.panel:ordered_file_list(), self.panel.cur_file) == -1 then
         self.panel.cur_file = nil
@@ -262,6 +271,12 @@ function DiffView:update_files(callback)
       end
 
       self.update_needed = false
+      perf:time()
+      logger.lvl(5).s_debug(perf)
+      logger.s_info(
+        ("[DiffView] Completed update for %d files successfully (%.3f ms)")
+        :format(self.files:len(), perf.final_time)
+      )
       if type(callback) == "function" then
         callback()
       end

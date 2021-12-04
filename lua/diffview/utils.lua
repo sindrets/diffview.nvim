@@ -41,54 +41,39 @@ end
 ---@param msg string|string[]
 ---@param schedule? boolean Schedule the echo call.
 function M.info(msg, schedule)
-  local prefix = "[Diffview.nvim] "
-  if type(msg) == "table" then
-    if vim.tbl_isempty(msg) then
-      return
-    end
-    msg[1] = prefix .. msg[1]
-  else
-    if msg == "" then
-      return
-    end
-    msg = prefix .. msg
+  if type(msg) ~= "table" then
+    msg = vim.split(msg, "\n")
   end
+  if not msg[1] or msg[1] == "" then
+    return
+  end
+  msg[1] = "[Diffview.nvim] " .. msg[1]
   M.echo_multiln(msg, "Directory", schedule)
 end
 
 ---@param msg string|string[]
 ---@param schedule? boolean Schedule the echo call.
 function M.warn(msg, schedule)
-  local prefix = "[Diffview.nvim] "
-  if type(msg) == "table" then
-    if vim.tbl_isempty(msg) then
-      return
-    end
-    msg[1] = prefix .. msg[1]
-  else
-    if msg == "" then
-      return
-    end
-    msg = prefix .. msg
+  if type(msg) ~= "table" then
+    msg = vim.split(msg, "\n")
   end
+  if not msg[1] or msg[1] == "" then
+    return
+  end
+  msg[1] = "[Diffview.nvim] " .. msg[1]
   M.echo_multiln(msg, "WarningMsg", schedule)
 end
 
 ---@param msg string|string[]
 ---@param schedule? boolean Schedule the echo call.
 function M.err(msg, schedule)
-  local prefix = "[Diffview.nvim] "
-  if type(msg) == "table" then
-    if vim.tbl_isempty(msg) then
-      return
-    end
-    msg[1] = prefix .. msg[1]
-  else
-    if msg == "" then
-      return
-    end
-    msg = prefix .. msg
+  if type(msg) ~= "table" then
+    msg = vim.split(msg, "\n")
   end
+  if not msg[1] or msg[1] == "" then
+    return
+  end
+  msg[1] = "[Diffview.nvim] " .. msg[1]
   M.echo_multiln(msg, "ErrorMsg", schedule)
 end
 

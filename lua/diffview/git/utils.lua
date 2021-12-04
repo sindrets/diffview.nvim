@@ -11,6 +11,7 @@ local async = require("plenary.async")
 local logger = require("diffview.logger")
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
+
 local M = {}
 
 ---@class JobStatus
@@ -735,7 +736,7 @@ function M.git_dir(path)
   return out[1] and vim.trim(out[1])
 end
 
-M.show = async.void(function(git_root, args, callback)
+M.show = async.wrap(function(git_root, args, callback)
   local job = Job:new({
     command = "git",
     args = utils.vec_join(
@@ -756,7 +757,7 @@ M.show = async.void(function(git_root, args, callback)
   -- NOTE: Running multiple 'show' jobs simultaneously may cause them to fail
   -- silently. Solution: queue them and run them one after another.
   queue_sync_job(job)
-end)
+end, 3)
 
 function M.expand_pathspec(git_root, cwd, pathspec)
   local magic = pathspec:match("^:[/!^]*:?") or pathspec:match("^:%b()") or ""
@@ -895,5 +896,4 @@ end
 ---@field callback function
 
 M.JobStatus = JobStatus
-M.FileDict = FileDict
 return M

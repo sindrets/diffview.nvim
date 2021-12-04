@@ -7,6 +7,7 @@ local Rev = require("diffview.git.rev").Rev
 local RevType = require("diffview.git.rev").RevType
 local async = require("plenary.async")
 local git = require("diffview.git.utils")
+local logger = require("diffview.logger")
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 
@@ -72,9 +73,34 @@ function CDiffView:init(opt)
 end
 
 ---@Override
-CDiffView.get_updated_files = async.void(function(self, callback)
-  callback(nil, self:create_file_entries(self:fetch_files()))
-end)
+CDiffView.get_updated_files = async.wrap(function(self, callback)
+  local err
+  callback = async.void(callback)
+
+  repeat
+    local ok, new_files = pcall(self.fetch_files, self)
+
+    if not ok or type(new_files) ~= "table" then
+      err = { "Integrating plugin failed to provide file data!" }
+      break
+    end
+
+    ---@diagnostic disable-next-line: redefined-local
+    local ok, entries = pcall(self.create_file_entries, self, new_files)
+
+    if not ok then
+      err = { "Integrating plugin provided malformed file data!" }
+      break
+    end
+
+    callback(nil, entries)
+    return
+  until true
+
+  utils.err(err, true)
+  logger.s_error(table.concat(err, "\n"))
+  callback(err, nil)
+end, 2)
 
 function CDiffView:create_file_entries(files)
   local entries = {}
