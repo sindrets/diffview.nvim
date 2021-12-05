@@ -302,6 +302,9 @@ COMMANDS                                                 *diffview-commands*
 :DiffviewRefresh        Update stats and entries in the file list of the
                         current Diffview.
 
+                                                        *:DiffviewLog*
+:DiffviewLog            Open the log.
+
 USER AUTOCOMMANDS                                     *diffview-user-autocmds*
 
 For information on how to use User autocommands, see |User|.
