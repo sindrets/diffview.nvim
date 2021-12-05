@@ -1,4 +1,5 @@
 local Job = require("plenary.job")
+local async = require("plenary.async")
 local api = vim.api
 local M = {}
 
@@ -15,7 +16,7 @@ local setlocal_opr_templates = {
 }
 
 ---Echo string with multiple lines.
----@param msg string
+---@param msg string|string[]
 ---@param hl? string Highlight group name.
 ---@param schedule? boolean Schedule the echo call.
 function M.echo_multiln(msg, hl, schedule)
@@ -27,28 +28,53 @@ function M.echo_multiln(msg, hl, schedule)
   end
 
   vim.cmd("echohl " .. (hl or "None"))
-  for _, line in ipairs(vim.split(msg, "\n")) do
-    vim.cmd(string.format('echom "%s"', vim.fn.escape(line, [["\]])))
+  if type(msg) ~= "table" then
+    msg = vim.split(msg, "\n")
+  end
+  for _, line in ipairs(msg) do
+    line = line:gsub('"', [[\"]])
+    vim.cmd(string.format('echom "%s"', line))
   end
   vim.cmd("echohl None")
 end
 
----@param msg string
+---@param msg string|string[]
 ---@param schedule? boolean Schedule the echo call.
 function M.info(msg, schedule)
-  M.echo_multiln("[Diffview.nvim] " .. msg, "Directory", schedule)
+  if type(msg) ~= "table" then
+    msg = vim.split(msg, "\n")
+  end
+  if not msg[1] or msg[1] == "" then
+    return
+  end
+  msg[1] = "[Diffview.nvim] " .. msg[1]
+  M.echo_multiln(msg, "Directory", schedule)
 end
 
----@param msg string
+---@param msg string|string[]
 ---@param schedule? boolean Schedule the echo call.
 function M.warn(msg, schedule)
-  M.echo_multiln("[Diffview.nvim] " .. msg, "WarningMsg", schedule)
+  if type(msg) ~= "table" then
+    msg = vim.split(msg, "\n")
+  end
+  if not msg[1] or msg[1] == "" then
+    return
+  end
+  msg[1] = "[Diffview.nvim] " .. msg[1]
+  M.echo_multiln(msg, "WarningMsg", schedule)
 end
 
----@param msg string
+---@param msg string|string[]
 ---@param schedule? boolean Schedule the echo call.
 function M.err(msg, schedule)
-  M.echo_multiln("[Diffview.nvim] " .. msg, "ErrorMsg", schedule)
+  if type(msg) ~= "table" then
+    msg = vim.split(msg, "\n")
+  end
+  if not msg[1] or msg[1] == "" then
+    return
+  end
+  msg[1] = "[Diffview.nvim] " .. msg[1]
+  M.echo_multiln(msg, "ErrorMsg", schedule)
 end
 
 ---Call the function `f`, ignoring most of the window and buffer related
@@ -306,10 +332,14 @@ end
 ---Get the output of a system command.
 ---@param cmd string[]
 ---@param cwd? string
+---@param silent? boolean Supress log output
 ---@return string[] stdout
 ---@return integer code
 ---@return string[] stderr
-function M.system_list(cmd, cwd)
+function M.system_list(cmd, cwd, silent)
+  if vim.in_fast_event() then
+    async.util.scheduler()
+  end
   local command = table.remove(cmd, 1)
   local stderr = {}
   local job = Job
@@ -322,7 +352,9 @@ function M.system_list(cmd, cwd)
       end,
     })
   local stdout, code = job:sync()
-  M.handle_failed_job(job)
+  if not silent then
+    M.handle_failed_job(job)
+  end
   return stdout, code, stderr
 end
 
@@ -571,19 +603,46 @@ function M.tabpage_win_find_buf(tabpage, bufid)
 end
 
 function M.clear_prompt()
-  vim.cmd("norm! :esc<CR>")
+  vim.api.nvim_echo({ { "" } }, false, {})
+  vim.cmd("redraw")
 end
 
-function M.input_char(prompt)
+---@class InputCharSpec
+---@field clear_prompt boolean (default: true)
+---@field allow_non_ascii boolean (default: true)
+---@field prompt_hl string (default: nil)
+
+---@param prompt string
+---@param opt InputCharSpec
+---@return string Char
+---@return string Raw
+function M.input_char(prompt, opt)
+  opt = vim.tbl_extend("keep", opt or {}, {
+    clear_prompt = true,
+    allow_non_ascii = false,
+    prompt_hl = nil,
+  })
+
   if prompt then
-    print(prompt)
+    vim.api.nvim_echo({ { prompt, opt.prompt_hl } }, false, {})
   end
+
   local c
-  while type(c) ~= "number" do
+  if not opt.allow_non_ascii then
+    while type(c) ~= "number" do
+      c = vim.fn.getchar()
+    end
+  else
     c = vim.fn.getchar()
   end
-  M.clear_prompt()
-  return vim.fn.nr2char(c)
+
+  if opt.clear_prompt then
+    M.clear_prompt()
+  end
+
+  local s = type(c) == "number" and vim.fn.nr2char(c) or nil
+  local raw = type(c) == "number" and s or c
+  return s, raw
 end
 
 function M.input(prompt, default, completion)
@@ -595,6 +654,18 @@ function M.input(prompt, default, completion)
   })
   M.clear_prompt()
   return v
+end
+
+function M.raw_key(vim_key)
+  return api.nvim_eval(string.format([["\%s"]], vim_key))
+end
+
+function M.pause(msg)
+  vim.cmd("redraw")
+  M.input_char(
+    "-- PRESS ANY KEY TO CONTINUE -- " .. (msg or ""),
+    { allow_non_ascii = true, prompt_hl = "Directory" }
+  )
 end
 
 local function prepare_mapping(t)

@@ -15,6 +15,7 @@ local FileDict = oop.create_class("FileDict")
 function FileDict:init()
   self.working = {}
   self.staged = {}
+  self:update_file_trees()
 end
 
 do

@@ -346,7 +346,7 @@ end
 ---@param callback function
 function FileEntry._create_buffer(git_root, rev, path, null, callback)
   if null then
-    callback()
+    vim.schedule(callback)
     return FileEntry._get_null_buffer()
   end
 
