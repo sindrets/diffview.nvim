@@ -28,7 +28,7 @@ M.defaults = {
     listing_style = "tree",       -- One of 'list' or 'tree'
     tree_options = {              -- Only applies when listing_style is 'tree'
       flatten_dirs = true,
-      folder_statuses = "always"  -- One of 'never', 'only_folded' or 'always'.
+      folder_statuses = "only_folded"  -- One of 'never', 'only_folded' or 'always'.
     }
   },
   file_history_panel = {
