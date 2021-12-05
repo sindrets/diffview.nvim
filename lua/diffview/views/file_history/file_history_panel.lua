@@ -316,7 +316,29 @@ function FileHistoryPanel:cur_file()
   return self.cur_item[2]
 end
 
-function FileHistoryPanel:prev_file()
+function FileHistoryPanel:_get_entry_by_file_offset(entry_idx, file_idx, offset)
+  local cur_entry = self.entries[entry_idx]
+
+  if cur_entry.files[file_idx + offset] then
+    return cur_entry, cur_entry.files[file_idx + offset]
+  end
+
+  local sign = utils.sign(offset)
+  local delta = math.abs(offset) - (sign > 0 and #cur_entry.files - file_idx or file_idx - 1)
+  local i = (entry_idx + (sign > 0 and 0 or -2)) % #self.entries + 1
+  while i ~= entry_idx do
+    local files = self.entries[i].files
+    if (#files - delta) >= 0 then
+      local target_file = sign > 0 and files[delta] or files[#files - (delta - 1)]
+      return self.entries[i], target_file
+    end
+
+    delta = delta - #files
+    i = (i + (sign > 0 and 0 or -2)) % #self.entries + 1
+  end
+end
+
+function FileHistoryPanel:set_file_by_offset(offset)
   local entry, file = self.cur_item[1], self.cur_item[2]
 
   if not (entry and file) and self:num_items() > 0 then
@@ -328,19 +350,12 @@ function FileHistoryPanel:prev_file()
     local entry_idx = utils.vec_indexof(self.entries, entry)
     local file_idx = utils.vec_indexof(entry.files, file)
     if entry_idx ~= -1 and file_idx ~= -1 then
-      if file_idx == 1 and #self.entries > 1 then
-        -- go to prev entry
-        local next_entry_idx = (entry_idx - 2) % #self.entries + 1
-        local next_entry = self.entries[next_entry_idx]
-        self:update_active_item({ next_entry, next_entry.files[#next_entry.files] })
+      local next_entry, next_file = self:_get_entry_by_file_offset(entry_idx, file_idx, offset)
+      self:update_active_item({ next_entry, next_file })
+      if next_entry ~= entry then
         self:set_entry_fold(entry, false)
-        return self.cur_item[2]
-      else
-        -- go to prev file in cur entry
-        local next_file_idx = (file_idx - 2) % #entry.files + 1
-        self:update_active_item({ entry, entry.files[next_file_idx] })
-        return self.cur_item[2]
       end
+      return self.cur_item[2]
     end
   else
     self:update_active_item({ self.entries[1], self.entries[1].files[1] })
@@ -348,35 +363,12 @@ function FileHistoryPanel:prev_file()
   end
 end
 
+function FileHistoryPanel:prev_file()
+  return self:set_file_by_offset(-vim.v.count1)
+end
+
 function FileHistoryPanel:next_file()
-  local entry, file = self.cur_item[1], self.cur_item[2]
-
-  if not (entry and file) and self:num_items() > 0 then
-    self:update_active_item({ self.entries[1], self.entries[1].files[1] })
-    return self.cur_item[2]
-  end
-
-  if self:num_items() > 1 then
-    local entry_idx = utils.vec_indexof(self.entries, entry)
-    local file_idx = utils.vec_indexof(entry.files, file)
-    if entry_idx ~= -1 and file_idx ~= -1 then
-      if file_idx == #entry.files and #self.entries > 1 then
-        -- go to next entry
-        local next_entry_idx = entry_idx % #self.entries + 1
-        self:update_active_item({ self.entries[next_entry_idx], self.entries[next_entry_idx].files[1] })
-        self:set_entry_fold(entry, false)
-        return self.cur_item[2]
-      else
-        -- go to next file in cur entry
-        local next_file_idx = file_idx % #entry.files + 1
-        self:update_active_item({ entry, entry.files[next_file_idx] })
-        return self.cur_item[2]
-      end
-    end
-  else
-    self:update_active_item({ self.entries[1], self.entries[1].files[1] })
-    return self.cur_item[2]
-  end
+  return self:set_file_by_offset(vim.v.count1)
 end
 
 function FileHistoryPanel:highlight_item(item)
