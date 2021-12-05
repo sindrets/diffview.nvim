@@ -17,6 +17,7 @@ for any git rev.
 
 - Git
 - Neovim >=0.5.0
+- [plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
 - [nvim-web-devicons](https://github.com/kyazdani42/nvim-web-devicons) (optional) For file icons
 
 ## Installation
@@ -53,14 +54,14 @@ require'diffview'.setup {
     fold_open = "",
   },
   file_panel = {
-    position = "left",            -- One of 'left', 'right', 'top', 'bottom'
-    width = 35,                   -- Only applies when position is 'left' or 'right'
-    height = 10,                  -- Only applies when position is 'top' or 'bottom'
-    listing_style = "tree",       -- One of 'list' or 'tree'
-    tree_options = {              -- Only applies when listing_style is 'tree'
-      flatten_dirs = true,
-      folder_statuses = "always"  -- One of 'never', 'only_folded' or 'always'.
-    }
+    position = "left",                  -- One of 'left', 'right', 'top', 'bottom'
+    width = 35,                         -- Only applies when position is 'left' or 'right'
+    height = 10,                        -- Only applies when position is 'top' or 'bottom'
+    listing_style = "tree",             -- One of 'list' or 'tree'
+    tree_options = {                    -- Only applies when listing_style is 'tree'
+      flatten_dirs = true,              -- Flatten dirs that only contain one single dir
+      folder_statuses = "only_folded",  -- One of 'never', 'only_folded' or 'always'.
+    },
   },
   file_history_panel = {
     position = "bottom",
@@ -250,6 +251,10 @@ is the top level of the git repository).
 - **Diff the index against a git rev:**
   - `DiffviewOpen HEAD~2 --cached`
   - Defaults to `HEAD` if no rev is given.
+- **Change the fill char for the deleted lines in diff-mode:**
+  - (vimscript): `set fillchars+=diff:╱`
+  - Note: whether or not the diagonal lines will line up nicely will depend on
+    your terminal emulator.
 
 ## Restoring Files
 

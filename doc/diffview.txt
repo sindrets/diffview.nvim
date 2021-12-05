@@ -49,14 +49,14 @@ Example configuration with default settings:
         fold_open = "",
       },
       file_panel = {
-        position = "left",            -- One of 'left', 'right', 'top', 'bottom'
-        width = 35,                   -- Only applies when position is 'left' or 'right'
-        height = 10,                  -- Only applies when position is 'top' or 'bottom'
-        listing_style = "tree",       -- One of 'list' or 'tree'
-        tree_options = {              -- Only applies when listing_style is 'tree'
-          flatten_dirs = true,
-          folder_statuses = "always"  -- One of 'never', 'only_folded' or 'always'.
-        }
+        position = "left",                  -- One of 'left', 'right', 'top', 'bottom'
+        width = 35,                         -- Only applies when position is 'left' or 'right'
+        height = 10,                        -- Only applies when position is 'top' or 'bottom'
+        listing_style = "tree",             -- One of 'list' or 'tree'
+        tree_options = {                    -- Only applies when listing_style is 'tree'
+          flatten_dirs = true,              -- Flatten dirs that only contain one single dir
+          folder_statuses = "only_folded",  -- One of 'never', 'only_folded' or 'always'.
+        },
       },
       default_args = {    -- Default args prepended to the arg-list for the listed commands
         DiffviewOpen = {},
