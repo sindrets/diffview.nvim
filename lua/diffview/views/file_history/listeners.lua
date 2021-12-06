@@ -149,11 +149,23 @@ return function(view)
         if target_tab then
           api.nvim_set_current_tabpage(target_tab)
           vim.cmd("sp " .. vim.fn.fnameescape(file.absolute_path))
-          vim.cmd("diffoff")
         else
           vim.cmd("tabe " .. vim.fn.fnameescape(file.absolute_path))
-          vim.cmd("diffoff")
         end
+        vim.cmd("diffoff")
+      end
+    end,
+    goto_file_edit = function()
+      local file = prepare_goto_file(view)
+      if file then
+        local target_tab = lib.get_prev_non_view_tabpage()
+        if target_tab then
+          api.nvim_set_current_tabpage(target_tab)
+          vim.cmd("e " .. vim.fn.fnameescape(file.absolute_path))
+        else
+          vim.cmd("tabe " .. vim.fn.fnameescape(file.absolute_path))
+        end
+        vim.cmd("diffoff")
       end
     end,
     goto_file_split = function()

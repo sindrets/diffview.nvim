@@ -219,9 +219,13 @@ AVAILABLE UNUSED MAPPINGS                 *diffview-available-unused-mappings*
 
 This section documents key-mappable functions that are not mapped by default.
 
-focus_entry                                     *diffview-config-focus_entry*
+focus_entry                                      *diffview-config-focus_entry*
         Like `select_entry`, but also bring the cursor to the right diff split.
         Available in both the file panel and the file history panel.
+
+goto_file_edit                                  *diffview-maps-goto_file_edit*
+        Works like |diffview-maps-goto_file| except instead of creating a new
+        split it will just open the file in the last accessed window.
 
 LAYOUT                                                     *diffview-layout*
 

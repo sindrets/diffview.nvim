@@ -191,6 +191,9 @@ This section documents key-mappable functions that are not mapped by default.
 - `focus_entry`
   - Like `select_entry`, but also bring the cursor to the right diff split.
     Available in both the file panel and the file history panel.
+- `goto_file_edit`
+  - Works like `goto_file` except instead of creating a new
+    split it will just open the file in the last accessed window.
 
 ## File History
 
