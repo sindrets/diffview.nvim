@@ -178,7 +178,7 @@ M.diff_file_list = async.void(function(git_root, left, right, path_args, opt, ca
   local files = FileDict()
   ---@type CountDownLatch
   local latch = CountDownLatch(2)
-  local rev_arg = M.rev_to_arg(left, right)
+  local rev_args = M.rev_to_args(left, right)
   local errors = {}
 
   tracked_files(
@@ -186,7 +186,7 @@ M.diff_file_list = async.void(function(git_root, left, right, path_args, opt, ca
     left,
     right,
     utils.vec_join(
-      rev_arg ~= "" and rev_arg or nil,
+      rev_args,
       "--",
       path_args
     ),
@@ -227,7 +227,8 @@ M.diff_file_list = async.void(function(git_root, left, right, path_args, opt, ca
   )
 
   if left.type == RevType.INDEX and right.type == RevType.LOCAL then
-    local left_rev = M.head_rev(git_root)
+    local head = M.head_rev(git_root)
+    local left_rev = head or Rev.new_null_tree()
     local right_rev = Rev(RevType.INDEX)
     tracked_files(
       git_root,
@@ -235,7 +236,7 @@ M.diff_file_list = async.void(function(git_root, left, right, path_args, opt, ca
       right_rev,
       utils.vec_join(
         "--cached",
-        "HEAD",
+        head and "HEAD" or Rev.NULL_TREE_SHA,
         "--",
         path_args
       ),
@@ -633,24 +634,24 @@ function M.file_history_dry_run(git_root, path_args, log_options)
   return code == 0 and #out > 0
 end
 
----Convert revs to a git rev arg.
+---Convert revs to git rev args.
 ---@param left Rev
 ---@param right Rev
----@return string
-function M.rev_to_arg(left, right)
+---@return string[]
+function M.rev_to_args(left, right)
   assert(
     not (left.type == RevType.LOCAL and right.type == RevType.LOCAL),
     "Can't diff LOCAL against LOCAL!"
   )
 
   if left.type == RevType.COMMIT and right.type == RevType.COMMIT then
-    return left.commit .. ".." .. right.commit
+    return { left.commit .. ".." .. right.commit }
   elseif left.type == RevType.INDEX and right.type == RevType.LOCAL then
-    return ""
+    return {}
   elseif left.type == RevType.COMMIT and right.type == RevType.INDEX then
-    return "--cached " .. left.commit
+    return { "--cached", left.commit }
   else
-    return left.commit
+    return { left.commit }
   end
 end
 
@@ -671,7 +672,7 @@ end
 
 ---@return Rev
 function M.head_rev(git_root)
-  local out, code = utils.system_list({ "git", "rev-parse", "HEAD" }, git_root)
+  local out, code = utils.system_list({ "git", "rev-parse", "HEAD", "--" }, git_root)
   if code ~= 0 then
     return
   end
@@ -689,20 +690,23 @@ end
 function M.symmetric_diff_revs(git_root, rev_arg)
   local r1 = rev_arg:match("(.+)%.%.%.") or "HEAD"
   local r2 = rev_arg:match("%.%.%.(.+)") or "HEAD"
-  local out, code
+  local out, code, stderr
 
   local function err()
-    utils.err("Failed to parse rev '" .. rev_arg .. "'!")
-    utils.err("Git output: " .. table.concat(out, "\n"))
+    utils.err(utils.vec_join(
+      ("Failed to parse rev '%s'!"):format(rev_arg),
+      "Git output: ",
+      stderr
+    ))
   end
 
-  out, code = utils.system_list({ "git", "merge-base", r1, r2 }, git_root)
+  out, code, stderr = utils.system_list({ "git", "merge-base", r1, r2 }, git_root)
   if code ~= 0 then
     return err()
   end
   local left_hash = out[1]:gsub("^%^", "")
 
-  out, code = utils.system_list({ "git", "rev-parse", "--revs-only", r2 }, git_root)
+  out, code, stderr = utils.system_list({ "git", "rev-parse", "--revs-only", r2 }, git_root)
   if code ~= 0 then
     return err()
   end

@@ -52,6 +52,10 @@ function M.diffview_open(args)
     }
   )
 
+  if not (left and right) then
+    return
+  end
+
   ---@type DiffViewOptions
   local options = {
     show_untracked = arg_parser.ambiguous_bool(
@@ -152,13 +156,11 @@ function M.parse_revs(git_root, rev_arg, opt)
   ---@type Rev
   local right
 
-  local e_git_root = vim.fn.shellescape(git_root)
-  local base_cmd = "git -C " .. e_git_root .. " "
   local head = git.head_rev(git_root)
 
   if not rev_arg then
     if opt.cached then
-      left = head
+      left = head or Rev.new_null_tree()
       right = Rev(RevType.INDEX)
     else
       left = Rev(RevType.INDEX)
@@ -172,15 +174,18 @@ function M.parse_revs(git_root, rev_arg, opt)
       left, right = M.imply_local(left, right, head)
     end
   else
-    local rev_strings = vim.fn.systemlist(
-      base_cmd .. "rev-parse --revs-only " .. vim.fn.shellescape(rev_arg)
+    local rev_strings, code, stderr = utils.system_list(
+      { "git", "rev-parse", "--revs-only", rev_arg }, git_root
     )
-    if utils.shell_error() then
-      utils.err("Failed to parse rev '" .. rev_arg .. "'!")
-      utils.err("Git output: " .. vim.fn.join(rev_strings, "\n"))
+    if code ~= 0 then
+      utils.err(utils.vec_join(
+        ("Failed to parse rev '%s'!"):format(rev_arg),
+        "Git output: ",
+        stderr
+      ))
       return
     elseif #rev_strings == 0 then
-      utils.err("Not a git rev: '" .. rev_arg .. "'.")
+      utils.err("Bad revision: '" .. rev_arg .. "'")
       return
     end
 

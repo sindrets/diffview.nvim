@@ -21,6 +21,9 @@ local RevType = oop.enum({
 ---@field head boolean If true, indicates that the rev should be updated when HEAD changes.
 local Rev = oop.create_class("Rev")
 
+-- The special SHA for git's empty tree.
+Rev.NULL_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
 ---Rev constructor
 ---@param type RevType
 ---@param commit string
@@ -40,6 +43,12 @@ function Rev:abbrev(length)
     return self.commit:sub(1, length or 7)
   end
   return nil
+end
+
+---Create a new commit rev with the special empty tree SHA.
+---@return Rev
+function Rev.new_null_tree()
+  return Rev(RevType.COMMIT, Rev.NULL_TREE_SHA)
 end
 
 M.RevType = RevType
