@@ -107,6 +107,8 @@ local tracked_files = async.void(function(git_root, left, right, args, kind, cal
       name = name:gsub("^.*\t", "")
     end
 
+    name = utils.path_to_os(name)
+
     local stats = {
       additions = tonumber(numstat_out[i]:match("^%d+")),
       deletions = tonumber(numstat_out[i]:match("^%d+%s+(%d+)")),
@@ -144,11 +146,12 @@ local untracked_files = async.void(function(git_root, left, right, callback)
       if j.code == 0 then
         local files = {}
         for _, s in ipairs(j:result()) do
+          local path = utils.path_to_os(s)
           table.insert(
             files,
             FileEntry({
-              path = s,
-              absolute_path = utils.path_join({ git_root, s }),
+              path = path,
+              absolute_path = utils.path_join({ git_root, path }),
               status = "?",
               kind = "working",
               left = left,
@@ -547,6 +550,8 @@ local function process_file_history(thread, git_root, path_args, opt, callback)
           old_path = oldname
         end
       end
+
+      name = utils.path_to_os(name)
 
       local stats = {
         additions = tonumber(cur.numstat[i]:match("^%d+")),

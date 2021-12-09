@@ -131,6 +131,21 @@ function M.pattern_esc(s)
   return result
 end
 
+---Convert a given path to the correct OS format.
+---@param path string
+---@param platform? '"unix"'|'"windows"'
+---@return string
+function M.path_to_os(path, platform)
+  platform = platform or (is_windows and "windows")
+  if platform == "windows" then
+    path, _ = path:gsub("/", "\\")
+    return path
+  else
+    path, _ = path:gsub("\\", "/")
+    return path
+  end
+end
+
 ---Check if a given path is absolute.
 ---@param path string
 ---@return boolean

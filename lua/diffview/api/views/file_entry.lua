@@ -180,7 +180,10 @@ function CFileEntry._create_buffer(git_root, rev, path, producer, null, callback
   end
 
   -- stylua: ignore
-  local fullname = utils.path_join({ "diffview://", git_root, ".git", context, path, })
+  local fullname = "diffview://" .. utils.path_to_os(
+    utils.path_join({ git_root, ".git", context, path }),
+    "unix"
+  )
   for option, value in pairs(FileEntry.bufopts) do
     api.nvim_buf_set_option(bn, option, value)
   end
@@ -191,7 +194,10 @@ function CFileEntry._create_buffer(git_root, rev, path, producer, null, callback
     local i = 1
     while not ok do
       -- stylua: ignore
-      fullname = utils.path_join({ "diffview://", git_root, ".git", context, i, path, })
+      fullname = "diffview://" .. utils.path_to_os(
+        utils.path_join({ git_root, ".git", context, i, path }),
+        "unix"
+      )
       ok = pcall(api.nvim_buf_set_name, bn, fullname)
       i = i + 1
     end

@@ -360,7 +360,10 @@ function FileEntry._create_buffer(git_root, rev, path, null, callback)
   end
 
   -- stylua: ignore
-  local fullname = utils.path_join({ "diffview://", git_root, ".git", context, path, })
+  local fullname = "diffview://" .. utils.path_to_os(
+    utils.path_join({ git_root, ".git", context, path }),
+    "unix"
+  )
   for option, value in pairs(FileEntry.bufopts) do
     api.nvim_buf_set_option(bn, option, value)
   end
@@ -371,32 +374,38 @@ function FileEntry._create_buffer(git_root, rev, path, null, callback)
     local i = 1
     repeat
       -- stylua: ignore
-      fullname = utils.path_join({ "diffview://", git_root, ".git", context, i, path, })
+      fullname = "diffview://" .. utils.path_to_os(
+        utils.path_join({ git_root, ".git", context, i, path }),
+        "unix"
+      )
       ok = pcall(api.nvim_buf_set_name, bn, fullname)
       i = i + 1
     until ok
   end
 
   local git = require("diffview.git.utils")
-  git.show(git_root, { (rev.commit or "") .. ":" .. path }, function(err, result)
-    if not err then
-      vim.schedule(function()
-        if api.nvim_buf_is_valid(bn) then
-          vim.bo[bn].modifiable = true
-          api.nvim_buf_set_lines(bn, 0, -1, false, result)
-          vim.bo[bn].modifiable = false
-          vim.api.nvim_buf_call(bn, function()
-            vim.cmd("filetype detect")
-          end)
-          callback()
-        end
-      end)
-    else
-      logger.error("[git] Failed to show file content.")
-      logger.error("[stderr] " .. table.concat(err, "\n"))
-      utils.err(string.format("Failed to create diff buffer: '%s'", fullname), true)
+  git.show(
+    git_root, { (rev.commit or "") .. ":" .. utils.path_to_os(path, "unix") },
+    function(err, result)
+      if not err then
+        vim.schedule(function()
+          if api.nvim_buf_is_valid(bn) then
+            vim.bo[bn].modifiable = true
+            api.nvim_buf_set_lines(bn, 0, -1, false, result)
+            vim.bo[bn].modifiable = false
+            vim.api.nvim_buf_call(bn, function()
+              vim.cmd("filetype detect")
+            end)
+            callback()
+          end
+        end)
+      else
+        logger.error("[git] Failed to show file content.")
+        logger.error("[stderr] " .. table.concat(err, "\n"))
+        utils.err(string.format("Failed to create diff buffer: '%s'", fullname), true)
+      end
     end
-  end)
+  )
 
   return bn
 end
