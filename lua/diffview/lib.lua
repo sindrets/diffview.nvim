@@ -27,10 +27,13 @@ function M.diffview_open(args)
       vim.bo.buftype == ""
         and vim.fn.filereadable(vim.fn.expand("%")) == 1
         and vim.fn.expand("%:p:h")
-      or "."
+      or vim.loop.fs_realpath(".")
     )
   local cpath = argo:get_flag("C")
-  local p = not vim.tbl_contains({ "true", "", nil }, cpath) and cpath or fpath
+  if vim.tbl_contains({ "true", "", nil }, cpath) then
+    cpath = nil
+  end
+  local p = cpath and vim.loop.fs_realpath(cpath) or fpath
   if vim.fn.isdirectory(p) ~= 1 then
     p = vim.fn.fnamemodify(p, ":h")
   end
@@ -38,7 +41,7 @@ function M.diffview_open(args)
   local git_root = git.toplevel(p)
   if not git_root then
     utils.err(
-      string.format("Path not a git repo (or any parent): '%s'", vim.fn.fnamemodify(p, ":."))
+      ("Path not a git repo (or any parent): '%s'"):format(vim.fn.fnamemodify(p, ":."))
     )
     return
   end
@@ -104,17 +107,19 @@ function M.file_history(args)
   end, paths)
 
   local p
-  if vim.fn.filereadable(paths[1]) == 1 then
-    p = vim.fn.isdirectory(paths[1]) ~= 1 and vim.fn.fnamemodify(paths[1], ":h") or paths[1]
-  elseif vim.bo.buftype == "" and vim.fn.filereadable(vim.fn.expand("%")) == 1 then
-    p = vim.fn.expand("%:p:h")
+  local stat = vim.loop.fs_stat(paths[1])
+  if stat then
+    p = vim.loop.fs_realpath(paths[1])
+    if stat.type ~= "directory" then
+      p = vim.fn.fnamemodify(p, ":h")
+    end
   else
-    p = "."
+    p = vim.loop.fs_realpath(".")
   end
 
   local git_root = git.toplevel(p)
   if not git_root then
-    utils.err( string.format("Path not a git repo (or any parent): '%s'", rel_paths[1]))
+    utils.err(("Path not a git repo (or any parent): '%s'"):format(rel_paths[1]))
     return
   end
 
@@ -127,7 +132,7 @@ function M.file_history(args)
   local ok = git.file_history_dry_run(git_root, paths, log_options)
 
   if not ok then
-    utils.info(string.format("No git history for target(s): '%s'", table.concat(rel_paths, ", ")))
+    utils.info(("No git history for target(s): '%s'"):format(table.concat(rel_paths, ", ")))
     return
   end
 

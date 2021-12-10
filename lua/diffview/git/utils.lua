@@ -62,6 +62,61 @@ local queue_sync_job = async.void(function(job)
   end
 end)
 
+---@param max_retries integer
+---@vararg Job
+local ensure_output = async.wrap(function(max_retries, jobs, callback)
+  local num_bad_jobs
+  local num_retries = 0
+  local new_jobs = {}
+
+  for n = 0, max_retries - 1 do
+    num_bad_jobs = 0
+    for i, job in ipairs(jobs) do
+
+      if job.code == 0 and #job:result() == 0 then
+        logger.warn(
+          ("Job silently returned nothing! Retrying %d more times(s).")
+          :format(max_retries - n)
+        )
+        logger.log_job(job, logger.warn)
+        num_retries = n + 1
+
+        new_jobs[i] = Job:new({
+          command = job.command,
+          args = job.args,
+          cwd = job._raw_cwd,
+          env = job.env,
+        })
+        new_jobs[i]:start()
+        if vim.in_fast_event() then
+          async.util.scheduler()
+        end
+        Job.join(new_jobs[i])
+
+        job._stdout_results = new_jobs[i]._stdout_results
+        job._stderr_results = new_jobs[i]._stderr_results
+
+        if new_jobs[i].code ~= 0 then
+          job.code = new_jobs[i].code
+          utils.handle_failed_job(new_jobs[i])
+        elseif #job._stdout_results == 0 then
+          num_bad_jobs = num_bad_jobs + 1
+        end
+      end
+    end
+
+    if num_bad_jobs == 0 then
+      if num_retries > 0 then
+        logger.s_info("Retry was successful!")
+      end
+      callback(JobStatus.SUCCESS)
+      return
+    end
+  end
+
+  callback(JobStatus.ERROR)
+end, 3)
+
 local tracked_files = async.void(function(git_root, left, right, args, kind, callback)
   ---@type FileEntry[]
   local files = {}
@@ -90,8 +145,12 @@ local tracked_files = async.void(function(git_root, left, right, args, kind, cal
   namestat_job:start()
   numstat_job:start()
   latch:await()
+  local out_status
+  if not (#namestat_job:result() == #numstat_job:result()) then
+    out_status = ensure_output(2, { namestat_job, numstat_job })
+  end
 
-  if not (namestat_job.code == 0 and numstat_job.code == 0) then
+  if out_status == JobStatus.ERROR or not (namestat_job.code == 0 and numstat_job.code == 0) then
     callback(utils.vec_join(namestat_job:stderr_result(), numstat_job:stderr_result()), nil)
     return
   end
@@ -230,8 +289,7 @@ M.diff_file_list = async.void(function(git_root, left, right, path_args, opt, ca
   )
 
   if left.type == RevType.INDEX and right.type == RevType.LOCAL then
-    local head = M.head_rev(git_root)
-    local left_rev = head or Rev.new_null_tree()
+    local left_rev = M.head_rev(git_root) or Rev.new_null_tree()
     local right_rev = Rev(RevType.INDEX)
     tracked_files(
       git_root,
@@ -239,7 +297,7 @@ M.diff_file_list = async.void(function(git_root, left, right, path_args, opt, ca
       right_rev,
       utils.vec_join(
         "--cached",
-        head and "HEAD" or Rev.NULL_TREE_SHA,
+        left_rev.commit,
         "--",
         path_args
       ),
@@ -494,7 +552,7 @@ local function process_file_history(thread, git_root, path_args, opt, callback)
         end,
       }
 
-      local max_retries = 1
+      local max_retries = 2
       resume_lock = true
 
       for i = 0, max_retries do
@@ -508,14 +566,14 @@ local function process_file_history(thread, git_root, path_args, opt, callback)
         utils.handle_failed_job(job)
 
         if #cur.namestat == 0 then
-          logger.warn("[git] 'git-show' returned nothing for merge commit!")
+          logger.warn("[git] 'git-show' silently returned nothing!")
           logger.log_job(job, logger.warn)
           if i < max_retries then
             logger.warn(("[git] Retrying %d more time(s)."):format(max_retries - i))
           end
         else
           if i > 0 then
-            logger.info("[git] Success!")
+            logger.info("[git] Retry successful!")
           end
           break
         end
@@ -774,13 +832,13 @@ function M.expand_pathspec(git_root, cwd, pathspec)
   if not utils.path_is_abs(pattern) then
     pattern = utils.path_join({ utils.path_relative(cwd, git_root), pattern })
   end
-  return magic .. pattern
+  return magic .. utils.path_to_os(pattern, "unix")
 end
 
 function M.pathspec_modify(pathspec, mods)
   local magic = pathspec:match("^:[/!^]*:?") or pathspec:match("^:%b()") or ""
   local pattern = pathspec:sub(1 + #magic, -1)
-  return magic .. vim.fn.fnamemodify(pattern, mods)
+  return magic .. utils.path_to_os(vim.fn.fnamemodify(pattern, mods), "unix")
 end
 
 ---Check if any of the given revs are LOCAL.
