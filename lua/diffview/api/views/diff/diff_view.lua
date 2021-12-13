@@ -123,7 +123,7 @@ function CDiffView:create_file_entries(files)
         CFileEntry({
           path = file_data.path,
           oldpath = file_data.oldpath,
-          absolute_path = utils.path_join({ self.git_root, file_data.path }),
+          absolute_path = utils.path:join(self.git_root, file_data.path),
           status = file_data.status,
           stats = file_data.stats,
           kind = v.kind,

@@ -127,7 +127,7 @@ return function(panel)
   ---@type RenderComponent
   local comp = panel.components.path.comp
   local line_idx = 0
-  local s = utils.path_shorten(vim.fn.fnamemodify(panel.git_root, ":~"), panel.width - 6)
+  local s = utils.path:shorten(utils.path:vim_fnamemodify(panel.git_root, ":~"), panel.width - 6)
   comp:add_hl("DiffviewFilePanelRootPath", line_idx, 0, #s)
   comp:add_line(s)
 
@@ -172,11 +172,11 @@ return function(panel)
     comp = panel.components.info.entries.comp
     line_idx = 0
     for _, arg in ipairs(extra_info) do
-      local relpath = utils.path_relative(arg, panel.git_root)
+      local relpath = utils.path:relative(arg, panel.git_root)
       if relpath == "" then
         relpath = "."
       end
-      s = utils.path_shorten(relpath, panel.width - 5)
+      s = utils.path:shorten(relpath, panel.width - 5)
       comp:add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
       comp:add_line(s)
       line_idx = line_idx + 1

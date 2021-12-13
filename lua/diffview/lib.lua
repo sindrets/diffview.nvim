@@ -20,28 +20,28 @@ function M.diffview_open(args)
   local paths = {}
 
   for _, path in ipairs(argo.post_args) do
-    table.insert(paths, vim.fn.expand(path))
+    table.insert(paths, utils.path:vim_expand(path))
   end
 
   local fpath = (
       vim.bo.buftype == ""
-        and vim.fn.filereadable(vim.fn.expand("%")) == 1
-        and vim.fn.expand("%:p:h")
-      or vim.loop.fs_realpath(".")
+        and utils.path:readable(utils.path:vim_expand("%"))
+        and utils.path:vim_expand("%:p:h")
+      or utils.path:realpath(".")
     )
   local cpath = argo:get_flag("C")
   if vim.tbl_contains({ "true", "", nil }, cpath) then
     cpath = nil
   end
-  local p = cpath and vim.loop.fs_realpath(cpath) or fpath
-  if vim.fn.isdirectory(p) ~= 1 then
-    p = vim.fn.fnamemodify(p, ":h")
+  local p = cpath and utils.path:realpath(cpath) or fpath
+  if not utils.path:is_directory(p) then
+    p = utils.path:parent(p)
   end
 
   local git_root = git.toplevel(p)
   if not git_root then
     utils.err(
-      ("Path not a git repo (or any parent): '%s'"):format(vim.fn.fnamemodify(p, ":."))
+      ("Path not a git repo (or any parent): '%s'"):format(utils.path:relative(p, "."))
     )
     return
   end
@@ -90,12 +90,12 @@ function M.file_history(args)
   local rel_paths
 
   for _, path in ipairs(argo.args) do
-    table.insert(paths, vim.fn.expand(path))
+    table.insert(paths, utils.path:vim_expand(path))
   end
 
   if #paths == 0 then
     if vim.bo.buftype == "" then
-      table.insert(paths, vim.fn.expand("%:p"))
+      table.insert(paths, utils.path:vim_expand("%:p"))
     else
       utils.err("No target!")
       return
@@ -103,18 +103,18 @@ function M.file_history(args)
   end
 
   rel_paths = vim.tbl_map(function(v)
-    return vim.fn.fnamemodify(v, ":.")
+    return utils.path:relative(v, ".")
   end, paths)
 
   local p
-  local stat = vim.loop.fs_stat(paths[1])
+  local stat = utils.path:stat(paths[1])
   if stat then
-    p = vim.loop.fs_realpath(paths[1])
+    p = utils.path:realpath(paths[1])
     if stat.type ~= "directory" then
-      p = vim.fn.fnamemodify(p, ":h")
+      p = utils.path:parent(p)
     end
   else
-    p = vim.loop.fs_realpath(".")
+    p = utils.path:realpath(".")
   end
 
   local git_root = git.toplevel(p)

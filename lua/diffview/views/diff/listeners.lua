@@ -9,17 +9,15 @@ local api = vim.api
 local function prepare_goto_file(view)
   local file = view:infer_cur_file()
   if file then
-    if not file.right.type == RevType.LOCAL then
-      -- Ensure file exists
-      if vim.fn.filereadable(file.absolute_path) ~= 1 then
-        utils.err(
-          string.format(
-            "File does not exist on disk: '%s'",
-            vim.fn.fnamemodify(file.absolute_path, ":.")
-          )
+    -- Ensure file exists
+    if not utils.path:readable(file.absolute_path) then
+      utils.err(
+        string.format(
+          "File does not exist on disk: '%s'",
+          utils.path:relative(file.absolute_path, ".")
         )
-        return
-      end
+      )
+      return
     end
     return file
   end

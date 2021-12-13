@@ -27,7 +27,7 @@ end
 
 ---@param file FileEntry
 function FileTree:add_file_entry(file)
-  local parts = utils.path_explode(file.path)
+  local parts = utils.path:explode(file.path)
   local cur_node = self.root
 
   -- Create missing intermediate pathname components
@@ -36,7 +36,7 @@ function FileTree:add_file_entry(file)
     local name = parts[i]
 
     if i > 1 then
-      path = utils.path_join({ path, parts[i] })
+      path = utils.path:join(path, parts[i])
     end
 
     if not cur_node.children[name] then
@@ -108,7 +108,7 @@ function FileTree:create_comp_schema(flatten_dirs)
         ---@type DirData
         local subdir_data = node.children[1].data
         dir_data = {
-          name = utils.path_join({ dir_data.name, subdir_data.name }),
+          name = utils.path:join(dir_data.name, subdir_data.name),
           path = subdir_data.path,
           kind = subdir_data.kind,
           collapsed = dir_data.collapsed and subdir_data.collapsed,
