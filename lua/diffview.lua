@@ -74,8 +74,8 @@ function M.completion(arg_lead, cmd_line, cur_pos)
   local args, argidx, divideridx = arg_parser.scan_ex_args(cmd_line, cur_pos)
   local fpath = (
       vim.bo.buftype == ""
-        and vim.fn.filereadable(vim.fn.expand("%"))
-        and vim.fn.expand("%:p:h")
+        and utils.path:readable(utils.path:vim_expand("%"))
+        and utils.path:vim_expand("%:p:h")
       or "."
     )
   local git_dir = require("diffview.git.utils").git_dir(fpath)
@@ -100,7 +100,7 @@ function M.completion(arg_lead, cmd_line, cur_pos)
     local heads = vim.tbl_filter(
       function(name) return vim.tbl_contains(targets, name) end,
       vim.tbl_map(
-        function(v) return vim.fn.fnamemodify(v, ":t") end,
+        function(v) return utils.path:basename(v) end,
         vim.fn.glob(git_dir .. "/*", false, true)
       )
     )

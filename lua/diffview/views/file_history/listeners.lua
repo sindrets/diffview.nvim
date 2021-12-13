@@ -1,7 +1,6 @@
 local utils = require("diffview.utils")
 local git = require("diffview.git.utils")
 local lib = require("diffview.lib")
-local RevType = require("diffview.git.rev").RevType
 local DiffView = require("diffview.views.diff.diff_view").DiffView
 local FileEntry = require("diffview.views.file_entry").FileEntry
 local api = vim.api
@@ -9,17 +8,15 @@ local api = vim.api
 local function prepare_goto_file(view)
   local file = view:infer_cur_file()
   if file then
-    if not file.right.type == RevType.LOCAL then
-      -- Ensure file exists
-      if vim.fn.filereadable(file.absolute_path) ~= 1 then
-        utils.err(
-          string.format(
-            "File does not exist on disk: '%s'",
-            vim.fn.fnamemodify(file.absolute_path, ":.")
-          )
+    -- Ensure file exists
+    if not utils.path:readable(file.absolute_path) then
+      utils.err(
+        string.format(
+          "File does not exist on disk: '%s'",
+          utils.path:relative(file.absolute_path, ".")
         )
-        return
-      end
+      )
+      return
     end
     return file
   end
@@ -112,7 +109,6 @@ return function(view)
       if view.panel:is_cur_win() then
         local item = view.panel:get_item_at_cursor()
         if item then
-          -- print(vim.inspect(item))
           if item.files then
             if view.panel.single_file then
               view:set_file(item.files[1], false)
@@ -129,7 +125,6 @@ return function(view)
       if view.panel:is_cur_win() then
         local item = view.panel:get_item_at_cursor()
         if item then
-          -- print(vim.inspect(item))
           if item.files then
             if view.panel.single_file then
               view:set_file(item.files[1], true)

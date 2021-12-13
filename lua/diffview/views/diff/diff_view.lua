@@ -191,7 +191,7 @@ function DiffView:update_files(callback)
     perf:lap("updated head rev")
   end
 
-  local index_stat = vim.loop.fs_stat(utils.path_join({ self.git_dir, "index" }))
+  local index_stat = utils.path:stat(utils.path:join(self.git_dir, "index"))
   local last_winid = api.nvim_get_current_win()
   self:get_updated_files(function(err, new_files)
     if err then

@@ -62,6 +62,62 @@ local queue_sync_job = async.void(function(job)
   end
 end)
 
+---@param max_retries integer
+---@vararg Job
+local ensure_output = async.wrap(function(max_retries, jobs, log_context, callback)
+  local num_bad_jobs
+  local num_retries = 0
+  local new_jobs = {}
+  log_context = log_context and ("[%s] "):format(log_context) or ""
+
+  for n = 0, max_retries - 1 do
+    num_bad_jobs = 0
+    for i, job in ipairs(jobs) do
+
+      if job.code == 0 and #job:result() == 0 then
+        logger.warn(
+          ("%sJob silently returned nothing! Retrying %d more times(s).")
+          :format(log_context, max_retries - n)
+        )
+        logger.log_job(job, logger.warn)
+        num_retries = n + 1
+
+        new_jobs[i] = Job:new({
+          command = job.command,
+          args = job.args,
+          cwd = job._raw_cwd,
+          env = job.env,
+        })
+        new_jobs[i]:start()
+        if vim.in_fast_event() then
+          async.util.scheduler()
+        end
+        Job.join(new_jobs[i])
+
+        job._stdout_results = new_jobs[i]._stdout_results
+        job._stderr_results = new_jobs[i]._stderr_results
+
+        if new_jobs[i].code ~= 0 then
+          job.code = new_jobs[i].code
+          utils.handle_failed_job(new_jobs[i])
+        elseif #job._stdout_results == 0 then
+          num_bad_jobs = num_bad_jobs + 1
+        end
+      end
+    end
+
+    if num_bad_jobs == 0 then
+      if num_retries > 0 then
+        logger.s_info("Retry was successful!")
+      end
+      callback(JobStatus.SUCCESS)
+      return
+    end
+  end
+
+  callback(JobStatus.ERROR)
+end, 4)
+
 local tracked_files = async.void(function(git_root, left, right, args, kind, callback)
   ---@type FileEntry[]
   local files = {}
@@ -90,8 +146,12 @@ local tracked_files = async.void(function(git_root, left, right, args, kind, cal
   namestat_job:start()
   numstat_job:start()
   latch:await()
+  local out_status
+  if not (#namestat_job:result() == #numstat_job:result()) then
+    out_status = ensure_output(2, { namestat_job, numstat_job })
+  end
 
-  if not (namestat_job.code == 0 and numstat_job.code == 0) then
+  if out_status == JobStatus.ERROR or not (namestat_job.code == 0 and numstat_job.code == 0) then
     callback(utils.vec_join(namestat_job:stderr_result(), numstat_job:stderr_result()), nil)
     return
   end
@@ -121,7 +181,7 @@ local tracked_files = async.void(function(git_root, left, right, args, kind, cal
       FileEntry({
         path = name,
         oldpath = oldname,
-        absolute_path = utils.path_join({ git_root, name }),
+        absolute_path = utils.path:join(git_root, name),
         status = status,
         stats = stats,
         kind = kind,
@@ -148,7 +208,7 @@ local untracked_files = async.void(function(git_root, left, right, callback)
             files,
             FileEntry({
               path = s,
-              absolute_path = utils.path_join({ git_root, s }),
+              absolute_path = utils.path:join(git_root, s),
               status = "?",
               kind = "working",
               left = left,
@@ -159,7 +219,7 @@ local untracked_files = async.void(function(git_root, left, right, callback)
         callback(nil, files)
       else
         utils.handle_failed_job(j)
-        callback(j:stderr_result(), nil)
+        callback(j:stderr_result() or {}, nil)
       end
     end
   }):start()
@@ -227,8 +287,7 @@ M.diff_file_list = async.void(function(git_root, left, right, path_args, opt, ca
   )
 
   if left.type == RevType.INDEX and right.type == RevType.LOCAL then
-    local head = M.head_rev(git_root)
-    local left_rev = head or Rev.new_null_tree()
+    local left_rev = M.head_rev(git_root) or Rev.new_null_tree()
     local right_rev = Rev(RevType.INDEX)
     tracked_files(
       git_root,
@@ -236,7 +295,7 @@ M.diff_file_list = async.void(function(git_root, left, right, path_args, opt, ca
       right_rev,
       utils.vec_join(
         "--cached",
-        head and "HEAD" or Rev.NULL_TREE_SHA,
+        left_rev.commit,
         "--",
         path_args
       ),
@@ -420,7 +479,7 @@ local function process_file_history(thread, git_root, path_args, opt, callback)
   local old_path
 
   local single_file = #path_args == 1
-    and vim.fn.isdirectory(path_args[1]) == 0
+    and utils.path:is_directory(path_args[1])
     and #utils.system_list({ "git", "ls-files", "--", unpack(path_args) }, git_root) < 2
 
   incremental_fh_data(
@@ -491,7 +550,7 @@ local function process_file_history(thread, git_root, path_args, opt, callback)
         end,
       }
 
-      local max_retries = 1
+      local max_retries = 2
       resume_lock = true
 
       for i = 0, max_retries do
@@ -505,14 +564,14 @@ local function process_file_history(thread, git_root, path_args, opt, callback)
         utils.handle_failed_job(job)
 
         if #cur.namestat == 0 then
-          logger.warn("[git] 'git-show' returned nothing for merge commit!")
+          logger.warn("[git] 'git-show' silently returned nothing!")
           logger.log_job(job, logger.warn)
           if i < max_retries then
             logger.warn(("[git] Retrying %d more time(s)."):format(max_retries - i))
           end
         else
           if i > 0 then
-            logger.info("[git] Success!")
+            logger.info("[git] Retry successful!")
           end
           break
         end
@@ -562,7 +621,7 @@ local function process_file_history(thread, git_root, path_args, opt, callback)
         FileEntry({
           path = name,
           oldpath = oldname,
-          absolute_path = utils.path_join({ git_root, name }),
+          absolute_path = utils.path:join(git_root, name),
           status = status,
           stats = stats,
           kind = "working",
@@ -620,7 +679,7 @@ end
 ---@param log_options LogOptions
 function M.file_history_dry_run(git_root, path_args, log_options)
   local single_file = #path_args == 1
-    and vim.fn.isdirectory(path_args[1]) == 0
+    and utils.path:is_directory(path_args[1])
     and #utils.system_list({ "git", "ls-files", "--", unpack(path_args) }, git_root) < 2
 
   log_options = utils.tbl_clone(log_options)
@@ -749,14 +808,23 @@ M.show = async.wrap(function(git_root, args, callback)
     ),
     cwd = git_root,
     ---@type Job
-    on_exit = function(j)
+    on_exit = async.void(function(j)
       if j.code ~= 0 then
         utils.handle_failed_job(j)
-        callback(j:stderr_result(), nil)
+        callback(j:stderr_result() or {}, nil)
       else
+        local out_status
+        if #j:result() == 0 then
+          async.util.scheduler()
+          out_status = ensure_output(2, { j }, "git.utils.show()")
+        end
+        if out_status == JobStatus.ERROR then
+          callback(j:stderr_result() or {}, nil)
+          return
+        end
         callback(nil, j:result())
       end
-    end,
+    end),
   })
   -- NOTE: Running multiple 'show' jobs simultaneously may cause them to fail
   -- silently. Solution: queue them and run them one after another.
@@ -766,16 +834,16 @@ end, 3)
 function M.expand_pathspec(git_root, cwd, pathspec)
   local magic = pathspec:match("^:[/!^]*:?") or pathspec:match("^:%b()") or ""
   local pattern = pathspec:sub(1 + #magic, -1)
-  if not utils.path_is_abs(pattern) then
-    pattern = utils.path_join({ utils.path_relative(cwd, git_root), pattern })
+  if not utils.path:is_abs(pattern) then
+    pattern = utils.path:join(utils.path:relative(cwd, git_root), pattern)
   end
-  return magic .. pattern
+  return magic .. utils.path:convert(pattern)
 end
 
 function M.pathspec_modify(pathspec, mods)
   local magic = pathspec:match("^:[/!^]*:?") or pathspec:match("^:%b()") or ""
   local pattern = pathspec:sub(1 + #magic, -1)
-  return magic .. vim.fn.fnamemodify(pattern, mods)
+  return magic .. utils.path:vim_fnamemodify(pattern, mods)
 end
 
 ---Check if any of the given revs are LOCAL.
@@ -856,7 +924,7 @@ end
 ---@param kind "staged"|"working"
 ---@param commit string
 function M.restore_file(git_root, path, kind, commit)
-  local file_exists = vim.fn.filereadable(utils.path_join({ git_root, path })) == 1
+  local file_exists = utils.path:readable(utils.path:join(git_root, path))
   local out, code
 
   if file_exists then

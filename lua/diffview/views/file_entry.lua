@@ -69,9 +69,9 @@ function FileEntry:init(opt)
   self.path = opt.path
   self.oldpath = opt.oldpath
   self.absolute_path = opt.absolute_path
-  self.parent_path = utils.path_parent(opt.path, true) or ""
-  self.basename = utils.path_basename(opt.path)
-  self.extension = utils.path_extension(opt.path)
+  self.parent_path = utils.path:parent(opt.path) or ""
+  self.basename = utils.path:basename(opt.path)
+  self.extension = utils.path:extension(opt.path)
   self.status = opt.status
   self.stats = opt.stats
   self.kind = opt.kind
@@ -171,7 +171,7 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid, callback)
     perf:lap("null buffers loaded")
   end
 
-  utils.no_win_event_call(function()
+  local ok, err = utils.no_win_event_call(function()
     for _, split in ipairs(splits) do
       local on_ready = on_ready_factory(split)
 
@@ -225,6 +225,10 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid, callback)
     end
   end)
 
+  if not ok then
+    utils.err(err)
+  end
+
   perf:lap("buffers attached")
 
   self.left_bufid = splits[1].bufid
@@ -273,7 +277,7 @@ function FileEntry:dispose_index_buffers()
 end
 
 function FileEntry:validate_index_buffers(git_root, git_dir, stat)
-  stat = stat or vim.loop.fs_stat(utils.path_join({ git_dir, "index" }))
+  stat = stat or utils.path:stat(utils.path:join(git_dir, "index"))
   local cached_stat
   if fstat_cache[git_root] then
     cached_stat = fstat_cache[git_root].index
@@ -321,7 +325,7 @@ end
 function FileEntry._get_null_buffer()
   if not (FileEntry._null_buffer and api.nvim_buf_is_loaded(FileEntry._null_buffer)) then
     local bn = api.nvim_create_buf(false, false)
-    local bufname = utils.path_join({ "diffview://", "null" })
+    local bufname = "diffview:///null"
     for option, value in pairs(FileEntry.bufopts) do
       api.nvim_buf_set_option(bn, option, value)
     end
@@ -360,7 +364,7 @@ function FileEntry._create_buffer(git_root, rev, path, null, callback)
   end
 
   -- stylua: ignore
-  local fullname = utils.path_join({ "diffview://", git_root, ".git", context, path, })
+  local fullname = "diffview://" .. utils.path:join(git_root, ".git", context, path)
   for option, value in pairs(FileEntry.bufopts) do
     api.nvim_buf_set_option(bn, option, value)
   end
@@ -371,7 +375,7 @@ function FileEntry._create_buffer(git_root, rev, path, null, callback)
     local i = 1
     repeat
       -- stylua: ignore
-      fullname = utils.path_join({ "diffview://", git_root, ".git", context, i, path, })
+      fullname = "diffview://" .. utils.path:join(git_root, ".git", context, i, path)
       ok = pcall(api.nvim_buf_set_name, bn, fullname)
       i = i + 1
     until ok
@@ -493,7 +497,7 @@ end
 
 ---@static
 function FileEntry.update_index_stat(git_root, git_dir, stat)
-  stat = stat or vim.loop.fs_stat(utils.path_join({ git_dir, "index" }))
+  stat = stat or utils.path:stat(utils.path:join(git_dir, "index"))
   if stat then
     if not fstat_cache[git_root] then
       fstat_cache[git_root] = {}
