@@ -235,7 +235,7 @@ Additional commands for convenience:
 With a Diffview open and the default key bindings, you can cycle through changed
 files with `<tab>` and `<s-tab>` (see configuration to change the key bindings).
 
-### `:DiffviewFileHistory [paths]`
+### `:DiffviewFileHistory [paths] [args]`
 
 Opens a new file history view that lists all commits that changed a given file
 or directory. If no `[paths]` are given, defaults to the current file. Multiple

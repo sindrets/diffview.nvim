@@ -467,8 +467,9 @@ end)
 ---@param git_root string
 ---@param path_args string[]
 ---@param opt LogOptions
+---@param base Rev
 ---@param callback function
-local function process_file_history(thread, git_root, path_args, opt, callback)
+local function process_file_history(thread, git_root, path_args, opt, base, callback)
   ---@type LogEntry[]
   local entries = {}
   local lec = 0 -- Last entry count
@@ -479,7 +480,7 @@ local function process_file_history(thread, git_root, path_args, opt, callback)
   local old_path
 
   local single_file = #path_args == 1
-    and utils.path:is_directory(path_args[1])
+    and not utils.path:is_directory(path_args[1])
     and #utils.system_list({ "git", "ls-files", "--", unpack(path_args) }, git_root) < 2
 
   incremental_fh_data(
@@ -627,7 +628,7 @@ local function process_file_history(thread, git_root, path_args, opt, callback)
           kind = "working",
           commit = commit,
           left = Rev(RevType.COMMIT, cur.left_hash),
-          right = Rev(RevType.COMMIT, cur.right_hash),
+          right = base or Rev(RevType.COMMIT, cur.right_hash),
         })
       )
     end
@@ -656,8 +657,9 @@ end
 ---@param git_root string
 ---@param path_args string[]
 ---@param opt LogOptions
+---@param base Rev
 ---@param callback function
-function M.file_history(git_root, path_args, opt, callback)
+function M.file_history(git_root, path_args, opt, base, callback)
   local thread
 
   for _, job in ipairs(file_history_jobs) do
@@ -668,7 +670,7 @@ function M.file_history(git_root, path_args, opt, callback)
   file_history_jobs = {}
 
   thread = coroutine.create(function()
-    process_file_history(thread, git_root, path_args, opt, callback)
+    process_file_history(thread, git_root, path_args, opt, base, callback)
   end)
 
   coroutine.resume(thread)
