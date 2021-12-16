@@ -155,7 +155,8 @@ default_args                                    *diffview-config-default_args*
 
         Examples: >
                 default_args = {
-                  DiffviewOpen = { "--untracked-files=no", "--imply-local" }
+                  DiffviewOpen = { "--untracked-files=no", "--imply-local" },
+                  DiffviewFileHistory = { "--base=LOCAL" },
                 }
 
 hooks                                                  *diffview-config-hooks*
@@ -255,7 +256,7 @@ COMMANDS                                                 *diffview-commands*
         :DiffviewOpen HEAD~2 -- lua/diffview plugin
         :DiffviewOpen d4a7b0d -uno
 <
-    Args:
+    Args:~
         -u[value], --untracked-files[={value}]
                         Specify whether or not to show untracked files. If
                         flag is given without value; defaults to `true`.
@@ -278,11 +279,13 @@ COMMANDS                                                 *diffview-commands*
                         current working directory.
 
                                                         *:DiffviewFileHistory*
-:DiffviewFileHistory [paths]
+:DiffviewFileHistory [paths] [args]
                         Opens a new file history view that lists all commits
                         that changed a given file or directory. If no [paths]
                         are given, defaults to the current file. Multiple
-                        [paths] may be provided.
+                        [paths] may be provided and git pathspec is supported
+                        (see `$ man gitglossary(7)` for information about
+                        pathspec).
 
                         From the file history panel (the panel listing the
                         commits) you can open an option panel by pressing
@@ -292,6 +295,25 @@ COMMANDS                                                 *diffview-commands*
                         followed by pressing <Tab>, or by using the mappings
                         that are shown directly in the panel, preceding the
                         flags' descriptions.
+
+                        Examples:
+>
+        :DiffviewFileHistory
+        :DiffviewFileHistory path/to/some/file.txt
+        :DiffviewFileHistory path/to/some/directory
+        :DiffviewFileHistory multiple/paths foo/bar baz/qux
+        :DiffviewFileHistory --base=HEAD~4
+        :DiffviewFileHistory --base=LOCAL
+<
+
+    Args:~
+        --base={git-rev}
+                        Specify a base git rev from which the right side of
+                        the diff will be created. Use the special value
+                        `LOCAL` to use the local version of the file.
+
+        -C{path}        Run as if git was started in {path} instead of the
+                        current working directory.
 
                                                         *:DiffviewClose*
 :DiffviewClose          Close the active Diffview.

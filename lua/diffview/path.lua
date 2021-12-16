@@ -101,7 +101,7 @@ function PathLib:is_root(path)
   path = self:_clean(path)
   if self:is_abs(path) then
     if self._is_windows then
-      return path:match(("^([A-Z]:%s?$)"):format(vim.pesc(self.sep))) ~= nil
+      return path:match(("^([A-Z]:%s?$)"):format(self.sep)) ~= nil
     else
       return path == self.sep
     end

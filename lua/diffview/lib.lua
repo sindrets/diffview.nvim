@@ -23,10 +23,11 @@ function M.diffview_open(args)
     table.insert(paths, utils.path:vim_expand(path))
   end
 
+  local cfile = utils.path:vim_expand("%")
   local fpath = (
       vim.bo.buftype == ""
-        and utils.path:readable(utils.path:vim_expand("%"))
-        and utils.path:vim_expand("%:p:h")
+      and utils.path:readable(cfile)
+      and utils.path:vim_expand("%p:h")
       or utils.path:realpath(".")
     )
   local cpath = argo:get_flag("C")
@@ -93,23 +94,32 @@ function M.file_history(args)
     table.insert(paths, utils.path:vim_expand(path))
   end
 
+  local cfile = utils.path:vim_expand("%")
+  local fpath =
+      (paths[1] and utils.path:absolute(paths[1]))
+      or (
+        vim.bo.buftype == ""
+        and utils.path:readable(cfile)
+        and utils.path:absolute(cfile)
+      )
+      or utils.path:realpath(".")
+
+  local cpath = argo:get_flag("C")
+  if vim.tbl_contains({ "true", "", nil }, cpath) then
+    cpath = nil
+  end
+
   if #paths == 0 then
-    if vim.bo.buftype == "" then
-      table.insert(paths, utils.path:vim_expand("%:p"))
-    else
-      utils.err("No target!")
-      return
-    end
+    paths[1] = cpath and utils.path:realpath(cpath) or fpath
   end
 
   rel_paths = vim.tbl_map(function(v)
     return utils.path:relative(v, ".")
   end, paths)
 
-  local p
-  local stat = utils.path:stat(paths[1])
+  local p = paths[1]
+  local stat = utils.path:stat(p)
   if stat then
-    p = utils.path:realpath(paths[1])
     if stat.type ~= "directory" then
       p = utils.path:parent(p)
     end
@@ -136,12 +146,28 @@ function M.file_history(args)
     return
   end
 
+  local base
+  local base_arg = argo:get_flag("base")
+  if base_arg then
+    if base_arg == "LOCAL" then
+      base = Rev(RevType.LOCAL)
+    else
+      local out, code = utils.system_list({ "git", "rev-parse", "--revs-only", base_arg }, git_root)
+      if code ~= 0 or not out[1] or out[1] == "" then
+        utils.warn(("Bad base revision, ignoring: '%s'"):format(base_arg))
+      else
+        base = Rev(RevType.COMMIT, out[1])
+      end
+    end
+  end
+
   ---@type FileHistoryView
   local v = FileHistoryView({
     git_root = git_root,
     path_args = paths,
     raw_args = argo.args,
     log_options = log_options,
+    base = base,
   })
 
   table.insert(M.views, v)

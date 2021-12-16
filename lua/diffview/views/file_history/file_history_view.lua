@@ -1,11 +1,12 @@
-local oop = require("diffview.oop")
-local git = require("diffview.git.utils")
 local Event = require("diffview.events").Event
 local EventEmitter = require("diffview.events").EventEmitter
-local StandardView = require("diffview.views.standard.standard_view").StandardView
-local LayoutMode = require("diffview.views.view").LayoutMode
 local FileEntry = require("diffview.views.file_entry").FileEntry
 local FileHistoryPanel = require("diffview.views.file_history.file_history_panel").FileHistoryPanel
+local LayoutMode = require("diffview.views.view").LayoutMode
+local StandardView = require("diffview.views.standard.standard_view").StandardView
+local git = require("diffview.git.utils")
+local oop = require("diffview.oop")
+
 local JobStatus = git.JobStatus
 local api = vim.api
 
@@ -35,7 +36,8 @@ function FileHistoryView:init(opt)
     {},
     self.path_args,
     self.raw_args,
-    opt.log_options
+    opt.log_options,
+    opt.base
   )
 end
 

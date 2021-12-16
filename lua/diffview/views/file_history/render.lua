@@ -3,7 +3,6 @@ local config = require("diffview.config")
 local renderer = require("diffview.renderer")
 local logger = require("diffview.logger")
 local Form = require("diffview.ui.panel").Form
-local RevType = require("diffview.git.rev").RevType
 local PerfTimer = require("diffview.perf").PerfTimer
 
 ---@type PerfTimer
@@ -142,10 +141,7 @@ local function render_entries(parent, entries, updating)
     end
 
     offset = #s + 1
-    local subject = #entry.files > 0
-        and entry.files[1].right.type == RevType.LOCAL
-        and "[Not Committed Yet]"
-      or utils.str_shorten(entry.commit.subject, 72)
+    local subject = utils.str_shorten(entry.commit.subject, 72)
     comp:add_hl("DiffviewFilePanelFileName", line_idx, offset, offset + #subject)
     s = s .. " " .. subject
 

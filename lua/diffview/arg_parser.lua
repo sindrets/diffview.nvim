@@ -43,8 +43,8 @@ function FlagValueMap:init()
 end
 
 ---@param flag_synonyms string[]
----@param values string[]
-function FlagValueMap:put(flag_synonyms, values)
+---@param producer string[]|fun(name_lead: string, arg_lead: string): string[]
+function FlagValueMap:put(flag_synonyms, producer)
   for _, flag in ipairs(flag_synonyms) do
     if flag:sub(1, 1) ~= "-" then
       if #flag > 1 then
@@ -53,7 +53,7 @@ function FlagValueMap:put(flag_synonyms, values)
         flag = "-" .. flag
       end
     end
-    self.map[flag] = values
+    self.map[flag] = producer
   end
 end
 
@@ -67,6 +67,10 @@ function FlagValueMap:get(flag_name)
     else
       flag_name = "-" .. flag_name
     end
+  end
+  if type(self.map[flag_name]) == "function" then
+    local is_short = flag_name:match(short_flag_pat) ~= nil
+    return self.map[flag_name](flag_name .. (not is_short and "=" or ""), "")
   end
   return self.map[flag_name]
 end
@@ -82,21 +86,31 @@ function FlagValueMap:get_all_names()
 end
 
 function FlagValueMap:get_completion(arg_lead)
+  local name
   local is_short = arg_lead:match(short_flag_pat) ~= nil
   if is_short then
-    arg_lead = arg_lead:sub(1, 2)
+    name = arg_lead:sub(1, 2)
+    arg_lead = arg_lead:match("..=?(.*)") or ""
   else
-    arg_lead = arg_lead:gsub("=.*", "")
+    name = arg_lead:gsub("=.*", "")
+    arg_lead = arg_lead:match("=(.*)") or ""
   end
 
-  local values = self.map[arg_lead]
+  local name_lead = name .. (not is_short and "=" or "")
+  local values = self.map[name]
+  if type(values) == "function" then
+    values = values(name_lead, arg_lead)
+  end
   if not values then
     return nil
   end
 
   local items = {}
   for _, v in ipairs(values) do
-    table.insert(items, arg_lead .. (not is_short and "=" or "") .. v)
+    local e_lead, _ = vim.pesc(arg_lead)
+    if v:match(e_lead) then
+      items[#items+1] = name_lead .. v
+    end
   end
 
   return items
