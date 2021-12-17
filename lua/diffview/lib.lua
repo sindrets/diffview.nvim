@@ -1,12 +1,14 @@
+local DiffView = require("diffview.views.diff.diff_view").DiffView
+local FileHistoryView = require("diffview.views.file_history.file_history_view").FileHistoryView
 local Rev = require("diffview.git.rev").Rev
 local RevType = require("diffview.git.rev").RevType
 local arg_parser = require("diffview.arg_parser")
+local config = require("diffview.config")
 local git = require("diffview.git.utils")
 local utils = require("diffview.utils")
-local config = require("diffview.config")
-local DiffView = require("diffview.views.diff.diff_view").DiffView
-local FileHistoryView = require("diffview.views.file_history.file_history_view").FileHistoryView
+
 local api = vim.api
+local path = utils.path
 
 local M = {}
 
@@ -19,30 +21,33 @@ function M.diffview_open(args)
   local rev_arg = argo.args[1]
   local paths = {}
 
-  for _, path in ipairs(argo.post_args) do
-    table.insert(paths, utils.path:vim_expand(path))
+  for _, path_arg in ipairs(argo.post_args) do
+    local magic, pattern = git.pathspec_split(path:vim_expand(path_arg))
+    pattern = path:readlink(pattern) or pattern
+    table.insert(paths, magic .. pattern)
   end
 
-  local cfile = utils.path:vim_expand("%")
+  local cfile = path:vim_expand("%")
+  cfile = path:readlink(cfile) or cfile
   local fpath = (
       vim.bo.buftype == ""
-      and utils.path:readable(cfile)
-      and utils.path:vim_expand("%p:h")
-      or utils.path:realpath(".")
+      and path:readable(cfile)
+      and path:parent(path:absolute(cfile))
+      or path:realpath(".")
     )
   local cpath = argo:get_flag("C")
   if vim.tbl_contains({ "true", "", nil }, cpath) then
     cpath = nil
   end
-  local p = cpath and utils.path:realpath(cpath) or fpath
-  if not utils.path:is_directory(p) then
-    p = utils.path:parent(p)
+  local p = cpath and path:realpath(cpath) or fpath
+  if not path:is_directory(p) then
+    p = path:parent(p)
   end
 
   local git_root = git.toplevel(p)
   if not git_root then
     utils.err(
-      ("Path not a git repo (or any parent): '%s'"):format(utils.path:relative(p, "."))
+      ("Path not a git repo (or any parent): '%s'"):format(path:relative(p, "."))
     )
     return
   end
@@ -90,19 +95,22 @@ function M.file_history(args)
   local paths = {}
   local rel_paths
 
-  for _, path in ipairs(argo.args) do
-    table.insert(paths, utils.path:vim_expand(path))
+  for _, path_arg in ipairs(argo.args) do
+    local magic, pattern = git.pathspec_split(path:vim_expand(path_arg))
+    pattern = path:readlink(pattern) or pattern
+    table.insert(paths, magic .. pattern)
   end
 
-  local cfile = utils.path:vim_expand("%")
+  local cfile = path:vim_expand("%")
+  cfile = path:readlink(cfile) or cfile
   local fpath =
-      (paths[1] and utils.path:absolute(paths[1]))
+      (paths[1] and path:absolute(paths[1]))
       or (
         vim.bo.buftype == ""
-        and utils.path:readable(cfile)
-        and utils.path:absolute(cfile)
+        and path:readable(cfile)
+        and path:absolute(cfile)
       )
-      or utils.path:realpath(".")
+      or path:realpath(".")
 
   local cpath = argo:get_flag("C")
   if vim.tbl_contains({ "true", "", nil }, cpath) then
@@ -110,21 +118,21 @@ function M.file_history(args)
   end
 
   if #paths == 0 then
-    paths[1] = cpath and utils.path:realpath(cpath) or fpath
+    paths[1] = cpath and path:realpath(cpath) or fpath
   end
 
   rel_paths = vim.tbl_map(function(v)
-    return utils.path:relative(v, ".")
+    return path:relative(v, ".")
   end, paths)
 
   local p = paths[1]
-  local stat = utils.path:stat(p)
+  local stat = path:stat(p)
   if stat then
     if stat.type ~= "directory" then
-      p = utils.path:parent(p)
+      p = path:parent(p)
     end
   else
-    p = utils.path:realpath(".")
+    p = path:realpath(".")
   end
 
   local git_root = git.toplevel(p)
@@ -135,7 +143,7 @@ function M.file_history(args)
 
   local cwd = vim.loop.cwd()
   paths = vim.tbl_map(function(pathspec)
-    return git.expand_pathspec(git_root, cwd, pathspec)
+    return git.pathspec_expand(git_root, cwd, pathspec)
   end, paths)
 
   local log_options = config.get_config().file_history_panel.log_options

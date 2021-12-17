@@ -481,7 +481,7 @@ local function process_file_history(thread, git_root, path_args, opt, base, call
 
   local single_file = #path_args == 1
     and not utils.path:is_directory(path_args[1])
-    and #utils.system_list({ "git", "ls-files", "--", unpack(path_args) }, git_root) < 2
+    and #utils.system_list(utils.vec_join("git", "ls-files", "--", path_args), git_root) < 2
 
   incremental_fh_data(
     git_root,
@@ -532,7 +532,7 @@ local function process_file_history(thread, git_root, path_args, opt, base, call
       local job
       local job_spec = {
         command = "git",
-        args = {
+        args = utils.vec_join(
           "show",
           "--format=",
           "-m",
@@ -540,8 +540,8 @@ local function process_file_history(thread, git_root, path_args, opt, base, call
           "--name-status",
           cur.right_hash,
           "--",
-          old_path or unpack(path_args),
-        },
+          old_path or path_args
+        ),
         cwd = git_root,
         on_exit = function(j)
           if j.code == 0 then
@@ -682,7 +682,7 @@ end
 function M.file_history_dry_run(git_root, path_args, log_options)
   local single_file = #path_args == 1
     and utils.path:is_directory(path_args[1])
-    and #utils.system_list({ "git", "ls-files", "--", unpack(path_args) }, git_root) < 2
+    and #utils.system_list(utils.vec_join("git", "ls-files", "--", path_args), git_root) < 2
 
   log_options = utils.tbl_clone(log_options)
   log_options.max_count = 1
@@ -833,7 +833,14 @@ M.show = async.wrap(function(git_root, args, callback)
   queue_sync_job(job)
 end, 3)
 
-function M.expand_pathspec(git_root, cwd, pathspec)
+---@return string, string
+function M.pathspec_split(pathspec)
+  local magic = pathspec:match("^:[/!^]*:?") or pathspec:match("^:%b()") or ""
+  local pattern = pathspec:sub(1 + #magic, -1)
+  return magic or "", pattern or ""
+end
+
+function M.pathspec_expand(git_root, cwd, pathspec)
   local magic = pathspec:match("^:[/!^]*:?") or pathspec:match("^:%b()") or ""
   local pattern = pathspec:sub(1 + #magic, -1)
   if not utils.path:is_abs(pattern) then
