@@ -122,6 +122,7 @@ return function(panel)
     return
   end
 
+  local conf = config.get_config()
   panel.render_data:clear()
 
   ---@type RenderComponent
@@ -133,12 +134,15 @@ return function(panel)
 
   comp = panel.components.working.title.comp
   line_idx = 0
-  s = "Changes"
-  comp:add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
-  local change_count = "(" .. #panel.files.working .. ")"
-  comp:add_hl("DiffviewFilePanelCounter", line_idx, #s + 1, #s + 1 + string.len(change_count))
-  s = s .. " " .. change_count
-  comp:add_line(s)
+
+  if conf.file_panel.render_summary then
+    s = "Changes"
+    comp:add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
+    local change_count = "(" .. #panel.files.working .. ")"
+    comp:add_hl("DiffviewFilePanelCounter", line_idx, #s + 1, #s + 1 + string.len(change_count))
+    s = s .. " " .. change_count
+    comp:add_line(s)
+  end
 
   render_files(panel.listing_style, panel.components.working.files.comp)
 
