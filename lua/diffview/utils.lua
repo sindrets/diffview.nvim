@@ -48,7 +48,7 @@ function M.info(msg, schedule)
   if type(msg) ~= "table" then
     msg = vim.split(msg, "\n")
   end
-  if not msg[1] or msg[1] == "" then
+  if not msg[1] or (msg[1] == "" and #msg == 1) then
     return
   end
   msg[1] = "[Diffview.nvim] " .. msg[1]
@@ -61,7 +61,7 @@ function M.warn(msg, schedule)
   if type(msg) ~= "table" then
     msg = vim.split(msg, "\n")
   end
-  if not msg[1] or msg[1] == "" then
+  if not msg[1] or (msg[1] == "" and #msg == 1) then
     return
   end
   msg[1] = "[Diffview.nvim] " .. msg[1]
@@ -74,7 +74,7 @@ function M.err(msg, schedule)
   if type(msg) ~= "table" then
     msg = vim.split(msg, "\n")
   end
-  if not msg[1] or msg[1] == "" then
+  if not msg[1] or (msg[1] == "" and #msg == 1) then
     return
   end
   msg[1] = "[Diffview.nvim] " .. msg[1]
@@ -87,13 +87,28 @@ end
 ---@return boolean success
 ---@return any result Return value
 function M.no_win_event_call(f)
-  local last = vim.opt.eventignore._value
+  local last = vim.o.eventignore
   vim.opt.eventignore:prepend(
     "WinEnter,WinLeave,WinNew,WinClosed,BufWinEnter,BufWinLeave,BufEnter,BufLeave"
   )
   local ok, err = pcall(f)
   vim.opt.eventignore = last
   return ok, err
+end
+
+---Update a given window by briefly setting it as the current window.
+---@param winid integer
+function M.update_win(winid)
+  local cur_winid = api.nvim_get_current_win()
+  if cur_winid ~= winid then
+    local ok, err = M.no_win_event_call(function()
+      api.nvim_set_current_win(winid)
+      api.nvim_set_current_win(cur_winid)
+    end)
+    if not ok then
+      error(err)
+    end
+  end
 end
 
 function M.clamp(value, min, max)

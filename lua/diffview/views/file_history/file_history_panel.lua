@@ -403,6 +403,9 @@ function FileHistoryPanel:highlight_item(item)
       end
     end
   end
+
+  -- Needed to update the cursorline highlight when the panel is not focused.
+  utils.update_win(self.winid)
 end
 
 function FileHistoryPanel:highlight_prev_item()
@@ -415,6 +418,7 @@ function FileHistoryPanel:highlight_prev_item()
     self.winid,
     { self.constrain_cursor(self.winid, -vim.v.count1), 0 }
   )
+  utils.update_win(self.winid)
 end
 
 function FileHistoryPanel:highlight_next_file()
@@ -426,6 +430,7 @@ function FileHistoryPanel:highlight_next_file()
     self.constrain_cursor(self.winid, vim.v.count1),
     0,
   })
+  utils.update_win(self.winid)
 end
 
 function FileHistoryPanel:set_entry_fold(entry, open)
