@@ -954,7 +954,7 @@ function M.restore_file(git_root, path, kind, commit)
 
   -- Revert file
   out, code = utils.system_list(
-    { "git", "checkout", commit or (kind == "staged" and "HEAD" or nil), "--", path },
+    utils.vec_join("git", "checkout", commit or (kind == "staged" and "HEAD" or nil), "--", path),
     git_root
   )
   if code ~= 0 then
