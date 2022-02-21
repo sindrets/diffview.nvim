@@ -3,7 +3,7 @@ local oop = require("diffview.oop")
 local M = {}
 
 local uv = vim.loop
-local is_windows = jit.os == "Windows"
+local is_windows = uv.os_uname().version:match("Windows")
 
 ---@class PathLib
 ---@field sep '"/"'|'"\\\\"'
