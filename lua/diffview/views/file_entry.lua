@@ -53,6 +53,7 @@ FileEntry.winopts = {
   foldmethod = "diff",
   foldcolumn = "1",
   foldlevel = 0,
+  foldenable = true,
 }
 
 FileEntry.bufopts = {
