@@ -445,6 +445,20 @@ function M.vec_push(t, ...)
   return t
 end
 
+---@return integer[]
+function M.get_loaded_bufs()
+  return vim.tbl_filter(function(id)
+    return api.nvim_buf_is_loaded(id)
+  end, api.nvim_list_bufs())
+end
+
+---@return integer[]
+function M.get_listed_bufs()
+  return vim.tbl_filter(function(id)
+    return vim.bo[id].buflisted
+  end, api.nvim_list_bufs())
+end
+
 function M.find_named_buffer(name)
   for _, v in ipairs(api.nvim_list_bufs()) do
     if vim.fn.bufname(v) == name then
@@ -469,6 +483,46 @@ function M.wipe_named_buffer(name)
       pcall(api.nvim_buf_delete, bn, {})
     end)
   end
+end
+
+---Delete a buffer while also preserving the window layout. Changes the current
+---buffer to the alt buffer if available, and then deletes it.
+---@param force boolean Ignore unsaved changes.
+---@param bn? integer
+---@return boolean ok, string err
+function M.remove_buffer(force, bn)
+  bn = bn or api.nvim_get_current_buf()
+  if not force then
+    local modified = vim.bo[bn].modified
+    if modified then
+      return false, "No write since last change!"
+    end
+  end
+
+  local win_ids = vim.fn.win_findbuf(bn)
+  local listed = M.get_listed_bufs()
+  for _, id in ipairs(win_ids) do
+    if vim.fn.win_gettype(id) ~= "autocmd" then
+      api.nvim_win_call(id, function()
+        local alt_bufid = vim.fn.bufnr("#")
+        if alt_bufid ~= -1 then
+          api.nvim_set_current_buf(alt_bufid)
+        else
+          if #listed > (vim.bo[0].buflisted and 1 or 0) then
+            vim.cmd("silent! bp")
+          else
+            vim.cmd("enew")
+          end
+        end
+      end)
+    end
+  end
+
+  if api.nvim_buf_is_valid(bn) then
+    api.nvim_buf_delete(bn, { force = true })
+  end
+
+  return true
 end
 
 function M.find_file_buffer(path)

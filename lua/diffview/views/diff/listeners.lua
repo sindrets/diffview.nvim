@@ -5,6 +5,7 @@ local RevType = require("diffview.git.rev").RevType
 local Event = require("diffview.events").Event
 local FileEntry = require("diffview.views.file_entry").FileEntry
 local api = vim.api
+local async = require("plenary.async")
 
 local function prepare_goto_file(view)
   local file = view:infer_cur_file()
@@ -151,7 +152,7 @@ return function(view)
       view:update_files()
       view.emitter:emit(Event.FILES_STAGED, view)
     end,
-    restore_entry = function()
+    restore_entry = async.void(function()
       local commit
       if not (view.right.type == RevType.LOCAL) then
         utils.err("The right side of the diff is not local! Aborting file restoration.")
@@ -167,10 +168,12 @@ return function(view)
           utils.err("The file is open with unsaved changes! Aborting file restoration.")
           return
         end
-        git.restore_file(view.git_root, file.path, file.kind, commit)
-        view:update_files()
+        git.restore_file(view.git_root, file.path, file.kind, commit, function()
+          async.util.scheduler()
+          view:update_files()
+        end)
       end
-    end,
+    end),
     goto_file = function()
       local file = prepare_goto_file(view)
       if file then

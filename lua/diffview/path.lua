@@ -1,4 +1,5 @@
 local oop = require("diffview.oop")
+local async = require("plenary.async")
 
 local M = {}
 
@@ -399,6 +400,18 @@ function PathLib:readable(path)
   end
   return false
 end
+
+---Delete a name and possibly the file it refers to.
+---@param self PathLib
+---@param path string
+---@param callback function
+---@return string err, boolean ok
+---@diagnostic disable-next-line: unused-local
+PathLib.unlink = async.wrap(function(self, path, callback)
+  uv.fs_unlink(path, function(err, ok)
+    callback(ok, err)
+  end)
+end, 3)
 
 M.PathLib = PathLib
 return M

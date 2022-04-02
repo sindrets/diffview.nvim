@@ -429,7 +429,7 @@ end
 
 ---@static
 function FileEntry.safe_delete_buf(bufid)
-  if bufid == FileEntry._null_buffer then
+  if bufid == FileEntry._null_buffer or not api.nvim_buf_is_loaded(bufid) then
     return
   end
   for _, winid in ipairs(utils.tabpage_win_find_buf(0, bufid)) do
@@ -450,7 +450,7 @@ end
 
 ---@static
 function FileEntry._restore_winopts(bufid)
-  if FileEntry.winopt_store[bufid] then
+  if FileEntry.winopt_store[bufid] and api.nvim_buf_is_loaded(bufid) then
     utils.no_win_event_call(function()
       vim.cmd("sp")
       api.nvim_win_set_buf(0, bufid)
