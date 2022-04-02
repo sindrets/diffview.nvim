@@ -60,6 +60,7 @@ Panel.bufopts = {
   buftype = "nofile",
   modifiable = false,
   bufhidden = "hide",
+  modeline = false,
 }
 
 function Panel.next_uid()
