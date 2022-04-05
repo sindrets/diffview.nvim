@@ -60,6 +60,10 @@ return function(view)
         end
       end
     end,
+    ---@diagnostic disable-next-line: unused-local
+    files_updated = function(files)
+      view.initialized = true
+    end,
     close = function()
       if view.panel:is_cur_win() then
         view.panel:close()

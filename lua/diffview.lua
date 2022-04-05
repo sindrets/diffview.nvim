@@ -18,6 +18,9 @@ comp_open:put({ "imply-local" }, { "true", "false" })
 comp_open:put({ "C" }, function(_, arg_lead)
   return vim.fn.getcompletion(arg_lead, "dir")
 end)
+comp_open:put({ "selected-file" }, function (_, arg_lead)
+  return vim.fn.getcompletion(arg_lead, "file")
+end)
 
 ---@type FlagValueMap
 local comp_file_history = arg_parser.FlagValueMap()

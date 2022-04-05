@@ -73,6 +73,9 @@ function M.diffview_open(args)
       { "all", "normal", "true" },
       { "no", "false" }
     ),
+    selected_file = argo:get_flag("selected-file")
+      or (vim.bo.buftype == "" and path:vim_expand("%:p"))
+      or nil,
   }
 
   local v = DiffView({

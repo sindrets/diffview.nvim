@@ -278,6 +278,11 @@ COMMANDS                                                 *diffview-commands*
         -C{path}        Run as if git was started in {path} instead of the
                         current working directory.
 
+        --selected-file={path}
+                        Specify a path to the preferred initially selected
+                        file. If the path doesn't match any of the files in
+                        the initial set of files, this option does nothing.
+
                                                         *:DiffviewFileHistory*
 :DiffviewFileHistory [paths] [args]
                         Opens a new file history view that lists all commits

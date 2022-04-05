@@ -19,7 +19,8 @@ local api = vim.api
 local M = {}
 
 ---@class DiffViewOptions
----@field show_untracked boolean|nil
+---@field show_untracked? boolean
+---@field selected_file? string Path to the preferred initially selected file.
 
 ---@class DiffView : StandardView
 ---@field git_root string Absolute path the root of the git directory.
@@ -32,6 +33,7 @@ local M = {}
 ---@field panel FilePanel
 ---@field files FileDict
 ---@field file_idx integer
+---@field initialized boolean
 local DiffView = oop.create_class("DiffView", StandardView)
 
 ---DiffView constructor
@@ -43,6 +45,7 @@ function DiffView:init(opt)
   self.closing = false
   self.nulled = false
   self.winopts = { left = {}, right = {} }
+  self.initialized = false
   self.git_root = opt.git_root
   self.git_dir = git.git_dir(opt.git_root)
   self.rev_arg = opt.rev_arg
@@ -50,6 +53,8 @@ function DiffView:init(opt)
   self.left = opt.left
   self.right = opt.right
   self.options = opt.options
+  self.options.selected_file = self.options.selected_file
+    and utils.path:relative(utils.path:absolute(self.options.selected_file), opt.git_root)
   self.files = FileDict()
   self.panel = FilePanel(
     self.git_root,
@@ -264,6 +269,16 @@ function DiffView:update_files(callback)
       if utils.vec_indexof(self.panel:ordered_file_list(), self.panel.cur_file) == -1 then
         self.panel.cur_file = nil
       end
+
+      -- Set initially selected file
+      if not self.initialized and self.options.selected_file then
+        for _, file in self.files:ipairs() do
+          if file.path == self.options.selected_file then
+            self.panel:set_cur_file(file)
+            break
+          end
+        end
+      end
       self:set_file(self.panel.cur_file or self.panel:next_file())
 
       if api.nvim_win_is_valid(last_winid) then
@@ -277,6 +292,7 @@ function DiffView:update_files(callback)
         ("[DiffView] Completed update for %d files successfully (%.3f ms)")
         :format(self.files:len(), perf.final_time)
       )
+      self.emitter:emit("files_updated", self.files)
       if type(callback) == "function" then
         callback()
       end
