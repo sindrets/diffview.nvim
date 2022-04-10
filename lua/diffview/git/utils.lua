@@ -360,13 +360,17 @@ local function structure_fh_data(namestat_data, numstat_data)
   }
 end
 
+---@class IncrementalFhDataSpec
+---@field rev_arg string
+
 ---@param git_root string
 ---@param path_args string[]
 ---@param single_file boolean
----@param opt LogOptions
+---@param log_opt LogOptions
+---@param opt IncrementalFhDataSpec
 ---@param callback function
-local incremental_fh_data = async.void(function(git_root, path_args, single_file, opt, callback)
-  local options = prepare_fh_options(opt, single_file)
+local incremental_fh_data = async.void(function(git_root, path_args, single_file, log_opt, opt, callback)
+  local options = prepare_fh_options(log_opt, single_file)
   local raw = {}
   local namestat_job, numstat_job
 
@@ -420,6 +424,7 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
     command = "git",
     args = utils.vec_join(
       "log",
+      opt.rev_arg,
       "--pretty=format:%x00%n%H %P%n%an%n%ad%n%ar%n%s",
       "--date=raw",
       "--name-status",
@@ -436,6 +441,7 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
     command = "git",
     args = utils.vec_join(
       "log",
+      opt.rev_arg,
       "--pretty=format:%x00",
       "--date=raw",
       "--numstat",
@@ -463,13 +469,17 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
   end
 end)
 
+---@class ProcessFileHistorySpec
+---@field range RevRange
+---@field base Rev
+
 ---@param thread thread
 ---@param git_root string
 ---@param path_args string[]
----@param opt LogOptions
----@param base Rev
+---@param log_opt LogOptions
+---@param opt ProcessFileHistorySpec
 ---@param callback function
-local function process_file_history(thread, git_root, path_args, opt, base, callback)
+local function process_file_history(thread, git_root, path_args, log_opt, opt, callback)
   ---@type LogEntry[]
   local entries = {}
   local lec = 0 -- Last entry count
@@ -478,6 +488,9 @@ local function process_file_history(thread, git_root, path_args, opt, base, call
   local last_status
   local resume_lock = false
   local old_path
+  local rev_arg = opt.range and (
+    opt.range.first.commit .. ".." .. opt.range.last.commit
+  ) or nil
 
   local single_file = #path_args == 1
     and not utils.path:is_directory(path_args[1])
@@ -487,7 +500,8 @@ local function process_file_history(thread, git_root, path_args, opt, base, call
     git_root,
     path_args,
     single_file,
-    opt,
+    log_opt,
+    { rev_arg = rev_arg, },
     function(status, d)
       if status == JobStatus.PROGRESS then
         data[#data+1] = d
@@ -628,7 +642,7 @@ local function process_file_history(thread, git_root, path_args, opt, base, call
           kind = "working",
           commit = commit,
           left = Rev(RevType.COMMIT, cur.left_hash),
-          right = base or Rev(RevType.COMMIT, cur.right_hash),
+          right = opt.base or Rev(RevType.COMMIT, cur.right_hash),
         })
       )
     end
@@ -656,10 +670,10 @@ end
 
 ---@param git_root string
 ---@param path_args string[]
----@param opt LogOptions
----@param base Rev
+---@param log_opt LogOptions
+---@param opt ProcessFileHistorySpec
 ---@param callback function
-function M.file_history(git_root, path_args, opt, base, callback)
+function M.file_history(git_root, path_args, log_opt, opt, callback)
   local thread
 
   for _, job in ipairs(file_history_jobs) do
@@ -670,29 +684,48 @@ function M.file_history(git_root, path_args, opt, base, callback)
   file_history_jobs = {}
 
   thread = coroutine.create(function()
-    process_file_history(thread, git_root, path_args, opt, base, callback)
+    process_file_history(thread, git_root, path_args, log_opt, opt, callback)
   end)
 
   coroutine.resume(thread)
 end
 
+---@class FileHistoryDryRunSpec
+---@field range RevRange
+
 ---@param git_root string
 ---@param path_args string[]
----@param log_options LogOptions
-function M.file_history_dry_run(git_root, path_args, log_options)
+---@param log_opt LogOptions
+---@param opt FileHistoryDryRunSpec
+---@return boolean ok, string description
+function M.file_history_dry_run(git_root, path_args, log_opt, opt)
   local single_file = #path_args == 1
     and utils.path:is_directory(path_args[1])
     and #utils.system_list(utils.vec_join("git", "ls-files", "--", path_args), git_root) < 2
 
-  log_options = utils.tbl_clone(log_options)
-  log_options.max_count = 1
-  local options = prepare_fh_options(log_options, single_file)
+  local rev_arg = opt.range and (
+    opt.range.first.commit .. ".." .. opt.range.last.commit
+  ) or nil
+
+  local options = vim.tbl_map(function(v)
+    return vim.fn.shellescape(v)
+  end, prepare_fh_options(log_opt, single_file))
+
+  local description = utils.vec_join(
+    ("Top-level path: '%s'"):format(utils.path:vim_fnamemodify(git_root, ":~")),
+    rev_arg and ("Range: '%s'"):format(rev_arg) or nil,
+    ("Flags: %s"):format(table.concat(options, " "))
+  )
+
+  log_opt = utils.tbl_clone(log_opt)
+  log_opt.max_count = 1
+  options = prepare_fh_options(log_opt, single_file)
   local out, code = utils.system_list(
-    utils.vec_join("git", "log", "--pretty=format:%H", "--name-status", options, "--", path_args),
+    utils.vec_join("git", "log", "--pretty=format:%H", "--name-status", options, rev_arg, "--", path_args),
     git_root
   )
 
-  return code == 0 and #out > 0
+  return code == 0 and #out > 0, table.concat(description, ", ")
 end
 
 ---Convert revs to git rev args.

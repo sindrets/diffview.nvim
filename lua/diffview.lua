@@ -25,7 +25,10 @@ end)
 ---@type FlagValueMap
 local comp_file_history = arg_parser.FlagValueMap()
 comp_file_history:put({ "base" }, function(_, arg_lead)
-  return M.filter_completion(arg_lead, M.rev_completion())
+  return M.rev_completion(arg_lead)
+end)
+comp_file_history:put({ "rev" }, function(_, arg_lead)
+  return M.rev_completion(arg_lead, { accept_range = true })
 end)
 comp_file_history:put({ "C" }, function(_, arg_lead)
   return vim.fn.getcompletion(arg_lead, "dir")
@@ -93,7 +96,7 @@ function M.completion(arg_lead, cmd_line, cur_pos)
   end
 end
 
-function M.rev_completion(git_root, git_dir)
+function M.rev_candidates(git_root, git_dir)
   local cfile, fpath
   if not (git_root and git_dir) then
     cfile = utils.path:vim_expand("%")
@@ -137,6 +140,34 @@ function M.rev_completion(git_root, git_dir)
   return utils.vec_join(heads, revs, stashes)
 end
 
+---@class RevCompletionSpec
+---@field accept_range boolean
+---@field git_root string
+---@field git_dir string
+
+---@param arg_lead string
+---@param opt RevCompletionSpec
+---@return string[]
+function M.rev_completion(arg_lead, opt)
+  opt = vim.tbl_extend("keep", opt or {}, { accept_range = false })
+  local candidates = M.rev_candidates(opt.git_root, opt.git_dir)
+  local _, range_end = utils.str_match(arg_lead, {
+    "^(%.%.%.?)()$",
+    "^(%.%.%.?)()[^.]",
+    "[^.](%.%.%.?)()$",
+    "[^.](%.%.%.?)()[^.]",
+  })
+
+  if opt.accept_range and range_end then
+    local range_lead = arg_lead:sub(1, range_end - 1)
+    candidates = vim.tbl_map(function(v)
+      return range_lead .. v
+    end, candidates)
+  end
+
+  return M.filter_completion(arg_lead, candidates)
+end
+
 M.completers = {
   DiffviewOpen = function(args, argidx, divideridx, arg_lead)
     local cfile = utils.path:vim_expand("%")
@@ -159,7 +190,11 @@ M.completers = {
     if argidx > divideridx then
       return vim.fn.getcompletion(arg_lead, "file", 0)
     elseif not has_rev_arg and arg_lead:sub(1, 1) ~= "-" and git_dir and git_root then
-      return M.filter_completion(arg_lead, M.rev_completion(git_root, git_dir))
+      return M.rev_completion(arg_lead, {
+        accept_range= true,
+        git_root = git_root,
+        git_dir = git_dir,
+      })
     else
       local flag_completion = comp_open:get_completion(arg_lead)
       if flag_completion then

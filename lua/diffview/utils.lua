@@ -221,6 +221,19 @@ function M.str_template(str, table)
   end))
 end
 
+---Match a given string against multiple patterns.
+---@param str string
+---@param patterns string[]
+---@return ... captured: The first match, or `nil` if no patterns matched.
+function M.str_match(str, patterns)
+  for _, pattern in ipairs(patterns) do
+    local m = { str:match(pattern) }
+    if #m > 0 then
+      return unpack(m)
+    end
+  end
+end
+
 ---@param job Job
 function M.handle_failed_job(job)
   if job.code == 0 then

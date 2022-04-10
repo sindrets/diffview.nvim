@@ -235,6 +235,22 @@ return {
       comp:add_line(s .. paths)
     end
 
+    if panel.rev_range then
+      line_idx = line_idx + 1
+      s = "Range: "
+      comp:add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
+      offset = #s
+      s = s .. panel.rev_arg
+      comp:add_hl("DiffviewFilePanelFileName", line_idx, offset, offset + #s)
+      offset = #s
+      local hash_range = (" (%s..%s)"):format(
+        panel.rev_range.first.commit:sub(1, 8),
+        panel.rev_range.last.commit:sub(1, 8)
+      )
+      comp:add_hl("DiffviewSecondary", line_idx, offset, offset + #hash_range)
+      comp:add_line(s .. hash_range)
+    end
+
     if panel.option_mapping then
       line_idx = line_idx + 1
       s = "Options: "

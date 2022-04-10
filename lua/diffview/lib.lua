@@ -2,6 +2,7 @@ local DiffView = require("diffview.views.diff.diff_view").DiffView
 local FileHistoryView = require("diffview.views.file_history.file_history_view").FileHistoryView
 local Rev = require("diffview.git.rev").Rev
 local RevType = require("diffview.git.rev").RevType
+local Commit = require("diffview.git.commit").Commit
 local arg_parser = require("diffview.arg_parser")
 local config = require("diffview.config")
 local git = require("diffview.git.utils")
@@ -125,7 +126,7 @@ function M.file_history(args)
   end
 
   rel_paths = vim.tbl_map(function(v)
-    return path:relative(v, ".")
+    return v == "." and "." or path:relative(v, ".")
   end, paths)
 
   local p = paths[1]
@@ -149,11 +150,46 @@ function M.file_history(args)
     return git.pathspec_expand(git_root, cwd, pathspec)
   end, paths)
 
+  local range ---@type { rev: Rev, commit: Commit }[]
+  local rev_arg = argo:get_flag("rev")
+  if rev_arg then
+    range = {
+      M.parse_revs(
+        git_root,
+        rev_arg,
+        {
+          cached = argo:get_flag("cached", "staged") == "true",
+          imply_local = argo:get_flag("imply-local") == "true",
+        }
+      )
+    }
+
+    if #range < 2 then
+      return
+    end
+
+    if range[2].type ~= RevType.COMMIT then
+      -- Set second rev to the earliest commit
+      range[2] =  Rev.earliest_commit(git_root)
+    end
+
+    range = vim.tbl_map(function(v)
+      return { rev = v, commit = Commit.from_rev(v, git_root) }
+    end, range)
+    table.sort(range, function (a, b)
+      return a.commit.time < b.commit.time
+    end)
+  end
+
   local log_options = config.get_config().file_history_panel.log_options
-  local ok = git.file_history_dry_run(git_root, paths, log_options)
+  local rev_range = (range and #range == 2) and { first = range[1].rev, last = range[2].rev } or nil
+  local ok, opt_description = git.file_history_dry_run(git_root, paths, log_options, { range = rev_range })
 
   if not ok then
-    utils.info(("No git history for target(s): '%s'"):format(table.concat(rel_paths, ", ")))
+    utils.info({
+      ("No git history for target(s) given the current options: %s"):format(table.concat(rel_paths, ", ")),
+      ("Current options: [ %s ]"):format(opt_description)
+    })
     return
   end
 
@@ -179,6 +215,8 @@ function M.file_history(args)
     raw_args = argo.args,
     log_options = log_options,
     base = base,
+    rev_arg = rev_arg,
+    rev_range = rev_range,
   })
 
   table.insert(M.views, v)

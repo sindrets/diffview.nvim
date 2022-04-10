@@ -1,3 +1,4 @@
+local utils = require("diffview.utils")
 local oop = require("diffview.oop")
 local M = {}
 
@@ -14,6 +15,8 @@ local RevType = oop.enum({
   "INDEX",
   "CUSTOM",
 })
+
+---@alias RevRange { first: Rev, last: Rev }
 
 ---@class Rev : Object
 ---@field type integer
@@ -33,6 +36,32 @@ function Rev:init(type, commit, head)
   self.type = type
   self.commit = commit
   self.head = head or false
+end
+
+---@param name string
+---@param git_root? string
+---@return Rev
+function Rev.from_name(name, git_root)
+  local out, code = utils.system_list({ "git", "rev-parse", "--revs-only", name }, git_root)
+  if code ~= 0 then
+    return
+  end
+
+  return Rev(RevType.COMMIT, out[1]:gsub("^%^", ""))
+end
+
+---@param git_root string
+---@return Rev
+function Rev.earliest_commit(git_root)
+  local out, code = utils.system_list({
+    "git", "rev-list", "--max-parents=0", "--first-parent", "HEAD"
+  }, git_root)
+
+  if code ~= 0 then
+    return
+  end
+
+  return Rev(RevType.COMMIT, ({ out[1]:gsub("^%^", "") })[1])
 end
 
 ---Get an abbreviated commit SHA. Returns `nil` if this Rev is not a commit.

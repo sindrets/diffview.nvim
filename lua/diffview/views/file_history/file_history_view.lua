@@ -18,6 +18,8 @@ local M = {}
 ---@field panel FileHistoryPanel
 ---@field path_args string[]
 ---@field raw_args string[]
+---@field rev_arg string?
+---@field rev_range RevRange
 local FileHistoryView = oop.create_class("FileHistoryView", StandardView)
 
 function FileHistoryView:init(opt)
@@ -31,13 +33,19 @@ function FileHistoryView:init(opt)
   self.git_dir = git.git_dir(self.git_root)
   self.path_args = opt.path_args
   self.raw_args = opt.raw_args
+  self.rev_arg = opt.rev_arg
+  self.rev_range = opt.rev_range
   self.panel = FileHistoryPanel(
     self.git_root,
     {},
     self.path_args,
     self.raw_args,
     opt.log_options,
-    opt.base
+    {
+      base = opt.base,
+      rev_arg = opt.rev_arg,
+      rev_range = opt.rev_range,
+    }
   )
 end
 
