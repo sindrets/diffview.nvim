@@ -342,6 +342,23 @@ local function prepare_fh_options(log_options, single_file)
   )
 end
 
+---@param log_options LogOptions
+---@param single_file boolean
+---@return string[]
+local function describe_fh_options(log_options, single_file)
+  local o = log_options
+  return utils.vec_join(
+    (o.follow and single_file) and { "--follow" } or nil,
+    o.all and { "--all" } or nil,
+    o.merges and { "--merges" } or nil,
+    o.no_merges and { "--no-merges" } or nil,
+    o.reverse and { "--reverse" } or nil,
+    o.max_count and { "--max-count=" .. o.max_count } or nil,
+    o.author and { "--author=" .. o.author } or nil,
+    o.grep and { "--grep=" .. o.grep } or nil
+  )
+end
+
 local function structure_fh_data(namestat_data, numstat_data)
   local right_hash, left_hash, merge_hash = unpack(utils.str_split(namestat_data[1]))
   local time, time_offset = unpack(utils.str_split(namestat_data[3]))
@@ -702,7 +719,7 @@ function M.file_history_dry_run(git_root, path_args, log_opt, opt)
 
   local options = vim.tbl_map(function(v)
     return vim.fn.shellescape(v)
-  end, prepare_fh_options(log_opt, single_file))
+  end, describe_fh_options(log_opt, single_file))
 
   local description = utils.vec_join(
     ("Top-level path: '%s'"):format(utils.path:vim_fnamemodify(git_root, ":~")),
@@ -757,15 +774,14 @@ function M.rev_to_pretty_string(left, right)
   return nil
 end
 
+---@param git_root string
 ---@return Rev
 function M.head_rev(git_root)
   local out, code = utils.system_list({ "git", "rev-parse", "HEAD", "--" }, git_root)
-  if code ~= 0 then
+  if code ~= 0 or not (out[1] and out[1] ~= "") then
     return
   end
-  local rev_string = out[1] or ""
-
-  local s = vim.trim(rev_string):gsub("^%^", "")
+  local s = vim.trim(out[1]):gsub("^%^", "")
   return Rev(RevType.COMMIT, s, true)
 end
 
@@ -867,8 +883,7 @@ function M.pathspec_split(pathspec)
 end
 
 function M.pathspec_expand(git_root, cwd, pathspec)
-  local magic = pathspec:match("^:[/!^]*:?") or pathspec:match("^:%b()") or ""
-  local pattern = pathspec:sub(1 + #magic, -1)
+  local magic, pattern = M.pathspec_split(pathspec)
   if not utils.path:is_abs(pattern) then
     pattern = utils.path:join(utils.path:relative(cwd, git_root), pattern)
   end
@@ -876,8 +891,7 @@ function M.pathspec_expand(git_root, cwd, pathspec)
 end
 
 function M.pathspec_modify(pathspec, mods)
-  local magic = pathspec:match("^:[/!^]*:?") or pathspec:match("^:%b()") or ""
-  local pattern = pathspec:sub(1 + #magic, -1)
+  local magic, pattern = M.pathspec_split(pathspec)
   return magic .. utils.path:vim_fnamemodify(pattern, mods)
 end
 
@@ -922,6 +936,11 @@ function M.show_untracked(git_root)
   return vim.trim(out[1] or "") ~= "false"
 end
 
+---Get the diff status letter for a file for a given rev.
+---@param git_root string
+---@param path string
+---@param rev_arg string
+---@return string?
 function M.get_file_status(git_root, path, rev_arg)
   local out, code = utils.system_list(
     { "git", "diff", "--name-status", rev_arg, "--", path },
@@ -932,6 +951,11 @@ function M.get_file_status(git_root, path, rev_arg)
   end
 end
 
+---Get diff stats for a file for a given rev.
+---@param git_root string
+---@param path string
+---@param rev_arg string
+---@return GitStats
 function M.get_file_stats(git_root, path, rev_arg)
   local out, code = utils.system_list(
     { "git", "diff", "--numstat", rev_arg, "--", path },
@@ -948,6 +972,15 @@ function M.get_file_stats(git_root, path, rev_arg)
     end
     return stats
   end
+end
+
+---Verify that a given git rev is valid.
+---@param git_root string
+---@param rev_arg string
+---@return boolean ok, string[] output
+function M.verify_rev_arg(git_root, rev_arg)
+  local out, code = utils.system_list({ "git", "rev-parse", "--revs-only", rev_arg }, git_root)
+  return code == 0 and out[1] and out[1] ~= "", out
 end
 
 ---Restore a file to the state it was in, in a given commit / rev. If no commit

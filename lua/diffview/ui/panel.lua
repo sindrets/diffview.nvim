@@ -173,6 +173,8 @@ function Panel:close()
       -- Ensure that the tabpage doesn't close if the panel is the last window.
       vim.cmd("sp")
       FileEntry.load_null_buffer(0)
+    else
+      vim.cmd("wincmd p")
     end
     api.nvim_win_hide(self.winid)
   end

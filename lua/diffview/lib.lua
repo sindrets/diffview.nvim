@@ -149,28 +149,24 @@ function M.file_history(args)
     return git.pathspec_expand(git_root, cwd, pathspec)
   end, paths)
 
-  local rev_arg = argo:get_flag("range")
-  if rev_arg then
-    local left, right = M.parse_revs(
-      git_root,
-      rev_arg,
-      {
-        cached = argo:get_flag("cached", "staged") == "true",
-        imply_local = argo:get_flag("imply-local") == "true",
-      }
-    )
-
-    if not (left and right) then
+  local range_arg = argo:get_flag("range")
+  if range_arg then
+    local ok = git.verify_rev_arg(git_root, range_arg)
+    if not ok then
+      utils.err(("Bad revision: '%s'"):format(range_arg))
       return
     end
   end
 
   local log_options = config.get_config().file_history_panel.log_options
-  local ok, opt_description = git.file_history_dry_run(git_root, paths, log_options, { rev_arg = rev_arg })
+  local ok, opt_description = git.file_history_dry_run(git_root, paths, log_options, { rev_arg = range_arg })
 
   if not ok then
     utils.info({
-      ("No git history for target(s) given the current options: %s"):format(table.concat(rel_paths, ", ")),
+      ("No git history for target(s) given the current options! Targets: %s")
+        :format(table.concat(vim.tbl_map(function(v)
+          return "'" .. v .. "'"
+        end, rel_paths), ", ")),
       ("Current options: [ %s ]"):format(opt_description)
     })
     return
@@ -182,8 +178,9 @@ function M.file_history(args)
     if base_arg == "LOCAL" then
       base = Rev(RevType.LOCAL)
     else
-      local out, code = utils.system_list({ "git", "rev-parse", "--revs-only", base_arg }, git_root)
-      if code ~= 0 or not out[1] or out[1] == "" then
+      ---@diagnostic disable-next-line: redefined-local
+      local ok, out = git.verify_rev_arg(git_root, base_arg)
+      if not ok then
         utils.warn(("Bad base revision, ignoring: '%s'"):format(base_arg))
       else
         base = Rev(RevType.COMMIT, out[1])
@@ -198,7 +195,7 @@ function M.file_history(args)
     raw_args = argo.args,
     log_options = log_options,
     base = base,
-    rev_arg = rev_arg,
+    rev_arg = range_arg,
   })
 
   table.insert(M.views, v)

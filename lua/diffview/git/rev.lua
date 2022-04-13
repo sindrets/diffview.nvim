@@ -28,12 +28,16 @@ local Rev = oop.create_class("Rev")
 Rev.NULL_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 ---Rev constructor
----@param type RevType
+---@param rev_type RevType
 ---@param commit string
----@param head boolean
+---@param head? boolean
 ---@return Rev
-function Rev:init(type, commit, head)
-  self.type = type
+function Rev:init(rev_type, commit, head)
+  local t = type(commit)
+  assert(t == "nil" or (t == "string" and commit ~= ""), "@param 'commit' cannot be an empty string!")
+  t = type(head)
+  assert(t == "boolean" or t == "nil", "@param 'head' must be of type 'boolean'!")
+  self.type = rev_type
   self.commit = commit
   self.head = head or false
 end
