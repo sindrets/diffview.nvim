@@ -470,7 +470,7 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
 end)
 
 ---@class ProcessFileHistorySpec
----@field range RevRange
+---@field rev_arg string
 ---@field base Rev
 
 ---@param thread thread
@@ -488,9 +488,6 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
   local last_status
   local resume_lock = false
   local old_path
-  local rev_arg = opt.range and (
-    opt.range.first.commit .. ".." .. opt.range.last.commit
-  ) or nil
 
   local single_file = #path_args == 1
     and not utils.path:is_directory(path_args[1])
@@ -501,7 +498,7 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
     path_args,
     single_file,
     log_opt,
-    { rev_arg = rev_arg, },
+    { rev_arg = opt.rev_arg, },
     function(status, d)
       if status == JobStatus.PROGRESS then
         data[#data+1] = d
@@ -691,7 +688,7 @@ function M.file_history(git_root, path_args, log_opt, opt, callback)
 end
 
 ---@class FileHistoryDryRunSpec
----@field range RevRange
+---@field rev_arg string
 
 ---@param git_root string
 ---@param path_args string[]
@@ -703,17 +700,13 @@ function M.file_history_dry_run(git_root, path_args, log_opt, opt)
     and utils.path:is_directory(path_args[1])
     and #utils.system_list(utils.vec_join("git", "ls-files", "--", path_args), git_root) < 2
 
-  local rev_arg = opt.range and (
-    opt.range.first.commit .. ".." .. opt.range.last.commit
-  ) or nil
-
   local options = vim.tbl_map(function(v)
     return vim.fn.shellescape(v)
   end, prepare_fh_options(log_opt, single_file))
 
   local description = utils.vec_join(
     ("Top-level path: '%s'"):format(utils.path:vim_fnamemodify(git_root, ":~")),
-    rev_arg and ("Range: '%s'"):format(rev_arg) or nil,
+    opt.rev_arg and ("Range: '%s'"):format(opt.rev_arg) or nil,
     ("Flags: %s"):format(table.concat(options, " "))
   )
 
@@ -721,7 +714,7 @@ function M.file_history_dry_run(git_root, path_args, log_opt, opt)
   log_opt.max_count = 1
   options = prepare_fh_options(log_opt, single_file)
   local out, code = utils.system_list(
-    utils.vec_join("git", "log", "--pretty=format:%H", "--name-status", options, rev_arg, "--", path_args),
+    utils.vec_join("git", "log", "--pretty=format:%H", "--name-status", options, opt.rev_arg, "--", path_args),
     git_root
   )
 

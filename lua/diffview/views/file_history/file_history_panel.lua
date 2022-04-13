@@ -70,7 +70,6 @@ FileHistoryPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 ---@class FileHistoryPanelSpec
 ---@field base Rev
 ---@field rev_arg string
----@field rev_range RevRange
 
 ---FileHistoryPanel constructor.
 ---@param git_root string
@@ -93,7 +92,6 @@ function FileHistoryPanel:init(git_root, entries, path_args, raw_args, log_optio
   self.raw_args = raw_args
   self.base = opt.base
   self.rev_arg = opt.rev_arg
-  self.rev_range = opt.rev_range
   self.cur_item = {}
   self.single_file = entries[1] and entries[1].single_file
   self.option_panel = FHOptionPanel(self)
@@ -254,7 +252,7 @@ function FileHistoryPanel:update_entries(callback)
     self.log_options,
     {
       base = self.base,
-      range = self.rev_range,
+      rev_arg = self.rev_arg,
     },
     update
   )
