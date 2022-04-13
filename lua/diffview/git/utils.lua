@@ -342,6 +342,23 @@ local function prepare_fh_options(log_options, single_file)
   )
 end
 
+---@param log_options LogOptions
+---@param single_file boolean
+---@return string[]
+local function describe_fh_options(log_options, single_file)
+  local o = log_options
+  return utils.vec_join(
+    (o.follow and single_file) and { "--follow" } or nil,
+    o.all and { "--all" } or nil,
+    o.merges and { "--merges" } or nil,
+    o.no_merges and { "--no-merges" } or nil,
+    o.reverse and { "--reverse" } or nil,
+    o.max_count and { "--max-count=" .. o.max_count } or nil,
+    o.author and { "--author=" .. o.author } or nil,
+    o.grep and { "--grep=" .. o.grep } or nil
+  )
+end
+
 local function structure_fh_data(namestat_data, numstat_data)
   local right_hash, left_hash, merge_hash = unpack(utils.str_split(namestat_data[1]))
   local time, time_offset = unpack(utils.str_split(namestat_data[3]))
@@ -360,13 +377,17 @@ local function structure_fh_data(namestat_data, numstat_data)
   }
 end
 
+---@class IncrementalFhDataSpec
+---@field rev_arg string
+
 ---@param git_root string
 ---@param path_args string[]
 ---@param single_file boolean
----@param opt LogOptions
+---@param log_opt LogOptions
+---@param opt IncrementalFhDataSpec
 ---@param callback function
-local incremental_fh_data = async.void(function(git_root, path_args, single_file, opt, callback)
-  local options = prepare_fh_options(opt, single_file)
+local incremental_fh_data = async.void(function(git_root, path_args, single_file, log_opt, opt, callback)
+  local options = prepare_fh_options(log_opt, single_file)
   local raw = {}
   local namestat_job, numstat_job
 
@@ -420,6 +441,7 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
     command = "git",
     args = utils.vec_join(
       "log",
+      opt.rev_arg,
       "--pretty=format:%x00%n%H %P%n%an%n%ad%n%ar%n%s",
       "--date=raw",
       "--name-status",
@@ -436,6 +458,7 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
     command = "git",
     args = utils.vec_join(
       "log",
+      opt.rev_arg,
       "--pretty=format:%x00",
       "--date=raw",
       "--numstat",
@@ -463,13 +486,17 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
   end
 end)
 
+---@class ProcessFileHistorySpec
+---@field rev_arg string
+---@field base Rev
+
 ---@param thread thread
 ---@param git_root string
 ---@param path_args string[]
----@param opt LogOptions
----@param base Rev
+---@param log_opt LogOptions
+---@param opt ProcessFileHistorySpec
 ---@param callback function
-local function process_file_history(thread, git_root, path_args, opt, base, callback)
+local function process_file_history(thread, git_root, path_args, log_opt, opt, callback)
   ---@type LogEntry[]
   local entries = {}
   local lec = 0 -- Last entry count
@@ -487,7 +514,8 @@ local function process_file_history(thread, git_root, path_args, opt, base, call
     git_root,
     path_args,
     single_file,
-    opt,
+    log_opt,
+    { rev_arg = opt.rev_arg, },
     function(status, d)
       if status == JobStatus.PROGRESS then
         data[#data+1] = d
@@ -628,7 +656,7 @@ local function process_file_history(thread, git_root, path_args, opt, base, call
           kind = "working",
           commit = commit,
           left = Rev(RevType.COMMIT, cur.left_hash),
-          right = base or Rev(RevType.COMMIT, cur.right_hash),
+          right = opt.base or Rev(RevType.COMMIT, cur.right_hash),
         })
       )
     end
@@ -656,10 +684,10 @@ end
 
 ---@param git_root string
 ---@param path_args string[]
----@param opt LogOptions
----@param base Rev
+---@param log_opt LogOptions
+---@param opt ProcessFileHistorySpec
 ---@param callback function
-function M.file_history(git_root, path_args, opt, base, callback)
+function M.file_history(git_root, path_args, log_opt, opt, callback)
   local thread
 
   for _, job in ipairs(file_history_jobs) do
@@ -670,29 +698,44 @@ function M.file_history(git_root, path_args, opt, base, callback)
   file_history_jobs = {}
 
   thread = coroutine.create(function()
-    process_file_history(thread, git_root, path_args, opt, base, callback)
+    process_file_history(thread, git_root, path_args, log_opt, opt, callback)
   end)
 
   coroutine.resume(thread)
 end
 
+---@class FileHistoryDryRunSpec
+---@field rev_arg string
+
 ---@param git_root string
 ---@param path_args string[]
----@param log_options LogOptions
-function M.file_history_dry_run(git_root, path_args, log_options)
+---@param log_opt LogOptions
+---@param opt FileHistoryDryRunSpec
+---@return boolean ok, string description
+function M.file_history_dry_run(git_root, path_args, log_opt, opt)
   local single_file = #path_args == 1
     and utils.path:is_directory(path_args[1])
     and #utils.system_list(utils.vec_join("git", "ls-files", "--", path_args), git_root) < 2
 
-  log_options = utils.tbl_clone(log_options)
-  log_options.max_count = 1
-  local options = prepare_fh_options(log_options, single_file)
+  local options = vim.tbl_map(function(v)
+    return vim.fn.shellescape(v)
+  end, describe_fh_options(log_opt, single_file))
+
+  local description = utils.vec_join(
+    ("Top-level path: '%s'"):format(utils.path:vim_fnamemodify(git_root, ":~")),
+    opt.rev_arg and ("Range: '%s'"):format(opt.rev_arg) or nil,
+    ("Flags: %s"):format(table.concat(options, " "))
+  )
+
+  log_opt = utils.tbl_clone(log_opt)
+  log_opt.max_count = 1
+  options = prepare_fh_options(log_opt, single_file)
   local out, code = utils.system_list(
-    utils.vec_join("git", "log", "--pretty=format:%H", "--name-status", options, "--", path_args),
+    utils.vec_join("git", "log", "--pretty=format:%H", "--name-status", options, opt.rev_arg, "--", path_args),
     git_root
   )
 
-  return code == 0 and #out > 0
+  return code == 0 and #out > 0, table.concat(description, ", ")
 end
 
 ---Convert revs to git rev args.
@@ -731,15 +774,14 @@ function M.rev_to_pretty_string(left, right)
   return nil
 end
 
+---@param git_root string
 ---@return Rev
 function M.head_rev(git_root)
   local out, code = utils.system_list({ "git", "rev-parse", "HEAD", "--" }, git_root)
-  if code ~= 0 then
+  if code ~= 0 or not (out[1] and out[1] ~= "") then
     return
   end
-  local rev_string = out[1] or ""
-
-  local s = vim.trim(rev_string):gsub("^%^", "")
+  local s = vim.trim(out[1]):gsub("^%^", "")
   return Rev(RevType.COMMIT, s, true)
 end
 
@@ -841,8 +883,7 @@ function M.pathspec_split(pathspec)
 end
 
 function M.pathspec_expand(git_root, cwd, pathspec)
-  local magic = pathspec:match("^:[/!^]*:?") or pathspec:match("^:%b()") or ""
-  local pattern = pathspec:sub(1 + #magic, -1)
+  local magic, pattern = M.pathspec_split(pathspec)
   if not utils.path:is_abs(pattern) then
     pattern = utils.path:join(utils.path:relative(cwd, git_root), pattern)
   end
@@ -850,8 +891,7 @@ function M.pathspec_expand(git_root, cwd, pathspec)
 end
 
 function M.pathspec_modify(pathspec, mods)
-  local magic = pathspec:match("^:[/!^]*:?") or pathspec:match("^:%b()") or ""
-  local pattern = pathspec:sub(1 + #magic, -1)
+  local magic, pattern = M.pathspec_split(pathspec)
   return magic .. utils.path:vim_fnamemodify(pattern, mods)
 end
 
@@ -896,6 +936,11 @@ function M.show_untracked(git_root)
   return vim.trim(out[1] or "") ~= "false"
 end
 
+---Get the diff status letter for a file for a given rev.
+---@param git_root string
+---@param path string
+---@param rev_arg string
+---@return string?
 function M.get_file_status(git_root, path, rev_arg)
   local out, code = utils.system_list(
     { "git", "diff", "--name-status", rev_arg, "--", path },
@@ -906,6 +951,11 @@ function M.get_file_status(git_root, path, rev_arg)
   end
 end
 
+---Get diff stats for a file for a given rev.
+---@param git_root string
+---@param path string
+---@param rev_arg string
+---@return GitStats
 function M.get_file_stats(git_root, path, rev_arg)
   local out, code = utils.system_list(
     { "git", "diff", "--numstat", rev_arg, "--", path },
@@ -922,6 +972,15 @@ function M.get_file_stats(git_root, path, rev_arg)
     end
     return stats
   end
+end
+
+---Verify that a given git rev is valid.
+---@param git_root string
+---@param rev_arg string
+---@return boolean ok, string[] output
+function M.verify_rev_arg(git_root, rev_arg)
+  local out, code = utils.system_list({ "git", "rev-parse", "--revs-only", rev_arg }, git_root)
+  return code == 0 and out[1] and out[1] ~= "", out
 end
 
 ---Restore a file to the state it was in, in a given commit / rev. If no commit

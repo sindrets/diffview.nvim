@@ -31,6 +31,45 @@ function Commit:init(opt)
   self.iso_date = Commit.time_to_iso(self.time, self.time_offset)
 end
 
+---@param rev_arg string
+---@param git_root string
+---@return Commit
+function Commit.from_rev_arg(rev_arg, git_root)
+  local out, code = utils.system_list({
+    "git",
+    "show",
+    "--pretty=format:%H %P%n%an%n%ad%n%ar%n%s",
+    "--date=raw",
+    "--name-status",
+    rev_arg,
+    "--",
+  }, git_root)
+
+  if code ~= 0 then
+    return
+  end
+
+  local right_hash, _, _ = unpack(utils.str_split(out[1]))
+  local time, time_offset = unpack(utils.str_split(out[3]))
+
+  return Commit({
+    hash = right_hash,
+    author = out[2],
+    time = tonumber(time),
+    time_offset = time_offset,
+    rel_date = out[4],
+    subject = out[5],
+  })
+end
+
+---@param rev Rev
+---@param git_root string
+---@return Commit
+function Commit.from_rev(rev, git_root)
+  assert(rev.type == require("diffview.git.rev").RevType.COMMIT, "Rev must be of type COMMIT!")
+  return Commit.from_rev_arg(rev.commit, git_root)
+end
+
 function Commit.parse_time_offset(iso_date)
   local sign, h, m = vim.trim(iso_date):match("([+-])(%d%d):?(%d%d)$")
   local offset = tonumber(h) * 60 * 60 + tonumber(m) * 60

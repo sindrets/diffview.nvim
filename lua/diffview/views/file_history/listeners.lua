@@ -28,6 +28,7 @@ return function(view)
     tab_enter = function()
       local file = view.panel.cur_item[2]
       if file then
+        view:set_file(file)
         file:attach_buffers()
       end
     end,

@@ -1,3 +1,4 @@
+local utils = require("diffview.utils")
 local oop = require("diffview.oop")
 local M = {}
 
@@ -15,6 +16,8 @@ local RevType = oop.enum({
   "CUSTOM",
 })
 
+---@alias RevRange { first: Rev, last: Rev }
+
 ---@class Rev : Object
 ---@field type integer
 ---@field commit string A commit SHA.
@@ -25,14 +28,44 @@ local Rev = oop.create_class("Rev")
 Rev.NULL_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 ---Rev constructor
----@param type RevType
+---@param rev_type RevType
 ---@param commit string
----@param head boolean
+---@param head? boolean
 ---@return Rev
-function Rev:init(type, commit, head)
-  self.type = type
+function Rev:init(rev_type, commit, head)
+  local t = type(commit)
+  assert(t == "nil" or (t == "string" and commit ~= ""), "@param 'commit' cannot be an empty string!")
+  t = type(head)
+  assert(t == "boolean" or t == "nil", "@param 'head' must be of type 'boolean'!")
+  self.type = rev_type
   self.commit = commit
   self.head = head or false
+end
+
+---@param name string
+---@param git_root? string
+---@return Rev
+function Rev.from_name(name, git_root)
+  local out, code = utils.system_list({ "git", "rev-parse", "--revs-only", name }, git_root)
+  if code ~= 0 then
+    return
+  end
+
+  return Rev(RevType.COMMIT, out[1]:gsub("^%^", ""))
+end
+
+---@param git_root string
+---@return Rev
+function Rev.earliest_commit(git_root)
+  local out, code = utils.system_list({
+    "git", "rev-list", "--max-parents=0", "--first-parent", "HEAD"
+  }, git_root)
+
+  if code ~= 0 then
+    return
+  end
+
+  return Rev(RevType.COMMIT, ({ out[1]:gsub("^%^", "") })[1])
 end
 
 ---Get an abbreviated commit SHA. Returns `nil` if this Rev is not a commit.

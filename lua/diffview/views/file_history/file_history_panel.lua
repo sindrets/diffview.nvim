@@ -34,6 +34,7 @@ local perf_update = PerfTimer("[FileHistoryPanel] update")
 ---@field path_args string[]
 ---@field raw_args string[]
 ---@field base Rev
+---@field rev_range RevRange
 ---@field log_options LogOptions
 ---@field cur_item {[1]: LogEntry, [2]: FileEntry}
 ---@field single_file boolean
@@ -66,14 +67,18 @@ FileHistoryPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
   filetype = "DiffviewFileHistory",
 })
 
+---@class FileHistoryPanelSpec
+---@field base Rev
+---@field rev_arg string
+
 ---FileHistoryPanel constructor.
 ---@param git_root string
 ---@param entries LogEntry[]
 ---@param path_args string[]
 ---@param log_options LogOptions
----@param base Rev
+---@param opt FileHistoryPanelSpec
 ---@return FileHistoryPanel
-function FileHistoryPanel:init(git_root, entries, path_args, raw_args, log_options, base)
+function FileHistoryPanel:init(git_root, entries, path_args, raw_args, log_options, opt)
   local conf = config.get_config()
   FileHistoryPanel:super().init(self, {
     position = conf.file_history_panel.position,
@@ -85,7 +90,8 @@ function FileHistoryPanel:init(git_root, entries, path_args, raw_args, log_optio
   self.entries = entries
   self.path_args = path_args
   self.raw_args = raw_args
-  self.base = base
+  self.base = opt.base
+  self.rev_arg = opt.rev_arg
   self.cur_item = {}
   self.single_file = entries[1] and entries[1].single_file
   self.option_panel = FHOptionPanel(self)
@@ -244,7 +250,10 @@ function FileHistoryPanel:update_entries(callback)
     self.git_root,
     self.path_args,
     self.log_options,
-    self.base,
+    {
+      base = self.base,
+      rev_arg = self.rev_arg,
+    },
     update
   )
   self:update_components()
@@ -343,6 +352,9 @@ function FileHistoryPanel:_get_entry_by_file_offset(entry_idx, file_idx, offset)
 end
 
 function FileHistoryPanel:set_file_by_offset(offset)
+  if self:num_items() == 0 then
+    return
+  end
   local entry, file = self.cur_item[1], self.cur_item[2]
 
   if not (entry and file) and self:num_items() > 0 then

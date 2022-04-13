@@ -28,13 +28,14 @@ end
 return function(view)
   return {
     tab_enter = function()
-      if view.ready then
-        view:update_files()
-      end
-
       local file = view.panel.cur_file
       if file then
+        view:set_file(file)
         file:attach_buffers()
+      end
+
+      if view.ready then
+        view:update_files()
       end
     end,
     tab_leave = function()

@@ -235,6 +235,16 @@ return {
       comp:add_line(s .. paths)
     end
 
+    if panel.rev_arg then
+      line_idx = line_idx + 1
+      s = "Range: "
+      comp:add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
+      offset = #s
+      s = s .. panel.rev_arg
+      comp:add_hl("DiffviewFilePanelFileName", line_idx, offset, offset + #s)
+      comp:add_line(s)
+    end
+
     if panel.option_mapping then
       line_idx = line_idx + 1
       s = "Options: "
