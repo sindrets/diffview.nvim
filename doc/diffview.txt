@@ -309,6 +309,7 @@ COMMANDS                                                 *diffview-commands*
         :DiffviewFileHistory multiple/paths foo/bar baz/qux
         :DiffviewFileHistory --base=HEAD~4
         :DiffviewFileHistory --base=LOCAL
+        :DiffviewFileHistory --range=origin..HEAD
 <
 
     Args:~
@@ -316,6 +317,9 @@ COMMANDS                                                 *diffview-commands*
                         Specify a base git rev from which the right side of
                         the diff will be created. Use the special value
                         `LOCAL` to use the local version of the file.
+
+        --range={git-rev}
+                        Show only commits in the specified revision range.
 
         -C{path}        Run as if git was started in {path} instead of the
                         current working directory.

@@ -149,7 +149,7 @@ function M.file_history(args)
     return git.pathspec_expand(git_root, cwd, pathspec)
   end, paths)
 
-  local rev_arg = argo:get_flag("rev")
+  local rev_arg = argo:get_flag("range")
   if rev_arg then
     local left, right = M.parse_revs(
       git_root,
