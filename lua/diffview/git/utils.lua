@@ -364,7 +364,7 @@ local function structure_fh_data(namestat_data, numstat_data)
   local time, time_offset = unpack(utils.str_split(namestat_data[3]))
 
   return {
-    left_hash = left_hash,
+    left_hash = left_hash ~= "" and left_hash or nil,
     right_hash = right_hash,
     merge_hash = merge_hash,
     author = namestat_data[2],
@@ -655,7 +655,7 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
           stats = stats,
           kind = "working",
           commit = commit,
-          left = Rev(RevType.COMMIT, cur.left_hash),
+          left = cur.left_hash and Rev(RevType.COMMIT, cur.left_hash) or Rev.new_null_tree(),
           right = opt.base or Rev(RevType.COMMIT, cur.right_hash),
         })
       )
