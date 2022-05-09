@@ -371,7 +371,7 @@ end
 ---file entry under the cursor. Otherwise return the file open in the view.
 ---Returns nil if no file is open in the view, or there is no entry under the
 ---cursor in the file panel.
----@param allow_dir boolean Allow directory nodes from the file tree.
+---@param allow_dir? boolean Allow directory nodes from the file tree.
 ---@return FileEntry|nil
 function DiffView:infer_cur_file(allow_dir)
   if self.panel:is_focused() then

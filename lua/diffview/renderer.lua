@@ -526,7 +526,7 @@ function M.get_file_icon(name, ext, render_data, line_idx, offset)
       config.get_config().use_icons = false
       utils.warn(
         "nvim-web-devicons is required to use file icons! "
-          .. "Set `use_icons = false` in your config to not see this message."
+          .. "Set `use_icons = false` in your config to stop seeing this message."
       )
       return " "
     end

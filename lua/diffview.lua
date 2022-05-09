@@ -51,6 +51,9 @@ function M.init()
   DiffviewGlobal.emitter:on("diff_buf_read", function(_)
     vim.cmd("do User DiffviewDiffBufRead")
   end)
+  DiffviewGlobal.emitter:on("diff_buf_win_enter", function(_)
+    vim.cmd("do User DiffviewDiffBufWinEnter")
+  end)
 end
 
 function M.open(...)
@@ -82,6 +85,9 @@ function M.close(tabpage)
   end
 end
 
+---@param arg_lead string
+---@param items string[]
+---@return string[]
 function M.filter_completion(arg_lead, items)
   arg_lead, _ = vim.pesc(arg_lead)
   return vim.tbl_filter(function(item)
@@ -92,7 +98,7 @@ end
 function M.completion(arg_lead, cmd_line, cur_pos)
   local args, argidx, divideridx = arg_parser.scan_ex_args(cmd_line, cur_pos)
   if M.completers[args[1]] then
-    return M.completers[args[1]](args, argidx, divideridx, arg_lead)
+    return M.filter_completion(arg_lead, M.completers[args[1]](args, argidx, divideridx, arg_lead))
   end
 end
 
@@ -146,9 +152,10 @@ end
 ---@field git_dir string
 
 ---@param arg_lead string
----@param opt RevCompletionSpec
+---@param opt? RevCompletionSpec
 ---@return string[]
 function M.rev_completion(arg_lead, opt)
+  ---@type RevCompletionSpec
   opt = vim.tbl_extend("keep", opt or {}, { accept_range = false })
   local candidates = M.rev_candidates(opt.git_root, opt.git_dir)
   local _, range_end = utils.str_match(arg_lead, {
@@ -187,38 +194,34 @@ M.completers = {
       end
     end
 
+    local candidates = {}
+
     if argidx > divideridx then
-      return vim.fn.getcompletion(arg_lead, "file", 0)
+      utils.vec_push(candidates, unpack(vim.fn.getcompletion(arg_lead, "file", 0)))
     elseif not has_rev_arg and arg_lead:sub(1, 1) ~= "-" and git_dir and git_root then
-      return M.rev_completion(arg_lead, {
+      utils.vec_push(candidates, unpack(comp_open:get_all_names()))
+      utils.vec_push(candidates, unpack(M.rev_completion(arg_lead, {
         accept_range= true,
         git_root = git_root,
         git_dir = git_dir,
-      })
+      })))
     else
-      local flag_completion = comp_open:get_completion(arg_lead)
-      if flag_completion then
-        return flag_completion
-      end
-
-      return M.filter_completion(arg_lead, comp_open:get_all_names())
+      utils.vec_push(candidates, unpack(
+        comp_open:get_completion(arg_lead)
+        or comp_open:get_all_names()
+      ))
     end
 
-    return args
+    return candidates
   end,
   ---@diagnostic disable-next-line: unused-local
   DiffviewFileHistory = function(args, argidx, divideridx, arg_lead)
     local candidates = {}
 
-    local flag_completion = comp_file_history:get_completion(arg_lead)
-    if flag_completion then
-      utils.vec_push(candidates, unpack(flag_completion))
-    else
-      utils.vec_push(
-        candidates,
-        unpack(M.filter_completion(arg_lead, comp_file_history:get_all_names()))
-      )
-    end
+    utils.vec_push(candidates, unpack(
+      comp_file_history:get_completion(arg_lead)
+      or comp_file_history:get_all_names()
+    ))
 
     utils.vec_push(candidates, unpack(vim.fn.getcompletion(arg_lead, "file", 0)))
 

@@ -49,8 +49,8 @@ FileEntry.winopts = {
   diff = true,
   scrollbind = true,
   cursorbind = true,
-  scrollopt = { "ver", "hor", "jump" },
   foldmethod = "diff",
+  scrollopt = { "ver", "hor", "jump" },
   foldcolumn = "1",
   foldlevel = 0,
   foldenable = true,
@@ -136,24 +136,35 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid, callback)
       split.ready = true
       local was_ready = self[split.pos .. "_ready"]
       self[split.pos .. "_ready"] = true
+
       if splits[1].ready and splits[2].ready and self.active then
         perf:lap("both buffers ready")
+
+        -- Load and set the buffer
         for _, sp in ipairs(splits) do
           if sp.load then
             sp.load()
           else
             api.nvim_win_set_buf(sp.winid, sp.bufid)
           end
-          if not was_ready then
-            api.nvim_win_call(sp.winid, function()
-              DiffviewGlobal.emitter:emit("diff_buf_read", sp.bufid)
-            end)
-          end
         end
+
         FileEntry._update_windows(left_winid, right_winid)
+
+        -- Call hooks
+        for _, sp in ipairs(splits) do
+          api.nvim_win_call(sp.winid, function()
+            if not was_ready then
+              DiffviewGlobal.emitter:emit("diff_buf_read", sp.bufid)
+            end
+            DiffviewGlobal.emitter:emit("diff_buf_win_enter", sp.bufid)
+          end)
+        end
+
         perf:lap("view updated")
         perf:time()
         logger.lvl(5).s_debug(perf)
+
         if type(callback) == "function" then
           callback()
         end
@@ -432,7 +443,7 @@ function FileEntry.safe_delete_buf(bufid)
   if bufid == FileEntry._null_buffer or not api.nvim_buf_is_loaded(bufid) then
     return
   end
-  for _, winid in ipairs(utils.tabpage_win_find_buf(0, bufid)) do
+  for _, winid in ipairs(utils.win_find_buf(bufid, 0)) do
     FileEntry.load_null_buffer(winid)
   end
   pcall(api.nvim_buf_delete, bufid, { force = true })
@@ -455,7 +466,7 @@ function FileEntry._restore_winopts(bufid)
       vim.cmd("sp")
       api.nvim_win_set_buf(0, bufid)
       utils.set_local(0, FileEntry.winopt_store[bufid])
-      api.nvim_win_close(0, true)
+      api.nvim_win_hide(0)
     end)
   end
 end

@@ -14,6 +14,7 @@ local Event = oop.enum({
 ---@class EventEmitter : Object
 ---@field listeners table<Event, function[]>
 ---@field any_listeners function[]
+---@field emit_lock table<Event, boolean>
 local EventEmitter = oop.create_class("EventEmitter")
 
 ---EventEmitter constructor.
@@ -21,8 +22,12 @@ local EventEmitter = oop.create_class("EventEmitter")
 function EventEmitter:init()
   self.listeners = {}
   self.any_listeners = {}
+  self.emit_lock = {}
 end
 
+---Subscribe to a given event.
+---@param event any Event identifier.
+---@param callback function
 function EventEmitter:on(event, callback)
   if not self.listeners[event] then
     self.listeners[event] = {}
@@ -32,6 +37,9 @@ function EventEmitter:on(event, callback)
   end)
 end
 
+---Subscribe a one-shot listener to a given event.
+---@param event any Event identifier.
+---@param callback function
 function EventEmitter:once(event, callback)
   if not self.listeners[event] then
     self.listeners[event] = {}
@@ -45,12 +53,16 @@ function EventEmitter:once(event, callback)
   end)
 end
 
+---Add a new any-listener, subscribed to all events.
+---@param callback function
 function EventEmitter:on_any(callback)
   table.insert(self.any_listeners, function(event, args)
     callback(event, args)
   end)
 end
 
+---Add a new one-shot any-listener, subscribed to all events.
+---@param callback function
 function EventEmitter:once_any(callback)
   local emitted = false
   table.insert(self.any_listeners, function(event, args)
@@ -61,24 +73,42 @@ function EventEmitter:once_any(callback)
   end)
 end
 
+---Notify all listeners subscribed a given event.
+---@param event any Event identifier.
+---@param ... any Event callback args.
 function EventEmitter:emit(event, ...)
-  local args = utils.tbl_pack(...)
-  if type(self.listeners[event]) == "table" then
-    for _, cb in ipairs(self.listeners[event]) do
-      cb(args)
+  if not self.emit_lock[event] then
+    local args = utils.tbl_pack(...)
+    if type(self.listeners[event]) == "table" then
+      for _, cb in ipairs(self.listeners[event]) do
+        cb(args)
+      end
     end
-  end
-  for _, cb in ipairs(self.any_listeners) do
-    cb(event, args)
+    for _, cb in ipairs(self.any_listeners) do
+      cb(event, args)
+    end
   end
 end
 
-function EventEmitter:_nore_emit(event, ...)
-  local args = utils.tbl_pack(...)
-  if type(self.listeners[event]) == "table" then
-    for _, cb in ipairs(self.listeners[event]) do
-      cb(args)
+---Non-recursively notify all listeners subscribed a given event.
+---@param event any Event identifier.
+---@param ... any Event callback args.
+function EventEmitter:nore_emit(event, ...)
+  if not self.emit_lock[event] then
+    self.emit_lock[event] = true
+    local args = utils.tbl_pack(...)
+
+    if type(self.listeners[event]) == "table" then
+      for _, cb in ipairs(self.listeners[event]) do
+        cb(args)
+      end
     end
+
+    for _, cb in ipairs(self.any_listeners) do
+      cb(event, args)
+    end
+
+    self.emit_lock[event] = false
   end
 end
 

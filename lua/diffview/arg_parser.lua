@@ -1,4 +1,5 @@
 local oop = require("diffview.oop")
+local utils = require("diffview.utils")
 
 local M = {}
 
@@ -54,6 +55,7 @@ function FlagValueMap:put(flag_synonyms, producer)
       end
     end
     self.map[flag] = producer
+    self.map[#self.map+1] = flag
   end
 end
 
@@ -78,13 +80,11 @@ end
 ---Get a list of all flag names.
 ---@return string[]
 function FlagValueMap:get_all_names()
-  local names = {}
-  for name, _ in pairs(self.map) do
-    table.insert(names, name)
-  end
-  return names
+  return utils.vec_slice(self.map)
 end
 
+---@param arg_lead string
+---@return string[]?
 function FlagValueMap:get_completion(arg_lead)
   local name
   local is_short = arg_lead:match(short_flag_pat) ~= nil

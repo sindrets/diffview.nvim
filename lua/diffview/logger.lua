@@ -2,6 +2,20 @@ local utils = require("diffview.utils")
 local log = require("plenary.log")
 local Mock = require("diffview.mock").Mock
 
+---@class Logger
+---@field plugin string
+---@field trace fun(obj: any)
+---@field debug fun(obj: any)
+---@field info fun(obj: any)
+---@field warn fun(obj: any)
+---@field error fun(obj: any)
+---@field fatal fun(obj: any)
+---@field s_trace fun(obj: any)
+---@field s_debug fun(obj: any)
+---@field s_info fun(obj: any)
+---@field s_warn fun(obj: any)
+---@field s_error fun(obj: any)
+---@field s_fatal fun(obj: any)
 local logger = log.new({
   plugin = "diffview",
   highlights = false,
@@ -32,7 +46,7 @@ end
 ---Require a minimum debug level. Returns a mock object if requirement is not
 ---met.
 ---@param min_level integer
----@return any
+---@return Logger
 function logger.lvl(min_level)
   if DiffviewGlobal.debug_level >= min_level then
     return logger

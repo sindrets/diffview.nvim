@@ -281,7 +281,7 @@ end
 ---Get the path to the parent directory of the given path. Returns `nil` if the
 ---path has no parent.
 ---@param path string
----@param n integer Nth parent. (default: 1)
+---@param n? integer Nth parent. (default: 1)
 ---@return string|nil
 function PathLib:parent(path, n)
   if type(n) ~= "number" or n < 1 then

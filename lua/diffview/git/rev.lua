@@ -2,7 +2,7 @@ local utils = require("diffview.utils")
 local oop = require("diffview.oop")
 local M = {}
 
----@class RevType
+---@class RevType : EnumValue
 
 ---@class ERevType
 ---@field LOCAL RevType

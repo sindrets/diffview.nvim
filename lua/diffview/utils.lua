@@ -129,27 +129,6 @@ function M.shell_error()
   return vim.v.shell_error ~= 0
 end
 
----Escape a string for use as a pattern.
----@param s string
----@return string
-function M.pattern_esc(s)
-  local result = string.gsub(s, "[%(|%)|%%|%[|%]|%-|%.|%?|%+|%*|%^|%$]", {
-    ["%"] = "%%",
-    ["-"] = "%-",
-    ["("] = "%(",
-    [")"] = "%)",
-    ["."] = "%.",
-    ["["] = "%[",
-    ["]"] = "%]",
-    ["?"] = "%?",
-    ["+"] = "%+",
-    ["*"] = "%*",
-    ["^"] = "%^",
-    ["$"] = "%$",
-  })
-  return result
-end
-
 function M.str_right_pad(s, min_size, fill)
   s = tostring(s)
   if #s >= min_size then
@@ -283,59 +262,61 @@ function M.system_list(cmd, cwd, silent)
   return stdout, code, stderr
 end
 
+---@class SetLocalSpec
+---@field method '"set"'|'"remove"'|'"append"'|'"prepend"' Assignment method. (default: "set")
+
+---@class SetLocalListSpec : string[]
+---@field opt SetLocalSpec
+
 ---HACK: workaround for inconsistent behavior from `vim.opt_local`.
 ---@see [Neovim issue](https://github.com/neovim/neovim/issues/14670)
 ---@param winids number[]|number Either a list of winids, or a single winid (0 for current window).
----`opt` fields:
----   @tfield method '"set"'|'"remove"'|'"append"'|'"prepend"' Assignment method. (default: "set")
----@overload fun(winids: number[]|number, option: string, value: string[]|string|boolean, opt?: any)
----@overload fun(winids: number[]|number, map: table<string, string[]|string|boolean>, opt?: table)
-function M.set_local(winids, x, y, z)
+---@param option_map table<string, SetLocalListSpec|string|boolean>
+---@param opt? SetLocalSpec
+function M.set_local(winids, option_map, opt)
   if type(winids) ~= "table" then
     winids = { winids }
-  end
-
-  local map, opt
-  if y == nil or type(y) == "table" then
-    map = x
-    opt = y
-  else
-    map = { [x] = y }
-    opt = z
   end
 
   opt = vim.tbl_extend("keep", opt or {}, { method = "set" })
 
   local cmd
-  local ok, err = M.no_win_event_call(function()
-    for _, id in ipairs(winids) do
-      api.nvim_win_call(id, function()
-        for option, value in pairs(map) do
+  for _, id in ipairs(winids) do
+    api.nvim_win_call(id, function()
+      for option, value in pairs(option_map) do
+        if type(value) == "boolean" then
+          cmd = string.format("setl %s%s", value and "" or "no", option)
+        else
+          ---@type SetLocalSpec
           local o = opt
-
-          if type(value) == "boolean" then
-            cmd = string.format("setl %s%s", value and "" or "no", option)
-          else
-            if type(value) == "table" then
-              ---@diagnostic disable-next-line: undefined-field
-              o = vim.tbl_extend("force", opt, value.opt or {})
-              value = table.concat(value, ",")
-            end
-
-            cmd = M.str_template(
-              setlocal_opr_templates[o.method],
-              { option = option, value = tostring(value):gsub("'", "''") }
-            )
+          if type(value) == "table" then
+            o = vim.tbl_extend("force", opt, value.opt or {})
+            value = table.concat(value, ",")
           end
 
-          vim.cmd(cmd)
+          cmd = M.str_template(
+            setlocal_opr_templates[o.method],
+            { option = option, value = tostring(value):gsub("'", "''") }
+          )
         end
-      end)
-    end
-  end)
 
-  if not ok then
-    error(err)
+        vim.cmd(cmd)
+      end
+    end)
+  end
+end
+
+---@param winids number[]|number Either a list of winids, or a single winid (0 for current window).
+---@param option string
+function M.unset_local(winids, option)
+  if type(winids) ~= "table" then
+    winids = { winids }
+  end
+
+  for _, id in ipairs(winids) do
+    api.nvim_win_call(id, function()
+      vim.cmd(string.format("set %s<", option))
+    end)
   end
 end
 
@@ -458,22 +439,48 @@ function M.vec_push(t, ...)
   return t
 end
 
----@return integer[]
-function M.get_loaded_bufs()
-  return vim.tbl_filter(function(id)
-    return api.nvim_buf_is_loaded(id)
-  end, api.nvim_list_bufs())
+---@class ListBufsSpec
+---@field loaded boolean Filter out buffers that aren't loaded.
+---@field listed boolean Filter out buffers that aren't listed.
+---@field no_hidden boolean Filter out buffers that are hidden.
+---@field tabpage integer Filter out buffers that are not displayed in a given tabpage.
+
+---@param opt? ListBufsSpec
+function M.list_bufs(opt)
+  opt = opt or {}
+  local bufs
+
+  if opt.no_hidden or opt.tabpage then
+    local wins = opt.tabpage and api.nvim_tabpage_list_wins(opt.tabpage) or api.nvim_list_wins()
+    local bufnr
+    local seen = {}
+    bufs = {}
+    for _, winid in ipairs(wins) do
+      bufnr = api.nvim_win_get_buf(winid)
+      if not seen[bufnr] then
+        bufs[#bufs+1] = bufnr
+      end
+      seen[bufnr] = true
+    end
+  else
+    bufs = api.nvim_list_bufs()
+  end
+
+  return vim.tbl_filter(function(v)
+    if opt.loaded and not api.nvim_buf_is_loaded(v) then
+      return false
+    end
+    if opt.listed and not vim.bo[v].buflisted then
+      return false
+    end
+    return true
+  end, bufs)
 end
 
----@return integer[]
-function M.get_listed_bufs()
-  return vim.tbl_filter(function(id)
-    return vim.bo[id].buflisted
-  end, api.nvim_list_bufs())
-end
-
-function M.find_named_buffer(name)
-  for _, v in ipairs(api.nvim_list_bufs()) do
+---@param name string
+---@param opt? ListBufsSpec
+function M.find_named_buffer(name, opt)
+  for _, v in ipairs(M.list_bufs(opt)) do
     if vim.fn.bufname(v) == name then
       return v
     end
@@ -481,8 +488,10 @@ function M.find_named_buffer(name)
   return nil
 end
 
-function M.wipe_named_buffer(name)
-  local bn = M.find_named_buffer(name)
+---@param name string
+---@param opt? ListBufsSpec
+function M.wipe_named_buffer(name, opt)
+  local bn = M.find_named_buffer(name, opt)
   if bn then
     local win_ids = vim.fn.win_findbuf(bn)
     for _, id in ipairs(win_ids) do
@@ -513,7 +522,7 @@ function M.remove_buffer(force, bn)
   end
 
   local win_ids = vim.fn.win_findbuf(bn)
-  local listed = M.get_listed_bufs()
+  local listed = M.list_bufs({ listed = true })
   for _, id in ipairs(win_ids) do
     if vim.fn.win_gettype(id) ~= "autocmd" then
       api.nvim_win_call(id, function()
@@ -538,9 +547,11 @@ function M.remove_buffer(force, bn)
   return true
 end
 
-function M.find_file_buffer(path)
+---@param path string
+---@param opt? ListBufsSpec
+function M.find_file_buffer(path, opt)
   local p = M.path:absolute(path)
-  for _, id in ipairs(vim.api.nvim_list_bufs()) do
+  for _, id in ipairs(M.list_bufs(opt)) do
     if p == vim.api.nvim_buf_get_name(id) then
       return id
     end
@@ -549,28 +560,17 @@ end
 
 ---Get a list of all windows that contain the given buffer.
 ---@param bufid integer
+---@param tabpage? integer Only search windows in the given tabpage.
 ---@return integer[]
-function M.win_find_buf(bufid)
+function M.win_find_buf(bufid, tabpage)
   local result = {}
-  local wins = api.nvim_list_wins()
+  local wins
 
-  for _, id in ipairs(wins) do
-    if api.nvim_win_get_buf(id) == bufid then
-      table.insert(result, id)
-    end
+  if tabpage then
+    wins = api.nvim_tabpage_list_wins(tabpage)
+  else
+    wins = api.nvim_list_wins()
   end
-
-  return result
-end
-
----Get a list of all windows in the given tabpage that contains the given
----buffer.
----@param tabpage integer
----@param bufid integer
----@return integer[]
-function M.tabpage_win_find_buf(tabpage, bufid)
-  local result = {}
-  local wins = api.nvim_tabpage_list_wins(tabpage)
 
   for _, id in ipairs(wins) do
     if api.nvim_win_get_buf(id) == bufid then

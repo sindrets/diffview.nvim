@@ -5,9 +5,11 @@
 
 local M = {}
 
+---@class EnumValue : integer
+
 ---Enum creator
 ---@param t string[]
----@return table<string, integer>
+---@return table<string, EnumValue>
 function M.enum(t)
   local enum = {}
   for i, v in ipairs(t) do
@@ -202,12 +204,13 @@ local function subclass(base_class, name)
   return the_class
 end
 
----@diagnostic disable-next-line: duplicate-doc-class
 ---@class Object
 ---@field init function
 ---@field class function
 ---@field instanceof function
 ---@field virtual function
+---@field super function
+---@field subclass function
 local Object = {}
 
 local function obj_newitem()
@@ -257,8 +260,10 @@ setmetatable(Object, {
 })
 
 ---Create a new class.
----@param name string
----@param super_class Object
+---@generic T : Object
+---@param name `T`
+---@param super_class? Object
+---@return T
 function M.create_class(name, super_class)
   super_class = super_class or Object
   return super_class:subclass(name)

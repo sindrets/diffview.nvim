@@ -39,7 +39,7 @@ _G.DiffviewGlobal = {
 
 DiffviewGlobal.emitter:on_any(function(event, args)
   local utils = require("diffview.utils")
-  require("diffview.config").user_emitter:_nore_emit(event, utils.tbl_unpack(args))
+  require("diffview.config").user_emitter:nore_emit(event, utils.tbl_unpack(args))
 end)
 
 return true
