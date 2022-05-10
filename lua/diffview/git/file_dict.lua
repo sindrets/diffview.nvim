@@ -1,8 +1,8 @@
 local oop = require("diffview.oop")
-local FileTree = require("diffview.views.file_tree.file_tree").FileTree
+local FileTree = require("diffview.ui.models.file_tree.file_tree").FileTree
 local M = {}
 
----@type table<integer, FileEntry>
+---@type { [integer]: FileEntry }
 ---@class FileDict : Object
 ---@field working FileEntry[]
 ---@field staged FileEntry[]

@@ -1,6 +1,7 @@
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
-local Node = require("diffview.views.file_tree.node").Node
+local Node = require("diffview.ui.models.file_tree.node").Node
+local Model = require("diffview.ui.model").Model
 
 local M = {}
 
@@ -11,9 +12,9 @@ local M = {}
 ---@field collapsed boolean
 ---@field status string
 
----@class FileTree : Object
+---@class FileTree : Model
 ---@field root Node
-local FileTree = oop.create_class("FileTree")
+local FileTree = oop.create_class("FileTree", Model)
 
 ---FileTree constructor
 ---@param files FileEntry[]|nil
@@ -89,11 +90,14 @@ function FileTree:update_statuses()
   end
 end
 
----@param flatten_dirs boolean
-function FileTree:create_comp_schema(flatten_dirs)
+---@Override
+function FileTree:create_comp_schema(data)
   self.root:sort()
+  ---@type CompSchema
   local schema = {}
 
+  ---@param parent CompSchema
+  ---@param node Node
   local function recurse(parent, node)
     if not node:has_children() then
       parent[#parent + 1] = { name = "file", context = node.data }
@@ -103,7 +107,7 @@ function FileTree:create_comp_schema(flatten_dirs)
     ---@type DirData
     local dir_data = node.data
 
-    if flatten_dirs then
+    if data.flatten_dirs then
       while #node.children == 1 and node.children[1]:has_children() do
         ---@type DirData
         local subdir_data = node.children[1].data

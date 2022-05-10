@@ -78,6 +78,7 @@ function Node:deep_some(callback)
   self:some(wrap)
 end
 
+---@return Node[]
 function Node:leaves()
   local leaves = {}
   self:deep_some(function(node)
