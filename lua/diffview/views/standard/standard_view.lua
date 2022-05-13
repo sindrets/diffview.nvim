@@ -47,7 +47,7 @@ function StandardView:init_layout()
   vim.cmd("belowright " .. split_cmd)
   self.right_winid = api.nvim_get_current_win()
   FileEntry.load_null_buffer(self.right_winid)
-  self.panel:open()
+  self.panel:focus()
   self:post_layout()
 end
 

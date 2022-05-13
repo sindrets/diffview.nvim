@@ -2,7 +2,6 @@ local utils = require("diffview.utils")
 local config = require("diffview.config")
 local renderer = require("diffview.renderer")
 local logger = require("diffview.logger")
-local Form = require("diffview.ui.panel").Form
 local PerfTimer = require("diffview.perf").PerfTimer
 
 ---@type PerfTimer
@@ -82,9 +81,6 @@ local function render_entries(parent, entries, updating)
     if i > #parent or (updating and i > 128) then
       break
     end
-    if not entry.status then
-      print(vim.inspect(entry, { depth = 2 }))
-    end
     local entry_struct = parent[i]
     local line_idx = 0
     local offset = 0
@@ -104,7 +100,7 @@ local function render_entries(parent, entries, updating)
       offset = #s
       local counter = " "
         .. utils.str_left_pad(tostring(#entry.files), #tostring(max_num_files))
-        .. " files"
+        .. (" file%s"):format(#entry.files > 1 and "s" or " ")
       comp:add_hl("DiffviewFilePanelCounter", line_idx, offset, offset + #counter)
       s = s .. counter
     end
@@ -173,10 +169,10 @@ end
 local function prepare_panel_cache(panel)
   local c = {}
   cache[panel] = c
-  c.root_path = panel.form == Form.COLUMN
+  c.root_path = panel.state.form == "column"
       and utils.path:shorten(
         utils.path:vim_fnamemodify(panel.git_root, ":~"),
-        panel.width - 6
+        panel:get_config().width - 6
       )
     or utils.path:vim_fnamemodify(panel.git_root, ":~")
   c.args = table.concat(panel.raw_args, " ")

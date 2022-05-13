@@ -39,10 +39,6 @@ local perf_update = PerfTimer("[FileHistoryPanel] update")
 ---@field cur_item {[1]: LogEntry, [2]: FileEntry}
 ---@field single_file boolean
 ---@field updating boolean
----@field width integer
----@field height integer
----@field bufid integer
----@field winid integer
 ---@field render_data RenderData
 ---@field option_panel FHOptionPanel
 ---@field option_mapping string
@@ -52,7 +48,7 @@ local FileHistoryPanel = oop.create_class("FileHistoryPanel", Panel)
 
 FileHistoryPanel.winopts = vim.tbl_extend("force", Panel.winopts, {
   cursorline = true,
-  winhl = table.concat({
+  winhl = {
     "EndOfBuffer:DiffviewEndOfBuffer",
     "Normal:DiffviewNormal",
     "CursorLine:DiffviewCursorLine",
@@ -60,7 +56,7 @@ FileHistoryPanel.winopts = vim.tbl_extend("force", Panel.winopts, {
     "SignColumn:DiffviewNormal",
     "StatusLine:DiffviewStatusLine",
     "StatusLineNC:DiffviewStatuslineNC",
-  }, ","),
+  },
 })
 
 FileHistoryPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
@@ -81,9 +77,11 @@ FileHistoryPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 function FileHistoryPanel:init(git_root, entries, path_args, raw_args, log_options, opt)
   local conf = config.get_config()
   FileHistoryPanel:super().init(self, {
-    position = conf.file_history_panel.position,
-    width = conf.file_history_panel.width,
-    height = conf.file_history_panel.height,
+    config = {
+      position = conf.file_history_panel.position,
+      width = conf.file_history_panel.width,
+      height = conf.file_history_panel.height,
+    },
     bufname = "DiffviewFileHistoryPanel",
   })
   self.git_root = git_root

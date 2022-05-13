@@ -738,6 +738,21 @@ function M.file_history_dry_run(git_root, path_args, log_opt, opt)
   return code == 0 and #out > 0, table.concat(description, ", ")
 end
 
+---Determine whether a rev arg is a range.
+---@param rev_arg string
+---@return boolean
+function M.is_rev_arg_range(rev_arg)
+  return utils.str_match(rev_arg, {
+    "^%.%.%.?$",
+    "^%.%.%.?[^.]",
+    "[^.]%.%.%.?$",
+    "[^.]%.%.%.?[^.]",
+    "^.-%^@",
+    "^.-%^!",
+    "^.-%^%-%d?",
+  }) ~= nil
+end
+
 ---Convert revs to git rev args.
 ---@param left Rev
 ---@param right Rev

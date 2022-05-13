@@ -61,6 +61,7 @@ FileEntry.bufopts = {
   modifiable = false,
   swapfile = false,
   bufhidden = "hide",
+  undolevels = -1,
 }
 
 ---FileEntry constructor
@@ -370,7 +371,7 @@ function FileEntry._create_buffer(git_root, rev, path, null, callback)
 
   local context
   if rev.type == RevType.COMMIT then
-    context = rev:abbrev()
+    context = rev:abbrev(11)
   elseif rev.type == RevType.INDEX then
     context = ":0:"
   end

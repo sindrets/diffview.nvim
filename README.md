@@ -37,6 +37,10 @@ use { 'sindrets/diffview.nvim', requires = 'nvim-lua/plenary.nvim' }
 
 ## Configuration
 
+<p>
+<details>
+<summary style='cursor: pointer'><b>Example config with default values</b></summary>
+
 ```lua
 -- Lua
 local cb = require'diffview.config'.diffview_callback
@@ -145,6 +149,9 @@ require'diffview'.setup {
   },
 }
 ```
+
+</details>
+</p>
 
 The diff windows can be aligned either with a horizontal split or a vertical
 split. To change the alignment add either `horizontal` or `vertical` to your

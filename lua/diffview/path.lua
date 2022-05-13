@@ -318,7 +318,7 @@ function PathLib:relative(path, relative_to, no_resolve)
   return p
 end
 
----Shotren a path by truncating the head.
+---Shorten a path by truncating the head.
 ---@param path string
 ---@param max_length integer
 ---@return string

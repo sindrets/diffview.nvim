@@ -44,6 +44,10 @@ M.defaults = {
       reverse = false,
     }
   },
+  commit_log_panel = {
+    type = "float",
+    win_config = {},
+  },
   default_args = {
     DiffviewOpen = {},
     DiffviewFileHistory = {},
@@ -73,6 +77,7 @@ M.defaults = {
       ["U"]             = cb("unstage_all"),
       ["X"]             = cb("restore_entry"),
       ["R"]             = cb("refresh_files"),
+      ["L"]             = cb("open_log"),
       ["<tab>"]         = cb("select_next_entry"),
       ["<s-tab>"]       = cb("select_prev_entry"),
       ["gf"]            = cb("goto_file"),
@@ -87,6 +92,7 @@ M.defaults = {
       ["g!"]            = cb("options"),
       ["<C-A-d>"]       = cb("open_in_diffview"),
       ["y"]             = cb("copy_hash"),
+      ["L"]             = cb("open_log"),
       ["zR"]            = cb("open_all_folds"),
       ["zM"]            = cb("close_all_folds"),
       ["j"]             = cb("next_entry"),

@@ -1,9 +1,13 @@
-local utils = require("diffview.utils")
-local git = require("diffview.git.utils")
-local lib = require("diffview.lib")
+local CommitLogPanel = require("diffview.ui.panels.commit_log_panel").CommitLogPanel
 local DiffView = require("diffview.views.diff.diff_view").DiffView
 local FileEntry = require("diffview.views.file_entry").FileEntry
 local api = vim.api
+local git = require("diffview.git.utils")
+local lib = require("diffview.lib")
+local utils = require("diffview.utils")
+
+---@type CommitLogPanel
+local log_panel
 
 local function prepare_goto_file(view)
   local file = view:infer_cur_file()
@@ -67,7 +71,7 @@ return function(view)
       end
     end,
     open_in_diffview = function()
-      if view.panel:is_cur_win() then
+      if view.panel:is_focused() then
         local item = view.panel:get_item_at_cursor()
         if item then
           ---@type FileEntry
@@ -107,7 +111,7 @@ return function(view)
       view.panel:highlight_prev_item()
     end,
     select_entry = function()
-      if view.panel:is_cur_win() then
+      if view.panel:is_focused() then
         local item = view.panel:get_item_at_cursor()
         if item then
           if item.files then
@@ -123,7 +127,7 @@ return function(view)
       end
     end,
     focus_entry = function()
-      if view.panel:is_cur_win() then
+      if view.panel:is_focused() then
         local item = view.panel:get_item_at_cursor()
         if item then
           if item.files then
@@ -136,6 +140,17 @@ return function(view)
             view:set_file(item, true)
           end
         end
+      end
+    end,
+    open_log = function()
+      local file = view:infer_cur_file()
+      if file then
+        if not log_panel then
+          log_panel = CommitLogPanel(view.git_root, {
+            name = ("diffview://%s/log/%d/%s"):format(view.git_dir, view.tabpage, "commit_log"),
+          })
+        end
+        log_panel:update(file.right.commit .. "^!")
       end
     end,
     goto_file = function()
@@ -179,13 +194,13 @@ return function(view)
       end
     end,
     focus_files = function()
-      view.panel:focus(true)
+      view.panel:focus()
     end,
     toggle_files = function()
-      view.panel:toggle()
+      view.panel:toggle(true)
     end,
     open_all_folds = function()
-      if view.panel:is_cur_win() and not view.panel.single_file then
+      if view.panel:is_focused() and not view.panel.single_file then
         for _, entry in ipairs(view.panel.entries) do
           entry.folded = false
         end
@@ -194,7 +209,7 @@ return function(view)
       end
     end,
     close_all_folds = function()
-      if view.panel:is_cur_win() and not view.panel.single_file then
+      if view.panel:is_focused() and not view.panel.single_file then
         for _, entry in ipairs(view.panel.entries) do
           entry.folded = true
         end
@@ -203,19 +218,19 @@ return function(view)
       end
     end,
     close = function()
-      if view.panel.option_panel:is_cur_win() then
+      if view.panel.option_panel:is_focused() then
         view.panel.option_panel:close()
-      elseif view.panel:is_cur_win() then
+      elseif view.panel:is_focused() then
         view.panel:close()
       elseif view:is_cur_tabpage() then
         view:close()
       end
     end,
     options = function()
-      view.panel.option_panel:open()
+      view.panel.option_panel:focus()
     end,
     select = function()
-      if view.panel.option_panel:is_cur_win() then
+      if view.panel.option_panel:is_focused() then
         local item = view.panel.option_panel:get_item_at_cursor()
         if item then
           view.panel.option_panel.emitter:emit("set_option", item[1])
@@ -223,7 +238,7 @@ return function(view)
       end
     end,
     copy_hash = function()
-      if view.panel:is_cur_win() then
+      if view.panel:is_focused() then
         local item = view.panel:get_item_at_cursor()
         if item then
           vim.fn.setreg("+", item.commit.hash)

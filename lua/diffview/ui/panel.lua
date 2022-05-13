@@ -1,32 +1,24 @@
-local oop = require("diffview.oop")
-local utils = require("diffview.utils")
-local renderer = require("diffview.renderer")
-local logger = require("diffview.logger")
-local PerfTimer = require("diffview.perf").PerfTimer
 local FileEntry = require("diffview.views.file_entry").FileEntry
-local api = vim.api
+local PerfTimer = require("diffview.perf").PerfTimer
+local logger = require("diffview.logger")
+local oop = require("diffview.oop")
+local renderer = require("diffview.renderer")
+local utils = require("diffview.utils")
+
 local M = {}
+local api = vim.api
 local uid_counter = 0
+
+---@alias PanelConfig PanelFloatSpec|PanelSplitSpec
+---@alias PanelType '"split"'|'"float"'
 
 ---@type PerfTimer
 local perf = PerfTimer("[Panel] redraw")
 
----@class Form
-
----@class EForm
----@field COLUMN Form
----@field ROW Form
-local Form = oop.enum({
-  "COLUMN",
-  "ROW",
-})
-
 ---@class Panel : Object
----@field position string
----@field form Form
----@field relative string
----@field width integer
----@field height integer
+---@field type PanelType
+---@field config_producer PanelConfig|fun(): PanelConfig
+---@field state table
 ---@field bufid integer
 ---@field winid integer
 ---@field render_data RenderData
@@ -61,6 +53,43 @@ Panel.bufopts = {
   modifiable = false,
   bufhidden = "hide",
   modeline = false,
+  undolevels = -1,
+}
+
+---@class PanelSplitSpec
+---@field position '"left"'|'"top"'|'"right"'|'"bottom"'
+---@field relative '"editor"'|'"window"'
+---@field win integer
+---@field width integer
+---@field height integer
+
+---@type PanelSplitSpec
+Panel.default_config_split = {
+  position = "left",
+  relative = "editor",
+  win = 0,
+}
+
+---@class PanelFloatSpec
+---@field relative '"editor"'|'"window"'|'"cursor"'
+---@field win integer
+---@field anchor '"NW"'|'"NE"'|'"SW"'|'"SE"'
+---@field width integer
+---@field height integer
+---@field row number
+---@field col number
+---@field zindex integer
+---@field style '"minimal"'
+---@field border '"none"'|'"single"'|'"double"'|'"rounded"'|'"solid"'|'"shadow"'|string[]
+
+---@type PanelFloatSpec
+Panel.default_config_float = {
+  relative = "editor",
+  row = 0,
+  col = 0,
+  zindex = 50,
+  style = "minimal",
+  border = "single",
 }
 
 function Panel.next_uid()
@@ -69,75 +98,102 @@ function Panel.next_uid()
   return uid
 end
 
-function Panel:init(opt)
-  self.position = opt.position or "left"
-  self.form = vim.tbl_contains({ "top", "bottom" }, self.position) and Form.ROW or Form.COLUMN
-  self.relative = opt.relative or "editor"
-  self.width = opt.width
-  self.height = opt.height
-  self.bufname = opt.bufname or "DiffviewPanel"
+---@class PanelSpec
+---@field type PanelType
+---@field config PanelConfig|fun(): PanelConfig
+---@field bufname string
 
-  local pos = { "left", "top", "right", "bottom" }
-  local rel = { "editor", "window" }
-  local dim = { "number", "nil" }
-  assert(
-    vim.tbl_contains(pos, self.position),
-    "'position' must be one of: " .. table.concat(pos, ", ")
-  )
-  assert(
-    vim.tbl_contains(rel, self.relative),
-    "'relative' must be one of: " .. table.concat(rel, ", ")
-  )
-  assert(
-    vim.tbl_contains(dim, type(self.width)),
-    "'width' must be one of: " .. table.concat(dim, ", ")
-  )
-  assert(
-    vim.tbl_contains(dim, type(self.height)),
-    "'height' must be one of: " .. table.concat(dim, ", ")
-  )
+---@param opt PanelSpec
+function Panel:init(opt)
+  self.type = opt.type or "split"
+  self.config_producer = opt.config or {}
+  self.state = {}
+  self.bufname = opt.bufname or "DiffviewPanel"
 end
 
-function Panel:is_open(in_tabpage)
+---@return PanelSplitSpec|PanelFloatSpec
+function Panel:get_config()
+  local config
+  if utils.is_callable(self.config_producer) then
+    config = self.config_producer()
+  elseif type(self.config_producer) == "table" then
+    config = utils.tbl_deep_clone(self.config_producer)
+  end
+
+  local default_config = self.type == "float"
+    and Panel.default_config_float
+    or Panel.default_config_split
+  config = vim.tbl_extend("force", default_config, config or {})
+
+  if self.type == "split" then
+    self.state.form = vim.tbl_contains({ "top", "bottom" }, config.position) and "row" or "column"
+    local subject = "Panel:get_config() - "
+    local pos = { "left", "top", "right", "bottom" }
+    local rel = { "editor", "window" }
+    local dim = { "number", "nil" }
+    assert(
+      vim.tbl_contains(pos, config.position),
+      subject .. "'position' must be one of: " .. table.concat(pos, ", ")
+    )
+    assert(
+      vim.tbl_contains(rel, config.relative),
+      subject .. "'relative' must be one of: " .. table.concat(rel, ", ")
+    )
+    assert(
+      vim.tbl_contains(dim, type(config.width)),
+      subject .. "'width' must be one of: " .. table.concat(dim, ", ")
+    )
+    assert(
+      vim.tbl_contains(dim, type(config.height)),
+      subject .. "'height' must be one of: " .. table.concat(dim, ", ")
+    )
+  end
+
+  return config
+end
+
+---@param tabpage? integer
+---@return boolean
+function Panel:is_open(tabpage)
   local valid = self.winid and api.nvim_win_is_valid(self.winid)
   if not valid then
     self.winid = nil
-  elseif in_tabpage then
-    return vim.tbl_contains(api.nvim_tabpage_list_wins(0), self.winid)
+  elseif tabpage then
+    return vim.tbl_contains(api.nvim_tabpage_list_wins(tabpage), self.winid)
   end
   return valid
-end
-
-function Panel:is_cur_win()
-  return self:is_open() and api.nvim_get_current_win() == self.winid
 end
 
 function Panel:is_focused()
   return self:is_open() and api.nvim_get_current_win() == self.winid
 end
 
-function Panel:focus(open_if_closed)
+---@param no_open? boolean Don't open the panel if it's closed.
+function Panel:focus(no_open)
   if self:is_open() then
     api.nvim_set_current_win(self.winid)
-  elseif open_if_closed then
+  elseif not no_open then
     self:open()
+    api.nvim_set_current_win(self.winid)
   end
 end
 
 function Panel:resize()
-  if not self:is_open(true) then
+  if not self:is_open(0) then
     return
   end
 
-  local cmd
-  if self.form == Form.COLUMN and self.width then
-    api.nvim_win_set_width(self.winid, self.width)
-  elseif self.height then
-    api.nvim_win_set_height(self.winid, self.height)
-  end
+  local config = self:get_config()
 
-  if cmd then
-    vim.cmd(cmd)
+  if self.type == "split" then
+    if self.state.form == "column" and config.width then
+      api.nvim_win_set_width(self.winid, config.width)
+    elseif config.height then
+      api.nvim_win_set_height(self.winid, config.height)
+    end
+  elseif self.type == "float" then
+    api.nvim_win_set_width(self.winid, config.width)
+    api.nvim_win_set_height(self.winid, config.height)
   end
 end
 
@@ -149,20 +205,38 @@ function Panel:open()
     return
   end
 
-  local split_dir = vim.tbl_contains({ "top", "left" }, self.position) and "aboveleft"
-    or "belowright"
-  local split_cmd = self.form == Form.ROW and "sp" or "vsp"
-  vim.cmd(split_dir .. " " .. split_cmd)
+  local config = self:get_config()
 
-  if self.relative == "editor" then
-    local dir = ({ left = "H", bottom = "J", top = "K", right = "L" })[self.position]
-    vim.cmd("wincmd " .. dir)
-    vim.cmd("wincmd =")
+  if self.type == "split" then
+    ---@type PanelSplitSpec
+    local split_dir = vim.tbl_contains({ "top", "left" }, config) and "aboveleft" or "belowright"
+    local split_cmd = self.state.form == "row" and "sp" or "vsp"
+    local rel_winid = config.relative == "window"
+      and api.nvim_win_is_valid(config.win or -1)
+      and config.win
+      or 0
+
+    api.nvim_win_call(rel_winid, function()
+      vim.cmd(split_dir .. " " .. split_cmd)
+      self.winid = api.nvim_get_current_win()
+      api.nvim_win_set_buf(self.winid, self.bufid)
+
+      if config.relative == "editor" then
+        local dir = ({ left = "H", bottom = "J", top = "K", right = "L" })[config.position]
+        vim.cmd("wincmd " .. dir)
+        vim.cmd("wincmd =")
+      end
+    end)
+
+  elseif self.type == "float" then
+    self.winid = vim.api.nvim_open_win(self.bufid, false, config)
+    if self.winid == 0 then
+      self.winid = nil
+      error("[diffview.nvim] Failed to open float panel window!")
+    end
   end
 
-  self.winid = api.nvim_get_current_win()
   self:resize()
-  api.nvim_win_set_buf(self.winid, self.bufid)
   utils.set_local(self.winid, self.class().winopts)
 end
 
@@ -173,7 +247,7 @@ function Panel:close()
       -- Ensure that the tabpage doesn't close if the panel is the last window.
       vim.cmd("sp")
       FileEntry.load_null_buffer(0)
-    else
+    elseif self:is_focused() then
       vim.cmd("wincmd p")
     end
     api.nvim_win_hide(self.winid)
@@ -187,9 +261,12 @@ function Panel:destroy()
   end
 end
 
-function Panel:toggle()
+---@param focus? boolean Focus the panel if it's opened.
+function Panel:toggle(focus)
   if self:is_open() then
     self:close()
+  elseif focus then
+    self:focus()
   else
     self:open()
   end
@@ -202,7 +279,13 @@ end
 function Panel:init_buffer()
   local bn = api.nvim_create_buf(false, false)
 
-  local bufname = string.format("diffview:///panels/%d/%s", Panel.next_uid(), self.bufname)
+  local bufname
+  if utils.path:is_abs(self.bufname) or utils.path:is_uri(self.bufname) then
+    bufname = self.bufname
+  else
+    bufname = string.format("diffview:///panels/%d/%s", Panel.next_uid(), self.bufname)
+  end
+
   local ok = pcall(api.nvim_buf_set_name, bn, bufname)
   if not ok then
     utils.wipe_named_buffer(bufname)
@@ -238,6 +321,19 @@ function Panel:redraw()
   logger.lvl(10).s_debug(perf)
 end
 
-M.Form = Form
+---@return integer
+function Panel:get_width()
+  if self:is_open() then
+    return api.nvim_win_get_width(self.winid)
+  end
+end
+
+---@return integer
+function Panel:get_height()
+  if self:is_open() then
+    return api.nvim_win_get_height(self.winid)
+  end
+end
+
 M.Panel = Panel
 return M

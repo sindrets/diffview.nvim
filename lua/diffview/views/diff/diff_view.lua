@@ -217,7 +217,7 @@ function DiffView:update_files(callback)
 
       for _, v in ipairs(files) do
         local diff = Diff(v.cur_files, v.new_files, function(aa, bb)
-          return aa.path == bb.path
+          return aa.path == bb.path and aa.oldpath == bb.oldpath
         end)
         local script = diff:create_edit_script()
 

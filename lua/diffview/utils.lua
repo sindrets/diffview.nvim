@@ -439,6 +439,21 @@ function M.vec_push(t, ...)
   return t
 end
 
+---Check if a given object is callable.
+---@param obj any
+---@return boolean
+function M.is_callable(obj)
+  if type(obj) == "function" then
+    return true
+  elseif type(obj) == "table" then
+    local mt = getmetatable(obj)
+    if mt then
+      return type(mt.__call) == "function"
+    end
+  end
+  return false
+end
+
 ---@class ListBufsSpec
 ---@field loaded boolean Filter out buffers that aren't loaded.
 ---@field listed boolean Filter out buffers that aren't listed.
@@ -446,6 +461,7 @@ end
 ---@field tabpage integer Filter out buffers that are not displayed in a given tabpage.
 
 ---@param opt? ListBufsSpec
+---@return integer[]
 function M.list_bufs(opt)
   opt = opt or {}
   local bufs
