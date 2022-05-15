@@ -1,3 +1,4 @@
+local EventEmitter = require("diffview.events").EventEmitter
 local FileEntry = require("diffview.views.file_entry").FileEntry
 local PerfTimer = require("diffview.perf").PerfTimer
 local logger = require("diffview.logger")
@@ -24,6 +25,7 @@ local perf = PerfTimer("[Panel] redraw")
 ---@field render_data RenderData
 ---@field components any
 ---@field bufname string
+---@field au_listeners table<string, function[]>
 ---@field init_buffer_opts function Abstract
 ---@field update_components function Abstract
 ---@field render function Abstract
@@ -92,6 +94,24 @@ Panel.default_config_float = {
   border = "single",
 }
 
+Panel.au = {
+  ---@type integer
+  group = api.nvim_create_augroup("diffview_panels", {}),
+  ---@type EventEmitter
+  emitter = EventEmitter(),
+  ---@type table<string, integer> Map of autocmd event names to its created autocmd ID.
+  events = {},
+  ---Delete all autocmds with no subscribed listeners.
+  prune = function()
+    for event, id in pairs(Panel.au.events) do
+      if #(Panel.au.emitter:get(event) or {}) == 0 then
+        api.nvim_del_autocmd(id)
+        Panel.au.events[event] = nil
+      end
+    end
+  end,
+}
+
 function Panel.next_uid()
   local uid = uid_counter
   uid_counter = uid_counter + 1
@@ -109,9 +129,10 @@ function Panel:init(opt)
   self.config_producer = opt.config or {}
   self.state = {}
   self.bufname = opt.bufname or "DiffviewPanel"
+  self.au_event_map = {}
 end
 
----@return PanelSplitSpec|PanelFloatSpec
+---@return PanelConfig
 function Panel:get_config()
   local config
   if utils.is_callable(self.config_producer) then
@@ -208,7 +229,6 @@ function Panel:open()
   local config = self:get_config()
 
   if self.type == "split" then
-    ---@type PanelSplitSpec
     local split_dir = vim.tbl_contains({ "top", "left" }, config) and "aboveleft" or "belowright"
     local split_cmd = self.state.form == "row" and "sp" or "vsp"
     local rel_winid = config.relative == "window"
@@ -259,6 +279,14 @@ function Panel:destroy()
   if self:buf_loaded() then
     api.nvim_buf_delete(self.bufid, { force = true })
   end
+
+  -- Disable autocmd listeners
+  for _, cbs in pairs(self.au_event_map) do
+    for _, cb in ipairs(cbs) do
+      Panel.au.emitter:off(cb)
+    end
+  end
+  Panel.au.prune()
 end
 
 ---@param focus? boolean Focus the panel if it's opened.
@@ -319,6 +347,69 @@ function Panel:redraw()
   renderer.render(self.bufid, self.render_data)
   perf:time()
   logger.lvl(10).s_debug(perf)
+end
+
+---@class PanelAutocmdSpec
+---@field callback function
+---@field once? boolean
+
+---@param event string|string[]
+---@param opts PanelAutocmdSpec
+function Panel:on_autocmd(event, opts)
+  if type(event) ~= "table" then
+    event = { event }
+  end
+
+  local callback = function(state)
+    local win_match, buf_match
+    if state.event:match("^Win") then
+      win_match = tonumber(state.match)
+    elseif state.event:match("^Buf") then
+      buf_match = state.buf
+    end
+
+    if self:is_focused()
+      or (win_match and win_match == self.winid)
+      or (buf_match and buf_match == self.bufid)
+      or (self.bufid and self.bufid == api.nvim_get_current_buf()) then
+        opts.callback()
+    end
+  end
+
+  for _, e in ipairs(event) do
+    if not self.au_event_map[e] then
+      self.au_event_map[e] = {}
+    end
+    table.insert(self.au_event_map[e], callback)
+
+    if not Panel.au.events[e] then
+      Panel.au.events[e] = api.nvim_create_autocmd(e, {
+        group = Panel.au.group,
+        callback = function(state)
+          Panel.au.emitter:emit(e, state)
+        end,
+      })
+    end
+
+    if opts.once then
+      Panel.au.emitter:once(e, callback)
+    else
+      Panel.au.emitter:on(e, callback)
+    end
+  end
+end
+
+---Unsubscribe an autocmd listener. If no event is given, the callback is
+---disabled for all events.
+---@param callback function
+---@param event? string
+function Panel:off_autocmd(callback, event)
+  for e, cbs in pairs(self.au_event_map) do
+    if (event == nil or event == e) and utils.vec_indexof(cbs, callback) ~= -1 then
+      Panel.au.emitter:off(callback, event)
+    end
+    Panel.au.prune()
+  end
 end
 
 ---@return integer

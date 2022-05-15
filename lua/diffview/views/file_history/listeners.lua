@@ -53,23 +53,6 @@ return function(view)
         end
       end
     end,
-    win_closed = function(winid)
-      if winid and winid == view.panel.option_panel.winid then
-        local op = view.panel.option_panel
-        if not vim.deep_equal(op.option_state, view.panel.log_options) then
-          vim.schedule(function ()
-            op.option_state = nil
-            view.panel.option_panel.winid = nil
-            ---@diagnostic disable-next-line: unused-local
-            view.panel:update_entries(function(entries, status)
-              if not view.panel:cur_file() then
-                view:next_item()
-              end
-            end)
-          end)
-        end
-      end
-    end,
     open_in_diffview = function()
       if view.panel:is_focused() then
         local item = view.panel:get_item_at_cursor()

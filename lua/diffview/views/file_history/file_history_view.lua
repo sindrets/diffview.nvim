@@ -34,6 +34,7 @@ function FileHistoryView:init(opt)
   self.raw_args = opt.raw_args
   self.rev_arg = opt.rev_arg
   self.panel = FileHistoryPanel(
+    self,
     self.git_root,
     {},
     self.path_args,

@@ -5,13 +5,11 @@ local get_user_config = require("diffview.config").get_config
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 
-local api = vim.api
-
 local M = {}
 
 ---@class CommitLogPanel : Panel
 ---@field git_root string
----@field rev_arg string
+---@field args string[]
 ---@field job_out string[]
 local CommitLogPanel = oop.create_class("CommitLogPanel", Panel)
 
@@ -28,7 +26,7 @@ CommitLogPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 ---@class CommitLogPanelSpec
 ---@field type PanelType
 ---@field config PanelConfig
----@field rev_arg string
+---@field args string[]
 ---@field name string
 
 ---@param git_root string
@@ -66,18 +64,30 @@ function CommitLogPanel:init(git_root, opt)
     config = config,
   })
   self.git_root = git_root
-  self.rev_arg = opt.rev_arg
+  self.args = opt.args or { "-n256" }
+
+  self:on_autocmd("BufWinEnter" , {
+    callback = function()
+      vim.bo[self.bufid].bufhidden = "wipe"
+    end,
+  })
 end
 
-CommitLogPanel.update = async.void(function(self, rev_arg)
+---@param self CommitLogPanel
+---@param args string|string[]
+CommitLogPanel.update = async.void(function(self, args)
+  if type(args) ~= "table" then
+    args = { args }
+  end
+
   Job:new({
     command = "git",
-    args = {
+    args = utils.vec_join(
       "log",
       "--first-parent",
       "--stat",
-      rev_arg or self.rev_arg,
-    },
+      args or self.args
+    ),
     cwd = self.git_root,
     on_exit = vim.schedule_wrap(function(job)
       if job.code ~= 0 then
@@ -98,17 +108,6 @@ CommitLogPanel.update = async.void(function(self, rev_arg)
     end),
   }):start()
 end)
-
----@Override
-function CommitLogPanel:open()
-  CommitLogPanel:super().open(self)
-
-  if self.winid and api.nvim_win_is_valid(self.winid) then
-    utils.set_local(self.winid, {
-      bufhidden = "wipe",
-    })
-  end
-end
 
 function CommitLogPanel:init_buffer_opts()
 end

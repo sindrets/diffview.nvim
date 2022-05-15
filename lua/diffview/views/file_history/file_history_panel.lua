@@ -29,6 +29,7 @@ local perf_update = PerfTimer("[FileHistoryPanel] update")
 ---@field grep string
 
 ---@class FileHistoryPanel : Panel
+---@field parent FileHistoryView
 ---@field git_root string
 ---@field entries LogEntry[]
 ---@field path_args string[]
@@ -68,13 +69,14 @@ FileHistoryPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 ---@field rev_arg string
 
 ---FileHistoryPanel constructor.
+---@param parent FileHistoryView
 ---@param git_root string
 ---@param entries LogEntry[]
 ---@param path_args string[]
 ---@param log_options LogOptions
 ---@param opt FileHistoryPanelSpec
 ---@return FileHistoryPanel
-function FileHistoryPanel:init(git_root, entries, path_args, raw_args, log_options, opt)
+function FileHistoryPanel:init(parent, git_root, entries, path_args, raw_args, log_options, opt)
   local conf = config.get_config()
   FileHistoryPanel:super().init(self, {
     config = {
@@ -84,6 +86,7 @@ function FileHistoryPanel:init(git_root, entries, path_args, raw_args, log_optio
     },
     bufname = "DiffviewFileHistoryPanel",
   })
+  self.parent = parent
   self.git_root = git_root
   self.entries = entries
   self.path_args = path_args

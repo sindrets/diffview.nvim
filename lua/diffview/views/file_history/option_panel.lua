@@ -86,6 +86,22 @@ function FHOptionPanel:init(parent)
     self:render()
     self:redraw()
   end)
+
+  self:on_autocmd("WinClosed", {
+    callback = function()
+      if not vim.deep_equal(self.option_state, self.parent.log_options) then
+        vim.schedule(function ()
+          self.option_state = nil
+          self.winid = nil
+          self.parent:update_entries(function(_, _)
+            if not self.parent:cur_file() then
+              self.parent.parent:next_item()
+            end
+          end)
+        end)
+      end
+    end,
+  })
 end
 
 ---@Override
