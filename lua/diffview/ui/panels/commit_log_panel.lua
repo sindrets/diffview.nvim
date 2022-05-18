@@ -23,8 +23,25 @@ CommitLogPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
   filetype = "git",
 })
 
+CommitLogPanel.default_type = "float"
+
+CommitLogPanel.default_config_split = vim.tbl_extend("force", Panel.default_config_split, {
+  position = "bottom",
+  height = 14,
+})
+
+CommitLogPanel.default_config_float = function()
+  local c = vim.deepcopy(Panel.default_config_float)
+  local viewport_width = vim.o.columns
+  local viewport_height = vim.o.lines
+  c.width = math.min(100, viewport_width)
+  c.height = math.min(24, viewport_height)
+  c.col = math.floor(viewport_width * 0.5 - c.width * 0.5)
+  c.row = math.floor(viewport_height * 0.5 - c.height * 0.5)
+  return c
+end
+
 ---@class CommitLogPanelSpec
----@field type PanelType
 ---@field config PanelConfig
 ---@field args string[]
 ---@field name string
@@ -32,36 +49,9 @@ CommitLogPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 ---@param git_root string
 ---@param opt CommitLogPanelSpec
 function CommitLogPanel:init(git_root, opt)
-  local user_config = get_user_config()
-  local panel_type = opt.type or user_config.commit_log_panel.type
-  local config = opt.config or user_config.commit_log_panel.win_config
-
-  if panel_type == "split" then
-    if type(config) == "table" then
-      config = vim.tbl_extend("keep", user_config, {
-        position = "bottom",
-        height = 14,
-      })
-    end
-  elseif panel_type == "float" then
-    if type(config) == "table" and vim.tbl_isempty(config) then
-      config = function()
-        local c = {}
-        local viewport_width = vim.o.columns
-        local viewport_height = vim.o.lines
-        c.width = math.min(100, viewport_width)
-        c.height = math.min(24, viewport_height)
-        c.col = math.floor(viewport_width * 0.5 - c.width * 0.5)
-        c.row = math.floor(viewport_height * 0.5 - c.height * 0.5)
-        return c
-      end
-    end
-  end
-
   CommitLogPanel:super().init(self, {
-    type = panel_type,
     bufname = opt.name,
-    config = config,
+    config = opt.config or get_user_config().commit_log_panel.win_config,
   })
   self.git_root = git_root
   self.args = opt.args or { "-n256" }

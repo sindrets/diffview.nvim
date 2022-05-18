@@ -79,11 +79,7 @@ FileHistoryPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 function FileHistoryPanel:init(parent, git_root, entries, path_args, raw_args, log_options, opt)
   local conf = config.get_config()
   FileHistoryPanel:super().init(self, {
-    config = {
-      position = conf.file_history_panel.position,
-      width = conf.file_history_panel.width,
-      height = conf.file_history_panel.height,
-    },
+    config = conf.file_history_panel.win_config,
     bufname = "DiffviewFileHistoryPanel",
   })
   self.parent = parent

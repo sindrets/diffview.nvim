@@ -1,9 +1,57 @@
 ================================================================================
-                                                          *diffview.changelog*
+                                                *diffview.changelog*
 
 CHANGELOG
 
-                                                       *diffview.changelog-93*
+                                                *diffview.changelog-136*
+
+PR: https://github.com/sindrets/diffview.nvim/pull/136
+
+This PR refactors the internal representation of a panel (the various
+interactive windows used in the plugin). The way panels are configured has
+been changed and extended in a manner that is incompatible with the way it was
+done before. To update your config, just move all the window related options
+into a new table key `win_config`:
+
+        Before: ~
+>
+                require("diffview").setup({
+                  -- other options...
+                  file_panel = {
+                    position = "left",
+                    width = 35,
+                    height = 16,
+                    listing_style = "tree",
+                    tree_options = {
+                      flatten_dirs = true,
+                      folder_statuses = "only_folded",
+                    },
+                  },
+                })
+<
+        After: ~
+>
+                require("diffview").setup({
+                  -- other options...
+                  file_panel = {
+                    win_config = {
+                      position = "left",
+                      width = 35,
+                      height = 16,
+                    },
+                    listing_style = "tree",
+                    tree_options = {
+                      flatten_dirs = true,
+                      folder_statuses = "only_folded",
+                    },
+                  },
+                })
+<
+This goes for both the `file_panel` and the `file_history_panel` config. To
+see all the available options for `win_config`, see
+|diffview-config-win_config|.
+
+                                                *diffview.changelog-93*
 
 PR: https://github.com/sindrets/diffview.nvim/pull/93
 
@@ -20,7 +68,7 @@ update, just make sure plenary is loaded before diffview. Examples:
             `Plug 'nvim-lua/plenary.nvim'`
             `Plug 'sindrets/diffview.nvim'`
 
-                                                       *diffview.changelog-64*
+                                                *diffview.changelog-64*
 
 PR: https://github.com/sindrets/diffview.nvim/pull/64
 

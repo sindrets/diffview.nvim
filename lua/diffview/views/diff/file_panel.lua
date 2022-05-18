@@ -49,11 +49,7 @@ FilePanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 function FilePanel:init(git_root, files, path_args, rev_pretty_name)
   local conf = config.get_config()
   FilePanel:super().init(self, {
-    config = {
-      position = conf.file_panel.position,
-      width = conf.file_panel.width,
-      height = conf.file_panel.height,
-    },
+    config = conf.file_panel.win_config,
     bufname = "DiffviewFilePanel",
   })
   self.git_root = git_root

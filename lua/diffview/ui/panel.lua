@@ -58,22 +58,27 @@ Panel.bufopts = {
   undolevels = -1,
 }
 
+Panel.default_type = "split"
+
 ---@class PanelSplitSpec
+---@field type '"split"'
 ---@field position '"left"'|'"top"'|'"right"'|'"bottom"'
----@field relative '"editor"'|'"window"'
+---@field relative '"editor"'|'"win"'
 ---@field win integer
 ---@field width integer
 ---@field height integer
 
 ---@type PanelSplitSpec
 Panel.default_config_split = {
+  type = "split",
   position = "left",
   relative = "editor",
   win = 0,
 }
 
 ---@class PanelFloatSpec
----@field relative '"editor"'|'"window"'|'"cursor"'
+---@field type '"float"'
+---@field relative '"editor"'|'"win"'|'"cursor"'
 ---@field win integer
 ---@field anchor '"NW"'|'"NE"'|'"SW"'|'"SE"'
 ---@field width integer
@@ -86,6 +91,7 @@ Panel.default_config_split = {
 
 ---@type PanelFloatSpec
 Panel.default_config_float = {
+  type = "float",
   relative = "editor",
   row = 0,
   col = 0,
@@ -112,12 +118,6 @@ Panel.au = {
   end,
 }
 
-function Panel.next_uid()
-  local uid = uid_counter
-  uid_counter = uid_counter + 1
-  return uid
-end
-
 ---@class PanelSpec
 ---@field type PanelType
 ---@field config PanelConfig|fun(): PanelConfig
@@ -125,7 +125,6 @@ end
 
 ---@param opt PanelSpec
 function Panel:init(opt)
-  self.type = opt.type or "split"
   self.config_producer = opt.config or {}
   self.state = {}
   self.bufname = opt.bufname or "DiffviewPanel"
@@ -134,6 +133,7 @@ end
 
 ---@return PanelConfig
 function Panel:get_config()
+  local subject = "Panel:get_config() -"
   local config
   if utils.is_callable(self.config_producer) then
     config = self.config_producer()
@@ -141,32 +141,29 @@ function Panel:get_config()
     config = utils.tbl_deep_clone(self.config_producer)
   end
 
-  local default_config = self.type == "float"
-    and Panel.default_config_float
-    or Panel.default_config_split
+  local default_config = self:get_default_config(config.type)
   config = vim.tbl_extend("force", default_config, config or {})
 
-  if self.type == "split" then
+  if config.type == "split" then
     self.state.form = vim.tbl_contains({ "top", "bottom" }, config.position) and "row" or "column"
-    local subject = "Panel:get_config() - "
     local pos = { "left", "top", "right", "bottom" }
-    local rel = { "editor", "window" }
+    local rel = { "editor", "win" }
     local dim = { "number", "nil" }
     assert(
       vim.tbl_contains(pos, config.position),
-      subject .. "'position' must be one of: " .. table.concat(pos, ", ")
+      ("%s 'position' must be one of: %s"):format(subject, table.concat(pos, ", "))
     )
     assert(
       vim.tbl_contains(rel, config.relative),
-      subject .. "'relative' must be one of: " .. table.concat(rel, ", ")
+      ("%s 'relative' must be one of: %s"):format(subject, table.concat(rel, ", "))
     )
     assert(
       vim.tbl_contains(dim, type(config.width)),
-      subject .. "'width' must be one of: " .. table.concat(dim, ", ")
+      ("%s 'width' must be one of: %s"):format(subject, table.concat(dim, ", "))
     )
     assert(
       vim.tbl_contains(dim, type(config.height)),
-      subject .. "'height' must be one of: " .. table.concat(dim, ", ")
+      ("%s 'height' must be one of: %s"):format(subject, table.concat(dim, ", "))
     )
   end
 
@@ -206,13 +203,13 @@ function Panel:resize()
 
   local config = self:get_config()
 
-  if self.type == "split" then
+  if config.type == "split" then
     if self.state.form == "column" and config.width then
       api.nvim_win_set_width(self.winid, config.width)
     elseif config.height then
       api.nvim_win_set_height(self.winid, config.height)
     end
-  elseif self.type == "float" then
+  elseif config.type == "float" then
     api.nvim_win_set_width(self.winid, config.width)
     api.nvim_win_set_height(self.winid, config.height)
   end
@@ -228,10 +225,10 @@ function Panel:open()
 
   local config = self:get_config()
 
-  if self.type == "split" then
+  if config.type == "split" then
     local split_dir = vim.tbl_contains({ "top", "left" }, config) and "aboveleft" or "belowright"
     local split_cmd = self.state.form == "row" and "sp" or "vsp"
-    local rel_winid = config.relative == "window"
+    local rel_winid = config.relative == "win"
       and api.nvim_win_is_valid(config.win or -1)
       and config.win
       or 0
@@ -248,8 +245,8 @@ function Panel:open()
       end
     end)
 
-  elseif self.type == "float" then
-    self.winid = vim.api.nvim_open_win(self.bufid, false, config)
+  elseif config.type == "float" then
+    self.winid = vim.api.nvim_open_win(self.bufid, false, utils.sanitize_float_config(config))
     if self.winid == 0 then
       self.winid = nil
       error("[diffview.nvim] Failed to open float panel window!")
@@ -412,6 +409,19 @@ function Panel:off_autocmd(callback, event)
   end
 end
 
+function Panel:get_default_config(panel_type)
+  local producer = self:class()["default_config_" .. (panel_type or self:class().default_type)]
+
+  local config
+  if utils.is_callable(producer) then
+    config = producer()
+  elseif type(producer) == "table" then
+    config = producer
+  end
+
+  return config
+end
+
 ---@return integer
 function Panel:get_width()
   if self:is_open() then
@@ -424,6 +434,12 @@ function Panel:get_height()
   if self:is_open() then
     return api.nvim_win_get_height(self.winid)
   end
+end
+
+function Panel.next_uid()
+  local uid = uid_counter
+  uid_counter = uid_counter + 1
+  return uid
 end
 
 M.Panel = Panel

@@ -58,19 +58,17 @@ require'diffview'.setup {
     fold_open = "",
   },
   file_panel = {
-    position = "left",                  -- One of 'left', 'right', 'top', 'bottom'
-    width = 35,                         -- Only applies when position is 'left' or 'right'
-    height = 10,                        -- Only applies when position is 'top' or 'bottom'
     listing_style = "tree",             -- One of 'list' or 'tree'
     tree_options = {                    -- Only applies when listing_style is 'tree'
       flatten_dirs = true,              -- Flatten dirs that only contain one single dir
       folder_statuses = "only_folded",  -- One of 'never', 'only_folded' or 'always'.
     },
+    win_config = {                      -- See ':h diffview-config-win_config'
+      position = "left",
+      width = 35,
+    },
   },
   file_history_panel = {
-    position = "bottom",
-    width = 35,
-    height = 16,
     log_options = {
       max_count = 256,      -- Limit the number of commits
       follow = false,       -- Follow renames (only for single file)
@@ -79,6 +77,13 @@ require'diffview'.setup {
       no_merges = false,    -- List no merge commits
       reverse = false,      -- List commits in reverse order
     },
+    win_config = {          -- See ':h diffview-config-win_config'
+      position = "bottom",
+      height = 16,
+    },
+  },
+  commit_log_panel = {
+    win_config = {},  -- See ':h diffview-config-win_config'
   },
   default_args = {    -- Default args prepended to the arg-list for the listed commands
     DiffviewOpen = {},
@@ -111,6 +116,7 @@ require'diffview'.setup {
       ["U"]             = cb("unstage_all"),          -- Unstage all entries.
       ["X"]             = cb("restore_entry"),        -- Restore entry to the state on the left side.
       ["R"]             = cb("refresh_files"),        -- Update stats and entries in the file list.
+      ["L"]             = cb("open_commit_log"),      -- Open the commit log panel.
       ["<tab>"]         = cb("select_next_entry"),
       ["<s-tab>"]       = cb("select_prev_entry"),
       ["gf"]            = cb("goto_file"),
@@ -125,6 +131,7 @@ require'diffview'.setup {
       ["g!"]            = cb("options"),            -- Open the option panel
       ["<C-A-d>"]       = cb("open_in_diffview"),   -- Open the entry under the cursor in a diffview
       ["y"]             = cb("copy_hash"),          -- Copy the commit hash of the entry under the cursor
+      ["L"]             = cb("open_commit_log"),
       ["zR"]            = cb("open_all_folds"),
       ["zM"]            = cb("close_all_folds"),
       ["j"]             = cb("next_entry"),

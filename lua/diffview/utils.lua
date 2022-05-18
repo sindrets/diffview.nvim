@@ -597,6 +597,41 @@ function M.win_find_buf(bufid, tabpage)
   return result
 end
 
+---Create a new table with only keys that are valid when passed to
+---`nvim_open_win()`.
+---@param config table
+---@param strict? boolean Raise errors if the given config contains illegal keys.
+---@return table
+function M.sanitize_float_config(config, strict)
+  local mask = {
+    relative = true,
+    win = true,
+    anchor = true,
+    width = true,
+    height = true,
+    bufpos = true,
+    row = true,
+    col = true,
+    focusable = true,
+    external = true,
+    zindex = true,
+    style = true,
+    border = true,
+    noautocmd = true,
+  }
+  local result = {}
+
+  for key, value in pairs(config) do
+    if mask[key] then
+      result[key] = vim.deepcopy(value)
+    elseif strict then
+      error(("Window config contained invalid key '%s'!"):format(key))
+    end
+  end
+
+  return result
+end
+
 function M.clear_prompt()
   vim.api.nvim_echo({ { "" } }, false, {})
   vim.cmd("redraw")

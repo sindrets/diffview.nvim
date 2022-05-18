@@ -125,7 +125,7 @@ return function(view)
         end
       end
     end,
-    open_log = function()
+    open_commit_log = function()
       local file = view:infer_cur_file()
       if file then
         if not log_panel then

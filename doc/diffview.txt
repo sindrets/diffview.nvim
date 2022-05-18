@@ -49,24 +49,17 @@ Example configuration with default settings:
         fold_open = "",
       },
       file_panel = {
-        position = "left",                  -- One of 'left', 'right', 'top', 'bottom'
-        width = 35,                         -- Only applies when position is 'left' or 'right'
-        height = 10,                        -- Only applies when position is 'top' or 'bottom'
         listing_style = "tree",             -- One of 'list' or 'tree'
         tree_options = {                    -- Only applies when listing_style is 'tree'
           flatten_dirs = true,              -- Flatten dirs that only contain one single dir
           folder_statuses = "only_folded",  -- One of 'never', 'only_folded' or 'always'.
         },
+        win_config = {                      -- See |diffview-config-win_config|
+          position = "left",
+          width = 35,
+        },
       },
-      default_args = {    -- Default args prepended to the arg-list for the listed commands
-        DiffviewOpen = {},
-        DiffviewFileHistory = {},
-      },
-      hooks = {},         -- See |diffview-config-hooks|
       file_history_panel = {
-        position = "bottom",
-        width = 35,
-        height = 16,
         log_options = {
           max_count = 256,      -- Limit the number of commits
           follow = false,       -- Follow renames (only for single file)
@@ -75,7 +68,19 @@ Example configuration with default settings:
           no_merges = false,    -- List no merge commits
           reverse = false,      -- List commits in reverse order
         },
+        win_config = {          -- See |diffview-config-win_config|
+          position = "bottom",
+          height = 16,
+        },
       },
+      commit_log_panel = {
+        win_config = {},  -- See |diffview-config-win_config|
+      },
+      default_args = {    -- Default args prepended to the arg-list for the listed commands
+        DiffviewOpen = {},
+        DiffviewFileHistory = {},
+      },
+      hooks = {},         -- See |diffview-config-hooks|
       key_bindings = {
         disable_defaults = false,                   -- Disable the default key bindings
         -- The `view` bindings are active in the diff buffers, only when the current
@@ -102,6 +107,7 @@ Example configuration with default settings:
           ["U"]             = cb("unstage_all"),          -- Unstage all entries.
           ["X"]             = cb("restore_entry"),        -- Restore entry to the state on the left side.
           ["R"]             = cb("refresh_files"),        -- Update stats and entries in the file list.
+          ["L"]             = cb("open_commit_log"),      -- Open the commit log panel.
           ["<tab>"]         = cb("select_next_entry"),
           ["<s-tab>"]       = cb("select_prev_entry"),
           ["gf"]            = cb("goto_file"),
@@ -116,6 +122,7 @@ Example configuration with default settings:
           ["g!"]            = cb("options"),            -- Open the option panel
           ["<C-A-d>"]       = cb("open_in_diffview"),   -- Open the entry under the cursor in a diffview
           ["y"]             = cb("copy_hash"),          -- Copy the commit hash of the entry under the cursor
+          ["L"]             = cb("open_commit_log"),
           ["zR"]            = cb("open_all_folds"),
           ["zM"]            = cb("close_all_folds"),
           ["j"]             = cb("next_entry"),
@@ -148,7 +155,91 @@ enhanced_diff_hl                                *diffview-config-enhanced_diff_h
         in the left diff buffer will be highlighted as |hl-DiffDelete|, and
         the delete fill-chars will be highlighted more subtly.
 
+win_config                                      *diffview-config-win_config*
+        Type: `table | fun(): table`, Default: `{}`
+
+        This is used to configure the windows of the various panels in the
+        plugin. If this is set to a function, it should return the config
+        table when called (usually whenever the panel opens). If
+        `type="float"`, then this should be the config table passed to
+        |nvim_open_win()|.
+
+        Certain fields are only applicable for either `type="split"` or
+        `type="float"`. If a field description is designated as "when
+        `type="split"`", then this implies that the field has a different
+        function when `type="float"`. When that is the case, the field's float
+        behavior is documented under |nvim_open_win()|.
+
+        Fields: ~
+            {type} ("split"|"float")
+                Determines whether the window should be a float or a normal
+                split.
+
+            {width} (integer)
+                The width of the window (in character cells). If `type` is
+                `"split"` then this is only applicable when `position` is
+                `"left"|"right"`.
+
+            {height} (integer)
+                The width of the window (in character cells). If `type` is
+                `"split"` then this is only applicable when `position` is
+                `"top"|"bottom"`.
+
+            {position} ("left"|"top"|"right"|"bottom")
+                Determines where the panel is positioned (only when
+                `type="split"`).
+
+            {relative} ("editor"|"win")
+                Determines what the `position` is relative to (when
+                `type="split"`).
+                Default: `"editor"`
+
+            {win} (integer)
+                The window handle of the target relative window (when
+                `type="split"`. Only when `relative="win"`). Use `0` for
+                current window.
+                Default: `0`
+
+            NOTE: Fields that are only applicable when `type="float"` are not
+            listed here because they are already documented under
+            |nvim_open_win|.
+
+        Examples: >
+                -- Split window, aligned to the right side of the editor:
+                win_config = {
+                  type = "split",
+                  position = "right",
+                  width = 40,
+                }
+
+                -- Split window, aligned to the bottom of the first window in
+                -- the current tabpage:
+                win_config = function()
+                  local c = {
+                    type = "split",
+                    position = "bottom",
+                    relative = "win",
+                    height = 14,
+                  }
+                  c.win = vim.api.nvim_tabpage_list_wins(0)[1]
+                  return c
+                end
+
+                -- Floating window, centered in the editor:
+                win_config = function()
+                  local c = { type = "float" }
+                  local editor_width = vim.o.columns
+                  local editor_height = vim.o.lines
+                  c.width = math.min(100, editor_width)
+                  c.height = math.min(24, editor_height)
+                  c.col = math.floor(editor_width * 0.5 - c.width * 0.5)
+                  c.row = math.floor(editor_height * 0.5 - c.height * 0.5)
+                  return c
+                end,
+
 default_args                                    *diffview-config-default_args*
+        Type: `table<string, string[]>`, Default: `{}`
+
         This table allows you to define the default args that will always be
         prepended to the arg-list for the commands specified by the table
         keys.

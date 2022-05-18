@@ -110,7 +110,7 @@ return function(view)
         end
       end
     end,
-    open_log = function()
+    open_commit_log = function()
       if view.left.type == RevType.INDEX and view.right.type == RevType.LOCAL then
         utils.info("Changes not commited yet. No log available for these changes.")
         return
