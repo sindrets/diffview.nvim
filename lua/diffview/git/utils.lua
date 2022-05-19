@@ -779,7 +779,7 @@ end
 ---@param right Rev
 ---@return string|nil
 function M.rev_to_pretty_string(left, right)
-  if left.head and right.type == RevType.LOCAL then
+  if left.track_head and right.type == RevType.LOCAL then
     return nil
   elseif left.commit and right.type == RevType.LOCAL then
     return left:abbrev()

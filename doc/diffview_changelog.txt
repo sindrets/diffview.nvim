@@ -16,34 +16,26 @@ into a new table key `win_config`:
         Before: ~
 >
                 require("diffview").setup({
-                  -- other options...
+                  -- ...
                   file_panel = {
                     position = "left",
                     width = 35,
                     height = 16,
-                    listing_style = "tree",
-                    tree_options = {
-                      flatten_dirs = true,
-                      folder_statuses = "only_folded",
-                    },
+                    -- (Other options...)
                   },
                 })
 <
         After: ~
 >
                 require("diffview").setup({
-                  -- other options...
+                  -- ...
                   file_panel = {
                     win_config = {
                       position = "left",
                       width = 35,
                       height = 16,
                     },
-                    listing_style = "tree",
-                    tree_options = {
-                      flatten_dirs = true,
-                      folder_statuses = "only_folded",
-                    },
+                    -- (Other options...)
                   },
                 })
 <

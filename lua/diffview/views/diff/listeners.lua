@@ -111,7 +111,12 @@ return function(view)
       end
     end,
     open_commit_log = function()
-      if view.left.type == RevType.INDEX and view.right.type == RevType.LOCAL then
+      if (view.left.type == RevType.INDEX and view.right.type == RevType.LOCAL)
+        or (
+          view.left.type == RevType.COMMIT
+          and vim.tbl_contains({ RevType.INDEX, RevType.LOCAL }, view.right.type)
+          and view.left:is_head(view.git_root)
+        ) then
         utils.info("Changes not commited yet. No log available for these changes.")
         return
       end
