@@ -61,6 +61,7 @@ FileEntry.bufopts = {
   modifiable = false,
   swapfile = false,
   bufhidden = "hide",
+  undolevels = -1,
 }
 
 ---FileEntry constructor
@@ -370,13 +371,13 @@ function FileEntry._create_buffer(git_root, rev, path, null, callback)
 
   local context
   if rev.type == RevType.COMMIT then
-    context = rev:abbrev()
+    context = rev:abbrev(11)
   elseif rev.type == RevType.INDEX then
     context = ":0:"
   end
 
   -- stylua: ignore
-  local fullname = "diffview://" .. utils.path:join(git_root, ".git", context, path)
+  local fullname = utils.path:join("diffview://", git_root, ".git", context, path)
   for option, value in pairs(FileEntry.bufopts) do
     api.nvim_buf_set_option(bn, option, value)
   end
@@ -387,7 +388,7 @@ function FileEntry._create_buffer(git_root, rev, path, null, callback)
     local i = 1
     repeat
       -- stylua: ignore
-      fullname = "diffview://" .. utils.path:join(git_root, ".git", context, i, path)
+      fullname = utils.path:join("diffview://", git_root, ".git", context, i, path)
       ok = pcall(api.nvim_buf_set_name, bn, fullname)
       i = i + 1
     until ok

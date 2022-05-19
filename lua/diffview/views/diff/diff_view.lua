@@ -186,7 +186,7 @@ function DiffView:update_files(callback)
 
   -- If left is tracking HEAD and right is LOCAL: Update HEAD rev.
   local new_head
-  if self.left.head and self.right.type == RevType.LOCAL then
+  if self.left.track_head and self.right.type == RevType.LOCAL then
     new_head = git.head_rev(self.git_root)
     if new_head and self.left.commit ~= new_head.commit then
       self.left = new_head
@@ -217,7 +217,7 @@ function DiffView:update_files(callback)
 
       for _, v in ipairs(files) do
         local diff = Diff(v.cur_files, v.new_files, function(aa, bb)
-          return aa.path == bb.path
+          return aa.path == bb.path and aa.oldpath == bb.oldpath
         end)
         local script = diff:create_edit_script()
 

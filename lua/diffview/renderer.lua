@@ -16,13 +16,17 @@ M.last_draw_time = 0
 ---@field first integer 0 indexed, inclusive
 ---@field last integer Exclusive
 
----@class CompStruct
+---@class CompStruct : { [integer]: CompStruct }
 ---@field _name string
 ---@field comp RenderComponent
-local CompStruct
+
+---@class CompSchema : { [integer]: CompSchema }
+---@field name? string
+---@field context? table
 
 ---@class RenderComponent : Object
 ---@field name string
+---@field context? table
 ---@field parent RenderComponent
 ---@field lines string[]
 ---@field hl HlData[]
@@ -32,7 +36,6 @@ local CompStruct
 ---@field height integer
 ---@field leaf boolean
 ---@field data_root RenderData
----@field context any
 local RenderComponent = oop.create_class("RenderComponent")
 
 ---RenderComponent constructor.
@@ -48,6 +51,9 @@ function RenderComponent:init(name)
   self.leaf = false
 end
 
+---@param parent RenderComponent
+---@param comp_struct CompStruct
+---@param schema CompSchema
 local function create_subcomponents(parent, comp_struct, schema)
   for i, v in ipairs(schema) do
     v.name = v.name or RenderComponent.next_uid()
@@ -75,10 +81,11 @@ function RenderComponent.next_uid()
 end
 
 ---Create a new compoenent
----@param schema table
+---@param schema? CompSchema
 ---@return RenderComponent, CompStruct
 function RenderComponent.create_static_component(schema)
   local comp_struct
+  ---@diagnostic disable-next-line: need-check-nil
   local new_comp = RenderComponent(schema and schema.name or nil)
 
   if schema then
@@ -91,7 +98,7 @@ function RenderComponent.create_static_component(schema)
 end
 
 ---Create and add a new component.
----@param schema table
+---@param schema? CompSchema
 ---@return RenderComponent|CompStruct
 function RenderComponent:create_component(schema)
   local new_comp, comp_struct = RenderComponent.create_static_component(schema)

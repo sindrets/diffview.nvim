@@ -16,7 +16,7 @@ local FHOptionPanel = oop.create_class("FHOptionPanel", Panel)
 
 FHOptionPanel.winopts = vim.tbl_extend("force", Panel.winopts, {
   cursorline = true,
-  winhl = table.concat({
+  winhl = {
     "EndOfBuffer:DiffviewEndOfBuffer",
     "Normal:DiffviewNormal",
     "CursorLine:DiffviewCursorLine",
@@ -24,7 +24,7 @@ FHOptionPanel.winopts = vim.tbl_extend("force", Panel.winopts, {
     "SignColumn:DiffviewNormal",
     "StatusLine:DiffviewStatusLine",
     "StatusLineNC:DiffviewStatuslineNC",
-  }, ","),
+  },
 })
 
 FHOptionPanel.bufopts = {
@@ -61,7 +61,9 @@ end
 ---@return FHOptionPanel
 function FHOptionPanel:init(parent)
   FHOptionPanel:super().init(self, {
-    position = "bottom",
+    config = {
+      position = "bottom",
+    },
     bufname = "DiffviewFHOptionPanel",
   })
   self.parent = parent
@@ -84,6 +86,22 @@ function FHOptionPanel:init(parent)
     self:render()
     self:redraw()
   end)
+
+  self:on_autocmd("WinClosed", {
+    callback = function()
+      if not vim.deep_equal(self.option_state, self.parent.log_options) then
+        vim.schedule(function ()
+          self.option_state = nil
+          self.winid = nil
+          self.parent:update_entries(function(_, _)
+            if not self.parent:cur_file() then
+              self.parent.parent:next_item()
+            end
+          end)
+        end)
+      end
+    end,
+  })
 end
 
 ---@Override

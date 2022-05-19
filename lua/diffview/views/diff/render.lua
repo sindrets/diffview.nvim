@@ -6,6 +6,7 @@ local renderer = require("diffview.renderer")
 ---@param show_path boolean
 ---@param depth integer|nil
 local function render_file(comp, show_path, depth)
+  ---@type table
   local file = comp.context
   local offset = 0
 
@@ -72,6 +73,7 @@ local function render_file_tree_recurse(depth, comp)
   end
 
   local dir = comp.components[1]
+  ---@type table
   local ctx = dir.context
 
   dir:add_hl(renderer.get_git_hl(ctx.status), 0, 0, 1)
@@ -123,11 +125,16 @@ return function(panel)
   end
 
   panel.render_data:clear()
+  local width = panel:get_width()
+  if not width then
+    local panel_config = panel:get_config()
+    width = panel_config.width
+  end
 
   ---@type RenderComponent
   local comp = panel.components.path.comp
   local line_idx = 0
-  local s = utils.path:shorten(utils.path:vim_fnamemodify(panel.git_root, ":~"), panel.width - 6)
+  local s = utils.path:shorten(utils.path:vim_fnamemodify(panel.git_root, ":~"), width - 6)
   comp:add_hl("DiffviewFilePanelRootPath", line_idx, 0, #s)
   comp:add_line(s)
 
@@ -176,7 +183,7 @@ return function(panel)
       if relpath == "" then
         relpath = "."
       end
-      s = utils.path:shorten(relpath, panel.width - 5)
+      s = utils.path:shorten(relpath, width - 5)
       comp:add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
       comp:add_line(s)
       line_idx = line_idx + 1

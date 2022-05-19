@@ -22,19 +22,17 @@ M.defaults = {
     fold_open = "",
   },
   file_panel = {
-    position = "left",            -- One of 'left', 'right', 'top', 'bottom'
-    width = 35,                   -- Only applies when position is 'left' or 'right'
-    height = 10,                  -- Only applies when position is 'top' or 'bottom'
     listing_style = "tree",       -- One of 'list' or 'tree'
     tree_options = {              -- Only applies when listing_style is 'tree'
       flatten_dirs = true,
       folder_statuses = "only_folded"  -- One of 'never', 'only_folded' or 'always'.
-    }
+    },
+    win_config = {
+      position = "left",
+      width = 35,
+    },
   },
   file_history_panel = {
-    position = "bottom",
-    width = 35,
-    height = 16,
     log_options = {
       max_count = 256,
       follow = false,
@@ -42,7 +40,14 @@ M.defaults = {
       merges = false,
       no_merges = false,
       reverse = false,
-    }
+    },
+    win_config = {
+      position = "bottom",
+      height = 16,
+    },
+  },
+  commit_log_panel = {
+    win_config = {},
   },
   default_args = {
     DiffviewOpen = {},
@@ -73,6 +78,7 @@ M.defaults = {
       ["U"]             = cb("unstage_all"),
       ["X"]             = cb("restore_entry"),
       ["R"]             = cb("refresh_files"),
+      ["L"]             = cb("open_commit_log"),
       ["<tab>"]         = cb("select_next_entry"),
       ["<s-tab>"]       = cb("select_prev_entry"),
       ["gf"]            = cb("goto_file"),
@@ -87,6 +93,7 @@ M.defaults = {
       ["g!"]            = cb("options"),
       ["<C-A-d>"]       = cb("open_in_diffview"),
       ["y"]             = cb("copy_hash"),
+      ["L"]             = cb("open_commit_log"),
       ["zR"]            = cb("open_all_folds"),
       ["zM"]            = cb("close_all_folds"),
       ["j"]             = cb("next_entry"),
@@ -128,10 +135,33 @@ function M.setup(user_config)
   ---@type EventEmitter
   M.user_emitter = EventEmitter()
 
-  -- deprecation notices
+  --#region DEPRECATION NOTICES
+
   if type(M._config.file_panel.use_icons) ~= "nil" then
     utils.warn("'file_panel.use_icons' has been deprecated. See ':h diffview.changelog-64'.")
   end
+
+  local old_win_config_spec = { "position", "width", "height" }
+  for _, panel_name in ipairs({ "file_panel", "file_history_panel" }) do
+    local panel_config = M._config[panel_name]
+    local notified = false
+
+    for _, option in ipairs(old_win_config_spec) do
+      if panel_config[option] ~= nil then
+        if not notified then
+          utils.warn(
+            ("'%s.{position|width|height}' has been deprecated. See ':h diffview.changelog-136'.")
+            :format(panel_name)
+          )
+          notified = true
+        end
+        panel_config.win_config[option] = panel_config[option]
+        panel_config[option] = nil
+      end
+    end
+  end
+
+  --#endregion
 
   for event, callback in pairs(M._config.hooks) do
     if type(callback) == "function" then

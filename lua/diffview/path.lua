@@ -45,6 +45,13 @@ function PathLib:is_uri(path)
   return string.match(path, "^%w+://") ~= nil
 end
 
+---Get the URI scheme of a given URI.
+---@param path string
+---@return string
+function PathLib:get_uri_scheme(path)
+  return string.match(path, "^(%w+://)")
+end
+
 ---Change the path separators in a path. Removes duplicate separators.
 ---@param path string
 ---@param sep? '"/"'|'"\\\\"'
@@ -201,11 +208,20 @@ function PathLib:join(...)
   segments = { self:_clean(unpack(segments)) }
   local argc = select("#", unpack(segments))
   local result = ""
-  if not self._is_windows and segments[1] == self.sep then
-    result = self.sep
+  local idx = 1
+
+  if self:is_uri(segments[idx] or "") then
+    result = segments[idx]
+    idx = idx + 1
   end
+
+  if not self._is_windows and segments[idx] == self.sep then
+    result = result .. self.sep
+    idx = idx + 1
+  end
+
   local segc = 0
-  for i = result == "" and 1 or 2, argc do
+  for i = idx, argc do
     if segments[i] ~= nil and segments[i] ~= "" then
       result = result
       .. (segc > 0 and self.sep or "")
@@ -213,6 +229,7 @@ function PathLib:join(...)
       segc = segc + 1
     end
   end
+
   return result
 end
 
@@ -222,18 +239,29 @@ end
 function PathLib:explode(path)
   path = self:_clean(path)
   local parts = {}
+  local i = 1
+
+  if self:is_uri(path) then
+    local scheme, p = path:match("^(%w+://)(.*)")
+    parts[i] = scheme
+    path = p
+    i = i + 1
+  end
+
   local root = self:root(path)
   if root then
-    parts[1] = root
+    parts[i] = root
     if self._is_windows then
       path = path:sub(#root + #self.sep + 1, -1)
     else
       path = path:sub(#root + 1, -1)
     end
   end
+
   for part in path:gmatch(string.format("([^%s]+)%s?", self.sep, self.sep)) do
     parts[#parts+1] = part
   end
+
   return parts
 end
 
@@ -318,7 +346,7 @@ function PathLib:relative(path, relative_to, no_resolve)
   return p
 end
 
----Shotren a path by truncating the head.
+---Shorten a path by truncating the head.
 ---@param path string
 ---@param max_length integer
 ---@return string

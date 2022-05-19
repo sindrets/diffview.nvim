@@ -29,6 +29,7 @@ local perf_update = PerfTimer("[FileHistoryPanel] update")
 ---@field grep string
 
 ---@class FileHistoryPanel : Panel
+---@field parent FileHistoryView
 ---@field git_root string
 ---@field entries LogEntry[]
 ---@field path_args string[]
@@ -39,10 +40,6 @@ local perf_update = PerfTimer("[FileHistoryPanel] update")
 ---@field cur_item {[1]: LogEntry, [2]: FileEntry}
 ---@field single_file boolean
 ---@field updating boolean
----@field width integer
----@field height integer
----@field bufid integer
----@field winid integer
 ---@field render_data RenderData
 ---@field option_panel FHOptionPanel
 ---@field option_mapping string
@@ -52,7 +49,7 @@ local FileHistoryPanel = oop.create_class("FileHistoryPanel", Panel)
 
 FileHistoryPanel.winopts = vim.tbl_extend("force", Panel.winopts, {
   cursorline = true,
-  winhl = table.concat({
+  winhl = {
     "EndOfBuffer:DiffviewEndOfBuffer",
     "Normal:DiffviewNormal",
     "CursorLine:DiffviewCursorLine",
@@ -60,7 +57,7 @@ FileHistoryPanel.winopts = vim.tbl_extend("force", Panel.winopts, {
     "SignColumn:DiffviewNormal",
     "StatusLine:DiffviewStatusLine",
     "StatusLineNC:DiffviewStatuslineNC",
-  }, ","),
+  },
 })
 
 FileHistoryPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
@@ -72,20 +69,20 @@ FileHistoryPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 ---@field rev_arg string
 
 ---FileHistoryPanel constructor.
+---@param parent FileHistoryView
 ---@param git_root string
 ---@param entries LogEntry[]
 ---@param path_args string[]
 ---@param log_options LogOptions
 ---@param opt FileHistoryPanelSpec
 ---@return FileHistoryPanel
-function FileHistoryPanel:init(git_root, entries, path_args, raw_args, log_options, opt)
+function FileHistoryPanel:init(parent, git_root, entries, path_args, raw_args, log_options, opt)
   local conf = config.get_config()
   FileHistoryPanel:super().init(self, {
-    position = conf.file_history_panel.position,
-    width = conf.file_history_panel.width,
-    height = conf.file_history_panel.height,
+    config = conf.file_history_panel.win_config,
     bufname = "DiffviewFileHistoryPanel",
   })
+  self.parent = parent
   self.git_root = git_root
   self.entries = entries
   self.path_args = path_args

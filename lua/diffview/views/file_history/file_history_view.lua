@@ -34,6 +34,7 @@ function FileHistoryView:init(opt)
   self.raw_args = opt.raw_args
   self.rev_arg = opt.rev_arg
   self.panel = FileHistoryPanel(
+    self,
     self.git_root,
     {},
     self.path_args,
@@ -219,11 +220,11 @@ end
 ---file entry under the cursor. Otherwise return the file open in the view.
 ---Returns nil if no file is open in the view, or there is no entry under the
 ---cursor in the file panel.
----@return FileEntry|nil
+---@return FileEntry?
 function FileHistoryView:infer_cur_file()
   if self.panel:is_focused() then
     local item = self.panel:get_item_at_cursor()
-    if not item:instanceof(FileEntry) then
+    if item and not item:instanceof(FileEntry) then
       return item.files[1]
     end
     return item

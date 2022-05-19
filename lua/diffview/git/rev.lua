@@ -21,7 +21,7 @@ local RevType = oop.enum({
 ---@class Rev : Object
 ---@field type integer
 ---@field commit string A commit SHA.
----@field head boolean If true, indicates that the rev should be updated when HEAD changes.
+---@field track_head boolean If true, indicates that the rev should be updated when HEAD changes.
 local Rev = oop.create_class("Rev")
 
 -- The special SHA for git's empty tree.
@@ -30,16 +30,16 @@ Rev.NULL_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 ---Rev constructor
 ---@param rev_type RevType
 ---@param commit string
----@param head? boolean
+---@param track_head? boolean
 ---@return Rev
-function Rev:init(rev_type, commit, head)
+function Rev:init(rev_type, commit, track_head)
   local t = type(commit)
   assert(t == "nil" or (t == "string" and commit ~= ""), "@param 'commit' cannot be an empty string!")
-  t = type(head)
-  assert(t == "boolean" or t == "nil", "@param 'head' must be of type 'boolean'!")
+  t = type(track_head)
+  assert(t == "boolean" or t == "nil", "@param 'track_head' must be of type 'boolean'!")
   self.type = rev_type
   self.commit = commit
-  self.head = head or false
+  self.track_head = track_head or false
 end
 
 ---@param name string
@@ -76,6 +76,21 @@ function Rev:abbrev(length)
     return self.commit:sub(1, length or 7)
   end
   return nil
+end
+
+---Determine if this rev is currently the head.
+---@param git_root string
+---@return boolean
+function Rev:is_head(git_root)
+  if not self.type == RevType.COMMIT then
+    return false
+  end
+
+  local out, code = utils.system_list({ "git", "rev-parse", "HEAD", "--" }, git_root)
+  if code ~= 0 or not (out[1] and out[1] ~= "") then
+    return
+  end
+  return self.commit == vim.trim(out[1]):gsub("^%^", "")
 end
 
 ---Create a new commit rev with the special empty tree SHA.

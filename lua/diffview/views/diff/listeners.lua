@@ -1,11 +1,15 @@
-local utils = require("diffview.utils")
-local git = require("diffview.git.utils")
-local lib = require("diffview.lib")
-local RevType = require("diffview.git.rev").RevType
+local CommitLogPanel = require("diffview.ui.panels.commit_log_panel").CommitLogPanel
 local Event = require("diffview.events").Event
 local FileEntry = require("diffview.views.file_entry").FileEntry
+local RevType = require("diffview.git.rev").RevType
 local api = vim.api
 local async = require("plenary.async")
+local git = require("diffview.git.utils")
+local lib = require("diffview.lib")
+local utils = require("diffview.utils")
+
+---@type CommitLogPanel
+local log_panel
 
 local function prepare_goto_file(view)
   local file = view:infer_cur_file()
@@ -66,7 +70,7 @@ return function(view)
       view.initialized = true
     end,
     close = function()
-      if view.panel:is_cur_win() then
+      if view.panel:is_focused() then
         view.panel:close()
       elseif view:is_cur_tabpage() then
         view:close()
@@ -105,6 +109,26 @@ return function(view)
           view:set_file(item, true)
         end
       end
+    end,
+    open_commit_log = function()
+      if (view.left.type == RevType.INDEX and view.right.type == RevType.LOCAL)
+        or (
+          view.left.type == RevType.COMMIT
+          and vim.tbl_contains({ RevType.INDEX, RevType.LOCAL }, view.right.type)
+          and view.left:is_head(view.git_root)
+        ) then
+        utils.info("Changes not commited yet. No log available for these changes.")
+        return
+      end
+
+      if not log_panel then
+        log_panel = CommitLogPanel(view.git_root, {
+          name = ("diffview://%s/log/%d/%s"):format(view.git_dir, view.tabpage, "commit_log"),
+        })
+      end
+
+      local rev_arg = ("%s..%s"):format(view.left.commit, view.right.commit or "HEAD")
+      log_panel:update(rev_arg)
     end,
     toggle_stage_entry = function()
       if not (view.left.type == RevType.INDEX and view.right.type == RevType.LOCAL) then
@@ -236,10 +260,10 @@ return function(view)
       view.panel:redraw()
     end,
     focus_files = function()
-      view.panel:focus(true)
+      view.panel:focus()
     end,
     toggle_files = function()
-      view.panel:toggle()
+      view.panel:toggle(true)
     end,
     refresh_files = function()
       view:update_files()

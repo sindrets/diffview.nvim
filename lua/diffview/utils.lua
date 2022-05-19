@@ -439,6 +439,21 @@ function M.vec_push(t, ...)
   return t
 end
 
+---Check if a given object is callable.
+---@param obj any
+---@return boolean
+function M.is_callable(obj)
+  if type(obj) == "function" then
+    return true
+  elseif type(obj) == "table" then
+    local mt = getmetatable(obj)
+    if mt then
+      return type(mt.__call) == "function"
+    end
+  end
+  return false
+end
+
 ---@class ListBufsSpec
 ---@field loaded boolean Filter out buffers that aren't loaded.
 ---@field listed boolean Filter out buffers that aren't listed.
@@ -446,6 +461,7 @@ end
 ---@field tabpage integer Filter out buffers that are not displayed in a given tabpage.
 
 ---@param opt? ListBufsSpec
+---@return integer[]
 function M.list_bufs(opt)
   opt = opt or {}
   local bufs
@@ -575,6 +591,41 @@ function M.win_find_buf(bufid, tabpage)
   for _, id in ipairs(wins) do
     if api.nvim_win_get_buf(id) == bufid then
       table.insert(result, id)
+    end
+  end
+
+  return result
+end
+
+---Create a new table with only keys that are valid when passed to
+---`nvim_open_win()`.
+---@param config table
+---@param strict? boolean Raise errors if the given config contains illegal keys.
+---@return table
+function M.sanitize_float_config(config, strict)
+  local mask = {
+    relative = true,
+    win = true,
+    anchor = true,
+    width = true,
+    height = true,
+    bufpos = true,
+    row = true,
+    col = true,
+    focusable = true,
+    external = true,
+    zindex = true,
+    style = true,
+    border = true,
+    noautocmd = true,
+  }
+  local result = {}
+
+  for key, value in pairs(config) do
+    if mask[key] then
+      result[key] = vim.deepcopy(value)
+    elseif strict then
+      error(("Window config contained invalid key '%s'!"):format(key))
     end
   end
 

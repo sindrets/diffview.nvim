@@ -16,9 +16,6 @@ local M = {}
 ---@field path_args string[]
 ---@field rev_pretty_name string|nil
 ---@field cur_file FileEntry
----@field width integer
----@field bufid integer
----@field winid integer
 ---@field listing_style '"list"'|'"tree"'
 ---@field tree_options TreeOptions
 ---@field render_data RenderData
@@ -52,9 +49,7 @@ FilePanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 function FilePanel:init(git_root, files, path_args, rev_pretty_name)
   local conf = config.get_config()
   FilePanel:super().init(self, {
-    position = conf.file_panel.position,
-    width = conf.file_panel.width,
-    height = conf.file_panel.height,
+    config = conf.file_panel.win_config,
     bufname = "DiffviewFilePanel",
   })
   self.git_root = git_root
@@ -104,11 +99,15 @@ function FilePanel:update_components()
 
     working_files = {
       name = "files",
-      unpack(self.files.working_tree:create_comp_schema(self.tree_options.flatten_dirs)),
+      unpack(self.files.working_tree:create_comp_schema({
+        flatten_dirs = self.tree_options.flatten_dirs
+      })),
     }
     staged_files = {
       name = "files",
-      unpack(self.files.staged_tree:create_comp_schema(self.tree_options.flatten_dirs)),
+      unpack(self.files.staged_tree:create_comp_schema({
+        flatten_dirs = self.tree_options.flatten_dirs
+      })),
     }
   end
 

@@ -248,11 +248,18 @@ function M.parse_revs(git_root, rev_arg, opt)
       return
     end
 
-    if #rev_strings > 1 then
-      local left_hash = rev_strings[2]:gsub("^%^", "")
+    local is_range = git.is_rev_arg_range(rev_arg)
+
+    if is_range then
       local right_hash = rev_strings[1]:gsub("^%^", "")
-      left = Rev(RevType.COMMIT, left_hash)
       right = Rev(RevType.COMMIT, right_hash)
+      if #rev_strings > 1 then
+        local left_hash = rev_strings[2]:gsub("^%^", "")
+        left = Rev(RevType.COMMIT, left_hash)
+      else
+        left = Rev.new_null_tree()
+      end
+
       if opt.imply_local then
         left, right = M.imply_local(left, right, head)
       end

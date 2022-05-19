@@ -57,20 +57,30 @@ function CFileEntry:load_buffers(git_root, left_winid, right_winid, callback)
       split.ready = true
       local was_ready = self[split.pos .. "_ready"]
       self[split.pos .. "_ready"] = true
+
       if splits[1].ready and splits[2].ready then
+
+        -- Load and set the buffer
         for _, sp in ipairs(splits) do
           if sp.load then
             sp.load()
           else
             api.nvim_win_set_buf(sp.winid, sp.bufid)
           end
-          if not was_ready then
-            api.nvim_win_call(sp.winid, function()
-              DiffviewGlobal.emitter:emit("diff_buf_read", sp.bufid)
-            end)
-          end
         end
+
         CFileEntry._update_windows(left_winid, right_winid)
+
+        -- Call hooks
+        for _, sp in ipairs(splits) do
+          api.nvim_win_call(sp.winid, function()
+            if not was_ready then
+              DiffviewGlobal.emitter:emit("diff_buf_read", sp.bufid)
+            end
+            DiffviewGlobal.emitter:emit("diff_buf_win_enter", sp.bufid)
+          end)
+        end
+
         if type(callback) == "function" then
           callback()
         end
@@ -172,7 +182,7 @@ function CFileEntry._create_buffer(git_root, rev, path, producer, null, callback
 
   local context
   if rev.type == RevType.COMMIT then
-    context = rev:abbrev()
+    context = rev:abbrev(11)
   elseif rev.type == RevType.INDEX then
     context = ":0:"
   elseif rev.type == RevType.CUSTOM then
@@ -180,7 +190,7 @@ function CFileEntry._create_buffer(git_root, rev, path, producer, null, callback
   end
 
   -- stylua: ignore
-  local fullname = "diffview://" .. utils.path:join(git_root, ".git", context, path)
+  local fullname = utils.path:join("diffview://", git_root, ".git", context, path)
   for option, value in pairs(FileEntry.bufopts) do
     api.nvim_buf_set_option(bn, option, value)
   end
@@ -191,7 +201,7 @@ function CFileEntry._create_buffer(git_root, rev, path, producer, null, callback
     local i = 1
     while not ok do
       -- stylua: ignore
-      fullname = "diffview://" .. utils.path:join(git_root, ".git", context, i, path)
+      fullname = utils.path:join("diffview://", git_root, ".git", context, i, path)
       ok = pcall(api.nvim_buf_set_name, bn, fullname)
       i = i + 1
     end
@@ -211,7 +221,7 @@ function CFileEntry._create_buffer(git_root, rev, path, producer, null, callback
         callback()
       end
     end)
-  end)
+  end, nil)
 
   return bn
 end
