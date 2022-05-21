@@ -16,7 +16,7 @@ for any git rev.
 ## Requirements
 
 - Git
-- Neovim >=0.5.0
+- Neovim ≥ 0.7.0
 - [plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
 - [nvim-web-devicons](https://github.com/kyazdani42/nvim-web-devicons) (optional) For file icons
 
@@ -43,9 +43,9 @@ use { 'sindrets/diffview.nvim', requires = 'nvim-lua/plenary.nvim' }
 
 ```lua
 -- Lua
-local cb = require'diffview.config'.diffview_callback
+local actions = require("diffview.config").actions
 
-require'diffview'.setup {
+require("diffview").setup({
   diff_binaries = false,    -- Show diffs for binaries
   enhanced_diff_hl = false, -- See ':h diffview-config-enhanced_diff_hl'
   use_icons = true,         -- Requires nvim-web-devicons
@@ -90,87 +90,81 @@ require'diffview'.setup {
     DiffviewFileHistory = {},
   },
   hooks = {},         -- See ':h diffview-config-hooks'
-  key_bindings = {
-    disable_defaults = false,                   -- Disable the default key bindings
-    -- The `view` bindings are active in the diff buffers, only when the current
-    -- tabpage is a Diffview.
+  keymaps = {
+    disable_defaults = false, -- Disable the default keymaps
     view = {
-      ["<tab>"]      = cb("select_next_entry"),  -- Open the diff for the next file
-      ["<s-tab>"]    = cb("select_prev_entry"),  -- Open the diff for the previous file
-      ["gf"]         = cb("goto_file"),          -- Open the file in a new split in previous tabpage
-      ["<C-w><C-f>"] = cb("goto_file_split"),    -- Open the file in a new split
-      ["<C-w>gf"]    = cb("goto_file_tab"),      -- Open the file in a new tabpage
-      ["<leader>e"]  = cb("focus_files"),        -- Bring focus to the files panel
-      ["<leader>b"]  = cb("toggle_files"),       -- Toggle the files panel.
+      -- The `view` bindings are active in the diff buffers, only when the current
+      -- tabpage is a Diffview.
+      ["<tab>"]      = actions.select_next_entry, -- Open the diff for the next file
+      ["<s-tab>"]    = actions.select_prev_entry, -- Open the diff for the previous file
+      ["gf"]         = actions.goto_file,         -- Open the file in a new split in previous tabpage
+      ["<C-w><C-f>"] = actions.goto_file_split,   -- Open the file in a new split
+      ["<C-w>gf"]    = actions.goto_file_tab,     -- Open the file in a new tabpage
+      ["<leader>e"]  = actions.focus_files,       -- Bring focus to the files panel
+      ["<leader>b"]  = actions.toggle_files,      -- Toggle the files panel.
     },
     file_panel = {
-      ["j"]             = cb("next_entry"),           -- Bring the cursor to the next file entry
-      ["<down>"]        = cb("next_entry"),
-      ["k"]             = cb("prev_entry"),           -- Bring the cursor to the previous file entry.
-      ["<up>"]          = cb("prev_entry"),
-      ["<cr>"]          = cb("select_entry"),         -- Open the diff for the selected entry.
-      ["o"]             = cb("select_entry"),
-      ["<2-LeftMouse>"] = cb("select_entry"),
-      ["-"]             = cb("toggle_stage_entry"),   -- Stage / unstage the selected entry.
-      ["S"]             = cb("stage_all"),            -- Stage all entries.
-      ["U"]             = cb("unstage_all"),          -- Unstage all entries.
-      ["X"]             = cb("restore_entry"),        -- Restore entry to the state on the left side.
-      ["R"]             = cb("refresh_files"),        -- Update stats and entries in the file list.
-      ["L"]             = cb("open_commit_log"),      -- Open the commit log panel.
-      ["<tab>"]         = cb("select_next_entry"),
-      ["<s-tab>"]       = cb("select_prev_entry"),
-      ["gf"]            = cb("goto_file"),
-      ["<C-w><C-f>"]    = cb("goto_file_split"),
-      ["<C-w>gf"]       = cb("goto_file_tab"),
-      ["i"]             = cb("listing_style"),        -- Toggle between 'list' and 'tree' views
-      ["f"]             = cb("toggle_flatten_dirs"),  -- Flatten empty subdirectories in tree listing style.
-      ["<leader>e"]     = cb("focus_files"),
-      ["<leader>b"]     = cb("toggle_files"),
+      ["j"]             = actions.next_entry,         -- Bring the cursor to the next file entry
+      ["<down>"]        = actions.next_entry,
+      ["k"]             = actions.prev_entry,         -- Bring the cursor to the previous file entry.
+      ["<up>"]          = actions.prev_entry,
+      ["<cr>"]          = actions.select_entry,       -- Open the diff for the selected entry.
+      ["o"]             = actions.select_entry,
+      ["<2-LeftMouse>"] = actions.select_entry,
+      ["-"]             = actions.toggle_stage_entry, -- Stage / unstage the selected entry.
+      ["S"]             = actions.stage_all,          -- Stage all entries.
+      ["U"]             = actions.unstage_all,        -- Unstage all entries.
+      ["X"]             = actions.restore_entry,      -- Restore entry to the state on the left side.
+      ["R"]             = actions.refresh_files,      -- Update stats and entries in the file list.
+      ["L"]             = actions.open_commit_log,    -- Open the commit log panel.
+      ["<tab>"]         = actions.select_next_entry,
+      ["<s-tab>"]       = actions.select_prev_entry,
+      ["gf"]            = actions.goto_file,
+      ["<C-w><C-f>"]    = actions.goto_file_split,
+      ["<C-w>gf"]       = actions.goto_file_tab,
+      ["i"]             = actions.listing_style,        -- Toggle between 'list' and 'tree' views
+      ["f"]             = actions.toggle_flatten_dirs,  -- Flatten empty subdirectories in tree listing style.
+      ["<leader>e"]     = actions.focus_files,
+      ["<leader>b"]     = actions.toggle_files,
     },
     file_history_panel = {
-      ["g!"]            = cb("options"),            -- Open the option panel
-      ["<C-A-d>"]       = cb("open_in_diffview"),   -- Open the entry under the cursor in a diffview
-      ["y"]             = cb("copy_hash"),          -- Copy the commit hash of the entry under the cursor
-      ["L"]             = cb("open_commit_log"),
-      ["zR"]            = cb("open_all_folds"),
-      ["zM"]            = cb("close_all_folds"),
-      ["j"]             = cb("next_entry"),
-      ["<down>"]        = cb("next_entry"),
-      ["k"]             = cb("prev_entry"),
-      ["<up>"]          = cb("prev_entry"),
-      ["<cr>"]          = cb("select_entry"),
-      ["o"]             = cb("select_entry"),
-      ["<2-LeftMouse>"] = cb("select_entry"),
-      ["<tab>"]         = cb("select_next_entry"),
-      ["<s-tab>"]       = cb("select_prev_entry"),
-      ["gf"]            = cb("goto_file"),
-      ["<C-w><C-f>"]    = cb("goto_file_split"),
-      ["<C-w>gf"]       = cb("goto_file_tab"),
-      ["<leader>e"]     = cb("focus_files"),
-      ["<leader>b"]     = cb("toggle_files"),
+      ["g!"]            = actions.options,          -- Open the option panel
+      ["<C-A-d>"]       = actions.open_in_diffview, -- Open the entry under the cursor in a diffview
+      ["y"]             = actions.copy_hash,        -- Copy the commit hash of the entry under the cursor
+      ["L"]             = actions.open_commit_log,
+      ["zR"]            = actions.open_all_folds,
+      ["zM"]            = actions.close_all_folds,
+      ["j"]             = actions.next_entry,
+      ["<down>"]        = actions.next_entry,
+      ["k"]             = actions.prev_entry,
+      ["<up>"]          = actions.prev_entry,
+      ["<cr>"]          = actions.select_entry,
+      ["o"]             = actions.select_entry,
+      ["<2-LeftMouse>"] = actions.select_entry,
+      ["<tab>"]         = actions.select_next_entry,
+      ["<s-tab>"]       = actions.select_prev_entry,
+      ["gf"]            = actions.goto_file,
+      ["<C-w><C-f>"]    = actions.goto_file_split,
+      ["<C-w>gf"]       = actions.goto_file_tab,
+      ["<leader>e"]     = actions.focus_files,
+      ["<leader>b"]     = actions.toggle_files,
     },
     option_panel = {
-      ["<tab>"] = cb("select"),
-      ["q"]     = cb("close"),
+      ["<tab>"] = actions.select,
+      ["q"]     = actions.close,
     },
   },
-}
+})
 ```
 
 </details>
 </p>
 
+### Layout
+
 The diff windows can be aligned either with a horizontal split or a vertical
 split. To change the alignment add either `horizontal` or `vertical` to your
 `'diffopt'`.
-
-Most of the file panel mappings should also work from the view if they are
-added to the view bindings (and vice versa). The exception is for mappings
-that only really make sense specifically in the file panel, such as
-`next_entry`, `prev_entry`, and `select_entry`. Functions such as
-`toggle_stage_entry` and `restore_entry` work just fine from the view. When
-invoked from the view, these will target the file currently open in the view
-rather than the file under the cursor in the file panel.
 
 ### Hooks
 
@@ -198,16 +192,45 @@ hooks = {
 }
 ```
 
-### Available Unused Mappings
+### Keymaps
 
-This section documents key-mappable functions that are not mapped by default.
+The keymaps config is structured as a table with sub-tables for various
+different contexts where mappings can be declared. In these sub-tables
+key-value pairs are treated as the `{lhs}` and `{rhs}` of a normal mode
+mapping. These mappings all use the `:map-arguments` `silent`, `nowait`, and
+`noremap`. The implementation uses `vim.keymap.set()`, so the `{rhs}` can be
+either a vim command in the form of a string, or it can be a lua function:
 
-- `focus_entry`
-  - Like `select_entry`, but also bring the cursor to the right diff split.
-    Available in both the file panel and the file history panel.
-- `goto_file_edit`
-  - Works like `goto_file` except instead of creating a new
-    split it will just open the file in the last accessed window.
+```lua
+  view = {
+    -- Vim command:
+    ["a"] = "<Cmd>echom 'foo'<CR>",
+    -- Lua function:
+    ["b"] = function() print("bar") end,
+  }
+```
+
+To disable any single mapping without disabling them all, set its value to
+`false`:
+
+```lua
+  view = {
+    -- Disable the default mapping for <tab>:
+    ["<tab>"] = false,
+  }
+```
+
+Most of the mapped file panel actions also work from the view if they are added
+to the view maps (and vice versa). The exception is for actions that only
+really make sense specifically in the file panel, such as `next_entry`,
+`prev_entry`. Actions such as `toggle_stage_entry` and `restore_entry` work
+just fine from the view. When invoked from the view, these will target the file
+currently open in the view rather than the file under the cursor in the file
+panel.
+
+**For more details on how to set mappings for other modes, actions, and more see:**
+- `:h diffview-config-keymaps`
+- `:h diffview-actions`
 
 ## File History
 
@@ -257,7 +280,14 @@ or directory. If no `[paths]` are given, defaults to the current file. Multiple
 files for every commit, simply call `:DiffviewFileHistory .` (assuming your cwd
 is the top level of the git repository).
 
-## Tips
+## Restoring Files
+
+If the right side of the diff is showing the local state of a file, you can
+restore the file to the state from the left side of the diff (key binding `X`
+from the file panel by default). The current state of the file is stored in the
+git object database, and a command is echoed that shows how to undo the change.
+
+## Tips and FAQ
 
 - **Hide untracked files:**
   - `DiffviewOpen -uno`
@@ -268,14 +298,9 @@ is the top level of the git repository).
 - **Diff the index against a git rev:**
   - `DiffviewOpen HEAD~2 --cached`
   - Defaults to `HEAD` if no rev is given.
-- **Change the fill char for the deleted lines in diff-mode:**
-  - (vimscript): `set fillchars+=diff:╱`
+- **Q: How do I get the diagonal lines in place of deleted lines in
+  diff-mode?**
+  - A: Change your `:h 'fillchars'`:
+    - (vimscript): `set fillchars+=diff:╱`
   - Note: whether or not the diagonal lines will line up nicely will depend on
-    your terminal emulator.
-
-## Restoring Files
-
-If the right side of the diff is showing the local state of a file, you can
-restore the file to the state from the left side of the diff (key binding `X`
-from the file panel by default). The current state of the file is stored in the
-git object database, and a command is echoed that shows how to undo the change.
+    your terminal emulator. The terminal used in the screenshots is Kitty.

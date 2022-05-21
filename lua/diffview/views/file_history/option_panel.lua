@@ -87,6 +87,12 @@ function FHOptionPanel:init(parent)
     self:redraw()
   end)
 
+  self:on_autocmd("BufNew", {
+    callback = function()
+      self:setup_buffer()
+    end,
+  })
+
   self:on_autocmd("WinClosed", {
     callback = function()
       if not vim.deep_equal(self.option_state, self.parent.log_options) then
@@ -110,22 +116,28 @@ function FHOptionPanel:open()
   self.option_state = utils.tbl_deep_clone(self.parent.log_options)
 end
 
-function FHOptionPanel:init_buffer_opts()
+function FHOptionPanel:setup_buffer()
   local conf = config.get_config()
-  local opt = { noremap = true, silent = true, nowait = true }
-  for lhs, rhs in pairs(conf.key_bindings.option_panel) do
-    api.nvim_buf_set_keymap(self.bufid, "n", lhs, rhs, opt)
+  local default_opt = { silent = true, nowait = true, buffer = self.bufid }
+  for lhs, mapping in pairs(conf.keymaps.option_panel) do
+    if type(lhs) == "number" then
+      local opt = vim.tbl_extend("force", mapping[4] or {}, { buffer = self.bufid })
+      vim.keymap.set(mapping[1], mapping[2], mapping[3], opt)
+    else
+      vim.keymap.set("n", lhs, mapping, default_opt)
+    end
   end
 
   for group, _ in pairs(FHOptionPanel.flags) do
     for option_name, v in pairs(FHOptionPanel.flags[group]) do
-      utils.buf_map(self.bufid, {
+      vim.keymap.set(
         "n",
         v[1],
         function()
           self.emitter:emit("set_option", option_name)
         end,
-      })
+        { silent = true, buffer = self.bufid }
+      )
     end
   end
 end

@@ -234,7 +234,7 @@ function M.update_colors()
   lib.update_colors()
 end
 
-function M.trigger_event(event_name, ...)
+function M.emit(event_name, ...)
   local view = lib.get_current_view()
   if view and not view.closing then
     view.emitter:emit(event_name, ...)

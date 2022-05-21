@@ -324,7 +324,14 @@ function Panel:init_buffer()
   self.bufid = bn
   self.render_data = renderer.RenderData(bufname)
 
-  self:init_buffer_opts()
+  api.nvim_buf_call(self.bufid, function()
+    vim.api.nvim_exec_autocmds({ "BufNew", "BufFilePre" }, {
+      group = Panel.au.group,
+      buffer = self.bufid,
+      modeline = false,
+    })
+  end)
+
   self:update_components()
   self:render()
   self:redraw()
@@ -332,7 +339,6 @@ function Panel:init_buffer()
   return bn
 end
 
-Panel:virtual("init_buffer_opts")
 Panel:virtual("update_components")
 Panel:virtual("render")
 
@@ -365,11 +371,9 @@ function Panel:on_autocmd(event, opts)
       buf_match = state.buf
     end
 
-    if self:is_focused()
-      or (win_match and win_match == self.winid)
-      or (buf_match and buf_match == self.bufid)
-      or (self.bufid and self.bufid == api.nvim_get_current_buf()) then
-        opts.callback()
+    if (win_match and win_match == self.winid)
+      or (buf_match and buf_match == self.bufid) then
+        opts.callback(state)
     end
   end
 

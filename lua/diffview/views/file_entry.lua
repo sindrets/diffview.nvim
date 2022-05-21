@@ -494,17 +494,31 @@ end
 ---@static
 function FileEntry._attach_buffer(bufid)
   local conf = config.get_config()
-  local opt = { noremap = true, silent = true, nowait = true }
-  for lhs, rhs in pairs(conf.key_bindings.view) do
-    api.nvim_buf_set_keymap(bufid, "n", lhs, rhs, opt)
+  local default_opt = { silent = true, nowait = true, buffer = bufid }
+
+  for lhs, mapping in pairs(conf.keymaps.view) do
+    if type(lhs) == "number" then
+      local opt = vim.tbl_extend("force", mapping[4] or {}, { buffer = bufid })
+      vim.keymap.set(mapping[1], mapping[2], mapping[3], opt)
+    else
+      vim.keymap.set("n", lhs, mapping, default_opt)
+    end
   end
 end
 
 ---@static
 function FileEntry._detach_buffer(bufid)
   local conf = config.get_config()
-  for lhs, _ in pairs(conf.key_bindings.view) do
-    pcall(api.nvim_buf_del_keymap, bufid, "n", lhs)
+
+  for lhs, mapping in pairs(conf.keymaps.view) do
+    if type(lhs) == "number" then
+      local modes = type(mapping[1]) == "table" and mapping[1] or { mapping[1] }
+      for _, mode in ipairs(modes) do
+        pcall(api.nvim_buf_del_keymap, bufid, mode, mapping[2])
+      end
+    else
+      pcall(api.nvim_buf_del_keymap, bufid, "n", lhs)
+    end
   end
 end
 

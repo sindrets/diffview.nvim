@@ -107,6 +107,11 @@ return function(view)
             view:set_file(item, false)
           end
         end
+      elseif view.panel.option_panel:is_focused() then
+        local item = view.panel.option_panel:get_item_at_cursor()
+        if item then
+          view.panel.option_panel.emitter:emit("set_option", item[1])
+        end
       end
     end,
     focus_entry = function()
@@ -211,14 +216,6 @@ return function(view)
     end,
     options = function()
       view.panel.option_panel:focus()
-    end,
-    select = function()
-      if view.panel.option_panel:is_focused() then
-        local item = view.panel.option_panel:get_item_at_cursor()
-        if item then
-          view.panel.option_panel.emitter:emit("set_option", item[1])
-        end
-      end
     end,
     copy_hash = function()
       if view.panel:is_focused() then

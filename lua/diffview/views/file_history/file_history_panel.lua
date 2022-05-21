@@ -102,6 +102,12 @@ function FileHistoryPanel:init(parent, git_root, entries, path_args, raw_args, l
     author = log_options.author,
     grep = log_options.grep,
   }
+
+  self:on_autocmd("BufNew", {
+    callback = function()
+      self:setup_buffer()
+    end,
+  })
 end
 
 ---@Override
@@ -126,15 +132,28 @@ function FileHistoryPanel:destroy()
   FileHistoryPanel:super().destroy(self)
 end
 
-function FileHistoryPanel:init_buffer_opts()
+function FileHistoryPanel:setup_buffer()
   local conf = config.get_config()
-  local option_rhs = config.diffview_callback("options")
-  local opt = { noremap = true, silent = true, nowait = true }
-  for lhs, rhs in pairs(conf.key_bindings.file_history_panel) do
-    if rhs == option_rhs then
+  local option_rhs = config.actions.options
+  ---@diagnostic disable-next-line: deprecated
+  local old_option_rhs = config.diffview_callback("options")
+
+  local default_opt = { silent = true, nowait = true, buffer = self.bufid }
+  for key, mapping in pairs(conf.keymaps.file_history_panel) do
+    local lhs, rhs
+    if type(key) == "number" then
+      lhs, rhs = mapping[2], mapping[3]
+      local opt = vim.tbl_extend("force", mapping[4] or {}, { buffer = self.bufid })
+      vim.keymap.set(mapping[1], mapping[2], mapping[3], opt)
+    else
+      lhs, rhs = key, mapping
+      vim.keymap.set("n", key, mapping, default_opt)
+    end
+
+    if rhs == option_rhs or rhs == old_option_rhs then
+      -- TODO: this is probably not gonna work with the new keymap implementation
       self.option_mapping = lhs
     end
-    api.nvim_buf_set_keymap(self.bufid, "n", lhs, rhs, opt)
   end
 end
 

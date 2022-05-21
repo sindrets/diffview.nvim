@@ -58,6 +58,12 @@ function FilePanel:init(git_root, files, path_args, rev_pretty_name)
   self.rev_pretty_name = rev_pretty_name
   self.listing_style = conf.file_panel.listing_style
   self.tree_options = conf.file_panel.tree_options
+
+  self:on_autocmd("BufNew", {
+    callback = function()
+      self:setup_buffer()
+    end,
+  })
 end
 
 ---@Override
@@ -66,11 +72,17 @@ function FilePanel:open()
   vim.cmd("wincmd =")
 end
 
-function FilePanel:init_buffer_opts()
+function FilePanel:setup_buffer()
   local conf = config.get_config()
-  local opt = { noremap = true, silent = true, nowait = true }
-  for lhs, rhs in pairs(conf.key_bindings.file_panel) do
-    api.nvim_buf_set_keymap(self.bufid, "n", lhs, rhs, opt)
+
+  local default_opt = { silent = true, nowait = true, buffer = self.bufid }
+  for lhs, mapping in pairs(conf.keymaps.file_panel) do
+    if type(lhs) == "number" then
+      local opt = vim.tbl_extend("force", mapping[4] or {}, { buffer = self.bufid })
+      vim.keymap.set(mapping[1], mapping[2], mapping[3], opt)
+    else
+      vim.keymap.set("n", lhs, mapping, default_opt)
+    end
   end
 end
 
