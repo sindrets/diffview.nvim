@@ -135,8 +135,6 @@ end
 function FileHistoryPanel:setup_buffer()
   local conf = config.get_config()
   local option_rhs = config.actions.options
-  ---@diagnostic disable-next-line: deprecated
-  local old_option_rhs = config.diffview_callback("options")
 
   local default_opt = { silent = true, nowait = true, buffer = self.bufid }
   for key, mapping in pairs(conf.keymaps.file_history_panel) do
@@ -150,8 +148,7 @@ function FileHistoryPanel:setup_buffer()
       vim.keymap.set("n", key, mapping, default_opt)
     end
 
-    if rhs == option_rhs or rhs == old_option_rhs then
-      -- TODO: this is probably not gonna work with the new keymap implementation
+    if rhs == option_rhs then
       self.option_mapping = lhs
     end
   end
