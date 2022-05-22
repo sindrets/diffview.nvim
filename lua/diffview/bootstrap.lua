@@ -15,7 +15,10 @@ _G.DiffviewGlobal = {
 }
 
 if vim.fn.has("nvim-0.7") ~= 1 then
-  err("Minimum required version is Neovim 0.7.0! Cannot continue.")
+  err(
+    "Minimum required version is Neovim 0.7.0! Cannot continue."
+    .. " (See ':h diffview.changelog-137')"
+  )
   return false
 end
 

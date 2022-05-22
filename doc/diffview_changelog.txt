@@ -3,6 +3,13 @@
 
 CHANGELOG
 
+                                                *diffview.changelog-137*
+
+PR: https://github.com/sindrets/diffview.nvim/pull/137
+
+The minimum required version has been bumped to Neovim 0.7.0, as the plugin
+now uses some of the API functions provided in this release.
+
                                                 *diffview.changelog-136*
 
 PR: https://github.com/sindrets/diffview.nvim/pull/136
