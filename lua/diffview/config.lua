@@ -1,12 +1,59 @@
+---@diagnostic disable: deprecated
 local utils = require("diffview.utils")
 local EventEmitter = require("diffview.events").EventEmitter
+
 local M = {}
 
-function M.diffview_callback(cb_name)
-  return string.format("<Cmd>lua require'diffview'.trigger_event('%s')<CR>", cb_name)
+M.actions = setmetatable({}, {
+  __index = function(_, k)
+    utils.err(("The action '%s' does not exist!"):format(k))
+  end
+})
+
+local actions = M.actions
+local action_names = {
+  "close",
+  "close_all_folds",
+  "copy_hash",
+  "focus_entry",
+  "focus_files",
+  "goto_file",
+  "goto_file_edit",
+  "goto_file_split",
+  "goto_file_tab",
+  "listing_style",
+  "next_entry",
+  "open_all_folds",
+  "open_commit_log",
+  "open_in_diffview",
+  "options",
+  "prev_entry",
+  "refresh_files",
+  "restore_entry",
+  "select_entry",
+  "select_next_entry",
+  "select_prev_entry",
+  "stage_all",
+  "toggle_files",
+  "toggle_flatten_dirs",
+  "toggle_stage_entry",
+  "unstage_all",
+}
+
+for _, name in ipairs(action_names) do
+  M.actions[name] = function()
+    require("diffview").emit(name)
+  end
 end
 
-local cb = M.diffview_callback
+---@deprecated
+function M.diffview_callback(cb_name)
+  if cb_name == "select" then
+    -- Reroute deprecated action
+    return M.actions.select_entry
+  end
+  return actions[cb_name]
+end
 
 -- stylua: ignore start
 M.defaults = {
@@ -22,10 +69,10 @@ M.defaults = {
     fold_open = "",
   },
   file_panel = {
-    listing_style = "tree",       -- One of 'list' or 'tree'
-    tree_options = {              -- Only applies when listing_style is 'tree'
+    listing_style = "tree",
+    tree_options = {
       flatten_dirs = true,
-      folder_statuses = "only_folded"  -- One of 'never', 'only_folded' or 'always'.
+      folder_statuses = "only_folded"
     },
     win_config = {
       position = "left",
@@ -54,66 +101,66 @@ M.defaults = {
     DiffviewFileHistory = {},
   },
   hooks = {},
-  key_bindings = {
+  keymaps = {
     disable_defaults = false,
     view = {
-      ["<tab>"]      = cb("select_next_entry"),
-      ["<s-tab>"]    = cb("select_prev_entry"),
-      ["gf"]         = cb("goto_file"),
-      ["<C-w><C-f>"] = cb("goto_file_split"),
-      ["<C-w>gf"]    = cb("goto_file_tab"),
-      ["<leader>e"]  = cb("focus_files"),
-      ["<leader>b"]  = cb("toggle_files"),
+      ["<tab>"]      = actions.select_next_entry,
+      ["<s-tab>"]    = actions.select_prev_entry,
+      ["gf"]         = actions.goto_file,
+      ["<C-w><C-f>"] = actions.goto_file_split,
+      ["<C-w>gf"]    = actions.goto_file_tab,
+      ["<leader>e"]  = actions.focus_files,
+      ["<leader>b"]  = actions.toggle_files,
     },
     file_panel = {
-      ["j"]             = cb("next_entry"),
-      ["<down>"]        = cb("next_entry"),
-      ["k"]             = cb("prev_entry"),
-      ["<up>"]          = cb("prev_entry"),
-      ["<cr>"]          = cb("select_entry"),
-      ["o"]             = cb("select_entry"),
-      ["<2-LeftMouse>"] = cb("select_entry"),
-      ["-"]             = cb("toggle_stage_entry"),
-      ["S"]             = cb("stage_all"),
-      ["U"]             = cb("unstage_all"),
-      ["X"]             = cb("restore_entry"),
-      ["R"]             = cb("refresh_files"),
-      ["L"]             = cb("open_commit_log"),
-      ["<tab>"]         = cb("select_next_entry"),
-      ["<s-tab>"]       = cb("select_prev_entry"),
-      ["gf"]            = cb("goto_file"),
-      ["<C-w><C-f>"]    = cb("goto_file_split"),
-      ["<C-w>gf"]       = cb("goto_file_tab"),
-      ["i"]             = cb("listing_style"),
-      ["f"]             = cb("toggle_flatten_dirs"),
-      ["<leader>e"]     = cb("focus_files"),
-      ["<leader>b"]     = cb("toggle_files"),
+      ["j"]             = actions.next_entry,
+      ["<down>"]        = actions.next_entry,
+      ["k"]             = actions.prev_entry,
+      ["<up>"]          = actions.prev_entry,
+      ["<cr>"]          = actions.select_entry,
+      ["o"]             = actions.select_entry,
+      ["<2-LeftMouse>"] = actions.select_entry,
+      ["-"]             = actions.toggle_stage_entry,
+      ["S"]             = actions.stage_all,
+      ["U"]             = actions.unstage_all,
+      ["X"]             = actions.restore_entry,
+      ["R"]             = actions.refresh_files,
+      ["L"]             = actions.open_commit_log,
+      ["<tab>"]         = actions.select_next_entry,
+      ["<s-tab>"]       = actions.select_prev_entry,
+      ["gf"]            = actions.goto_file,
+      ["<C-w><C-f>"]    = actions.goto_file_split,
+      ["<C-w>gf"]       = actions.goto_file_tab,
+      ["i"]             = actions.listing_style,
+      ["f"]             = actions.toggle_flatten_dirs,
+      ["<leader>e"]     = actions.focus_files,
+      ["<leader>b"]     = actions.toggle_files,
     },
     file_history_panel = {
-      ["g!"]            = cb("options"),
-      ["<C-A-d>"]       = cb("open_in_diffview"),
-      ["y"]             = cb("copy_hash"),
-      ["L"]             = cb("open_commit_log"),
-      ["zR"]            = cb("open_all_folds"),
-      ["zM"]            = cb("close_all_folds"),
-      ["j"]             = cb("next_entry"),
-      ["<down>"]        = cb("next_entry"),
-      ["k"]             = cb("prev_entry"),
-      ["<up>"]          = cb("prev_entry"),
-      ["<cr>"]          = cb("select_entry"),
-      ["o"]             = cb("select_entry"),
-      ["<2-LeftMouse>"] = cb("select_entry"),
-      ["<tab>"]         = cb("select_next_entry"),
-      ["<s-tab>"]       = cb("select_prev_entry"),
-      ["gf"]            = cb("goto_file"),
-      ["<C-w><C-f>"]    = cb("goto_file_split"),
-      ["<C-w>gf"]       = cb("goto_file_tab"),
-      ["<leader>e"]     = cb("focus_files"),
-      ["<leader>b"]     = cb("toggle_files"),
+      ["g!"]            = actions.options,
+      ["<C-A-d>"]       = actions.open_in_diffview,
+      ["y"]             = actions.copy_hash,
+      ["L"]             = actions.open_commit_log,
+      ["zR"]            = actions.open_all_folds,
+      ["zM"]            = actions.close_all_folds,
+      ["j"]             = actions.next_entry,
+      ["<down>"]        = actions.next_entry,
+      ["k"]             = actions.prev_entry,
+      ["<up>"]          = actions.prev_entry,
+      ["<cr>"]          = actions.select_entry,
+      ["o"]             = actions.select_entry,
+      ["<2-LeftMouse>"] = actions.select_entry,
+      ["<tab>"]         = actions.select_next_entry,
+      ["<s-tab>"]       = actions.select_prev_entry,
+      ["gf"]            = actions.goto_file,
+      ["<C-w><C-f>"]    = actions.goto_file_split,
+      ["<C-w>gf"]       = actions.goto_file_tab,
+      ["<leader>e"]     = actions.focus_files,
+      ["<leader>b"]     = actions.toggle_files,
     },
     option_panel = {
-      ["<tab>"] = cb("select"),
-      ["q"]     = cb("close"),
+      ["<tab>"] = actions.select_entry,
+      ["q"]     = actions.close,
     },
   },
 }
@@ -141,6 +188,7 @@ function M.setup(user_config)
     utils.warn("'file_panel.use_icons' has been deprecated. See ':h diffview.changelog-64'.")
   end
 
+  -- Move old panel preoperties to win_config
   local old_win_config_spec = { "position", "width", "height" }
   for _, panel_name in ipairs({ "file_panel", "file_history_panel" }) do
     local panel_config = M._config[panel_name]
@@ -161,6 +209,13 @@ function M.setup(user_config)
     end
   end
 
+  -- Move old keymaps
+  if user_config.key_bindings then
+    M._config.keymaps = vim.tbl_deep_extend("force", M._config.keymaps, user_config.key_bindings)
+    user_config.keymaps = user_config.key_bindings
+    M._config.key_bindings = nil
+  end
+
   --#endregion
 
   for event, callback in pairs(M._config.hooks) do
@@ -169,11 +224,22 @@ function M.setup(user_config)
     end
   end
 
-  if M._config.key_bindings.disable_defaults then
-    for name, _ in pairs(M._config.key_bindings) do
+  if M._config.keymaps.disable_defaults then
+    for name, _ in pairs(M._config.keymaps) do
       if name ~= "disable_defaults" then
-        M._config.key_bindings[name] = (user_config.key_bindings and user_config.key_bindings[name])
+        M._config.keymaps[name] = (user_config.keymaps and user_config.keymaps[name])
           or {}
+      end
+    end
+  end
+
+  -- Disable keymaps set to `false`
+  for name, keymaps in pairs(M._config.keymaps) do
+    if type(name) == "string" and type(keymaps) == "table" then
+      for lhs, rhs in pairs(keymaps) do
+        if type(lhs) == "string" and type(rhs) == "boolean" and not rhs then
+          keymaps[lhs] = nil
+        end
       end
     end
   end

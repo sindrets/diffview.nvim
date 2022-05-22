@@ -1,4 +1,4 @@
-if !has('nvim-0.5') || exists('g:diffview_nvim_loaded') | finish | endif
+if exists('g:diffview_nvim_loaded') | finish | endif
 
 if !luaeval("require('diffview.bootstrap')")
     finish
@@ -7,9 +7,9 @@ endif
 command! -complete=customlist,s:completion -nargs=* DiffviewOpen lua require'diffview'.open(<f-args>)
 command! -complete=customlist,s:completion -nargs=* DiffviewFileHistory lua require'diffview'.file_history(<f-args>)
 command! -bar -nargs=0 DiffviewClose lua require'diffview'.close()
-command! -bar -nargs=0 DiffviewFocusFiles lua require'diffview'.trigger_event("focus_files")
-command! -bar -nargs=0 DiffviewToggleFiles lua require'diffview'.trigger_event("toggle_files")
-command! -bar -nargs=0 DiffviewRefresh lua require'diffview'.trigger_event("refresh_files")
+command! -bar -nargs=0 DiffviewFocusFiles lua require'diffview'.emit("focus_files")
+command! -bar -nargs=0 DiffviewToggleFiles lua require'diffview'.emit("toggle_files")
+command! -bar -nargs=0 DiffviewRefresh lua require'diffview'.emit("refresh_files")
 command! -bar -nargs=0 DiffviewLog exe 'sp ' . fnameescape(v:lua.require('diffview.logger').outfile)
 
 function s:completion(argLead, cmdLine, curPos)
@@ -21,12 +21,12 @@ endfunction
 
 augroup Diffview
     au!
-    au TabEnter * lua require'diffview'.trigger_event("tab_enter")
-    au TabLeave * lua require'diffview'.trigger_event("tab_leave")
+    au TabEnter * lua require'diffview'.emit("tab_enter")
+    au TabLeave * lua require'diffview'.emit("tab_leave")
     au TabClosed * lua require'diffview'.close(tonumber(vim.fn.expand("<afile>")))
-    au BufWritePost * lua require'diffview'.trigger_event("buf_write_post")
-    au WinClosed * lua require'diffview'.trigger_event("win_closed", tonumber(vim.fn.expand("<afile>")))
-    au User FugitiveChanged lua require'diffview'.trigger_event("refresh_files")
+    au BufWritePost * lua require'diffview'.emit("buf_write_post")
+    au WinClosed * lua require'diffview'.emit("win_closed", tonumber(vim.fn.expand("<afile>")))
+    au User FugitiveChanged lua require'diffview'.emit("refresh_files")
     au ColorScheme * lua require'diffview'.update_colors()
 augroup END
 

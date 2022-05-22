@@ -5,7 +5,7 @@ end
 local function err(msg)
   msg = msg:gsub("'", "''")
   vim.cmd("echohl Error")
-  vim.cmd(string.format("echom '%s'", msg))
+  vim.cmd(string.format("echom '[diffview.nvim] %s'", msg))
   vim.cmd("echohl NONE")
 end
 
@@ -14,11 +14,19 @@ _G.DiffviewGlobal = {
   bootstrap_ok = false,
 }
 
+if vim.fn.has("nvim-0.7") ~= 1 then
+  err(
+    "Minimum required version is Neovim 0.7.0! Cannot continue."
+    .. " (See ':h diffview.changelog-137')"
+  )
+  return false
+end
+
 -- Ensure dependencies
 local ok = pcall(require, "plenary")
 if not ok then
   err(
-    "[diffview.nvim] Dependency 'plenary.nvim' is not installed! "
+    "Dependency 'plenary.nvim' is not installed! "
     .. "See ':h diffview.changelog-93' for more information."
   )
   return false

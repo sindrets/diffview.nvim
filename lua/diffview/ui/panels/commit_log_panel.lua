@@ -99,9 +99,6 @@ CommitLogPanel.update = async.void(function(self, args)
   }):start()
 end)
 
-function CommitLogPanel:init_buffer_opts()
-end
-
 function CommitLogPanel:update_components()
 end
 

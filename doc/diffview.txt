@@ -24,9 +24,9 @@ opens in its own tabpage. To close and dispose of a Diffview, call either
 `:DiffviewClose` or `:tabclose` while a Diffview is the current tabpage.
 Diffviews are automatically updated:
 
-        - Every time you enter a Diffview
-        - On |BufWritePost|
-        - On |FugitiveChanged|
+        • Every time you enter a Diffview
+        • On |BufWritePost|
+        • On |User_FugitiveChanged|
 
 Updates are not run unless the current tabpage is a Diffview.
 
@@ -35,8 +35,8 @@ CONFIGURATION                                   *diffview-config*
 Example configuration with default settings:
 >
     -- Lua
-    local cb = require'diffview.config'.diffview_callback
-    require'diffview'.setup {
+    local actions = require("diffview.config").actions
+    require("diffview").setup({
       diff_binaries = false,    -- Show diffs for binaries
       enhanced_diff_hl = false, -- See |diffview-config-enhanced_diff_hl|
       use_icons = true,         -- Requires nvim-web-devicons
@@ -81,71 +81,71 @@ Example configuration with default settings:
         DiffviewFileHistory = {},
       },
       hooks = {},         -- See |diffview-config-hooks|
-      key_bindings = {
-        disable_defaults = false,                   -- Disable the default key bindings
-        -- The `view` bindings are active in the diff buffers, only when the current
-        -- tabpage is a Diffview.
+      keymaps = {
+        disable_defaults = false, -- Disable the default keymaps
         view = {
-          ["<tab>"]      = cb("select_next_entry"),  -- Open the diff for the next file
-          ["<s-tab>"]    = cb("select_prev_entry"),  -- Open the diff for the previous file
-          ["gf"]         = cb("goto_file"),          -- Open the file in a new split in previous tabpage
-          ["<C-w><C-f>"] = cb("goto_file_split"),    -- Open the file in a new split
-          ["<C-w>gf"]    = cb("goto_file_tab"),      -- Open the file in a new tabpage
-          ["<leader>e"]  = cb("focus_files"),        -- Bring focus to the files panel
-          ["<leader>b"]  = cb("toggle_files"),       -- Toggle the files panel.
+          -- The `view` bindings are active in the diff buffers, only when the current
+          -- tabpage is a Diffview.
+          ["<tab>"]      = actions.select_next_entry, -- Open the diff for the next file
+          ["<s-tab>"]    = actions.select_prev_entry, -- Open the diff for the previous file
+          ["gf"]         = actions.goto_file,         -- Open the file in a new split in previous tabpage
+          ["<C-w><C-f>"] = actions.goto_file_split,   -- Open the file in a new split
+          ["<C-w>gf"]    = actions.goto_file_tab,     -- Open the file in a new tabpage
+          ["<leader>e"]  = actions.focus_files,       -- Bring focus to the files panel
+          ["<leader>b"]  = actions.toggle_files,      -- Toggle the files panel.
         },
         file_panel = {
-          ["j"]             = cb("next_entry"),           -- Bring the cursor to the next file entry
-          ["<down>"]        = cb("next_entry"),
-          ["k"]             = cb("prev_entry"),           -- Bring the cursor to the previous file entry.
-          ["<up>"]          = cb("prev_entry"),
-          ["<cr>"]          = cb("select_entry"),         -- Open the diff for the selected entry.
-          ["o"]             = cb("select_entry"),
-          ["<2-LeftMouse>"] = cb("select_entry"),
-          ["-"]             = cb("toggle_stage_entry"),   -- Stage / unstage the selected entry.
-          ["S"]             = cb("stage_all"),            -- Stage all entries.
-          ["U"]             = cb("unstage_all"),          -- Unstage all entries.
-          ["X"]             = cb("restore_entry"),        -- Restore entry to the state on the left side.
-          ["R"]             = cb("refresh_files"),        -- Update stats and entries in the file list.
-          ["L"]             = cb("open_commit_log"),      -- Open the commit log panel.
-          ["<tab>"]         = cb("select_next_entry"),
-          ["<s-tab>"]       = cb("select_prev_entry"),
-          ["gf"]            = cb("goto_file"),
-          ["<C-w><C-f>"]    = cb("goto_file_split"),
-          ["<C-w>gf"]       = cb("goto_file_tab"),
-          ["i"]             = cb("listing_style"),        -- Toggle between 'list' and 'tree' views
-          ["f"]             = cb("toggle_flatten_dirs"),  -- Flatten empty subdirectories in tree listing style.
-          ["<leader>e"]     = cb("focus_files"),
-          ["<leader>b"]     = cb("toggle_files"),
+          ["j"]             = actions.next_entry,         -- Bring the cursor to the next file entry
+          ["<down>"]        = actions.next_entry,
+          ["k"]             = actions.prev_entry,         -- Bring the cursor to the previous file entry.
+          ["<up>"]          = actions.prev_entry,
+          ["<cr>"]          = actions.select_entry,       -- Open the diff for the selected entry.
+          ["o"]             = actions.select_entry,
+          ["<2-LeftMouse>"] = actions.select_entry,
+          ["-"]             = actions.toggle_stage_entry, -- Stage / unstage the selected entry.
+          ["S"]             = actions.stage_all,          -- Stage all entries.
+          ["U"]             = actions.unstage_all,        -- Unstage all entries.
+          ["X"]             = actions.restore_entry,      -- Restore entry to the state on the left side.
+          ["R"]             = actions.refresh_files,      -- Update stats and entries in the file list.
+          ["L"]             = actions.open_commit_log,    -- Open the commit log panel.
+          ["<tab>"]         = actions.select_next_entry,
+          ["<s-tab>"]       = actions.select_prev_entry,
+          ["gf"]            = actions.goto_file,
+          ["<C-w><C-f>"]    = actions.goto_file_split,
+          ["<C-w>gf"]       = actions.goto_file_tab,
+          ["i"]             = actions.listing_style,        -- Toggle between 'list' and 'tree' views
+          ["f"]             = actions.toggle_flatten_dirs,  -- Flatten empty subdirectories in tree listing style.
+          ["<leader>e"]     = actions.focus_files,
+          ["<leader>b"]     = actions.toggle_files,
         },
         file_history_panel = {
-          ["g!"]            = cb("options"),            -- Open the option panel
-          ["<C-A-d>"]       = cb("open_in_diffview"),   -- Open the entry under the cursor in a diffview
-          ["y"]             = cb("copy_hash"),          -- Copy the commit hash of the entry under the cursor
-          ["L"]             = cb("open_commit_log"),
-          ["zR"]            = cb("open_all_folds"),
-          ["zM"]            = cb("close_all_folds"),
-          ["j"]             = cb("next_entry"),
-          ["<down>"]        = cb("next_entry"),
-          ["k"]             = cb("prev_entry"),
-          ["<up>"]          = cb("prev_entry"),
-          ["<cr>"]          = cb("select_entry"),
-          ["o"]             = cb("select_entry"),
-          ["<2-LeftMouse>"] = cb("select_entry"),
-          ["<tab>"]         = cb("select_next_entry"),
-          ["<s-tab>"]       = cb("select_prev_entry"),
-          ["gf"]            = cb("goto_file"),
-          ["<C-w><C-f>"]    = cb("goto_file_split"),
-          ["<C-w>gf"]       = cb("goto_file_tab"),
-          ["<leader>e"]     = cb("focus_files"),
-          ["<leader>b"]     = cb("toggle_files"),
+          ["g!"]            = actions.options,          -- Open the option panel
+          ["<C-A-d>"]       = actions.open_in_diffview, -- Open the entry under the cursor in a diffview
+          ["y"]             = actions.copy_hash,        -- Copy the commit hash of the entry under the cursor
+          ["L"]             = actions.open_commit_log,
+          ["zR"]            = actions.open_all_folds,
+          ["zM"]            = actions.close_all_folds,
+          ["j"]             = actions.next_entry,
+          ["<down>"]        = actions.next_entry,
+          ["k"]             = actions.prev_entry,
+          ["<up>"]          = actions.prev_entry,
+          ["<cr>"]          = actions.select_entry,
+          ["o"]             = actions.select_entry,
+          ["<2-LeftMouse>"] = actions.select_entry,
+          ["<tab>"]         = actions.select_next_entry,
+          ["<s-tab>"]       = actions.select_prev_entry,
+          ["gf"]            = actions.goto_file,
+          ["<C-w><C-f>"]    = actions.goto_file_split,
+          ["<C-w>gf"]       = actions.goto_file_tab,
+          ["<leader>e"]     = actions.focus_files,
+          ["<leader>b"]     = actions.toggle_files,
         },
         option_panel = {
-          ["<tab>"] = cb("select"),
-          ["q"]     = cb("close"),
+          ["<tab>"] = actions.select,
+          ["q"]     = actions.close,
         },
       },
-    }
+    })
 <
 
 enhanced_diff_hl                                *diffview-config-enhanced_diff_hl*
@@ -202,7 +202,7 @@ win_config                                      *diffview-config-win_config*
 
             NOTE: Fields that are only applicable when `type="float"` are not
             listed here because they are already documented under
-            |nvim_open_win|.
+            |nvim_open_win()|.
 
         Examples: >
                 -- Split window, aligned to the right side of the editor:
@@ -236,6 +236,7 @@ win_config                                      *diffview-config-win_config*
                   c.row = math.floor(editor_height * 0.5 - c.height * 0.5)
                   return c
                 end,
+<
 
 default_args                                    *diffview-config-default_args*
         Type: `table<string, string[]>`, Default: `{}`
@@ -249,6 +250,7 @@ default_args                                    *diffview-config-default_args*
                   DiffviewOpen = { "--untracked-files=no", "--imply-local" },
                   DiffviewFileHistory = { "--base=LOCAL" },
                 }
+<
 
 hooks                                           *diffview-config-hooks*
         Type: `table<string, function>`, Default: `{}`
@@ -259,49 +261,48 @@ hooks                                           *diffview-config-hooks*
         |diffview-user-autocmds| for more details.
 
         Available Events:~
-                {view_opened} (`fun(view: View)`)
-                        Emitted after a new view has been opened. It's called
-                        after initializing the layout in the new tabpage (all
-                        windows are ready).
+            {view_opened} (`fun(view: View)`)
+                Emitted after a new view has been opened. It's called after
+                initializing the layout in the new tabpage (all windows are
+                ready).
 
-                        Callback Parameters:~
-                                {view} (`View`)
-                                        The `View` instance that was opened.
+                Callback Parameters:~
+                    {view} (`View`)
+                        The `View` instance that was opened.
 
-                {view_closed} (`fun(view: View)`)
-                        Emitted after closing a view.
+            {view_closed} (`fun(view: View)`)
+                Emitted after closing a view.
 
-                        Callback Parameters:~
-                                {view} (`View`)
-                                        The `View` instance that was closed.
+                Callback Parameters:~
+                    {view} (`View`)
+                        The `View` instance that was closed.
 
-                {diff_buf_read} (`fun(bufnr: integer)`)
-                        Emitted after a new diff buffer is ready (the first
-                        time it's created and loaded into a window). Diff
-                        buffers are all buffers with |diff-mode| enabled. That
-                        includes buffers of local files (not created from
-                        git).
+            {diff_buf_read} (`fun(bufnr: integer)`)
+                Emitted after a new diff buffer is ready (the first time it's
+                created and loaded into a window). Diff buffers are all
+                buffers with |diff-mode| enabled. That includes buffers of
+                local files (not created from git).
 
-                        This is always called with the new buffer as the
-                        current buffer and the correct diff window as the
-                        current window such that |:setlocal| will apply
-                        settings to the relevant buffer / window.
+                This is always called with the new buffer as the current
+                buffer and the correct diff window as the current window such
+                that |:setlocal| will apply settings to the relevant buffer /
+                window.
 
-                        Callback Parameters:~
-                                {bufnr} (`integer`)
-                                        The buffer number of the new buffer.
+                Callback Parameters:~
+                    {bufnr} (`integer`)
+                        The buffer number of the new buffer.
 
-                {diff_buf_win_enter} (`fun(bufnr: integer)`)
-                        Emitted after a diff buffer is displayed in a window.
+            {diff_buf_win_enter} (`fun(bufnr: integer)`)
+                Emitted after a diff buffer is displayed in a window.
 
-                        This is always called with the new buffer as the
-                        current buffer and the correct diff window as the
-                        current window such that |:setlocal| will apply
-                        settings to the relevant buffer / window.
+                This is always called with the new buffer as the current
+                buffer and the correct diff window as the current window such
+                that |:setlocal| will apply settings to the relevant buffer /
+                window.
 
-                        Callback Parameters:~
-                                {bufnr} (`integer`)
-                                        The buffer number of the new buffer.
+                Callback Parameters:~
+                    {bufnr} (`integer`)
+                        The buffer number of the new buffer.
 
         Examples: >
                 hooks = {
@@ -318,18 +319,294 @@ hooks                                           *diffview-config-hooks*
                     )
                   end,
                 }
+<
 
-AVAILABLE UNUSED MAPPINGS                       *diffview-available-unused-mappings*
+keymaps                                         *diffview-config-keymaps*
+        Type: `table`, Default: (see example config above)
 
-This section documents key-mappable functions that are not mapped by default.
+        The keymaps config is structured as a table with sub-tables for
+        various different contexts where mappings can be declared. In these
+        sub-tables key-value pairs are treated as the |{lhs}| and |{rhs}| of a
+        normal mode mapping. These mappings all use the |:map-arguments|
+        `silent`, `nowait`, and `noremap`. The implementation uses
+        |vim.keymap.set()|, so the {rhs} can be either a vim command in the
+        form of a string, or it can be a lua function: >
 
-focus_entry                                     *diffview-config-focus_entry*
-        Like `select_entry`, but also bring the cursor to the right diff split.
-        Available in both the file panel and the file history panel.
+                view = {
+                  -- Vim command:
+                  ["a"] = "<Cmd>echom 'foo'<CR>",
+                  -- Lua function:
+                  ["b"] = function() print("bar") end,
+                }
+<
 
-goto_file_edit                                  *diffview-maps-goto_file_edit*
-        Works like |diffview-maps-goto_file| except instead of creating a new
-        split it will just open the file in the last accessed window.
+        For more control (i.e. mappings for other modes), you can also define
+        index values as list-like tables containing the args for
+        |vim.keymap.set()|. This way you can also change all the
+        |:map-arguments| with the only exception being the `buffer` field, as
+        this will be overridden with the target buffer number: >
+
+                view = {
+                  -- Normal and visual mode mapping to vim command:
+                  { { "n", "v" }, "<leader>a", "<Cmd>echom 'foo'<CR>", { silent = true } },
+                  -- Visual mode mapping to lua function:
+                  { "v", "<leader>b", function() print("bar") end, { nowait = true } },
+                }
+<
+
+        To disable all the default mappings simply set: >
+
+        keymaps = {
+          disable_defaults = true,
+        }
+<
+
+        To disable any single mapping without disabling them all, set its
+        value to `false`: >
+
+        view = {
+          ["<tab>"] = false,
+        }
+<
+
+                                                *diffview-actions*
+Actions~
+
+        Actions are key-mappable functions. You can access an action through
+        the config module: >
+
+                require("diffview.config").actions.{action_name}
+<
+
+        Where {action_name} is the name of the action you're accessing. Many
+        actions are contextual and will behave slightly differently depending
+        on what context they were called from. The various actions are
+        described with all the contexts in which they have a function.
+        Following are the different contexts described alongside possible
+        subjects, upon which actions called from their context, will act on.
+
+        Contexts:~
+            {diff_view}
+                The windows containing the diff buffers in a Diffview.
+
+                Subjects:
+                    • The current tabpage
+                    • The file being diffed
+                    • The commit of either of the two files being diffed
+                    • The range of git revs between the two files being diffed
+
+            {file_history_view}
+                The windows containing the diff buffers in a FileHistoryView.
+
+                Subjects:
+                    • The current tabpage
+                    • The file being diffed
+                    • The commit of either of the two files being diffed
+                    • The range of git revs between the two files being diffed
+
+            {view}
+                Any of the views.
+
+            {file_panel}
+                The panel listing the files in a Diffview.
+
+                Subjects:
+                    • The window
+                    • The file under the cursor
+                    • The file currently open
+
+            {file_history_panel}
+                The panel listing the commits in a FileHistoryView.
+
+                Subjects:
+                    • The window
+                    • The commit under the cursor
+                    • The file under cursor
+                    • The file currently open
+
+            {options_panel}
+                Panel used for interactively changing options in i.e. the
+                FileHistoryView.
+
+                Subjects:
+                    • The window
+                    • The option under the cursor
+
+            {panel}
+                Any of the panels.
+
+                                                *diffview-available-actions*
+Available Actions~
+
+close                                           *diffview-actions-close*
+        Contexts: `view`, `panel`
+
+        Close the subject of the context.
+
+close_all_folds                                 *diffview-actions-close_all_folds*
+        Contexts: `file_history_panel`
+
+        If the FileHistoryView is showing history for multiple files: close
+        all the folds in the panel.
+
+copy_hash                                       *diffview-actions-copy_hash*
+        Contexts: `file_history_panel`
+
+        Copy the commit hash of the commit under the cursor.
+
+focus_entry                                     *diffview-actions-focus_entry*
+        Contexts: `file_panel`, `file_history_panel`
+
+        Like |diffview-actions-select_entry| when invoked from the same
+        context, but also bring the cursor to the right diff split.
+
+focus_files                                     *diffview-actions-focus_files*
+        Contexts: `view`
+
+        Bring focus to the file panel of the subject. Opens the panel if it's
+        closed.
+
+goto_file                                       *diffview-actions-goto_file*
+        Contexts: `view`, `panel`
+
+        Open the local version of the file in a new split in a different
+        tabpage. This will target your previous (last accessed) tabpage first.
+        If you have no non-diffview tabpages open, the file will open in a new
+        tabpage. See |diffview-file-inference| for details on how the
+        file target is determined.
+
+goto_file_edit                                  *diffview-actions-goto_file_edit*
+        Contexts: `view`, `panel`
+
+        Like |diffview-actions-goto_file| except after changing tabpage,
+        instead of creating a new split, it will just open the file in the
+        last accessed window.
+
+goto_file_split                                 *diffview-actions-goto_file_split*
+        Contexts: `view`, `panel`
+
+        Open the local version of the file in a new split. See
+        |diffview-file-inference| for details on how the file target is
+        determined.
+
+goto_file_tab                                   *diffview-actions-goto_file_tab*
+        Contexts: `view`, `panel`
+
+        Open the local version of the file in a new tabpage. See
+        |diffview-file-inference| for details on how the file target is
+        determined.
+
+listing_style                                   *diffview-actions-listing_style*
+        Contexts: `file_panel`
+
+        Cycle through the available listing styles. The currently available
+        styles are: file tree and flat list.
+
+next_entry                                      *diffview-actions-next_entry*
+        Contexts: `view`, `panel`
+
+        Bring the cursor in the subject panel to the next entry.
+
+open_all_folds                                  *diffview-actions-open_all_folds*
+        Contexts: `file_history_panel`
+
+        If the FileHistoryView is showing history for multiple files: open
+        all the folds in the panel.
+
+open_commit_log                                 *diffview-actions-open_commit_log*
+        Contexts: `view`, `file_panel`, `file_history_panel`
+
+        Open a panel showing the full commit description of the subject's
+        target commit range.
+
+open_in_diffview                                *diffview-actions-open_in_diffview*
+        Contexts: `file_history_view`, `file_history_panel`
+
+        Open the subject in a new Diffview.
+
+options                                         *diffview-actions-options*
+        Contexts: `file_history_view`, `file_history_panel`
+
+        Open the option panel for the subject.
+
+prev_entry                                      *diffview-actions-prev_entry*
+        Contexts: `view`, `panel`
+
+        Bring the cursor in the subject panel to the previous entry.
+
+refresh_files                                   *diffview-actions-refresh_files*
+        Contexts: `diff_view`, `file_panel`
+
+        Update stats and entries in the file list.
+
+restore_entry                                   *diffview-actions-restore_entry*
+        Contexts: `diff_view`, `file_panel`
+
+        Revert the selected file entry to the state from the left side of the
+        diff. This only works if the right side of the diff is showing the
+        local state of the file. A command is echoed that shows how to undo
+        the change. Check `:messages` to see it again.
+
+        NOTE: "Restoring" an untracked file will delete it from disk. It still
+        gets backed up in the local git database, so it is reversible.
+
+select_entry                                    *diffview-actions-select_entry*
+        Contexts: `view`, `panel`
+
+        Select the subject.
+
+        Think of this as a general "interact" action. In the file panel, and
+        the file history panel, this will open the file under the cursor. If
+        the entry under the cursor is a directory, or a history entry with
+        multiple files, this will toggle the entry's collapsed state. In the
+        option panel this will interact with the option under the cursor.
+
+select_next_entry                               *diffview-actions-select_next_entry*
+        Contexts: `view`, `file_panel`, `file_history_panel`
+
+        Select the entry following the subject.
+
+select_prev_entry                               *diffview-actions-select_prev_entry*
+        Contexts: `view`, `file_panel`, `file_history_panel`
+
+        Select the entry preceding the subject.
+
+stage_all                                       *diffview-actions-stage_all*
+        Contexts: `diff_view`, `file_panel`
+
+        Stage all changes.
+
+toggle_files                                    *diffview-actions-toggle_files*
+        Contexts: `view`, `file_panel`, `file_history_panel`
+
+        Toggle the subject panel.
+
+toggle_flatten_dirs                             *diffview-actions-toggle_flatten_dirs*
+        Contexts: `file_panel`
+
+        Toggle whether or not to flatten empty subdirectories in the file tree
+        listing style.
+
+toggle_stage_entry                              *diffview-actions-toggle_stage_entry*
+        Contexts: `diff_view`, `file_panel`
+
+        Stage / unstage the subject.
+
+unstage_all                                     *diffview-actions-unstage_all*
+        Contexts: `diff_view`, `file_panel`
+
+        Unstage all changes.
+
+                                                *diffview-unused-actions*
+Unused actions~
+
+Not all actions are mapped by default. The unused actions offer variations on
+the functionality provided by other actions, or just different functionality
+that you might optionally want to use. Here is a list of tags to the unused
+actions:
+
+        • |diffview-actions-focus_entry|
+        • |diffview-actions-goto_file_edit|
 
 LAYOUT                                          *diffview-layout*
 
@@ -474,23 +751,27 @@ For information on how to use User autocommands, see |User|.
 MAPS                                            *diffview-maps*
 
 All listed maps are the defaults, but all mappings can be configured. Most of
-the file panel mappings should also work from the view if they are added to
-the view bindings (and vice versa). The exception is for mappings that only
-really make sense specifically in the file panel, such as `next_entry`,
-`prev_entry`, and `select_entry`. Functions such as `toggle_stage_entry` and
-`restore_entry` work just fine from the view. When invoked from the view,
-these will target the file currently open in the view rather than the file
-under the cursor in the file panel.
+the file panel actions should also work from the view if they are added to the
+view bindings (and vice versa). The exception is for actions that only really
+make sense specifically in the file panel, such as `next_entry` and
+`prev_entry`. Actions such as `toggle_stage_entry` and `restore_entry` work
+just fine from the view. When invoked from the view, these will target the
+file currently open in the view rather than the file under the cursor in the
+file panel.
+
+        See also: ~
+            • |diffview-config-keymaps|
+            • |diffview-actions|
 
                                                 *diffview-file-inference*
 File inference~
 
-Mappings that target a file will infer the target file according to a set of
+Actions that target a file will infer the target file according to a set of
 simple rules:
 
-        - If the cursor is in one of the diff buffers, the target file will be the
+        • If the cursor is in one of the diff buffers, the target file will be the
           file being compared.
-        - If the cursor is in a file panel, the target file will be determined by
+        • If the cursor is in a file panel, the target file will be determined by
           the entry under the cursor.
 
                                                 *diffview-maps-view*
@@ -510,17 +791,17 @@ gf                      Open the local version of the file in a new split in a
                         different tabpage. This will target your previous
                         (last accessed) tabpage first. If you have no
                         non-diffview tabpages open, the file will open in a
-                        new tabpage. See |diffview-nvim-file-inference| for
+                        new tabpage. See |diffview-file-inference| for
                         details on how the file target is determined.
 
                                                 *diffview-maps-goto_file_split*
 <C-w><C-f>              Open the local version of the file in a new split. See
-                        |diffview-nvim-file-inference| for details on how the
+                        |diffview-file-inference| for details on how the
                         file target is determined.
 
                                                 *diffview-maps-goto_file_tab*
 <C-w>gf                 Open the local version of the file in a new tabpage.
-                        See |diffview-nvim-file-inference| for details on how
+                        See |diffview-file-inference| for details on how
                         the file target is determined.
 
                                                 *diffview-maps-toggle_files*
