@@ -141,7 +141,7 @@ Example configuration with default settings:
           ["<leader>b"]     = actions.toggle_files,
         },
         option_panel = {
-          ["<tab>"] = actions.select,
+          ["<tab>"] = actions.select_entry,
           ["q"]     = actions.close,
         },
       },

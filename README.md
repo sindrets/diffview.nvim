@@ -150,7 +150,7 @@ require("diffview").setup({
       ["<leader>b"]     = actions.toggle_files,
     },
     option_panel = {
-      ["<tab>"] = actions.select,
+      ["<tab>"] = actions.select_entry,
       ["q"]     = actions.close,
     },
   },
