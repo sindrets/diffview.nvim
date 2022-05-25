@@ -1,4 +1,5 @@
 local Job = require("plenary.job")
+local Mock = require("diffview.mock").Mock
 local PathLib = require("diffview.path").PathLib
 local async = require("plenary.async")
 
@@ -213,52 +214,132 @@ function M.str_match(str, patterns)
   end
 end
 
+---@class HandleJobSpec
+---@field fail_on_empty boolean Consider the job as failed if the code is 0 and stdout is empty.
+---@field log_func function|string
+---@field context string Context for the logger.
+
+---Handles logging of failed jobs. If the given job hasn't failed, this does nothing.
 ---@param job Job
-function M.handle_failed_job(job)
-  if job.code == 0 then
+---@param opt? HandleJobSpec
+function M.handle_job(job, opt)
+  opt = opt or {}
+  local empty = false
+  if opt.fail_on_empty then
+    local out = job:result()
+    empty = not (out[1] and out[1] ~= "")
+  end
+
+  if job.code == 0 and not empty then
     return
   end
 
   local logger = require("diffview.logger")
+  local log_func = logger.s_error
+
+  if type(opt.log_func) == "string" then
+    log_func = logger[opt.log_func]
+  elseif type(opt.log_func) == "function" then
+    log_func = opt.log_func
+  end
+
   local args = vim.tbl_map(function(arg)
     return ("'%s'"):format(arg:gsub("'", [['"'"']]))
   end, job.args)
 
-  logger.s_error(("Job exited with a non-zero exit status! Code: %s"):format(job.code))
-  logger.s_error(("[cmd] %s %s"):format(job.command, table.concat(args, " ")))
+  local msg
+  local context = opt.context and ("[%s] "):format(opt.context) or ""
+  if empty then
+    msg = ("%sJob expected output, but returned nothing! Code: %s"):format(context, job.code)
+  else
+    msg = ("%sJob exited with a non-zero exit status! Code: %s"):format(context, job.code)
+  end
+
+  log_func(msg)
+  log_func(("%s[cmd] %s %s"):format(context, job.command, table.concat(args, " ")))
 
   local stderr = job:stderr_result()
   if #stderr > 0 then
-    logger.s_error("[stderr] " .. table.concat(stderr, "\n"))
+    log_func("%s[stderr] " .. table.concat(context, stderr, "\n"))
   end
 end
 
+---@class SystemListSpec
+---@field cwd string Working directory of the job.
+---@field silent boolean Supress log output.
+---@field fail_on_empty boolean Return code 1 if stdout is empty and code is 0.
+---@field retry_on_empty integer Number of times to retry job if stdout is empty and code is 0. Implies `fail_on_empty`.
+---@field context string Context for the logger.
+
 ---Get the output of a system command.
 ---@param cmd string[]
----@param cwd? string
----@param silent? boolean Supress log output
+---@param cwd_or_opt? string|SystemListSpec
 ---@return string[] stdout
 ---@return integer code
 ---@return string[] stderr
-function M.system_list(cmd, cwd, silent)
+---@overload fun(cmd: string[], cwd: string?)
+---@overload fun(cmd: string[], opt: SystemListSpec?)
+function M.system_list(cmd, cwd_or_opt)
   if vim.in_fast_event() then
     async.util.scheduler()
   end
+
+  ---@type SystemListSpec
+  local opt
+  if type(cwd_or_opt) == "string" then
+    opt = { cwd = cwd_or_opt }
+  else
+    opt = cwd_or_opt or {}
+  end
+
+  opt.fail_on_empty = vim.F.if_nil(opt.fail_on_empty, opt.retry_on_empty ~= nil)
+  opt.context = opt.context or "system_list()"
+  local context = ("[%s] "):format(opt.context)
+  local logger = opt.silent and Mock() or require("diffview.logger")
   local command = table.remove(cmd, 1)
-  local stderr = {}
-  local job = Job
-    :new({
+  local num_retries = 0
+  local max_retries = opt.retry_on_empty or 0
+  local job, stdout, stderr, code, empty
+
+  for i = 0, max_retries do
+    if i > 0 then
+      logger.warn(
+        ("%sJob silently returned nothing! Retrying %d more time(s)...")
+        :format(context, max_retries - i + 1)
+      )
+      logger.log_job(job, { func = logger.warn, context = opt.context })
+      num_retries = num_retries + 1
+    end
+
+    stderr = {}
+    job = Job:new({
       command = command,
       args = cmd,
-      cwd = cwd,
+      cwd = opt.cwd,
       on_stderr = function(_, data)
         table.insert(stderr, data)
       end,
     })
-  local stdout, code = job:sync()
-  if not silent then
-    M.handle_failed_job(job)
+    stdout, code = job:sync()
+    empty = not (stdout[1] and stdout[1] ~= "")
+
+    if (code ~= 0 or not empty) then
+      break
+    end
   end
+
+  if not opt.silent then
+    M.handle_job(job, { fail_on_empty = opt.fail_on_empty, context = opt.context })
+  end
+
+  if num_retries > 0 and code == 0 and not empty then
+    logger.info(("%sRetry was successful!"):format(context))
+  end
+
+  if opt.fail_on_empty and code == 0 and empty then
+    code = 1
+  end
+
   return stdout, code, stderr
 end
 

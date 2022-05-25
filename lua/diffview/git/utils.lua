@@ -68,7 +68,7 @@ local ensure_output = async.wrap(function(max_retries, jobs, log_context, callba
   local num_bad_jobs
   local num_retries = 0
   local new_jobs = {}
-  log_context = log_context and ("[%s] "):format(log_context) or ""
+  local context = log_context and ("[%s] "):format(log_context) or ""
 
   for n = 0, max_retries - 1 do
     num_bad_jobs = 0
@@ -77,9 +77,9 @@ local ensure_output = async.wrap(function(max_retries, jobs, log_context, callba
       if job.code == 0 and #job:result() == 0 then
         logger.warn(
           ("%sJob silently returned nothing! Retrying %d more times(s).")
-          :format(log_context, max_retries - n)
+          :format(context, max_retries - n)
         )
-        logger.log_job(job, logger.warn)
+        logger.log_job(job, { func = logger.warn, context = log_context })
         num_retries = n + 1
 
         new_jobs[i] = Job:new({
@@ -99,7 +99,7 @@ local ensure_output = async.wrap(function(max_retries, jobs, log_context, callba
 
         if new_jobs[i].code ~= 0 then
           job.code = new_jobs[i].code
-          utils.handle_failed_job(new_jobs[i])
+          utils.handle_job(new_jobs[i], { context = log_context })
         elseif #job._stdout_results == 0 then
           num_bad_jobs = num_bad_jobs + 1
         end
@@ -108,7 +108,7 @@ local ensure_output = async.wrap(function(max_retries, jobs, log_context, callba
 
     if num_bad_jobs == 0 then
       if num_retries > 0 then
-        logger.s_info("Retry was successful!")
+        logger.s_info(("%sRetry was successful!"):format(context))
       end
       callback(JobStatus.SUCCESS)
       return
@@ -126,7 +126,7 @@ local tracked_files = async.void(function(git_root, left, right, args, kind, cal
 
   ---@param job Job
   local function on_exit(job)
-    utils.handle_failed_job(job)
+    utils.handle_job(job)
     latch:count_down()
   end
 
@@ -148,7 +148,7 @@ local tracked_files = async.void(function(git_root, left, right, args, kind, cal
   latch:await()
   local out_status
   if not (#namestat_job:result() == #numstat_job:result()) then
-    out_status = ensure_output(2, { namestat_job, numstat_job })
+    out_status = ensure_output(2, { namestat_job, numstat_job }, "git.utils>tracked_files()")
   end
 
   if out_status == JobStatus.ERROR or not (namestat_job.code == 0 and numstat_job.code == 0) then
@@ -218,7 +218,7 @@ local untracked_files = async.void(function(git_root, left, right, callback)
         end
         callback(nil, files)
       else
-        utils.handle_failed_job(j)
+        utils.handle_job(j)
         callback(j:stderr_result() or {}, nil)
       end
     end
@@ -478,8 +478,8 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
 
   latch:await()
   if namestat_job.code ~= 0 or numstat_job.code ~= 0 then
-    utils.handle_failed_job(namestat_job)
-    utils.handle_failed_job(numstat_job)
+    utils.handle_job(namestat_job)
+    utils.handle_job(numstat_job)
     callback(JobStatus.ERROR)
   else
     callback(JobStatus.SUCCESS)
@@ -580,6 +580,7 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
       }
 
       local max_retries = 2
+      local context = "git.utils.process_file_history()"
       resume_lock = true
 
       for i = 0, max_retries do
@@ -590,17 +591,15 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
         table.insert(file_history_jobs, job)
         job:start()
         coroutine.yield()
-        utils.handle_failed_job(job)
+        utils.handle_job(job, { fail_on_empty = true, context = context, log_func = logger.warn })
 
         if #cur.namestat == 0 then
-          logger.warn("[git] 'git-show' silently returned nothing!")
-          logger.log_job(job, logger.warn)
           if i < max_retries then
-            logger.warn(("[git] Retrying %d more time(s)."):format(max_retries - i))
+            logger.warn(("[%s] Retrying %d more time(s)."):format(context, max_retries - i))
           end
         else
           if i > 0 then
-            logger.info("[git] Retry successful!")
+            logger.info(("[%s] Retry successful!"):format(context))
           end
           break
         end
@@ -616,7 +615,7 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
       if #cur.namestat == 0 then
         -- Give up: something has been renamed. We can no longer track the
         -- history.
-        logger.warn("[git] Giving up.")
+        logger.warn(("[%s] Giving up."):format(context))
         utils.warn("Displayed history may be incomplete. Check ':DiffviewLog' for details.", true)
         break
       end
@@ -792,8 +791,11 @@ end
 ---@param git_root string
 ---@return Rev
 function M.head_rev(git_root)
-  local out, code = utils.system_list({ "git", "rev-parse", "HEAD", "--" }, git_root)
-  if code ~= 0 or not (out[1] and out[1] ~= "") then
+  local out, code = utils.system_list(
+    { "git", "rev-parse", "HEAD", "--" },
+    { cwd = git_root, retry_on_empty = 2 }
+  )
+  if code ~= 0 then
     return
   end
   local s = vim.trim(out[1]):gsub("^%^", "")
@@ -869,7 +871,7 @@ M.show = async.wrap(function(git_root, args, callback)
     ---@type Job
     on_exit = async.void(function(j)
       if j.code ~= 0 then
-        utils.handle_failed_job(j)
+        utils.handle_job(j)
         callback(j:stderr_result() or {}, nil)
       else
         local out_status
@@ -885,8 +887,9 @@ M.show = async.wrap(function(git_root, args, callback)
       end
     end),
   })
-  -- NOTE: Running multiple 'show' jobs simultaneously may cause them to fail
-  -- silently. Solution: queue them and run them one after another.
+  -- Problem: Running multiple 'show' jobs simultaneously may cause them to fail
+  -- silently.
+  -- Solution: queue them and run them one after another.
   queue_sync_job(job)
 end, 3)
 
@@ -935,7 +938,7 @@ function M.is_binary(git_root, path, rev)
 
   utils.vec_push(cmd, "--", path)
 
-  local _, code = utils.system_list(cmd, git_root, true)
+  local _, code = utils.system_list(cmd, { cwd = git_root, silent = true })
   return code ~= 0
 end
 
@@ -945,8 +948,7 @@ end
 function M.show_untracked(git_root)
   local out = utils.system_list(
     { "git", "config", "--type=bool", "status.showUntrackedFiles" },
-    git_root,
-    true
+    { cwd = git_root, silent = true }
   )
   return vim.trim(out[1] or "") ~= "false"
 end

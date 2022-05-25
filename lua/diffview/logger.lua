@@ -54,27 +54,37 @@ function logger.lvl(min_level)
   return mock_logger
 end
 
+---@class LogJobSpec
+---@field func function|string
+---@field context string
+
 ---@param job Job
----@param log_func function
-function logger.log_job(job, log_func)
+---@param opt? LogJobSpec
+function logger.log_job(job, opt)
   local stdout, stderr = job:result(), job:stderr_result()
   local args = vim.tbl_map(function(arg)
     -- Simple shell escape. NOTE: not valid for windows shell.
     return ("'%s'"):format(arg:gsub("'", [['"'"']]))
   end, job.args)
 
-  if type(log_func) == "string" then
-    log_func = logger[log_func]
+  opt = opt or {}
+  local log_func = logger.s_debug
+  local context = opt.context and ("[%s] "):format(opt.context) or ""
+
+  if type(opt.func) == "string" then
+    log_func = logger[opt.func]
+  elseif type(opt.func) == "function" then
+    log_func = opt.func
   end
 
-  log_func(("[job-info] Exit code: %s"):format(job.code))
-  log_func(("[cmd] %s %s"):format(job.command, table.concat(args, " ")))
+  log_func(("%s[job-info] Exit code: %s"):format(context, job.code))
+  log_func(("%s[cmd] %s %s"):format(context, job.command, table.concat(args, " ")))
 
   if #stdout > 0 then
-    log_func("[stdout] " .. table.concat(stdout, "\n"))
+    log_func(context .. "[stdout] " .. table.concat(stdout, "\n"))
   end
   if #stderr > 0 then
-    log_func("[stderr] " .. table.concat(stderr, "\n"))
+    log_func(context .. "[stderr] " .. table.concat(stderr, "\n"))
   end
 end
 

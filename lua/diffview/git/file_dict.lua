@@ -20,7 +20,7 @@ end
 
 do
   local __index = FileDict.__index
-  function FileDict.__index(self, k)
+  function FileDict:__index(k)
     if type(k) == "number" then
       if k > #self.working then
         return self.staged[k - #self.working]

@@ -44,7 +44,7 @@ function PerfTimer:time()
   return self.final_time
 end
 
-function PerfTimer.__tostring(self)
+function PerfTimer:__tostring()
   if not self.final_time then
     self:time()
   end

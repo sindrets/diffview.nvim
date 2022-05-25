@@ -3,7 +3,6 @@ A class for creating mock objects. Accessing any key in the object returns
 itself. Calling the object does nothing.
 --]]
 
-local utils = require("diffview.utils")
 local M = {}
 local mock_mt = {}
 local Mock = setmetatable({}, mock_mt)
@@ -13,6 +12,7 @@ function mock_mt.__index(_, key)
 end
 
 function mock_mt.__call(_, internals)
+  local utils = require("diffview.utils")
   local mt = {
     __index = function(self, k)
       if Mock[k] then

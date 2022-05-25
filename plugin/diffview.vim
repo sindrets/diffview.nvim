@@ -10,7 +10,7 @@ command! -bar -nargs=0 DiffviewClose lua require'diffview'.close()
 command! -bar -nargs=0 DiffviewFocusFiles lua require'diffview'.emit("focus_files")
 command! -bar -nargs=0 DiffviewToggleFiles lua require'diffview'.emit("toggle_files")
 command! -bar -nargs=0 DiffviewRefresh lua require'diffview'.emit("refresh_files")
-command! -bar -nargs=0 DiffviewLog exe 'sp ' . fnameescape(v:lua.require('diffview.logger').outfile)
+command! -bar -nargs=0 DiffviewLog exe 'sp ' . fnameescape(v:lua.require('diffview.logger').outfile) | norm! G
 
 function s:completion(argLead, cmdLine, curPos)
     return luaeval("require'diffview'.completion("

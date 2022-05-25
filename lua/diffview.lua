@@ -134,13 +134,11 @@ function M.rev_candidates(git_root, git_dir)
   -- stylua: ignore end
   local revs = utils.system_list(
     { "git", "rev-parse", "--symbolic", "--branches", "--tags", "--remotes" },
-    git_root,
-    true
+    { cwd = git_root, silent = true }
   )
   local stashes = utils.system_list(
     { "git", "stash", "list", "--pretty=format:%gd" },
-    git_root,
-    true
+    { cwd = git_root, silent = true }
   )
 
   return utils.vec_join(heads, revs, stashes)
