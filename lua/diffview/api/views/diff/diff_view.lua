@@ -43,7 +43,7 @@ function CDiffView:init(opt)
   self.path_args = opt.path_args
   self.left = opt.left
   self.right = opt.right
-  self.options = opt.options
+  self.options = opt.options or {}
   self.files = FileDict()
   self.fetch_files = opt.update_files
   self.get_file_data = opt.get_file_data
@@ -66,7 +66,7 @@ function CDiffView:init(opt)
 
     if self.panel.cur_file then
       vim.schedule(function()
-        self:set_file(self.panel.cur_file, false)
+        self:set_file(self.panel.cur_file, false, true)
       end)
     end
   end

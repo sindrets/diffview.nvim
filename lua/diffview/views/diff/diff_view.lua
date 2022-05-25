@@ -52,7 +52,7 @@ function DiffView:init(opt)
   self.path_args = opt.path_args
   self.left = opt.left
   self.right = opt.right
-  self.options = opt.options
+  self.options = opt.options or {}
   self.options.selected_file = self.options.selected_file
     and utils.path:relative(utils.path:absolute(self.options.selected_file), opt.git_root)
   self.files = FileDict()
@@ -85,7 +85,10 @@ function DiffView:close()
   DiffView:super().close(self)
 end
 
-function DiffView:next_file()
+---Open the next file.
+---@param highlight? boolean Bring the cursor to the file entry in the panel.
+---@return FileEntry?
+function DiffView:next_file(highlight)
   self:ensure_layout()
   if self:file_safeguard() then
     return
@@ -99,7 +102,9 @@ function DiffView:next_file()
     vim.cmd("diffoff!")
     cur = self.panel:next_file()
     if cur then
-      self.panel:highlight_file(cur)
+      if highlight or not self.panel:is_focused() then
+        self.panel:highlight_file(cur)
+      end
       self.nulled = false
       cur:load_buffers(self.git_root, self.left_winid, self.right_winid, function()
         self:update_windows()
@@ -110,7 +115,10 @@ function DiffView:next_file()
   end
 end
 
-function DiffView:prev_file()
+---Open the previous file.
+---@param highlight? boolean Bring the cursor to the file entry in the panel.
+---@return FileEntry?
+function DiffView:prev_file(highlight)
   self:ensure_layout()
   if self:file_safeguard() then
     return
@@ -124,7 +132,9 @@ function DiffView:prev_file()
     vim.cmd("diffoff!")
     cur = self.panel:prev_file()
     if cur then
-      self.panel:highlight_file(cur)
+      if highlight or not self.panel:is_focused() then
+        self.panel:highlight_file(cur)
+      end
       self.nulled = false
       cur:load_buffers(self.git_root, self.left_winid, self.right_winid, function()
         self:update_windows()
@@ -135,7 +145,11 @@ function DiffView:prev_file()
   end
 end
 
-function DiffView:set_file(file, focus)
+---Set the active file.
+---@param file FileEntry
+---@param focus? boolean Bring focus to the diff buffers.
+---@param highlight? boolean Bring the cursor to the file entry in the panel.
+function DiffView:set_file(file, focus, highlight)
   self:ensure_layout()
   if self:file_safeguard() or not file then
     return
@@ -149,7 +163,9 @@ function DiffView:set_file(file, focus)
       end
       vim.cmd("diffoff!")
       self.panel:set_cur_file(file)
-      self.panel:highlight_file(file)
+      if highlight or not self.panel:is_focused() then
+        self.panel:highlight_file(file)
+      end
       self.nulled = false
       file:load_buffers(self.git_root, self.left_winid, self.right_winid, function()
         self:update_windows()
@@ -162,11 +178,15 @@ function DiffView:set_file(file, focus)
   end
 end
 
-function DiffView:set_file_by_path(path, focus)
+---Set the active file.
+---@param path string
+---@param focus? boolean Bring focus to the diff buffers.
+---@param highlight? boolean Bring the cursor to the file entry in the panel.
+function DiffView:set_file_by_path(path, focus, highlight)
   ---@type FileEntry
   for _, file in self.files:ipairs() do
     if file.path == path then
-      self:set_file(file, focus)
+      self:set_file(file, focus, highlight)
       return
     end
   end
@@ -237,7 +257,12 @@ function DiffView:update_files(callback)
             bi = bi + 1
           elseif opr == EditToken.DELETE then
             if self.panel.cur_file == v.cur_files[ai] then
-              self.panel.cur_file = self.panel:prev_file()
+              local file_list = self.panel:ordered_file_list()
+              if file_list[1] == self.panel.cur_file then
+                self.panel:set_cur_file(nil)
+              else
+                self.panel:set_cur_file(self.panel:prev_file())
+              end
             end
             v.cur_files[ai]:destroy()
             table.remove(v.cur_files, ai)
@@ -247,7 +272,12 @@ function DiffView:update_files(callback)
             bi = bi + 1
           elseif opr == EditToken.REPLACE then
             if self.panel.cur_file == v.cur_files[ai] then
-              self.panel.cur_file = self.panel:prev_file()
+              local file_list = self.panel:ordered_file_list()
+              if file_list[1] == self.panel.cur_file then
+                self.panel:set_cur_file(nil)
+              else
+                self.panel:set_cur_file(self.panel:prev_file())
+              end
             end
             v.cur_files[ai]:destroy()
             table.remove(v.cur_files, ai)
@@ -265,9 +295,10 @@ function DiffView:update_files(callback)
       self.panel:render()
       self.panel:redraw()
       perf:lap("panel redrawn")
+      self.panel:reconstrain_cursor()
 
       if utils.vec_indexof(self.panel:ordered_file_list(), self.panel.cur_file) == -1 then
-        self.panel.cur_file = nil
+        self.panel:set_cur_file(nil)
       end
 
       -- Set initially selected file
@@ -279,7 +310,7 @@ function DiffView:update_files(callback)
           end
         end
       end
-      self:set_file(self.panel.cur_file or self.panel:next_file())
+      self:set_file(self.panel.cur_file or self.panel:next_file(), false, not self.initialized)
 
       if api.nvim_win_is_valid(last_winid) then
         api.nvim_set_current_win(last_winid)

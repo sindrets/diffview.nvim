@@ -77,10 +77,10 @@ return function(view)
       end
     end,
     select_next_entry = function()
-      view:next_file()
+      view:next_file(true)
     end,
     select_prev_entry = function()
-      view:prev_file()
+      view:prev_file(true)
     end,
     next_entry = function()
       view.panel:highlight_next_file()
@@ -149,7 +149,15 @@ return function(view)
           return
         end
 
-        view:update_files()
+        local was_active = item.active
+        if was_active then
+          view:next_file(true)
+        end
+        view:update_files(function()
+          if was_active then
+            view.panel:highlight_cur_file()
+          end
+        end)
         view.emitter:emit(Event.FILES_STAGED, view)
       end
     end,

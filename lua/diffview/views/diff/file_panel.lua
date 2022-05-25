@@ -171,8 +171,12 @@ function FilePanel:set_cur_file(file)
   if self.cur_file then
     self.cur_file.active = false
   end
-  self.cur_file = file
-  self.cur_file.active = true
+  if file == nil then
+    self.cur_file = nil
+  else
+    self.cur_file = file
+    self.cur_file.active = true
+  end
 end
 
 function FilePanel:prev_file()
@@ -266,6 +270,12 @@ function FilePanel:highlight_file(file)
   utils.update_win(self.winid)
 end
 
+function FilePanel:highlight_cur_file()
+  if self.cur_file then
+    self:highlight_file(self.cur_file)
+  end
+end
+
 function FilePanel:highlight_prev_file()
   if not (self:is_open() and self:buf_loaded()) or self.files:len() == 0 then
     return
@@ -289,6 +299,17 @@ function FilePanel:highlight_next_file()
     0,
   })
   utils.update_win(self.winid)
+end
+
+function FilePanel:reconstrain_cursor()
+  if not (self:is_open() and self:buf_loaded()) or self.files:len() == 0 then
+    return
+  end
+
+  pcall(api.nvim_win_set_cursor, self.winid, {
+    self.constrain_cursor(self.winid, 0),
+    0,
+  })
 end
 
 function FilePanel:set_item_fold(item, open)
