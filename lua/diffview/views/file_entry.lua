@@ -40,6 +40,9 @@ local FileEntry = oop.create_class("FileEntry")
 ---@type integer|nil
 FileEntry._null_buffer = nil
 
+---@type table<integer, boolean>
+FileEntry.attached = {}
+
 ---@static
 ---@type table<integer, table>
 FileEntry.winopt_store = {}
@@ -251,21 +254,23 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid, callback)
   perf:lap("load done")
 end
 
-function FileEntry:attach_buffers()
+---@param force? boolean
+function FileEntry:attach_buffers(force)
   if self.left_bufid then
-    FileEntry._attach_buffer(self.left_bufid)
+    FileEntry._attach_buffer(self.left_bufid, force)
   end
   if self.right_bufid then
-    FileEntry._attach_buffer(self.right_bufid)
+    FileEntry._attach_buffer(self.right_bufid, force)
   end
 end
 
-function FileEntry:detach_buffers()
+---@param force? boolean
+function FileEntry:detach_buffers(force)
   if self.left_bufid then
-    FileEntry._detach_buffer(self.left_bufid)
+    FileEntry._detach_buffer(self.left_bufid, force)
   end
   if self.right_bufid then
-    FileEntry._detach_buffer(self.right_bufid)
+    FileEntry._detach_buffer(self.right_bufid, force)
   end
 end
 
@@ -492,33 +497,45 @@ function FileEntry._update_windows(left_winid, right_winid)
 end
 
 ---@static
-function FileEntry._attach_buffer(bufid)
-  local conf = config.get_config()
-  local default_opt = { silent = true, nowait = true, buffer = bufid }
+---@param bufid integer
+---@param force? boolean
+function FileEntry._attach_buffer(bufid, force)
+  if force or not FileEntry.attached[bufid] then
+    local conf = config.get_config()
+    local default_opt = { silent = true, nowait = true, buffer = bufid }
 
-  for lhs, mapping in pairs(conf.keymaps.view) do
-    if type(lhs) == "number" then
-      local opt = vim.tbl_extend("force", mapping[4] or {}, { buffer = bufid })
-      vim.keymap.set(mapping[1], mapping[2], mapping[3], opt)
-    else
-      vim.keymap.set("n", lhs, mapping, default_opt)
+    for lhs, mapping in pairs(conf.keymaps.view) do
+      if type(lhs) == "number" then
+        local opt = vim.tbl_extend("force", mapping[4] or {}, { buffer = bufid })
+        vim.keymap.set(mapping[1], mapping[2], mapping[3], opt)
+      else
+        vim.keymap.set("n", lhs, mapping, default_opt)
+      end
     end
+
+    FileEntry.attached[bufid] = true
   end
 end
 
 ---@static
-function FileEntry._detach_buffer(bufid)
-  local conf = config.get_config()
+---@param bufid integer
+---@param force? boolean
+function FileEntry._detach_buffer(bufid, force)
+  if force or FileEntry.attached[bufid] then
+    local conf = config.get_config()
 
-  for lhs, mapping in pairs(conf.keymaps.view) do
-    if type(lhs) == "number" then
-      local modes = type(mapping[1]) == "table" and mapping[1] or { mapping[1] }
-      for _, mode in ipairs(modes) do
-        pcall(api.nvim_buf_del_keymap, bufid, mode, mapping[2])
+    for lhs, mapping in pairs(conf.keymaps.view) do
+      if type(lhs) == "number" then
+        local modes = type(mapping[1]) == "table" and mapping[1] or { mapping[1] }
+        for _, mode in ipairs(modes) do
+          pcall(api.nvim_buf_del_keymap, bufid, mode, mapping[2])
+        end
+      else
+        pcall(api.nvim_buf_del_keymap, bufid, "n", lhs)
       end
-    else
-      pcall(api.nvim_buf_del_keymap, bufid, "n", lhs)
     end
+
+    FileEntry.attached[bufid] = nil
   end
 end
 

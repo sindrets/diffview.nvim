@@ -96,9 +96,6 @@ function DiffView:next_file(highlight)
 
   if self.files:len() > 1 or self.nulled then
     local cur = self.panel.cur_file
-    if cur then
-      cur:detach_buffers()
-    end
     vim.cmd("diffoff!")
     cur = self.panel:next_file()
     if cur then
@@ -126,9 +123,6 @@ function DiffView:prev_file(highlight)
 
   if self.files:len() > 1 or self.nulled then
     local cur = self.panel.cur_file
-    if cur then
-      cur:detach_buffers()
-    end
     vim.cmd("diffoff!")
     cur = self.panel:prev_file()
     if cur then
@@ -157,10 +151,6 @@ function DiffView:set_file(file, focus, highlight)
 
   for _, f in self.files:ipairs() do
     if f == file then
-      local cur = self.panel.cur_file
-      if cur then
-        cur:detach_buffers()
-      end
       vim.cmd("diffoff!")
       self.panel:set_cur_file(file)
       if highlight or not self.panel:is_focused() then
@@ -403,7 +393,7 @@ end
 ---Returns nil if no file is open in the view, or there is no entry under the
 ---cursor in the file panel.
 ---@param allow_dir? boolean Allow directory nodes from the file tree.
----@return FileEntry|nil
+---@return FileEntry|DirData|nil
 function DiffView:infer_cur_file(allow_dir)
   if self.panel:is_focused() then
     ---@type any

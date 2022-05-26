@@ -65,7 +65,7 @@ local function render_files(comp, files)
   perf:lap("files")
 end
 
----@param parent any RenderComponent struct
+---@param parent CompStruct RenderComponent struct
 ---@param entries LogEntry[]
 ---@param updating boolean
 local function render_entries(parent, entries, updating)
@@ -191,7 +191,6 @@ return {
       prepare_panel_cache(panel)
     end
 
-    ---@type RenderComponent
     local comp = panel.components.header.comp
     local cached = cache[panel]
     local line_idx = 0

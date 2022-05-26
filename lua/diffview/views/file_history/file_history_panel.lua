@@ -43,7 +43,7 @@ local perf_update = PerfTimer("[FileHistoryPanel] update")
 ---@field render_data RenderData
 ---@field option_panel FHOptionPanel
 ---@field option_mapping string
----@field components any
+---@field components CompStruct
 ---@field constrain_cursor function
 local FileHistoryPanel = oop.create_class("FileHistoryPanel", Panel)
 
@@ -170,7 +170,7 @@ function FileHistoryPanel:update_components()
     })
   end
 
-  ---@type any
+  ---@type CompStruct
   self.components = self.render_data:create_component({
     { name = "header" },
     {

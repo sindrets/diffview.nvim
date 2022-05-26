@@ -23,7 +23,7 @@ local logger = log.new({
   level = DiffviewGlobal.debug_level > 0 and "debug" or "info",
 })
 
-local mock_logger = Mock()
+logger.mock = Mock()
 
 logger.outfile = string.format(
   "%s/%s.log", vim.api.nvim_call_function("stdpath", { "cache" }),
@@ -51,7 +51,7 @@ function logger.lvl(min_level)
   if DiffviewGlobal.debug_level >= min_level then
     return logger
   end
-  return mock_logger
+  return logger.mock
 end
 
 ---@class LogJobSpec

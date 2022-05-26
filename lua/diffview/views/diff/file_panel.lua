@@ -19,7 +19,7 @@ local M = {}
 ---@field listing_style '"list"'|'"tree"'
 ---@field tree_options TreeOptions
 ---@field render_data RenderData
----@field components any
+---@field components CompStruct
 ---@field constrain_cursor function
 local FilePanel = oop.create_class("FilePanel", Panel)
 
@@ -123,7 +123,7 @@ function FilePanel:update_components()
     }
   end
 
-  ---@type any
+  ---@type CompStruct
   self.components = self.render_data:create_component({
     { name = "path" },
     {
@@ -169,8 +169,10 @@ end
 
 function FilePanel:set_cur_file(file)
   if self.cur_file then
+    self.cur_file:detach_buffers()
     self.cur_file.active = false
   end
+
   if file == nil then
     self.cur_file = nil
   else

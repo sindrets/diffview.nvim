@@ -1,5 +1,4 @@
 local Job = require("plenary.job")
-local Mock = require("diffview.mock").Mock
 local PathLib = require("diffview.path").PathLib
 local async = require("plenary.async")
 
@@ -295,11 +294,21 @@ function M.system_list(cmd, cwd_or_opt)
   opt.fail_on_empty = vim.F.if_nil(opt.fail_on_empty, opt.retry_on_empty ~= nil)
   opt.context = opt.context or "system_list()"
   local context = ("[%s] "):format(opt.context)
-  local logger = opt.silent and Mock() or require("diffview.logger")
+  local logger = require("diffview.logger")
+  logger = opt.silent and logger.mock or logger
+
   local command = table.remove(cmd, 1)
   local num_retries = 0
   local max_retries = opt.retry_on_empty or 0
   local job, stdout, stderr, code, empty
+  local job_spec = {
+    command = command,
+    args = cmd,
+    cwd = opt.cwd,
+    on_stderr = function(_, data)
+      table.insert(stderr, data)
+    end,
+  }
 
   for i = 0, max_retries do
     if i > 0 then
@@ -312,14 +321,7 @@ function M.system_list(cmd, cwd_or_opt)
     end
 
     stderr = {}
-    job = Job:new({
-      command = command,
-      args = cmd,
-      cwd = opt.cwd,
-      on_stderr = function(_, data)
-        table.insert(stderr, data)
-      end,
-    })
+    job = Job:new(job_spec)
     stdout, code = job:sync()
     empty = not (stdout[1] and stdout[1] ~= "")
 

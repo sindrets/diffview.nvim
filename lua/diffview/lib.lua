@@ -378,12 +378,11 @@ function M.update_colors()
   local StandardView = require("diffview.views.standard.standard_view").StandardView
   for _, view in ipairs(M.views) do
     if view:instanceof(StandardView) then
-      ---@diagnostic disable
+      ---@cast view StandardView
       if view.panel:buf_loaded() then
         view.panel:render()
         view.panel:redraw()
       end
-      ---@diagnostic enable
     end
   end
 end

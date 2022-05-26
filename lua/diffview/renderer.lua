@@ -16,7 +16,7 @@ M.last_draw_time = 0
 ---@field first integer 0 indexed, inclusive
 ---@field last integer Exclusive
 
----@class CompStruct : { [integer]: CompStruct }
+---@class CompStruct : { [integer|string]: CompStruct }
 ---@field _name string
 ---@field comp RenderComponent
 

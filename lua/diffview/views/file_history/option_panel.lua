@@ -11,7 +11,7 @@ local M = {}
 ---@field emitter EventEmitter
 ---@field render_data RenderData
 ---@field option_state LogOptions
----@field components any
+---@field components CompStruct
 local FHOptionPanel = oop.create_class("FHOptionPanel", Panel)
 
 FHOptionPanel.winopts = vim.tbl_extend("force", Panel.winopts, {
@@ -152,7 +152,7 @@ function FHOptionPanel:update_components()
     table.insert(option_schema, { name = "option", context = { option.key, option } })
   end
 
-  ---@type any
+  ---@type CompStruct
   self.components = self.render_data:create_component({
     {
       name = "switches",
