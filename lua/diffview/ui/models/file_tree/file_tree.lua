@@ -11,6 +11,7 @@ local M = {}
 ---@field kind '"working"'|'"staged"'
 ---@field collapsed boolean
 ---@field status string
+---@field _node Node
 
 ---@class FileTree : Model
 ---@field root Node
@@ -20,7 +21,7 @@ local FileTree = oop.create_class("FileTree", Model)
 ---@param files FileEntry[]|nil
 ---@return FileTree
 function FileTree:init(files)
-  self.root = Node("")
+  self.root = Node("__ROOT__")
   for _, file in ipairs(files) do
     self:add_file_entry(file)
   end
@@ -90,7 +91,6 @@ function FileTree:update_statuses()
   end
 end
 
----@Override
 function FileTree:create_comp_schema(data)
   self.root:sort()
   ---@type CompSchema
@@ -117,6 +117,7 @@ function FileTree:create_comp_schema(data)
           kind = subdir_data.kind,
           collapsed = dir_data.collapsed and subdir_data.collapsed,
           status = dir_data.status,
+          _node = node,
         }
         node = node.children[1]
       end

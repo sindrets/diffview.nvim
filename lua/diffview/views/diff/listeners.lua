@@ -149,14 +149,37 @@ return function(view)
           return
         end
 
-        local was_active = item.active
-        if was_active then
-          view:next_file(true)
-        end
-        view:update_files(function()
-          if was_active then
-            view.panel:highlight_cur_file()
+        if type(item.collapsed) == "boolean" then
+          ---@cast item DirData
+          ---@type FileTree
+          local tree = item.kind == "working"
+            and view.panel.files.working_tree
+            or view.panel.files.staged_tree
+
+          ---@type Node
+          local item_node
+          tree.root:deep_some(function (node, _, _)
+            if node == item._node then
+              item_node = node
+              return true
+            end
+          end)
+
+          if item_node then
+            local next_leaf = item_node:next_leaf()
+            if next_leaf then
+              view:set_file(next_leaf.data)
+            else
+              view:set_file(view.panel.files[1])
+            end
           end
+        else
+          view.panel:set_cur_file(item)
+          view:next_file()
+        end
+
+        view:update_files(function()
+          view.panel:highlight_cur_file()
         end)
         view.emitter:emit(Event.FILES_STAGED, view)
       end
