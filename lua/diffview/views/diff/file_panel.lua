@@ -173,10 +173,8 @@ function FilePanel:set_cur_file(file)
     self.cur_file.active = false
   end
 
-  if file == nil then
-    self.cur_file = nil
-  else
-    self.cur_file = file
+  self.cur_file = file
+  if self.cur_file then
     self.cur_file.active = true
   end
 end

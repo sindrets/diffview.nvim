@@ -316,24 +316,25 @@ function FileHistoryPanel:get_item_at_cursor()
   end
 end
 
-function FileHistoryPanel:update_active_item(new_item)
+function FileHistoryPanel:set_cur_item(new_item)
   if self.cur_item[2] then
+    self.cur_item[2]:detach_buffers()
     self.cur_item[2].active = false
   end
   self.cur_item = new_item
-  if self.cur_item[2] then
+  if self.cur_item and self.cur_item[2] then
     self.cur_item[2].active = true
   end
 end
 
-function FileHistoryPanel:set_cur_file(item)
+function FileHistoryPanel:set_entry_from_file(item)
   local file = self.cur_item[2]
   if item:instanceof(LogEntry) then
-    self:update_active_item({ item, item.files[1] })
+    self:set_cur_item({ item, item.files[1] })
   else
     local entry = self:find_entry(file)
     if entry then
-      self:update_active_item({ entry, file })
+      self:set_cur_item({ entry, file })
     end
   end
 end
@@ -371,7 +372,7 @@ function FileHistoryPanel:set_file_by_offset(offset)
   local entry, file = self.cur_item[1], self.cur_item[2]
 
   if not (entry and file) and self:num_items() > 0 then
-    self:update_active_item({ self.entries[1], self.entries[1].files[1] })
+    self:set_cur_item({ self.entries[1], self.entries[1].files[1] })
     return self.cur_item[2]
   end
 
@@ -380,14 +381,14 @@ function FileHistoryPanel:set_file_by_offset(offset)
     local file_idx = utils.vec_indexof(entry.files, file)
     if entry_idx ~= -1 and file_idx ~= -1 then
       local next_entry, next_file = self:_get_entry_by_file_offset(entry_idx, file_idx, offset)
-      self:update_active_item({ next_entry, next_file })
+      self:set_cur_item({ next_entry, next_file })
       if next_entry ~= entry then
         self:set_entry_fold(entry, false)
       end
       return self.cur_item[2]
     end
   else
-    self:update_active_item({ self.entries[1], self.entries[1].files[1] })
+    self:set_cur_item({ self.entries[1], self.entries[1].files[1] })
     return self.cur_item[2]
   end
 end

@@ -80,12 +80,8 @@ function FileHistoryView:next_item()
   end
 
   if self.panel:num_items() > 1 or self.nulled then
-    local cur = self.panel.cur_item[2]
-    if cur then
-      cur:detach_buffers()
-    end
     vim.cmd("diffoff!")
-    cur = self.panel:next_file()
+    local cur = self.panel:next_file()
     if cur then
       self.panel:highlight_item(cur)
       self.nulled = false
@@ -105,12 +101,8 @@ function FileHistoryView:prev_item()
   end
 
   if self.panel:num_items() > 1 or self.nulled then
-    local cur = self.panel.cur_item[2]
-    if cur then
-      cur:detach_buffers()
-    end
     vim.cmd("diffoff!")
-    cur = self.panel:prev_file()
+    local cur = self.panel:prev_file()
     if cur then
       self.panel:highlight_item(cur)
       self.nulled = false
@@ -131,12 +123,8 @@ function FileHistoryView:set_file(file, focus)
 
   local entry = self.panel:find_entry(file)
   if entry then
-    local cur = self.panel.cur_item[2]
-    if cur then
-      cur:detach_buffers()
-    end
     vim.cmd("diffoff!")
-    self.panel:update_active_item({ entry, file })
+    self.panel:set_cur_item({ entry, file })
     self.panel:highlight_item(file)
     self.nulled = false
     file:load_buffers(self.git_root, self.left_winid, self.right_winid, function()
