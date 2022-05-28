@@ -1,56 +1,15 @@
 ---@diagnostic disable: deprecated
-local utils = require("diffview.utils")
 local EventEmitter = require("diffview.events").EventEmitter
+local actions = require("diffview.actions")
+local utils = require("diffview.utils")
 
 local M = {}
-
-M.actions = setmetatable({}, {
-  __index = function(_, k)
-    utils.err(("The action '%s' does not exist!"):format(k))
-  end
-})
-
-local actions = M.actions
-local action_names = {
-  "close",
-  "close_all_folds",
-  "copy_hash",
-  "focus_entry",
-  "focus_files",
-  "goto_file",
-  "goto_file_edit",
-  "goto_file_split",
-  "goto_file_tab",
-  "listing_style",
-  "next_entry",
-  "open_all_folds",
-  "open_commit_log",
-  "open_in_diffview",
-  "options",
-  "prev_entry",
-  "refresh_files",
-  "restore_entry",
-  "select_entry",
-  "select_next_entry",
-  "select_prev_entry",
-  "stage_all",
-  "toggle_files",
-  "toggle_flatten_dirs",
-  "toggle_stage_entry",
-  "unstage_all",
-}
-
-for _, name in ipairs(action_names) do
-  M.actions[name] = function()
-    require("diffview").emit(name)
-  end
-end
 
 ---@deprecated
 function M.diffview_callback(cb_name)
   if cb_name == "select" then
     -- Reroute deprecated action
-    return M.actions.select_entry
+    return actions.select_entry
   end
   return actions[cb_name]
 end
@@ -126,6 +85,8 @@ M.defaults = {
       ["X"]             = actions.restore_entry,
       ["R"]             = actions.refresh_files,
       ["L"]             = actions.open_commit_log,
+      ["<c-b>"]         = actions.scroll_view(-0.25),
+      ["<c-f>"]         = actions.scroll_view(0.25),
       ["<tab>"]         = actions.select_next_entry,
       ["<s-tab>"]       = actions.select_prev_entry,
       ["gf"]            = actions.goto_file,
@@ -150,6 +111,8 @@ M.defaults = {
       ["<cr>"]          = actions.select_entry,
       ["o"]             = actions.select_entry,
       ["<2-LeftMouse>"] = actions.select_entry,
+      ["<c-b>"]         = actions.scroll_view(-0.25),
+      ["<c-f>"]         = actions.scroll_view(0.25),
       ["<tab>"]         = actions.select_next_entry,
       ["<s-tab>"]       = actions.select_prev_entry,
       ["gf"]            = actions.goto_file,
@@ -245,4 +208,5 @@ function M.setup(user_config)
   end
 end
 
+M.actions = actions
 return M

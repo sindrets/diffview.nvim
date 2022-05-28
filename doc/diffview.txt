@@ -35,7 +35,7 @@ CONFIGURATION                                   *diffview-config*
 Example configuration with default settings:
 >
     -- Lua
-    local actions = require("diffview.config").actions
+    local actions = require("diffview.actions")
     require("diffview").setup({
       diff_binaries = false,    -- Show diffs for binaries
       enhanced_diff_hl = false, -- See |diffview-config-enhanced_diff_hl|
@@ -108,6 +108,8 @@ Example configuration with default settings:
           ["X"]             = actions.restore_entry,      -- Restore entry to the state on the left side.
           ["R"]             = actions.refresh_files,      -- Update stats and entries in the file list.
           ["L"]             = actions.open_commit_log,    -- Open the commit log panel.
+          ["<c-b>"]         = actions.scroll_view(-0.25), -- Scroll the view up
+          ["<c-f>"]         = actions.scroll_view(0.25),  -- Scroll the view down
           ["<tab>"]         = actions.select_next_entry,
           ["<s-tab>"]       = actions.select_prev_entry,
           ["gf"]            = actions.goto_file,
@@ -132,6 +134,8 @@ Example configuration with default settings:
           ["<cr>"]          = actions.select_entry,
           ["o"]             = actions.select_entry,
           ["<2-LeftMouse>"] = actions.select_entry,
+          ["<c-b>"]         = actions.scroll_view(-0.25),
+          ["<c-f>"]         = actions.scroll_view(0.25),
           ["<tab>"]         = actions.select_next_entry,
           ["<s-tab>"]       = actions.select_prev_entry,
           ["gf"]            = actions.goto_file,
@@ -550,6 +554,17 @@ restore_entry                                   *diffview-actions-restore_entry*
         NOTE: "Restoring" an untracked file will delete it from disk. It still
         gets backed up in the local git database, so it is reversible.
 
+scroll_view({distance})                         *diffview-actions-scroll_view*
+        Contexts: `panel`
+
+        Scroll the view a given distance.
+
+        Parameters:~
+            {distance} (number)
+                Either an exact number of lines, or a fraction of the window
+                height. Use negative numbers to scroll up and positive numbers
+                to scroll down.
+
 select_entry                                    *diffview-actions-select_entry*
         Contexts: `view`, `panel`
 
@@ -597,6 +612,19 @@ unstage_all                                     *diffview-actions-unstage_all*
 
         Unstage all changes.
 
+view_windo({cmd}, [targets])                    *diffview-actions-view_windo*
+        Contexts: `view`, `panel`
+
+        Execute {cmd} for each target window in the target view. If no targets
+        are given, all windows are targeted.
+
+        Parameters:~
+            {cmd} (string)
+                Vim command.
+
+            [targets] (`{ left: boolean, right: boolean }`)
+                The windows to target.
+
                                                 *diffview-unused-actions*
 Unused actions~
 
@@ -607,6 +635,7 @@ actions:
 
         • |diffview-actions-focus_entry|
         • |diffview-actions-goto_file_edit|
+        • |diffview-actions-view_windo|
 
 LAYOUT                                          *diffview-layout*
 

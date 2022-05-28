@@ -43,7 +43,7 @@ use { 'sindrets/diffview.nvim', requires = 'nvim-lua/plenary.nvim' }
 
 ```lua
 -- Lua
-local actions = require("diffview.config").actions
+local actions = require("diffview.actions")
 
 require("diffview").setup({
   diff_binaries = false,    -- Show diffs for binaries
@@ -117,6 +117,8 @@ require("diffview").setup({
       ["X"]             = actions.restore_entry,      -- Restore entry to the state on the left side.
       ["R"]             = actions.refresh_files,      -- Update stats and entries in the file list.
       ["L"]             = actions.open_commit_log,    -- Open the commit log panel.
+      ["<c-b>"]         = actions.scroll_view(-0.25), -- Scroll the view up
+      ["<c-f>"]         = actions.scroll_view(0.25),  -- Scroll the view down
       ["<tab>"]         = actions.select_next_entry,
       ["<s-tab>"]       = actions.select_prev_entry,
       ["gf"]            = actions.goto_file,
@@ -141,6 +143,8 @@ require("diffview").setup({
       ["<cr>"]          = actions.select_entry,
       ["o"]             = actions.select_entry,
       ["<2-LeftMouse>"] = actions.select_entry,
+      ["<c-b>"]         = actions.scroll_view(-0.25),
+      ["<c-f>"]         = actions.scroll_view(0.25),
       ["<tab>"]         = actions.select_next_entry,
       ["<s-tab>"]       = actions.select_prev_entry,
       ["gf"]            = actions.goto_file,
