@@ -5,8 +5,12 @@ end
 local arg_parser = require("diffview.arg_parser")
 local colors = require("diffview.colors")
 local config = require("diffview.config")
+local lazy = require("diffview.lazy")
 local lib = require("diffview.lib")
 local utils = require("diffview.utils")
+
+---@module "diffview.git.utils"
+local git = lazy.require("diffview.git.utils")
 
 local M = {}
 
@@ -113,8 +117,8 @@ function M.rev_candidates(git_root, git_dir)
         or "."
   end
 
-  git_root = git_root or require("diffview.git.utils").toplevel(fpath)
-  git_dir = git_dir or require("diffview.git.utils").git_dir(fpath)
+  git_root = git_root or git.toplevel(fpath)
+  git_dir = git_dir or git.git_dir(fpath)
   if not (git_root and git_dir) then
     return {}
   end
@@ -181,8 +185,8 @@ M.completers = {
         and utils.path:readable(cfile)
         and utils.path:parent(cfile)
         or "."
-    local git_dir = require("diffview.git.utils").git_dir(fpath)
-    local git_root = require("diffview.git.utils").toplevel(fpath)
+    local git_dir = git.git_dir(fpath)
+    local git_root = git.toplevel(fpath)
     local has_rev_arg = false
 
     for i = 2, math.min(#args, divideridx) do

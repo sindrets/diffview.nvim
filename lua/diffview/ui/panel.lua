@@ -25,7 +25,7 @@ local perf = PerfTimer("[Panel] redraw")
 ---@field render_data RenderData
 ---@field components any
 ---@field bufname string
----@field au_listeners table<string, function[]>
+---@field au_event_map table<string, function[]>
 ---@field init_buffer_opts function Abstract
 ---@field update_components function Abstract
 ---@field render function Abstract

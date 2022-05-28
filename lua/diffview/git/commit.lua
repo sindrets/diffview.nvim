@@ -1,5 +1,10 @@
+local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
+
+---@type ERevType|LazyModule
+local RevType = lazy.access("diffview.git.rev", "RevType")
+
 local M = {}
 
 ---@class Commit : Object
@@ -66,7 +71,7 @@ end
 ---@param git_root string
 ---@return Commit
 function Commit.from_rev(rev, git_root)
-  assert(rev.type == require("diffview.git.rev").RevType.COMMIT, "Rev must be of type COMMIT!")
+  assert(rev.type == RevType.COMMIT, "Rev must be of type COMMIT!")
   return Commit.from_rev_arg(rev.commit, git_root)
 end
 

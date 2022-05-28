@@ -1,4 +1,12 @@
+local lazy = require("diffview.lazy")
 local utils = require("diffview.utils")
+
+---@type DiffView|LazyModule
+local DiffView = lazy.access("diffview.views.diff.diff_view", "DiffView")
+---@type FileHistoryView|LazyModule
+local FileHistoryView = lazy.access("diffview.views.file_history.file_history_view", "FileHistoryView")
+---@module "diffview.lib"
+local lib = lazy.require("diffview.lib")
 
 local api = vim.api
 
@@ -11,6 +19,102 @@ local M = setmetatable({}, {
   end
 })
 
+---@return FileEntry?
+---@return integer[]? cursor
+local function prepare_goto_file()
+  local view = lib.get_current_view()
+
+  if not (view:instanceof(DiffView.__get()) or view:instanceof(FileHistoryView.__get())) then
+    return
+  end
+
+  ---@cast view DiffView|FileHistoryView
+  local file = view:infer_cur_file()
+  if file then
+    ---@cast file FileEntry
+    -- Ensure file exists
+    if not utils.path:readable(file.absolute_path) then
+      utils.err(
+        string.format(
+          "File does not exist on disk: '%s'",
+          utils.path:relative(file.absolute_path, ".")
+        )
+      )
+      return
+    end
+
+    local cursor
+    local cur_file = (view.panel.cur_item and view.panel.cur_item[2]) or view.panel.cur_file
+    if file == cur_file then
+      cursor = api.nvim_win_get_cursor(view.right_winid)
+    end
+
+    return file, cursor
+  end
+end
+
+function M.goto_file()
+  local file, cursor = prepare_goto_file()
+  if file then
+    local target_tab = lib.get_prev_non_view_tabpage()
+    if target_tab then
+      api.nvim_set_current_tabpage(target_tab)
+      vim.cmd("sp " .. vim.fn.fnameescape(file.absolute_path))
+    else
+      vim.cmd("tabe " .. vim.fn.fnameescape(file.absolute_path))
+    end
+    vim.cmd("diffoff")
+
+    if cursor then
+      -- NOTE: using normal command rather than `nvim_win_set_cursor` to avoid
+      -- dealing with out-of-bounds coordinates.
+      vim.cmd(("norm! %dG"):format(cursor[1]))
+    end
+  end
+end
+
+function M.goto_file_edit()
+  local file, cursor = prepare_goto_file()
+  if file then
+    local target_tab = lib.get_prev_non_view_tabpage()
+    if target_tab then
+      api.nvim_set_current_tabpage(target_tab)
+      vim.cmd("e " .. vim.fn.fnameescape(file.absolute_path))
+    else
+      vim.cmd("tabe " .. vim.fn.fnameescape(file.absolute_path))
+    end
+    vim.cmd("diffoff")
+
+    if cursor then
+      vim.cmd(("norm! %dG"):format(cursor[1]))
+    end
+  end
+end
+
+function M.goto_file_split()
+  local file, cursor = prepare_goto_file()
+  if file then
+    vim.cmd("sp " .. vim.fn.fnameescape(file.absolute_path))
+    vim.cmd("diffoff")
+
+    if cursor then
+      vim.cmd(("norm! %dG"):format(cursor[1]))
+    end
+  end
+end
+
+function M.goto_file_tab()
+  local file, cursor = prepare_goto_file()
+  if file then
+    vim.cmd("tabe " .. vim.fn.fnameescape(file.absolute_path))
+    vim.cmd("diffoff")
+
+    if cursor then
+      vim.cmd(("norm! %dG"):format(cursor[1]))
+    end
+  end
+end
+
 ---Execute `cmd` for each target window in the current view. If no targets
 ---are given, all windows are targeted.
 ---@param cmd string The vim cmd to execute.
@@ -18,7 +122,7 @@ local M = setmetatable({}, {
 ---@return function action
 function M.view_windo(cmd, targets)
   return function()
-    local view = require("diffview.lib").get_current_view()
+    local view = lib.get_current_view()
     if view then
       targets = targets or { left = true, right = true }
       for _, side in ipairs({ "left", "right" }) do
@@ -54,10 +158,6 @@ local action_names = {
   "copy_hash",
   "focus_entry",
   "focus_files",
-  "goto_file",
-  "goto_file_edit",
-  "goto_file_split",
-  "goto_file_tab",
   "listing_style",
   "next_entry",
   "open_all_folds",

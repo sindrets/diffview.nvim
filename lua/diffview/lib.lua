@@ -5,7 +5,11 @@ local RevType = require("diffview.git.rev").RevType
 local arg_parser = require("diffview.arg_parser")
 local config = require("diffview.config")
 local git = require("diffview.git.utils")
+local lazy = require("diffview.lazy")
 local utils = require("diffview.utils")
+
+---@type StandardView|LazyModule
+local StandardView = lazy.access("diffview.views.standard_view", "StandardView")
 
 local api = vim.api
 local path = utils.path
@@ -375,9 +379,8 @@ function M.get_prev_non_view_tabpage()
 end
 
 function M.update_colors()
-  local StandardView = require("diffview.views.standard.standard_view").StandardView
   for _, view in ipairs(M.views) do
-    if view:instanceof(StandardView) then
+    if view:instanceof(StandardView.__get()) then
       ---@cast view StandardView
       if view.panel:buf_loaded() then
         view.panel:render()

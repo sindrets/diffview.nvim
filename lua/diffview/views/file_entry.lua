@@ -1,9 +1,14 @@
+local PerfTimer = require("diffview.perf").PerfTimer
+local RevType = require("diffview.git.rev").RevType
+local config = require("diffview.config")
+local lazy = require("diffview.lazy")
+local logger = require("diffview.logger")
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
-local config = require("diffview.config")
-local logger = require("diffview.logger")
-local RevType = require("diffview.git.rev").RevType
-local PerfTimer = require("diffview.perf").PerfTimer
+
+---@module "diffview.git.utils"
+local git = lazy.require("diffview.git.utils")
+
 local api = vim.api
 local M = {}
 
@@ -109,7 +114,6 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid, callback)
 
   if not config.get_config().diff_binaries then
     if self.left_binary == nil then
-      local git = require("diffview.git.utils")
       self.left_binary = git.is_binary(git_root, self.oldpath or self.path, self.left)
       self.right_binary = git.is_binary(git_root, self.path, self.right)
       perf:lap("binary check")
@@ -399,7 +403,6 @@ function FileEntry._create_buffer(git_root, rev, path, null, callback)
     until ok
   end
 
-  local git = require("diffview.git.utils")
   git.show(git_root, { (rev.commit or "") .. ":" .. path }, function(err, result)
     if not err then
       vim.schedule(function()

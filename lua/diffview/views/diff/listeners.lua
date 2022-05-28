@@ -5,28 +5,10 @@ local RevType = require("diffview.git.rev").RevType
 local api = vim.api
 local async = require("plenary.async")
 local git = require("diffview.git.utils")
-local lib = require("diffview.lib")
 local utils = require("diffview.utils")
 
 ---@type CommitLogPanel
 local log_panel
-
-local function prepare_goto_file(view)
-  local file = view:infer_cur_file()
-  if file then
-    -- Ensure file exists
-    if not utils.path:readable(file.absolute_path) then
-      utils.err(
-        string.format(
-          "File does not exist on disk: '%s'",
-          utils.path:relative(file.absolute_path, ".")
-        )
-      )
-      return
-    end
-    return file
-  end
-end
 
 ---@param view DiffView
 return function(view)
@@ -234,46 +216,6 @@ return function(view)
         end)
       end
     end),
-    goto_file = function()
-      local file = prepare_goto_file(view)
-      if file then
-        local target_tab = lib.get_prev_non_view_tabpage()
-        if target_tab then
-          api.nvim_set_current_tabpage(target_tab)
-          vim.cmd("sp " .. vim.fn.fnameescape(file.absolute_path))
-        else
-          vim.cmd("tabe " .. vim.fn.fnameescape(file.absolute_path))
-        end
-        vim.cmd("diffoff")
-      end
-    end,
-    goto_file_edit = function()
-      local file = prepare_goto_file(view)
-      if file then
-        local target_tab = lib.get_prev_non_view_tabpage()
-        if target_tab then
-          api.nvim_set_current_tabpage(target_tab)
-          vim.cmd("e " .. vim.fn.fnameescape(file.absolute_path))
-        else
-          vim.cmd("tabe " .. vim.fn.fnameescape(file.absolute_path))
-        end
-        vim.cmd("diffoff")
-      end
-    end,
-    goto_file_split = function()
-      local file = prepare_goto_file(view)
-      if file then
-        vim.cmd("sp " .. vim.fn.fnameescape(file.absolute_path))
-        vim.cmd("diffoff")
-      end
-    end,
-    goto_file_tab = function()
-      local file = prepare_goto_file(view)
-      if file then
-        vim.cmd("tabe " .. vim.fn.fnameescape(file.absolute_path))
-        vim.cmd("diffoff")
-      end
-    end,
     listing_style = function()
       if view.panel.listing_style == "list" then
         view.panel.listing_style = "tree"
