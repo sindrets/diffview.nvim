@@ -53,11 +53,13 @@ end
 
 function StandardView:post_layout()
   if config.get_config().enhanced_diff_hl then
-    self.winopts.left.winhl = table.concat({
+    self.winopts.left.winhl = {
       "DiffAdd:DiffviewDiffAddAsDelete",
       "DiffDelete:DiffviewDiffDelete",
-    }, ",")
-    self.winopts.right.winhl = "DiffDelete:DiffviewDiffDelete"
+    }
+    self.winopts.right.winhl = {
+      "DiffDelete:DiffviewDiffDelete",
+    }
   end
 end
 

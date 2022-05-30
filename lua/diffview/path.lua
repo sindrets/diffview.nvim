@@ -1,5 +1,8 @@
+local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
-local async = require("plenary.async")
+
+---@module "plenary.async"
+local async = lazy.require("plenary.async")
 
 local M = {}
 

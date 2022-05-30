@@ -9,6 +9,21 @@ local function err(msg)
   vim.cmd("echohl NONE")
 end
 
+local function is_module_available(name)
+  if package.loaded[name] then
+    return true
+  else
+    for _, searcher in ipairs(package.loaders) do
+      local loader = searcher(name)
+      if type(loader) == 'function' then
+        return true
+      end
+    end
+    return false
+  end
+  return true
+end
+
 _G.DiffviewGlobal = {
   bootstrap_done = true,
   bootstrap_ok = false,
@@ -23,8 +38,7 @@ if vim.fn.has("nvim-0.7") ~= 1 then
 end
 
 -- Ensure dependencies
-local ok = pcall(require, "plenary")
-if not ok then
+if not is_module_available("plenary") then
   err(
     "Dependency 'plenary.nvim' is not installed! "
     .. "See ':h diffview.changelog-93' for more information."

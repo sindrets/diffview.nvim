@@ -1,5 +1,4 @@
 local lazy = require("diffview.lazy")
-local utils = require("diffview.utils")
 
 ---@type DiffView|LazyModule
 local DiffView = lazy.access("diffview.views.diff.diff_view", "DiffView")
@@ -7,6 +6,8 @@ local DiffView = lazy.access("diffview.views.diff.diff_view", "DiffView")
 local FileHistoryView = lazy.access("diffview.views.file_history.file_history_view", "FileHistoryView")
 ---@module "diffview.lib"
 local lib = lazy.require("diffview.lib")
+---@module "diffview.utils"
+local utils = lazy.require("diffview.utils")
 
 local api = vim.api
 

@@ -1,6 +1,18 @@
-local Job = require("plenary.job")
 local PathLib = require("diffview.path").PathLib
-local async = require("plenary.async")
+local lazy = require("diffview.lazy")
+
+---@module "plenary.job"
+local Job = lazy.require("plenary.job", function(m)
+  -- Ensure plenary's `new` method will use the right metatable when this is
+  -- invoked as a method.
+  local new = m.new
+  function m.new(_, ...)
+    return new(m, ...)
+  end
+  return m
+end)
+---@module "plenary.async"
+local async = lazy.require("plenary.async")
 
 local api = vim.api
 local M = {}
@@ -259,7 +271,7 @@ function M.handle_job(job, opt)
 
   local stderr = job:stderr_result()
   if #stderr > 0 then
-    log_func("%s[stderr] " .. table.concat(context, stderr, "\n"))
+    log_func(("%s[stderr] %s"):format(context, table.concat(stderr, "\n")))
   end
 end
 

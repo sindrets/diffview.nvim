@@ -1,7 +1,10 @@
 ---@diagnostic disable: deprecated
 local EventEmitter = require("diffview.events").EventEmitter
 local actions = require("diffview.actions")
-local utils = require("diffview.utils")
+local lazy = require("diffview.lazy")
+
+---@module "diffview.utils"
+local utils = lazy.require("diffview.utils")
 
 local M = {}
 

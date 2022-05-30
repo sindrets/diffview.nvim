@@ -1,15 +1,23 @@
-local DiffView = require("diffview.views.diff.diff_view").DiffView
-local FileHistoryView = require("diffview.views.file_history.file_history_view").FileHistoryView
-local Rev = require("diffview.git.rev").Rev
-local RevType = require("diffview.git.rev").RevType
-local arg_parser = require("diffview.arg_parser")
-local config = require("diffview.config")
-local git = require("diffview.git.utils")
 local lazy = require("diffview.lazy")
-local utils = require("diffview.utils")
 
+---@type DiffView|LazyModule
+local DiffView = lazy.access("diffview.views.diff.diff_view", "DiffView")
+---@type FileHistoryView|LazyModule
+local FileHistoryView = lazy.access("diffview.views.file_history.file_history_view", "FileHistoryView")
+---@type Rev|LazyModule
+local Rev = lazy.access("diffview.git.rev", "Rev")
+---@type RevType|LazyModule
+local RevType = lazy.access("diffview.git.rev", "RevType")
+---@module "diffview.arg_parser"
+local arg_parser = lazy.require("diffview.arg_parser")
+---@module "diffview.config"
+local config = lazy.require("diffview.config")
+---@module "diffview.git.utils"
+local git = lazy.require("diffview.git.utils")
+---@module "diffview.utils"
+local utils = lazy.require("diffview.utils")
 ---@type StandardView|LazyModule
-local StandardView = lazy.access("diffview.views.standard_view", "StandardView")
+local StandardView = lazy.access("diffview.views.standard.standard_view", "StandardView")
 
 local api = vim.api
 local path = utils.path

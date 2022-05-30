@@ -2,15 +2,21 @@ if not require("diffview.bootstrap") then
   return
 end
 
-local arg_parser = require("diffview.arg_parser")
 local colors = require("diffview.colors")
-local config = require("diffview.config")
 local lazy = require("diffview.lazy")
-local lib = require("diffview.lib")
-local utils = require("diffview.utils")
 
+---@module "diffview.arg_parser"
+local arg_parser = lazy.require("diffview.arg_parser")
+---@module "diffview.config"
+local config = lazy.require("diffview.config")
 ---@module "diffview.git.utils"
 local git = lazy.require("diffview.git.utils")
+---@module "diffview.lib"
+local lib = lazy.require("diffview.lib")
+---@module "diffview.utils"
+local utils = lazy.require("diffview.utils")
+
+local api = vim.api
 
 local M = {}
 
@@ -43,9 +49,62 @@ function M.setup(user_config)
 end
 
 function M.init()
+  local au = api.nvim_create_autocmd
   colors.setup()
 
-  -- Set up autocommand emitters
+  -- Set up autocommands
+  M.augroup = api.nvim_create_augroup("diffview_nvim", {})
+  au("TabEnter", {
+    group = M.augroup,
+    pattern = "*",
+    callback = function(_)
+      M.emit("tab_enter")
+    end,
+  })
+  au("TabLeave", {
+    group = M.augroup,
+    pattern = "*",
+    callback = function(_)
+      M.emit("tab_leave")
+    end,
+  })
+  au("TabClosed", {
+    group = M.augroup,
+    pattern = "*",
+    callback = function(state)
+      M.close(tonumber(state.file))
+    end,
+  })
+  au("BufWritePost", {
+    group = M.augroup,
+    pattern = "*",
+    callback = function(_)
+      M.emit("buf_write_post")
+    end,
+  })
+  au("WinClosed", {
+    group = M.augroup,
+    pattern = "*",
+    callback = function(state)
+      M.emit("win_closed", tonumber(state.file))
+    end,
+  })
+  au("ColorScheme", {
+    group = M.augroup,
+    pattern = "*",
+    callback = function(_)
+      M.update_colors()
+    end,
+  })
+  au("User", {
+    group = M.augroup,
+    pattern = "FugitiveChanged",
+    callback = function(_)
+      M.emit("refresh_files")
+    end,
+  })
+
+  -- Set up user autocommand emitters
   DiffviewGlobal.emitter:on("view_opened", function(_)
     vim.cmd("do <nomodeline> User DiffviewViewOpened")
   end)

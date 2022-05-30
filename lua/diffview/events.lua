@@ -1,5 +1,8 @@
+local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
-local utils = require("diffview.utils")
+
+---@module "diffview.utils"
+local utils = lazy.require("diffview.utils")
 
 local M = {}
 
@@ -138,7 +141,7 @@ function EventEmitter:clear(event)
   end
 end
 
----Notify all listeners subscribed a given event.
+---Notify all listeners subscribed to a given event.
 ---@param event any Event identifier.
 ---@param ... any Event callback args.
 function EventEmitter:emit(event, ...)
@@ -155,7 +158,7 @@ function EventEmitter:emit(event, ...)
   end
 end
 
----Non-recursively notify all listeners subscribed a given event.
+---Non-recursively notify all listeners subscribed to a given event.
 ---@param event any Event identifier.
 ---@param ... any Event callback args.
 function EventEmitter:nore_emit(event, ...)
