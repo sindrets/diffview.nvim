@@ -111,6 +111,12 @@ function M.init()
   DiffviewGlobal.emitter:on("view_closed", function(_)
     vim.cmd("do <nomodeline> User DiffviewViewClosed")
   end)
+  DiffviewGlobal.emitter:on("view_enter", function(_)
+    vim.cmd("do <nomodeline> User DiffviewViewEnter")
+  end)
+  DiffviewGlobal.emitter:on("view_leave", function(_)
+    vim.cmd("do <nomodeline> User DiffviewViewLeave")
+  end)
   DiffviewGlobal.emitter:on("diff_buf_read", function(_)
     vim.cmd("do User DiffviewDiffBufRead")
   end)
@@ -299,6 +305,12 @@ function M.emit(event_name, ...)
   local view = lib.get_current_view()
   if view and not view.closing then
     view.emitter:emit(event_name, ...)
+
+    if event_name == "tab_enter" then
+      DiffviewGlobal.emitter:emit("view_enter", view)
+    elseif event_name == "tab_leave" then
+      DiffviewGlobal.emitter:emit("view_leave", view)
+    end
   end
 end
 

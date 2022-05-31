@@ -281,6 +281,20 @@ hooks                                           *diffview-config-hooks*
                     {view} (`View`)
                         The `View` instance that was closed.
 
+            {view_enter} (`fun(view: View)`)
+                Emitted just after entering the tabpage of a view.
+
+                Callback Parameters:~
+                    {view} (`View`)
+                        The `View` instance that was entered.
+
+            {view_leave} (`fun(view: View)`)
+                Emitted just before leaving the tabpage of a view.
+
+                Callback Parameters:~
+                    {view} (`View`)
+                        The `View` instance that's about to be left.
+
             {diff_buf_read} (`fun(bufnr: integer)`)
                 Emitted after a new diff buffer is ready (the first time it's
                 created and loaded into a window). Diff buffers are all
@@ -758,6 +772,10 @@ For information on how to use User autocommands, see |User|.
                       windows are ready).
 
 `DiffviewViewClosed`    Fires after a view is closed.
+
+`DiffviewViewEnter`     Fires just after entering a view.
+
+`DiffviewViewLeave`     Fires just before leaving a view.
 
 `DiffviewDiffBufRead`   Fires after a new diff buffer is ready (the first
                       time it's created and loaded into a window). Diff
