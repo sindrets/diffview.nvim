@@ -499,7 +499,6 @@ end)
 local function process_file_history(thread, git_root, path_args, log_opt, opt, callback)
   ---@type LogEntry[]
   local entries = {}
-  local lec = 0 -- Last entry count
   local data = {}
   local data_idx = 1
   local last_status
@@ -556,7 +555,7 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
     -- lists only an incomplete list of files at best. We need to use 'git
     -- show' to get file statuses for merge commits. And merges do not always
     -- have changes.
-    if cur.merge_hash then
+    if cur.numstat[1] and cur.merge_hash then
       local job
       local job_spec = {
         command = "git",
@@ -566,6 +565,7 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
           "-m",
           "--first-parent",
           "--name-status",
+          (single_file and log_opt.follow) and "--follow" or nil,
           cur.right_hash,
           "--",
           old_path or path_args
@@ -660,18 +660,17 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
       )
     end
 
-    table.insert(
-      entries,
-      LogEntry({
-        path_args = path_args,
-        commit = commit,
-        files = files,
-        single_file = single_file,
-      })
-    )
+    if files[1] then
+      table.insert(
+        entries,
+        LogEntry({
+          path_args = path_args,
+          commit = commit,
+          files = files,
+          single_file = single_file,
+        })
+      )
 
-    if #entries > 0 and #entries > lec then
-      lec = #entries
       callback(entries, JobStatus.PROGRESS)
     end
 
