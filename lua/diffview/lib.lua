@@ -8,6 +8,8 @@ local FileHistoryView = lazy.access("diffview.views.file_history.file_history_vi
 local Rev = lazy.access("diffview.git.rev", "Rev")
 ---@type RevType|LazyModule
 local RevType = lazy.access("diffview.git.rev", "RevType")
+---@type StandardView|LazyModule
+local StandardView = lazy.access("diffview.views.standard.standard_view", "StandardView")
 ---@module "diffview.arg_parser"
 local arg_parser = lazy.require("diffview.arg_parser")
 ---@module "diffview.config"
@@ -16,8 +18,6 @@ local config = lazy.require("diffview.config")
 local git = lazy.require("diffview.git.utils")
 ---@module "diffview.utils"
 local utils = lazy.require("diffview.utils")
----@type StandardView|LazyModule
-local StandardView = lazy.access("diffview.views.standard.standard_view", "StandardView")
 
 local api = vim.api
 local path = utils.path
@@ -48,7 +48,7 @@ function M.diffview_open(args)
       or path:realpath(".")
     )
   local cpath = argo:get_flag("C")
-  if vim.tbl_contains({ "true", "", nil }, cpath) then
+  if vim.tbl_contains({ true, "", nil }, cpath) then
     cpath = nil
   end
   local p = cpath and path:realpath(cpath) or fpath
@@ -68,8 +68,8 @@ function M.diffview_open(args)
     git_root,
     rev_arg,
     {
-      cached = argo:get_flag("cached", "staged") == "true",
-      imply_local = argo:get_flag("imply-local") == "true",
+      cached = argo:get_flag({ "cached", "staged" }),
+      imply_local = argo:get_flag("imply-local"),
     }
   )
 
@@ -80,7 +80,7 @@ function M.diffview_open(args)
   ---@type DiffViewOptions
   local options = {
     show_untracked = arg_parser.ambiguous_bool(
-      argo:get_flag("u", "untracked-files"),
+      argo:get_flag({ "u", "untracked-files" }, { plain = true }),
       nil,
       { "all", "normal", "true" },
       { "no", "false" }
@@ -128,7 +128,7 @@ function M.file_history(args)
       or path:realpath(".")
 
   local cpath = argo:get_flag("C")
-  if vim.tbl_contains({ "true", "", nil }, cpath) then
+  if vim.tbl_contains({ true, "", nil }, cpath) then
     cpath = nil
   end
 
@@ -170,7 +170,35 @@ function M.file_history(args)
     end
   end
 
-  local log_options = config.get_config().file_history_panel.log_options
+  local log_flag_names = {
+    { "follow" },
+    { "first-parent" },
+    { "show-pulls" },
+    { "all" },
+    { "merges" },
+    { "no-merges" },
+    { "reverse" },
+    { "max-count", "n" },
+    { "diff-merges" },
+    { "author" },
+    { "grep" },
+  }
+
+  local log_oneshot_options = {}
+  for _, names in ipairs(log_flag_names) do
+    local v = argo:get_flag(names)
+    if v then
+      local key, _ = names[1]:gsub("%-", "_")
+      log_oneshot_options[key] = v
+    end
+  end
+
+  local log_options = vim.tbl_extend(
+    "force",
+    config.get_config().file_history_panel.log_options,
+    log_oneshot_options
+  )
+
   local ok, opt_description = git.file_history_dry_run(git_root, paths, log_options, { rev_arg = range_arg })
 
   if not ok then

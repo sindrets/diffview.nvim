@@ -229,6 +229,7 @@ end
 ---@field fail_on_empty boolean Consider the job as failed if the code is 0 and stdout is empty.
 ---@field log_func function|string
 ---@field context string Context for the logger.
+---@field debug_opt LogJobSpec
 
 ---Handles logging of failed jobs. If the given job hasn't failed, this does nothing.
 ---@param job Job
@@ -242,6 +243,9 @@ function M.handle_job(job, opt)
   end
 
   if job.code == 0 and not empty then
+    if opt.debug_opt then
+      require("diffview.logger").log_job(job, opt.debug_opt)
+    end
     return
   end
 

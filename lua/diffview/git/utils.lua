@@ -331,31 +331,17 @@ end)
 local function prepare_fh_options(log_options, single_file)
   local o = log_options
   return utils.vec_join(
-    (o.follow and single_file) and { "--follow", "--first-parent" } or { "-m", "-c" },
-    o.all and { "--all" } or nil,
-    o.merges and { "--merges", "--first-parent" } or nil,
-    o.no_merges and { "--no-merges" } or nil,
-    o.reverse and { "--reverse" } or nil,
-    o.max_count and { "-n" .. o.max_count } or nil,
-    o.author and { "--author=" .. o.author } or nil,
-    o.grep and { "--grep=" .. o.grep } or nil
-  )
-end
-
----@param log_options LogOptions
----@param single_file boolean
----@return string[]
-local function describe_fh_options(log_options, single_file)
-  local o = log_options
-  return utils.vec_join(
     (o.follow and single_file) and { "--follow" } or nil,
+    o.first_parent and { "--first-parent" } or nil,
+    o.show_pulls and { "--show-pulls" } or nil,
     o.all and { "--all" } or nil,
     o.merges and { "--merges" } or nil,
     o.no_merges and { "--no-merges" } or nil,
     o.reverse and { "--reverse" } or nil,
-    o.max_count and { "--max-count=" .. o.max_count } or nil,
+    o.max_count and { "-n" .. o.max_count } or nil,
+    o.diff_merges and { "--diff-merges=" .. o.diff_merges } or nil,
     o.author and { "--author=" .. o.author } or nil,
-    o.grep and { "--grep=" .. o.grep } or nil
+    o.grep and { "-E", "--grep=" .. o.grep } or nil
   )
 end
 
@@ -477,9 +463,17 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
   numstat_job:start()
 
   latch:await()
+
+  local debug_opt = {
+    context = "git.utils>incremental_fh_data()",
+    func = "s_debug",
+    debug_level = 1,
+    no_stdout = true,
+  }
+  utils.handle_job(namestat_job, { debug_opt = debug_opt })
+  utils.handle_job(numstat_job, { debug_opt = debug_opt })
+
   if namestat_job.code ~= 0 or numstat_job.code ~= 0 then
-    utils.handle_job(namestat_job)
-    utils.handle_job(numstat_job)
     callback(JobStatus.ERROR)
   else
     callback(JobStatus.SUCCESS)
@@ -555,15 +549,14 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
     -- lists only an incomplete list of files at best. We need to use 'git
     -- show' to get file statuses for merge commits. And merges do not always
     -- have changes.
-    if cur.numstat[1] and cur.merge_hash then
+    if cur.merge_hash and cur.numstat[1] and #cur.numstat ~= #cur.namestat then
       local job
       local job_spec = {
         command = "git",
         args = utils.vec_join(
           "show",
           "--format=",
-          "-m",
-          "--first-parent",
+          "--diff-merges=first-parent",
           "--name-status",
           (single_file and log_opt.follow) and "--follow" or nil,
           cur.right_hash,
@@ -717,7 +710,7 @@ function M.file_history_dry_run(git_root, path_args, log_opt, opt)
 
   local options = vim.tbl_map(function(v)
     return vim.fn.shellescape(v)
-  end, describe_fh_options(log_opt, single_file))
+  end, prepare_fh_options(log_opt, single_file))
 
   local description = utils.vec_join(
     ("Top-level path: '%s'"):format(utils.path:vim_fnamemodify(git_root, ":~")),

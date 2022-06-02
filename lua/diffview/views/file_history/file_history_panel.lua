@@ -20,6 +20,8 @@ local perf_update = PerfTimer("[FileHistoryPanel] update")
 
 ---@class LogOptions
 ---@field follow boolean
+---@field first_parent boolean
+---@field show_pulls boolean
 ---@field all boolean
 ---@field merges boolean
 ---@field no_merges boolean
@@ -27,6 +29,7 @@ local perf_update = PerfTimer("[FileHistoryPanel] update")
 ---@field max_count integer
 ---@field author string
 ---@field grep string
+---@field diff_merges string
 
 ---@class FileHistoryPanel : Panel
 ---@field parent FileHistoryView
@@ -92,16 +95,7 @@ function FileHistoryPanel:init(parent, git_root, entries, path_args, raw_args, l
   self.cur_item = {}
   self.single_file = entries[1] and entries[1].single_file
   self.option_panel = FHOptionPanel(self)
-  self.log_options = {
-    follow = log_options.follow or false,
-    all = log_options.all or false,
-    merges = log_options.merges or false,
-    no_merges = log_options.no_merges or false,
-    reverse = log_options.reverse or false,
-    max_count = log_options.max_count or 256,
-    author = log_options.author,
-    grep = log_options.grep,
-  }
+  self.log_options = vim.tbl_extend("force", conf.file_history_panel.log_options, log_options)
 
   self:on_autocmd("BufNew", {
     callback = function()
@@ -196,8 +190,10 @@ function FileHistoryPanel:update_entries(callback)
       if status == JobStatus.ERROR then
         utils.err("Updating file history failed!", true)
         self.updating = false
-        self:render()
-        self:redraw()
+        vim.schedule(function()
+          self:render()
+          self:redraw()
+        end)
         callback(nil, JobStatus.ERROR)
         return
       elseif status == JobStatus.PROGRESS and (#entries <= c or lock) then

@@ -71,9 +71,20 @@ end
 local function render_entries(parent, entries, updating)
   local c = config.get_config()
   local max_num_files = -1
+  local max_len_stats = 7
   for _, entry in ipairs(entries) do
     if #entry.files > max_num_files then
       max_num_files = #entry.files
+    end
+    if entry.stats then
+      local adds = tostring(entry.stats.additions)
+      local dels = tostring(entry.stats.deletions)
+      local l = 7
+      local w = l - (#adds + #dels)
+      if w < 1 then
+        l = (#adds + #dels) - ((#adds + #dels) % 2) + 2
+      end
+      max_len_stats = l > max_len_stats and l or max_len_stats
     end
   end
 
@@ -108,12 +119,7 @@ local function render_entries(parent, entries, updating)
     if entry.stats then
       local adds = tostring(entry.stats.additions)
       local dels = tostring(entry.stats.deletions)
-      local l = 7
-      local w = l - (#adds + #dels)
-      if w < 1 then
-        l = (#adds + #dels) - ((#adds + #dels) % 2) + 2
-        w = l - (#adds + #dels)
-      end
+      local w = max_len_stats - (#adds + #dels)
 
       comp:add_hl("DiffviewNonText", line_idx, #s + 1, #s + 2)
       s = s .. " | "

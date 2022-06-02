@@ -35,23 +35,45 @@ FHOptionPanel.bufopts = {
   bufhidden = "hide",
 }
 
+---@class FlagOption : string[]
+---@field key string
+---@field select string[]
+
 FHOptionPanel.flags = {
+  ---@type FlagOption[]
   switches = {
-    { "-f", "--follow", "Follow renames (only for single file)", key = "follow" },
-    { "-a", "--all", "Include all refs", key = "all" },
-    { "-m", "--merges", "List only merge commits", key = "merges" },
-    { "-n", "--no-merges", "List no merge commits", key = "no_merges" },
-    { "-r", "--reverse", "List commits in reverse order", key = "reverse" },
+    { "-f", "--follow", "Follow renames (only for single file)" },
+    { "-p", "--first-parent", "Follow only the first parent upon seeing a merge commit" },
+    { "-s", "--show-pulls", "Show merge commits that are not TREESAME to its first parent, but are to a later parent" },
+    { "-a", "--all", "Include all refs" },
+    { "-m", "--merges", "List only merge commits" },
+    { "-n", "--no-merges", "List no merge commits" },
+    { "-r", "--reverse", "List commits in reverse order" },
   },
+  ---@type FlagOption[]
   options = {
-    { "=n", "--max-count=", "Limit number of commits", key = "max_count" },
-    { "=a", "--author=", "List only commits from a given author", key = "author" },
-    { "=g", "--grep=", "Filter commit messages", key = "grep" },
+    { "=n", "--max-count=", "Limit number of commits" },
+    {
+      "=d", "--diff-merges=", "Determines how merge commits are treated",
+      select = {
+        "",
+        "off",
+        "on",
+        "first-parent",
+        "separate",
+        "combined",
+        "dense-combined",
+        "remerge",
+      },
+    },
+    { "=a", "--author=", "List only commits from a given author" },
+    { "=g", "--grep=", "Filter commit messages" },
   },
 }
 
 for _, list in pairs(FHOptionPanel.flags) do
   for _, option in ipairs(list) do
+    option.key = option[2]:match("%-%-?([^=]+)=?"):gsub("%-", "_")
     list[option.key] = option
   end
 end
@@ -69,20 +91,44 @@ function FHOptionPanel:init(parent)
   self.parent = parent
   self.emitter = EventEmitter()
 
+  ---@param option_name string
   self.emitter:on("set_option", function(option_name)
     local log_options = self.parent.log_options
+
     if FHOptionPanel.flags.switches[option_name] then
-      self.parent.log_options[option_name] = not self.parent.log_options[option_name]
+      log_options[option_name] = not log_options[option_name]
+
     elseif FHOptionPanel.flags.options[option_name] then
       local o = FHOptionPanel.flags.options[option_name]
-      local new_value = utils.input(o[2], log_options[option_name])
-      if new_value ~= "__INPUT_CANCELLED__" then
-        if new_value == "" then
-          new_value = nil
+
+      if o.select then
+        vim.ui.select(o.select, {
+          prompt = o[2],
+          format_item = function(item)
+            return item == "" and "<unset>" or item
+          end,
+        }, function(choice)
+          if choice then
+            log_options[option_name] = choice ~= "" and choice or nil
+          end
+
+          self:render()
+          self:redraw()
+        end)
+
+        return
+      else
+        local new_value = utils.input(o[2], log_options[option_name])
+
+        if new_value ~= "__INPUT_CANCELLED__" then
+          if new_value == "" then
+            new_value = nil
+          end
+          log_options[option_name] = new_value
         end
-        log_options[option_name] = new_value
       end
     end
+
     self:render()
     self:redraw()
   end)
@@ -118,7 +164,7 @@ end
 
 function FHOptionPanel:setup_buffer()
   local conf = config.get_config()
-  local default_opt = { silent = true, nowait = true, buffer = self.bufid }
+  local default_opt = { silent = true, buffer = self.bufid }
   for lhs, mapping in pairs(conf.keymaps.option_panel) do
     if type(lhs) == "number" then
       local opt = vim.tbl_extend("force", mapping[4] or {}, { buffer = self.bufid })

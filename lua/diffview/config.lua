@@ -43,12 +43,17 @@ M.defaults = {
   },
   file_history_panel = {
     log_options = {
-      max_count = 256,
       follow = false,
+      first_parent = false,
+      show_pulls = true,
       all = false,
       merges = false,
       no_merges = false,
       reverse = false,
+      max_count = 256,
+      diff_merges = "on",
+      author = nil,
+      grep = nil,
     },
     win_config = {
       position = "bottom",
