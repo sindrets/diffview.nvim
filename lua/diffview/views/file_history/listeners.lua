@@ -1,13 +1,9 @@
-local CommitLogPanel = require("diffview.ui.panels.commit_log_panel").CommitLogPanel
 local DiffView = require("diffview.views.diff.diff_view").DiffView
 local FileEntry = require("diffview.views.file_entry").FileEntry
 local api = vim.api
 local git = require("diffview.git.utils")
 local lib = require("diffview.lib")
 local utils = require("diffview.utils")
-
----@type CommitLogPanel
-local log_panel
 
 ---@param view FileHistoryView
 return function(view)
@@ -116,12 +112,7 @@ return function(view)
     open_commit_log = function()
       local file = view:infer_cur_file()
       if file then
-        if not log_panel then
-          log_panel = CommitLogPanel(view.git_root, {
-            name = ("diffview://%s/log/%d/%s"):format(view.git_dir, view.tabpage, "commit_log"),
-          })
-        end
-        log_panel:update(file.right.commit .. "^!")
+        view.commit_log_panel:update(file.right.commit .. "^!")
       end
     end,
     focus_files = function()

@@ -69,15 +69,15 @@ require("diffview").setup({
     },
   },
   file_history_panel = {
-    log_options = {
-      max_count = 256,      -- Limit the number of commits
-      follow = false,       -- Follow renames (only for single file)
-      all = false,          -- Include all refs under 'refs/' including HEAD
-      merges = false,       -- List only merge commits
-      no_merges = false,    -- List no merge commits
-      reverse = false,      -- List commits in reverse order
+    log_options = {   -- See ':h diffview-config-log_options'
+      single_file = {
+        diff_merges = "combined",
+      },
+      multiple_files = {
+        diff_merges = "first-parent",
+      },
     },
-    win_config = {          -- See ':h diffview-config-win_config'
+    win_config = {    -- See ':h diffview-config-win_config'
       position = "bottom",
       height = 16,
     },
@@ -97,7 +97,7 @@ require("diffview").setup({
       -- tabpage is a Diffview.
       ["<tab>"]      = actions.select_next_entry, -- Open the diff for the next file
       ["<s-tab>"]    = actions.select_prev_entry, -- Open the diff for the previous file
-      ["gf"]         = actions.goto_file,         -- Open the file in a new split in previous tabpage
+      ["gf"]         = actions.goto_file,         -- Open the file in a new split in the previous tabpage
       ["<C-w><C-f>"] = actions.goto_file_split,   -- Open the file in a new split
       ["<C-w>gf"]    = actions.goto_file_tab,     -- Open the file in a new tabpage
       ["<leader>e"]  = actions.focus_files,       -- Bring focus to the files panel
@@ -240,17 +240,20 @@ panel.
 
 ![file-history-multi](https://user-images.githubusercontent.com/2786478/131269782-f4184640-6d73-4226-b425-feccb5002dd0.png)
 
-The file history view allows you to list all the commits that changed a given
-file or directory, and view the changes made in a diff split. Open a file
-history view for your current file by calling `:DiffviewFileHistory`.
+The file history view allows you to list all the commits that affected a given
+file or directory, and view the changes made in a diff split. This is a
+porcelain interface for git-log. Open a file history view for your current file
+by calling `:DiffviewFileHistory %`.
 
 ## Usage
 
-### `:DiffviewOpen [git rev] [args] [ -- {paths...}]`
+### `:DiffviewOpen [git rev] [options] [ -- {paths...}]`
 
 Calling `:DiffviewOpen` with no args opens a new Diffview that compares against
 the current index. You can also provide any valid git rev to view only changes
-for that rev. Examples:
+for that rev.
+
+Examples:
 
 - `:DiffviewOpen`
 - `:DiffviewOpen HEAD~2`
@@ -263,7 +266,8 @@ You can also provide additional paths to narrow down what files are shown:
 
 - `:DiffviewOpen HEAD~2 -- lua/diffview plugin`
 
-For information about additional `[args]`, visit the [documentation](https://github.com/sindrets/diffview.nvim/blob/main/doc/diffview.txt).
+For information about additional `[options]`, visit the
+[documentation](https://github.com/sindrets/diffview.nvim/blob/main/doc/diffview.txt).
 
 Additional commands for convenience:
 
@@ -276,13 +280,24 @@ Additional commands for convenience:
 With a Diffview open and the default key bindings, you can cycle through changed
 files with `<tab>` and `<s-tab>` (see configuration to change the key bindings).
 
-### `:DiffviewFileHistory [paths] [args]`
+### `:DiffviewFileHistory [paths] [options]`
 
-Opens a new file history view that lists all commits that changed a given file
-or directory. If no `[paths]` are given, defaults to the current file. Multiple
-`[paths]` may be provided. If you want to view the file history for all changed
-files for every commit, simply call `:DiffviewFileHistory .` (assuming your cwd
-is the top level of the git repository).
+Opens a new file history view that lists all commits that affected the given
+paths. This is a porcelain interface for git-log.
+
+If no `[paths]` are given, defaults to the top-level of the git repository. The
+top-level will be inferred from the current buffer when possible, otherwise the
+cwd is used. Multiple `[paths]` may be provided and git pathspec is supported.
+
+Examples:
+
+- `:DiffviewFileHistory`
+- `:DiffviewFileHistory %`
+- `:DiffviewFileHistory path/to/some/file.txt`
+- `:DiffviewFileHistory path/to/some/directory`
+- `:DiffviewFileHistory include/this and/this :!but/not/this`
+- `:DiffviewFileHistory --range=origin..HEAD`
+- `:DiffviewFileHistory --range=feat/example-branch`
 
 ## Restoring Files
 

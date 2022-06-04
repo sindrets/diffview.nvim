@@ -52,7 +52,7 @@ FHOptionPanel.flags = {
   },
   ---@type FlagOption[]
   options = {
-    { "=n", "--max-count=", "Limit number of commits" },
+    { "=n", "--max-count=", "Limit the number of commits" },
     {
       "=d", "--diff-merges=", "Determines how merge commits are treated",
       select = {
@@ -93,7 +93,7 @@ function FHOptionPanel:init(parent)
 
   ---@param option_name string
   self.emitter:on("set_option", function(option_name)
-    local log_options = self.parent.log_options
+    local log_options = self.parent:get_log_options()
 
     if FHOptionPanel.flags.switches[option_name] then
       log_options[option_name] = not log_options[option_name]
@@ -141,7 +141,7 @@ function FHOptionPanel:init(parent)
 
   self:on_autocmd("WinClosed", {
     callback = function()
-      if not vim.deep_equal(self.option_state, self.parent.log_options) then
+      if not vim.deep_equal(self.option_state, self.parent:get_log_options()) then
         vim.schedule(function ()
           self.option_state = nil
           self.winid = nil
@@ -159,7 +159,7 @@ end
 ---@Override
 function FHOptionPanel:open()
   FHOptionPanel:super().open(self)
-  self.option_state = utils.tbl_deep_clone(self.parent.log_options)
+  self.option_state = utils.tbl_deep_clone(self.parent:get_log_options())
 end
 
 function FHOptionPanel:setup_buffer()

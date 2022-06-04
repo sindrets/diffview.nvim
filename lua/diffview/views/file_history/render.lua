@@ -205,10 +205,10 @@ return {
     -- root path
     comp:add_hl("DiffviewFilePanelRootPath", line_idx, 0, #cached.root_path)
     comp:add_line(cached.root_path)
-    line_idx = line_idx + 1
 
     local offset
     if panel.single_file then
+      line_idx = line_idx + 1
       if #panel.entries > 0 then
         local file = panel.entries[1].files[1]
 
@@ -227,7 +227,8 @@ return {
         s = icon .. file.path
         comp:add_line(s)
       end
-    else
+    elseif #cached.args > 0 then
+      line_idx = line_idx + 1
       s = "Showing history for: "
       comp:add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
       offset = #s
@@ -294,6 +295,7 @@ return {
     local comp = panel.components.switches.title.comp
     local line_idx = 0
     local offset
+    local log_options = panel.parent:get_log_options()
 
     local s = "Switches"
     comp:add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
@@ -303,7 +305,7 @@ return {
       ---@type RenderComponent
       comp = item.comp
       local option = comp.context[2]
-      local enabled = panel.parent.log_options[comp.context[1]]
+      local enabled = log_options[comp.context[1]]
 
       s = " " .. option[1] .. " "
       comp:add_hl("DiffviewDim1", 0, 0, #s)
@@ -337,7 +339,7 @@ return {
       ---@type RenderComponent
       comp = item.comp
       local option = comp.context[2]
-      local value = panel.parent.log_options[comp.context[1]] or ""
+      local value = log_options[comp.context[1]] or ""
 
       s = " " .. option[1] .. " "
       comp:add_hl("DiffviewDim1", 0, 0, #s)

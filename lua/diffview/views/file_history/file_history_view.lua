@@ -1,3 +1,4 @@
+local CommitLogPanel = require("diffview.ui.panels.commit_log_panel").CommitLogPanel
 local Event = require("diffview.events").Event
 local EventEmitter = require("diffview.events").EventEmitter
 local FileEntry = require("diffview.views.file_entry").FileEntry
@@ -16,6 +17,7 @@ local M = {}
 ---@field git_root string
 ---@field git_dir string
 ---@field panel FileHistoryPanel
+---@field commit_log_panel CommitLogPanel
 ---@field path_args string[]
 ---@field raw_args string[]
 ---@field rev_arg string?
@@ -48,6 +50,9 @@ function FileHistoryView:init(opt)
 end
 
 function FileHistoryView:post_open()
+  self.commit_log_panel = CommitLogPanel(self.git_root, {
+    name = ("diffview://%s/log/%d/%s"):format(self.git_dir, self.tabpage, "commit_log"),
+  })
   self:init_event_listeners()
   vim.schedule(function()
     self:file_safeguard()
@@ -70,6 +75,7 @@ function FileHistoryView:close()
   for _, entry in ipairs(self.panel.entries or {}) do
     entry:destroy()
   end
+  self.commit_log_panel:destroy()
   FileHistoryView:super().close(self)
 end
 

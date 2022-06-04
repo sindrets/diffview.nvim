@@ -39,7 +39,7 @@ local perf_update = PerfTimer("[FileHistoryPanel] update")
 ---@field raw_args string[]
 ---@field base Rev
 ---@field rev_range RevRange
----@field log_options LogOptions
+---@field log_options ConfigLogOptions
 ---@field cur_item {[1]: LogEntry, [2]: FileEntry}
 ---@field single_file boolean
 ---@field updating boolean
@@ -95,7 +95,18 @@ function FileHistoryPanel:init(parent, git_root, entries, path_args, raw_args, l
   self.cur_item = {}
   self.single_file = entries[1] and entries[1].single_file
   self.option_panel = FHOptionPanel(self)
-  self.log_options = vim.tbl_extend("force", conf.file_history_panel.log_options, log_options)
+  self.log_options = {
+    single_file = vim.tbl_extend(
+      "force",
+      conf.file_history_panel.log_options.single_file,
+      log_options
+    ),
+    multiple_files = vim.tbl_extend(
+      "force",
+      conf.file_history_panel.log_options.multiple_files,
+      log_options
+    ),
+  }
 
   self:on_autocmd("BufNew", {
     callback = function()
@@ -476,6 +487,15 @@ function FileHistoryPanel:render()
   require("diffview.views.file_history.render").file_history_panel(self)
   perf_render:time()
   logger.lvl(10).s_debug(perf_render)
+end
+
+---@return LogOptions
+function FileHistoryPanel:get_log_options()
+  if self.single_file then
+    return self.log_options.single_file
+  else
+    return self.log_options.multiple_files
+  end
 end
 
 M.FileHistoryPanel = FileHistoryPanel

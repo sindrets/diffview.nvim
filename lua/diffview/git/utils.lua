@@ -8,6 +8,7 @@ local Rev = require("diffview.git.rev").Rev
 local RevType = require("diffview.git.rev").RevType
 local Semaphore = require("diffview.control").Semaphore
 local async = require("plenary.async")
+local config = require("diffview.config")
 local logger = require("diffview.logger")
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
@@ -76,7 +77,7 @@ local ensure_output = async.wrap(function(max_retries, jobs, log_context, callba
 
       if job.code == 0 and #job:result() == 0 then
         logger.warn(
-          ("%sJob silently returned nothing! Retrying %d more times(s).")
+          ("%sJob expected output, but returned nothing! Retrying %d more times(s).")
           :format(context, max_retries - n)
         )
         logger.log_job(job, { func = logger.warn, context = log_context })
@@ -487,7 +488,7 @@ end)
 ---@param thread thread
 ---@param git_root string
 ---@param path_args string[]
----@param log_opt LogOptions
+---@param log_opt ConfigLogOptions
 ---@param opt ProcessFileHistorySpec
 ---@param callback function
 local function process_file_history(thread, git_root, path_args, log_opt, opt, callback)
@@ -503,11 +504,17 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
     and not utils.path:is_directory(path_args[1])
     and #utils.system_list(utils.vec_join("git", "ls-files", "--", path_args), git_root) < 2
 
+  ---@type LogOptions
+  local log_options = config.get_log_options(
+    single_file,
+    single_file and log_opt.single_file or log_opt.multiple_files
+  )
+
   incremental_fh_data(
     git_root,
     path_args,
     single_file,
-    log_opt,
+    log_options,
     { rev_arg = opt.rev_arg, },
     function(status, d)
       if status == JobStatus.PROGRESS then
@@ -558,7 +565,7 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
           "--format=",
           "--diff-merges=first-parent",
           "--name-status",
-          (single_file and log_opt.follow) and "--follow" or nil,
+          (single_file and log_options.follow) and "--follow" or nil,
           cur.right_hash,
           "--",
           old_path or path_args
@@ -675,7 +682,7 @@ end
 
 ---@param git_root string
 ---@param path_args string[]
----@param log_opt LogOptions
+---@param log_opt ConfigLogOptions
 ---@param opt ProcessFileHistorySpec
 ---@param callback function
 function M.file_history(git_root, path_args, log_opt, opt, callback)
@@ -708,9 +715,11 @@ function M.file_history_dry_run(git_root, path_args, log_opt, opt)
     and utils.path:is_directory(path_args[1])
     and #utils.system_list(utils.vec_join("git", "ls-files", "--", path_args), git_root) < 2
 
+  local log_options = config.get_log_options(single_file, log_opt)
+
   local options = vim.tbl_map(function(v)
     return vim.fn.shellescape(v)
-  end, prepare_fh_options(log_opt, single_file))
+  end, prepare_fh_options(log_options, single_file))
 
   local description = utils.vec_join(
     ("Top-level path: '%s'"):format(utils.path:vim_fnamemodify(git_root, ":~")),
@@ -718,9 +727,9 @@ function M.file_history_dry_run(git_root, path_args, log_opt, opt)
     ("Flags: %s"):format(table.concat(options, " "))
   )
 
-  log_opt = utils.tbl_clone(log_opt)
-  log_opt.max_count = 1
-  options = prepare_fh_options(log_opt, single_file)
+  log_options = utils.tbl_clone(log_options)
+  log_options.max_count = 1
+  options = prepare_fh_options(log_options, single_file)
   local out, code = utils.system_list(
     utils.vec_join("git", "log", "--pretty=format:%H", "--name-status", options, opt.rev_arg, "--", path_args),
     git_root

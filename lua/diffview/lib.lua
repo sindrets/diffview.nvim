@@ -118,13 +118,10 @@ function M.file_history(args)
 
   local cfile = path:vim_expand("%")
   cfile = path:readlink(cfile) or cfile
-  local fpath =
-      (paths[1] and path:absolute(paths[1]))
-      or (
-        vim.bo.buftype == ""
-        and path:readable(cfile)
-        and path:absolute(cfile)
-      )
+  local fpath = (paths[1] and path:absolute(paths[1]))
+      or (vim.bo.buftype == ""
+          and path:readable(cfile)
+          and path:absolute(cfile))
       or path:realpath(".")
 
   local cpath = argo:get_flag("C")
@@ -132,15 +129,11 @@ function M.file_history(args)
     cpath = nil
   end
 
-  if #paths == 0 then
-    paths[1] = cpath and path:realpath(cpath) or fpath
-  end
-
   rel_paths = vim.tbl_map(function(v)
     return v == "." and "." or path:relative(v, ".")
   end, paths)
 
-  local p = paths[1]
+  local p = cpath and path:realpath(cpath) or fpath
   local stat = path:stat(p)
   if stat then
     if stat.type ~= "directory" then
@@ -152,7 +145,7 @@ function M.file_history(args)
 
   local git_root = git.toplevel(p)
   if not git_root then
-    utils.err(("Path not a git repo (or any parent): '%s'"):format(rel_paths[1]))
+    utils.err(("Path not a git repo (or any parent): '%s'"):format(path:relative(p, ".")))
     return
   end
 
@@ -184,22 +177,22 @@ function M.file_history(args)
     { "grep" },
   }
 
-  local log_oneshot_options = {}
+  ---@type LogOptions
+  local log_options = {}
   for _, names in ipairs(log_flag_names) do
     local v = argo:get_flag(names)
     if v then
       local key, _ = names[1]:gsub("%-", "_")
-      log_oneshot_options[key] = v
+      log_options[key] = v
     end
   end
 
-  local log_options = vim.tbl_extend(
-    "force",
-    config.get_config().file_history_panel.log_options,
-    log_oneshot_options
+  local ok, opt_description = git.file_history_dry_run(
+    git_root,
+    paths,
+    log_options,
+    { rev_arg = range_arg }
   )
-
-  local ok, opt_description = git.file_history_dry_run(git_root, paths, log_options, { rev_arg = range_arg })
 
   if not ok then
     utils.info({

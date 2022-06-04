@@ -271,7 +271,7 @@ function M.handle_job(job, opt)
   end
 
   log_func(msg)
-  log_func(("%s[cmd] %s %s"):format(context, job.command, table.concat(args, " ")))
+  log_func(("%s   [cmd] %s %s"):format(context, job.command, table.concat(args, " ")))
 
   local stderr = job:stderr_result()
   if #stderr > 0 then
@@ -329,7 +329,7 @@ function M.system_list(cmd, cwd_or_opt)
   for i = 0, max_retries do
     if i > 0 then
       logger.warn(
-        ("%sJob silently returned nothing! Retrying %d more time(s)...")
+        ("%sJob expected output, but returned nothing! Retrying %d more time(s)...")
         :format(context, max_retries - i + 1)
       )
       logger.log_job(job, { func = logger.warn, context = opt.context })
@@ -474,10 +474,28 @@ function M.tbl_clear(t)
   end
 end
 
+---Try property access.
+---@param t table
+---@param table_path string A `.` separated string of table keys.
+---@return any?
+function M.tbl_access(t, table_path)
+  local keys = vim.split(table_path, ".", { plain = true })
+  local cur = t
+
+  for _, k in ipairs(keys) do
+    cur = cur[k]
+    if not cur then
+      return nil
+    end
+  end
+
+  return cur
+end
+
 ---Create a shallow copy of a portion of a vector.
 ---@param t vector
----@param first? integer First index, inclusive
----@param last? integer Last index, inclusive
+---@param first? integer First index, inclusive. (default: 1)
+---@param last? integer Last index, inclusive. (default: `#t`)
 ---@return vector
 function M.vec_slice(t, first, last)
   local slice = {}

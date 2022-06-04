@@ -60,15 +60,15 @@ Example configuration with default settings:
         },
       },
       file_history_panel = {
-        log_options = {
-          max_count = 256,      -- Limit the number of commits
-          follow = false,       -- Follow renames (only for single file)
-          all = false,          -- Include all refs under 'refs/' including HEAD
-          merges = false,       -- List only merge commits
-          no_merges = false,    -- List no merge commits
-          reverse = false,      -- List commits in reverse order
+        log_options = {   -- See |diffview-config-log_options|
+          single_file = {
+            diff_merges = "combined",
+          },
+          multiple_files = {
+            diff_merges = "first-parent",
+          },
         },
-        win_config = {          -- See |diffview-config-win_config|
+        win_config = {    -- See |diffview-config-win_config|
           position = "bottom",
           height = 16,
         },
@@ -241,6 +241,24 @@ win_config                                      *diffview-config-win_config*
                   return c
                 end,
 <
+
+
+log_options                                     *diffview-config-log_options*
+        Type: `table`, Default: (see example config above)
+
+        This table allows you to control the default options that are passed
+        to git-log in order to produce the file history. The table is divided
+        into the sub-tables `single_file`, and `multiple_files`. This allows
+        you to define different default log options for history targeting
+        singular files, and history targeting multiple paths, and/or
+        directories.
+
+        Fields:~
+            {single_file} (`LogOptions`)
+                See |diffview.git.LogOptions|.
+
+            {multiple_files} (`LogOptions`)
+                See |diffview.git.LogOptions|.
 
 default_args                                    *diffview-config-default_args*
         Type: `table<string, string[]>`, Default: `{}`
@@ -587,8 +605,8 @@ select_entry                                    *diffview-actions-select_entry*
         Think of this as a general "interact" action. In the file panel, and
         the file history panel, this will open the file under the cursor. If
         the entry under the cursor is a directory, or a history entry with
-        multiple files, this will toggle the entry's collapsed state. In the
-        option panel this will interact with the option under the cursor.
+        multiple files, this will collapse or open the entry. In the option
+        panel this will interact with the option under the cursor.
 
 select_next_entry                               *diffview-actions-select_next_entry*
         Contexts: `view`, `file_panel`, `file_history_panel`
@@ -660,14 +678,14 @@ split. To change the alignment add either `horizontal` or `vertical` to your
 COMMANDS                                        *diffview-commands*
 
                                                 *:DiffviewOpen*
-:DiffviewOpen [git-rev] [args] [ -- {paths...}]
+:DiffviewOpen [git-rev] [options] [ -- {paths...}]
                         Opens a new Diffview that compares against [git-rev].
                         If no [git-rev] is given, defaults to comparing
                         against the index. Additional {paths...} can be
                         provided to narrow down what files are shown. If the
-                        `-C` flag is not defined, the git root is determined
-                        from the current buffer when possible. Otherwise it's
-                        determined from the cwd.
+                        `-C` flag is not defined, the git top-level is
+                        determined from the current buffer when possible.
+                        Otherwise it's determined from the cwd.
                         Examples:
 >
         :DiffviewOpen
@@ -679,7 +697,7 @@ COMMANDS                                        *diffview-commands*
         :DiffviewOpen HEAD~2 -- lua/diffview plugin
         :DiffviewOpen d4a7b0d -uno
 <
-    Args:~
+    Options:~
         -u[value], --untracked-files[={value}]
                         Specify whether or not to show untracked files. If
                         flag is given without value; defaults to `true`.
@@ -707,13 +725,17 @@ COMMANDS                                        *diffview-commands*
                         the initial set of files, this option does nothing.
 
                                                 *:DiffviewFileHistory*
-:DiffviewFileHistory [paths] [args]
+:DiffviewFileHistory [paths] [options]
                         Opens a new file history view that lists all commits
-                        that changed a given file or directory. If no [paths]
-                        are given, defaults to the current file. Multiple
-                        [paths] may be provided and git pathspec is supported
-                        (see `$ man gitglossary(7)` for information about
-                        pathspec).
+                        that affected the given paths. This is a porcelain
+                        interface for git-log.
+
+                        If no [paths] are given, defaults to the top-level of
+                        the git repository. The top-level will be inferred
+                        from the current buffer when possible, otherwise the
+                        cwd is used. Multiple [paths] may be provided and git
+                        pathspec is supported (see `:Man gitglossary(7)` for
+                        information about pathspec).
 
                         From the file history panel (the panel listing the
                         commits) you can open an option panel by pressing
@@ -724,18 +746,30 @@ COMMANDS                                        *diffview-commands*
                         that are shown directly in the panel, preceding the
                         flags' descriptions.
 
+                        NOTE: Commits are only listed if git-log is able to
+                        show its file stats given your currently configured
+                        log options. As such pay attention to the value of
+                        `--diff-merges`, as this controls how git-log treats
+                        merge commits and subsequently it's willingness to
+                        show stats for these commits. Setting
+                        `--diff-merges=off` will tell git-log to never compare
+                        merge commits, and as such they won't show up in the
+                        file history view.
+
                         Examples:
 >
         :DiffviewFileHistory
+        :DiffviewFileHistory %
         :DiffviewFileHistory path/to/some/file.txt
         :DiffviewFileHistory path/to/some/directory
         :DiffviewFileHistory multiple/paths foo/bar baz/qux
         :DiffviewFileHistory --base=HEAD~4
         :DiffviewFileHistory --base=LOCAL
         :DiffviewFileHistory --range=origin..HEAD
+        :DiffviewFileHistory --range=feat/some-branch
 <
 
-    Args:~
+    Options:~
         --base={git-rev}
                         Specify a base git rev from which the right side of
                         the diff will be created. Use the special value
@@ -746,6 +780,48 @@ COMMANDS                                        *diffview-commands*
 
         -C{path}        Run as if git was started in {path} instead of the
                         current working directory.
+
+        NOTE: All following options are described in far more detail in the
+        man page for git-log. See `:Man git-log(1)` for more information.
+
+        --follow        Follow renames (only for single file).
+
+        --first-parent  Follow only the first parent upon seeing a merge
+                        commit.
+
+        --show-pulls    Show merge commits that are not TREESAME to its first
+                        parent, but are to a later parent.
+
+        --all           Include all refs.
+
+        --merges        List only merge commits.
+
+        --no-merges     List no merge commits.
+
+        --reverse       List commits in reverse order.
+
+        -n{n}, --max-count={n}
+                        Limit the number of commits.
+
+        --diff-merges={value}
+                        Determines how merge commits are treated. {value} can
+                        be one of:
+                            • `off`
+                            • `on`
+                            • `first-parent`
+                            • `separate`
+                            • `combined`
+                            • `dense-combined`
+                            • `remerge`
+
+        --author={pattern}
+                        Limit the commits output to ones with author/committer
+                        header lines that match the specified pattern (regular
+                        expression).
+
+        --grep={pattern}
+                        Limit the commits output to ones with log message that
+                        matches the specified pattern (regular expression).
 
                                                 *:DiffviewClose*
 :DiffviewClose          Close the active Diffview.
@@ -966,73 +1042,149 @@ https://gist.github.com/sindrets/b750723f5f23182904f70a6274106304
 
 CDiffView                                       *diffview.api.views.diff.diff_view.CDiffView*
 
-    Class that represents a custom Diffview.
+        Class that represents a custom Diffview.
 
-    CDiffView({opt})
+        CDiffView({opt})
 
-        Parameters: ~
-            {opt}   (table)   Table containing the args passed to the view
-                              constructor.
+            Parameters: ~
+                {opt} (table)
+                    Table containing the args passed to the view constructor.
 
-        Fields: ~
-            {git_root} (string)         Absolute path to the toplevel git
-                                        directory.
-            {left} (Rev)                The git rev representing the left
-                                        window in the diffview.
-            {right} (Rev)               The git rev representing the right
-                                        window in the diffview.
-            {files} (FileDict)          List of file data used to create the
-                                        file entries in the view.
-            {update_files} (function)   This function should return an updated
-                                        list of `FileData`, and is called from
-                                        `View:update_files`.
-                Parameters: ~
-                    {view} (CDiffView)  The CDiffView object that called the
-                                        function.
+            Fields: ~
+                {git_root} (string)
+                    Absolute path to the toplevel git
+                                            directory.
 
-            {get_file_data} (function)  This should return a list of lines that
-                                        make up the buffer indicated by `path`
-                                        and `split`.
-                Parameters: ~
-                    {kind} ("working"|"staged")
-                    {path} (string)             Path to the file, relative to
-                                                git root.
-                    {split} ("left"|"right")
+                {left} (Rev)
+                    The git rev representing the left window in the diffview.
+
+                {right} (Rev)
+                    The git rev representing the right window in the diffview.
+
+                {files} (FileDict)
+                    List of file data used to create the file entries in the
+                    view.
+
+                {update_files} (function)
+                    This function should return an updated list of `FileData`, and
+                    is called from `View:update_files`.
+
+                    Parameters: ~
+                        {view} (CDiffView)
+                            The CDiffView object that called the function.
+
+
+                {get_file_data} (function)
+                    This should return a list of lines that make up the buffer
+                    indicated by `path` and `split`.
+
+                    Parameters: ~
+                        {kind} ("working"|"staged")
+                        {path} (string)             Path to the file, relative to
+                                                    git root.
+                        {split} ("left"|"right")
 
 FileDict                                        *diffview.git.FileDict*
 
-    Fields:~
-        {working} (FileData[])
-        {staged}  (FileData[])
+        Fields:~
+            {working} (FileData[])
+            {staged}  (FileData[])
 
 FileData                                        *diffview.api.views.diff.diff_view.FileData*
 
-    Table that contains the metadata used to create file entries.
+        Table that contains the metadata used to create file entries.
 
-    Fields: ~
-        {path} (string)         Path relative to git root.
-        {oldpath} (string|nil)  If the file has been renamed, this should be
-                                the old path, otherwise nil.
-        {status} (string)       Git status symbol. Can be one of:
-                                `A`, `?`, `M`, `R`, `C`, `T`, `U`, `X`, `D`, `B`
-                                See `man git-status` for the definition of the
-                                different symbols.
-        {stats} (GitStats|nil)  Table describing number of additions and
-                                deletions in the file.
-        {left_null} (boolean)   If true, indicates that the left diff buffer
-                                should be represented by the null buffer.
-        {right_null} (boolean)  If true, indicates that the right diff buffer
-                                should be represented by the null buffer.
-        {selected} (boolean)    If true, indicates that this should be the
-                                initially selected file.
+        Fields: ~
+            {path} (string)
+                Path relative to git root.
+
+            {oldpath} (string|nil)
+                If the file has been renamed, this should be the old path,
+                otherwise nil.
+
+            {status} (string)
+                Git status symbol. Can be one of: `A`, `?`, `M`, `R`, `C`,
+                `T`, `U`, `X`, `D`, `B` See `:Man git-status(1)` for the
+                definition of the different symbols.
+
+            {stats} (GitStats|nil)
+                Table describing number of additions and deletions in the
+                file.
+
+            {left_null} (boolean)
+                If true, indicates that the left diff buffer should be
+                represented by the null buffer.
+
+            {right_null} (boolean)
+                If true, indicates that the right diff buffer should be
+                represented by the null buffer.
+
+            {selected} (boolean)
+                If true, indicates that this should be the initially selected
+                file.
 
 GitStats                                        *diffview.views.file_entry.GitStats*
 
-    Table describing number of additions and deletions in a file.
+        Table describing number of additions and deletions in a file.
 
-    Fields: ~
-        {additions} (integer)   Number of additons in the file.
-        {deletions} (integer)   Number of deletions in the file.
+        Fields: ~
+            {additions} (integer)
+                Number of additons in the file.
+
+            {deletions} (integer)
+                Number of deletions in the file.
+
+LogOptions                                      *diffview.git.LogOptions*
+
+        Table controlling the options passed to git-log.
+
+        Fields:~
+            NOTE: All these options are described in far more detail in the
+            man page for git-log. See `:Man git-log(1)` for more information.
+
+            {follow} (boolean)
+                Follow renames (only for single file).
+
+            {first_parent} (boolean)
+                Follow only the first parent upon seeing a merge commit.
+
+            {show_pulls} (boolean)
+                Show merge commits that are not TREESAME to its first parent,
+                but are to a later parent.
+
+            {all} (boolean)
+                Include all refs.
+
+            {merges} (boolean)
+                List only merge commits.
+
+            {no_merges} (boolean)
+                List no merge commits.
+
+            {reverse} (boolean)
+                List commits in reverse order.
+
+            {max_count} (integer)
+                Limit the number of commits.
+
+            {diff_merges} (string)
+                Determines how merge commits are treated. The value can be one
+                of:
+                    • `"off"`
+                    • `"on"`
+                    • `"first-parent"`
+                    • `"separate"`
+                    • `"combined"`
+                    • `"dense-combined"`
+                    • `"remerge"`
+
+            {author} (string)
+                Limit the commits output to ones with author/committer header
+                lines that match the specified pattern (regular expression).
+
+            {grep} (string)
+                Limit the commits output to ones with log message that matches
+                the specified pattern (regular expression).
 
 
  vim:tw=78:ts=8:ft=help:norl:
