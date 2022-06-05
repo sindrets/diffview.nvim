@@ -359,7 +359,7 @@ local function structure_fh_data(namestat_data, numstat_data)
     time = tonumber(time),
     time_offset = time_offset,
     rel_date = namestat_data[4],
-    subject = namestat_data[5],
+    subject = namestat_data[5]:sub(3),
     namestat = utils.vec_slice(namestat_data, 6),
     numstat = numstat_data,
   }
@@ -426,7 +426,7 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
     args = utils.vec_join(
       "log",
       log_opt.rev_range,
-      "--pretty=format:%x00%n%H %P%n%an%n%ad%n%ar%n%s",
+      "--pretty=format:%x00%n%H %P%n%an%n%ad%n%ar%n  %s",
       "--date=raw",
       "--name-status",
       options,

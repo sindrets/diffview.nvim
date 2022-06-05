@@ -144,6 +144,9 @@ local function render_entries(parent, entries, updating)
 
     offset = #s + 1
     local subject = utils.str_shorten(entry.commit.subject, 72)
+    if subject == "" then
+      subject = "[empty message]"
+    end
     comp:add_hl("DiffviewFilePanelFileName", line_idx, offset, offset + #subject)
     s = s .. " " .. subject
 

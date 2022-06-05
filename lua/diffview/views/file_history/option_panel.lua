@@ -108,7 +108,7 @@ function FHOptionPanel:init(parent)
     ---@type PanelSplitSpec
     config = {
       position = "bottom",
-      height = 17,
+      height = #FHOptionPanel.flags.switches + #FHOptionPanel.flags.options + 4,
     },
     bufname = "DiffviewFHOptionPanel",
   })
