@@ -47,10 +47,7 @@ function M.diffview_open(args)
       and path:parent(path:absolute(cfile))
       or path:realpath(".")
     )
-  local cpath = argo:get_flag("C")
-  if vim.tbl_contains({ true, "", nil }, cpath) then
-    cpath = nil
-  end
+  local cpath = argo:get_flag("C", { expect_string = true, no_empty = true })
   local p = cpath and path:realpath(cpath) or fpath
   if not path:is_directory(p) then
     p = path:parent(p)
@@ -85,7 +82,7 @@ function M.diffview_open(args)
       { "all", "normal", "true" },
       { "no", "false" }
     ),
-    selected_file = argo:get_flag("selected-file")
+    selected_file = argo:get_flag("selected-file", { expect_string = true, no_empty = true })
       or (vim.bo.buftype == "" and path:vim_expand("%:p"))
       or nil,
   }
@@ -124,10 +121,7 @@ function M.file_history(args)
           and path:absolute(cfile))
       or path:realpath(".")
 
-  local cpath = argo:get_flag("C")
-  if vim.tbl_contains({ true, "", nil }, cpath) then
-    cpath = nil
-  end
+  local cpath = argo:get_flag("C", { expect_string = true, no_empty = true })
 
   rel_paths = vim.tbl_map(function(v)
     return v == "." and "." or path:relative(v, ".")
@@ -154,7 +148,7 @@ function M.file_history(args)
     return git.pathspec_expand(git_root, cwd, pathspec)
   end, paths)
 
-  local range_arg = argo:get_flag("range")
+  local range_arg = argo:get_flag("range", { expect_string = true, no_empty = true })
   if range_arg then
     local ok = git.verify_rev_arg(git_root, range_arg)
     if not ok then
@@ -167,6 +161,7 @@ function M.file_history(args)
     { "follow" },
     { "first-parent" },
     { "show-pulls" },
+    { "reflog" },
     { "all" },
     { "merges" },
     { "no-merges" },
@@ -178,21 +173,19 @@ function M.file_history(args)
   }
 
   ---@type LogOptions
-  local log_options = {}
+  local log_options = { rev_range = range_arg }
   for _, names in ipairs(log_flag_names) do
-    local v = argo:get_flag(names)
-    if v then
-      local key, _ = names[1]:gsub("%-", "_")
-      log_options[key] = v
-    end
+    local key, _ = names[1]:gsub("%-", "_")
+    local v = argo:get_flag(
+      names,
+      type(config.log_option_defaults[key]) ~= "boolean"
+        and { expect_string = true }
+        or nil
+    )
+    log_options[key] = v
   end
 
-  local ok, opt_description = git.file_history_dry_run(
-    git_root,
-    paths,
-    log_options,
-    { rev_arg = range_arg }
-  )
+  local ok, opt_description = git.file_history_dry_run(git_root, paths, log_options)
 
   if not ok then
     utils.info({
@@ -206,7 +199,7 @@ function M.file_history(args)
   end
 
   local base
-  local base_arg = argo:get_flag("base")
+  local base_arg = argo:get_flag("base", { expect_string = true, no_empty = true })
   if base_arg then
     if base_arg == "LOCAL" then
       base = Rev(RevType.LOCAL)
@@ -228,7 +221,6 @@ function M.file_history(args)
     raw_args = argo.args,
     log_options = log_options,
     base = base,
-    rev_arg = range_arg,
   })
 
   table.insert(M.views, v)

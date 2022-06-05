@@ -46,6 +46,7 @@ end)
 comp_file_history:put({ "--follow" })
 comp_file_history:put({ "--first-parent" })
 comp_file_history:put({ "--show-pulls" })
+comp_file_history:put({ "--reflog" })
 comp_file_history:put({ "--all" })
 comp_file_history:put({ "--merges" })
 comp_file_history:put({ "--no-merges" })
@@ -142,6 +143,14 @@ function M.init()
   DiffviewGlobal.emitter:on("diff_buf_win_enter", function(_)
     vim.cmd("do User DiffviewDiffBufWinEnter")
   end)
+
+  -- Set up completion wrapper used by `vim.ui.input()`
+  vim.cmd([[
+    function! Diffview__ui_input_completion(...) abort
+      return luaeval("DiffviewGlobal.state.current_completer(
+            \ unpack(vim.fn.eval('a:000')))")
+    endfunction
+  ]])
 end
 
 function M.open(...)

@@ -64,7 +64,7 @@ Example configuration with default settings:
           single_file = {
             diff_merges = "combined",
           },
-          multiple_files = {
+          multi_file = {
             diff_merges = "first-parent",
           },
         },
@@ -248,16 +248,15 @@ log_options                                     *diffview-config-log_options*
 
         This table allows you to control the default options that are passed
         to git-log in order to produce the file history. The table is divided
-        into the sub-tables `single_file`, and `multiple_files`. This allows
-        you to define different default log options for history targeting
-        singular files, and history targeting multiple paths, and/or
-        directories.
+        into the sub-tables `single_file`, and `multi_file`. This allows you
+        to define different default log options for history targeting singular
+        files, and history targeting multiple paths, and/or directories.
 
         Fields:~
             {single_file} (`LogOptions`)
                 See |diffview.git.LogOptions|.
 
-            {multiple_files} (`LogOptions`)
+            {multi_file} (`LogOptions`)
                 See |diffview.git.LogOptions|.
 
 default_args                                    *diffview-config-default_args*
@@ -792,6 +791,8 @@ COMMANDS                                        *diffview-commands*
         --show-pulls    Show merge commits that are not TREESAME to its first
                         parent, but are to a later parent.
 
+        --reflog        Include all reachable objects mentioned by reflogs.
+
         --all           Include all refs.
 
         --merges        List only merge commits.
@@ -1152,6 +1153,9 @@ LogOptions                                      *diffview.git.LogOptions*
                 Show merge commits that are not TREESAME to its first parent,
                 but are to a later parent.
 
+            {reflog} (boolean)
+                Include all reachable objects mentioned by reflogs.
+
             {all} (boolean)
                 Include all refs.
 
@@ -1163,6 +1167,9 @@ LogOptions                                      *diffview.git.LogOptions*
 
             {reverse} (boolean)
                 List commits in reverse order.
+
+            {rev_range} (string)
+                List only the commits in the specified revision range.
 
             {max_count} (integer)
                 Limit the number of commits.

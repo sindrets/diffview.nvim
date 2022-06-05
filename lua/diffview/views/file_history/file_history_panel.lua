@@ -18,19 +18,6 @@ local perf_render = PerfTimer("[FileHistoryPanel] render")
 ---@type PerfTimer
 local perf_update = PerfTimer("[FileHistoryPanel] update")
 
----@class LogOptions
----@field follow boolean
----@field first_parent boolean
----@field show_pulls boolean
----@field all boolean
----@field merges boolean
----@field no_merges boolean
----@field reverse boolean
----@field max_count integer
----@field author string
----@field grep string
----@field diff_merges string
-
 ---@class FileHistoryPanel : Panel
 ---@field parent FileHistoryView
 ---@field git_root string
@@ -69,7 +56,6 @@ FileHistoryPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 
 ---@class FileHistoryPanelSpec
 ---@field base Rev
----@field rev_arg string
 
 ---FileHistoryPanel constructor.
 ---@param parent FileHistoryView
@@ -91,7 +77,6 @@ function FileHistoryPanel:init(parent, git_root, entries, path_args, raw_args, l
   self.path_args = path_args
   self.raw_args = raw_args
   self.base = opt.base
-  self.rev_arg = opt.rev_arg
   self.cur_item = {}
   self.single_file = entries[1] and entries[1].single_file
   self.option_panel = FHOptionPanel(self)
@@ -101,9 +86,9 @@ function FileHistoryPanel:init(parent, git_root, entries, path_args, raw_args, l
       conf.file_history_panel.log_options.single_file,
       log_options
     ),
-    multiple_files = vim.tbl_extend(
+    multi_file = vim.tbl_extend(
       "force",
-      conf.file_history_panel.log_options.multiple_files,
+      conf.file_history_panel.log_options.multi_file,
       log_options
     ),
   }
@@ -194,19 +179,26 @@ function FileHistoryPanel:update_entries(callback)
   local timeout = 64
   local ldt = 0 -- Last draw time
   local lock = false
+  local update
 
-  local update = debounce.throttle_trailing(
+  update = debounce.throttle_trailing(
     timeout,
-    function(entries, status)
+    function(entries, status, msg)
       if status == JobStatus.ERROR then
-        utils.err("Updating file history failed!", true)
         self.updating = false
         vim.schedule(function()
+          utils.err(utils.vec_join(
+            ("Updating file history failed! %s"):format(msg and "Error message:" or ""),
+            msg
+          ))
           self:render()
           self:redraw()
+          callback(nil, JobStatus.ERROR, msg)
         end)
-        callback(nil, JobStatus.ERROR)
+
+        update:close()
         return
+
       elseif status == JobStatus.PROGRESS and (#entries <= c or lock) then
         return
       end
@@ -241,6 +233,7 @@ function FileHistoryPanel:update_entries(callback)
         ldt = renderer.last_draw_time
 
         if status == JobStatus.SUCCESS then
+          update:close()
           perf_update:time()
           logger.s_info(string.format(
             "[FileHistory] Completed update for %d entries successfully (%.3f ms).",
@@ -270,10 +263,7 @@ function FileHistoryPanel:update_entries(callback)
     self.git_root,
     self.path_args,
     self.log_options,
-    {
-      base = self.base,
-      rev_arg = self.rev_arg,
-    },
+    { base = self.base, },
     update
   )
   self:update_components()
@@ -494,7 +484,7 @@ function FileHistoryPanel:get_log_options()
   if self.single_file then
     return self.log_options.single_file
   else
-    return self.log_options.multiple_files
+    return self.log_options.multi_file
   end
 end
 

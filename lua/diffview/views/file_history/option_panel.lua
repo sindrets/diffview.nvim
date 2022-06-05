@@ -1,8 +1,11 @@
+local EventEmitter = require("diffview.events").EventEmitter
+local JobStatus = require("diffview.git.utils").JobStatus
+local Panel = require("diffview.ui.panel").Panel
 local config = require("diffview.config")
+local diffview = require("diffview")
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
-local Panel = require("diffview.ui.panel").Panel
-local EventEmitter = require("diffview.events").EventEmitter
+
 local api = vim.api
 local M = {}
 
@@ -38,13 +41,15 @@ FHOptionPanel.bufopts = {
 ---@class FlagOption : string[]
 ---@field key string
 ---@field select string[]
+---@field completion string|fun(panel: FHOptionPanel): function
 
 FHOptionPanel.flags = {
   ---@type FlagOption[]
   switches = {
     { "-f", "--follow", "Follow renames (only for single file)" },
     { "-p", "--first-parent", "Follow only the first parent upon seeing a merge commit" },
-    { "-s", "--show-pulls", "Show merge commits that are not TREESAME to its first parent, but are to a later parent" },
+    { "-s", "--show-pulls", "Show merge commits the first introduced a change to a branch" },
+    { "-R", "--reflog", "Include all reachable objects mentioned by reflogs" },
     { "-a", "--all", "Include all refs" },
     { "-m", "--merges", "List only merge commits" },
     { "-n", "--no-merges", "List no merge commits" },
@@ -52,6 +57,20 @@ FHOptionPanel.flags = {
   },
   ---@type FlagOption[]
   options = {
+    {
+      "=r", "++rev-range=", "Show only commits in the specified revision range",
+      ---@param panel FHOptionPanel
+      completion = function(panel)
+        return function(arg_lead, _, _)
+          local view = panel.parent.parent
+          return diffview.rev_completion(arg_lead, {
+            accept_range = true,
+            git_root = view.git_root,
+            git_dir = view.git_dir,
+          })
+        end
+      end,
+    },
     { "=n", "--max-count=", "Limit the number of commits" },
     {
       "=d", "--diff-merges=", "Determines how merge commits are treated",
@@ -73,7 +92,10 @@ FHOptionPanel.flags = {
 
 for _, list in pairs(FHOptionPanel.flags) do
   for _, option in ipairs(list) do
-    option.key = option[2]:match("%-%-?([^=]+)=?"):gsub("%-", "_")
+    option.key = utils.str_match(option[2], {
+      "^%-%-?([^=]+)=?",
+      "^%+%+?([^=]+)=?",
+    }):gsub("%-", "_")
     list[option.key] = option
   end
 end
@@ -83,8 +105,10 @@ end
 ---@return FHOptionPanel
 function FHOptionPanel:init(parent)
   FHOptionPanel:super().init(self, {
+    ---@type PanelSplitSpec
     config = {
       position = "bottom",
+      height = 17,
     },
     bufname = "DiffviewFHOptionPanel",
   })
@@ -97,6 +121,8 @@ function FHOptionPanel:init(parent)
 
     if FHOptionPanel.flags.switches[option_name] then
       log_options[option_name] = not log_options[option_name]
+      self:render()
+      self:redraw()
 
     elseif FHOptionPanel.flags.options[option_name] then
       local o = FHOptionPanel.flags.options[option_name]
@@ -116,21 +142,23 @@ function FHOptionPanel:init(parent)
           self:redraw()
         end)
 
-        return
       else
-        local new_value = utils.input(o[2], log_options[option_name])
+        local completion = type(o.completion) == "function" and o.completion(self) or o.completion
 
-        if new_value ~= "__INPUT_CANCELLED__" then
-          if new_value == "" then
-            new_value = nil
-          end
-          log_options[option_name] = new_value
-        end
+        utils.input(o[2], {
+          default = log_options[option_name],
+          completion = completion,
+          callback = function(response)
+            if response ~= "__INPUT_CANCELLED__" then
+              log_options[option_name] = response
+            end
+
+            self:render()
+            self:redraw()
+          end,
+        })
       end
     end
-
-    self:render()
-    self:redraw()
   end)
 
   self:on_autocmd("BufNew", {
@@ -145,7 +173,10 @@ function FHOptionPanel:init(parent)
         vim.schedule(function ()
           self.option_state = nil
           self.winid = nil
-          self.parent:update_entries(function(_, _)
+          self.parent:update_entries(function(_, status)
+            if status == JobStatus.ERROR then
+              return
+            end
             if not self.parent:cur_file() then
               self.parent.parent:next_item()
             end

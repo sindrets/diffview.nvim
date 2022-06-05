@@ -198,6 +198,7 @@ return {
     end
 
     local comp = panel.components.header.comp
+    local log_options = panel:get_log_options()
     local cached = cache[panel]
     local line_idx = 0
     local s
@@ -237,12 +238,12 @@ return {
       comp:add_line(s .. paths)
     end
 
-    if panel.rev_arg then
+    if log_options.rev_range then
       line_idx = line_idx + 1
-      s = "Range: "
+      s = "Revision range: "
       comp:add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
       offset = #s
-      s = s .. panel.rev_arg
+      s = s .. log_options.rev_range
       comp:add_hl("DiffviewFilePanelFileName", line_idx, offset, offset + #s)
       comp:add_line(s)
     end
@@ -308,7 +309,7 @@ return {
       local enabled = log_options[comp.context[1]]
 
       s = " " .. option[1] .. " "
-      comp:add_hl("DiffviewDim1", 0, 0, #s)
+      comp:add_hl("DiffviewSecondary", 0, 0, #s)
 
       offset = #s
       comp:add_hl("DiffviewFilePanelFileName", 0, offset, offset + #option[3])
@@ -342,7 +343,7 @@ return {
       local value = log_options[comp.context[1]] or ""
 
       s = " " .. option[1] .. " "
-      comp:add_hl("DiffviewDim1", 0, 0, #s)
+      comp:add_hl("DiffviewSecondary", 0, 0, #s)
 
       offset = #s
       comp:add_hl("DiffviewFilePanelFileName", 0, offset, offset + #option[3])

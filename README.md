@@ -73,7 +73,7 @@ require("diffview").setup({
       single_file = {
         diff_merges = "combined",
       },
-      multiple_files = {
+      multi_file = {
         diff_merges = "first-parent",
       },
     },

@@ -24,6 +24,8 @@ end
 
 ---@class ArgObjectGetFlagSpec
 ---@field plain boolean Never cast string values to booleans.
+---@field expect_string boolean Inferred boolean values are changed to be empty strings.
+---@field no_empty boolean Return nil if the value is an empty string.
 
 ---Get a flag value.
 ---@param names string|string[] Flag synonyms
@@ -37,7 +39,12 @@ function ArgObject:get_flag(names, opt)
   for _, name in ipairs(names) do
     local v = self.flags[name]
     if v ~= nil then
-      if not opt.plain and (v == "true" or v == "false") then
+      if opt.expect_string and v == "true" then
+        if opt.no_empty then
+          return nil
+        end
+        v = ""
+      elseif not opt.plain and (v == "true" or v == "false") then
         v = v == "true" and true or false
       end
       return v

@@ -19,7 +19,7 @@ end
 
 ---@class ConfigLogOptions
 ---@field single_file LogOptions
----@field multiple_files LogOptions
+---@field multi_file LogOptions
 
 -- stylua: ignore start
 M.defaults = {
@@ -51,7 +51,7 @@ M.defaults = {
       single_file = {
         diff_merges = "combined",
       },
-      multiple_files = {
+      multi_file = {
         diff_merges = "first-parent",
       },
     },
@@ -141,6 +141,38 @@ M.defaults = {
 M.user_emitter = EventEmitter()
 M._config = M.defaults
 
+---@class LogOptions
+---@field follow boolean
+---@field first_parent boolean
+---@field show_pulls boolean
+---@field reflog boolean
+---@field all boolean
+---@field merges boolean
+---@field no_merges boolean
+---@field reverse boolean
+---@field max_count integer
+---@field author string
+---@field grep string
+---@field diff_merges string
+---@field rev_range string
+
+---@type LogOptions
+M.log_option_defaults = {
+  follow = false,
+  first_parent = false,
+  show_pulls = false,
+  reflog = false,
+  all = false,
+  merges = false,
+  no_merges = false,
+  reverse = false,
+  rev_range = nil,
+  max_count = 256,
+  diff_merges = nil,
+  author = nil,
+  grep = nil,
+}
+
 function M.get_config()
   return M._config
 end
@@ -154,15 +186,15 @@ function M.get_log_options(single_file, t)
   if single_file then
     log_options =  M._config.file_history_panel.log_options.single_file
   else
-    log_options = M._config.file_history_panel.log_options.multiple_files
+    log_options = M._config.file_history_panel.log_options.multi_file
   end
 
   if t then
     log_options = vim.tbl_extend("force", log_options, t)
 
-    for _, option in ipairs({ "max_count", "diff_merges", "grep", "author" }) do
-      if t[option] == nil or t[option] == "" then
-        log_options[option] = nil
+    for k, _ in pairs(log_options) do
+      if t[k] == "" then
+        log_options[k] = nil
       end
     end
   end
@@ -214,26 +246,18 @@ function M.setup(user_config)
 
   --#endregion
 
-  local log_option_defaults = {
-    follow = false,
-    first_parent = false,
-    show_pulls = false,
-    all = false,
-    merges = false,
-    no_merges = false,
-    reverse = false,
-    max_count = 256,
-    diff_merges = nil,
-    author = nil,
-    grep = nil,
-  }
-
-  for _, name in ipairs({ "single_file", "multiple_files" }) do
-    M._config.file_history_panel.log_options[name] = vim.tbl_extend(
+  for _, name in ipairs({ "single_file", "multi_file" }) do
+    local t = M._config.file_history_panel.log_options
+    t[name] = vim.tbl_extend(
       "force",
-      log_option_defaults,
-      M._config.file_history_panel.log_options[name]
+      M.log_option_defaults,
+      t[name]
     )
+    for k, _ in pairs(t[name]) do
+      if t[name][k] == "" then
+        t[name][k] = nil
+      end
+    end
   end
 
   for event, callback in pairs(M._config.hooks) do

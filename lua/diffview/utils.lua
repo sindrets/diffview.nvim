@@ -792,15 +792,28 @@ function M.input_char(prompt, opt)
   return s, raw
 end
 
-function M.input(prompt, default, completion)
-  local v = vim.fn.input({
+---@class InputSpec
+---@field default string
+---@field completion string|function
+---@field cancelreturn string
+---@field callback fun(response: string?)
+
+---@param prompt string
+---@param opt InputSpec
+function M.input(prompt, opt)
+  local completion = opt.completion
+  if type(completion) == "function" then
+    DiffviewGlobal.state.current_completer = completion
+    completion = "customlist,Diffview__ui_input_completion"
+  end
+
+  vim.ui.input({
     prompt = prompt,
-    default = default,
+    default = opt.default,
     completion = completion,
-    cancelreturn = "__INPUT_CANCELLED__",
-  })
+    cancelreturn = opt.cancelreturn or "__INPUT_CANCELLED__",
+  }, opt.callback)
   M.clear_prompt()
-  return v
 end
 
 function M.raw_key(vim_key)
