@@ -65,6 +65,7 @@ function M.info(msg, schedule)
   if not msg[1] or (msg[1] == "" and #msg == 1) then
     return
   end
+  msg = M.vec_slice(msg)
   msg[1] = "[Diffview.nvim] " .. msg[1]
   M.echo_multiln(msg, "Directory", schedule)
 end
@@ -78,6 +79,7 @@ function M.warn(msg, schedule)
   if not msg[1] or (msg[1] == "" and #msg == 1) then
     return
   end
+  msg = M.vec_slice(msg)
   msg[1] = "[Diffview.nvim] " .. msg[1]
   M.echo_multiln(msg, "WarningMsg", schedule)
 end
@@ -91,6 +93,7 @@ function M.err(msg, schedule)
   if not msg[1] or (msg[1] == "" and #msg == 1) then
     return
   end
+  msg = M.vec_slice(msg)
   msg[1] = "[Diffview.nvim] " .. msg[1]
   M.echo_multiln(msg, "ErrorMsg", schedule)
 end

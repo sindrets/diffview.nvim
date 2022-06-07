@@ -126,10 +126,12 @@ end, 4)
 ---@return any result
 local function handle_co(thread, ok, result)
   if not ok then
-    utils.err(utils.vec_join(
+    local err_msg = utils.vec_join(
       "Coroutine failed!",
       debug.traceback(thread, result, 1)
-    ), true)
+    )
+    utils.err(err_msg, true)
+    logger.s_error(table.concat(err_msg, "\n"))
   end
   return ok, result
 end
