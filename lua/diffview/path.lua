@@ -1,8 +1,9 @@
+local async = require("plenary.async")
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
----@module "plenary.async"
-local async = lazy.require("plenary.async")
+---@module "diffview.utils"
+local utils = lazy.require("diffview.utils")
 
 local M = {}
 
@@ -443,6 +444,28 @@ PathLib.unlink = async.wrap(function(self, path, callback)
     callback(ok, err)
   end)
 end, 3)
+
+function PathLib:chain(...)
+  local t = {
+    _result = utils.tbl_pack(...)
+  }
+
+  return setmetatable(t, {
+    __index = function(chain, k)
+      if k == "get" then
+        return function(_)
+          return utils.tbl_unpack(t._result)
+        end
+
+      else
+        return function(_, ...)
+          t._result = utils.tbl_pack(self[k](self, utils.tbl_unpack(t._result), ...))
+          return chain
+        end
+      end
+    end
+  })
+end
 
 M.PathLib = PathLib
 return M

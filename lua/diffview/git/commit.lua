@@ -43,7 +43,7 @@ function Commit.from_rev_arg(rev_arg, git_root)
   local out, code = utils.system_list({
     "git",
     "show",
-    "--pretty=format:%H %P%n%an%n%ad%n%ar%n%s",
+    "--pretty=format:%H %P%n%an%n%ad%n%ar%n  %s",
     "--date=raw",
     "--name-status",
     rev_arg,
@@ -63,7 +63,7 @@ function Commit.from_rev_arg(rev_arg, git_root)
     time = tonumber(time),
     time_offset = time_offset,
     rel_date = out[4],
-    subject = out[5],
+    subject = out[5]:sub(3),
   })
 end
 

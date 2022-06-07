@@ -4,18 +4,18 @@ local Mock = require("diffview.mock").Mock
 
 ---@class Logger
 ---@field plugin string
----@field trace fun(obj: any)
----@field debug fun(obj: any)
----@field info fun(obj: any)
----@field warn fun(obj: any)
----@field error fun(obj: any)
----@field fatal fun(obj: any)
----@field s_trace fun(obj: any)
----@field s_debug fun(obj: any)
----@field s_info fun(obj: any)
----@field s_warn fun(obj: any)
----@field s_error fun(obj: any)
----@field s_fatal fun(obj: any)
+---@field trace fun(...: any)
+---@field debug fun(...: any)
+---@field info fun(...: any)
+---@field warn fun(...: any)
+---@field error fun(...: any)
+---@field fatal fun(...: any)
+---@field s_trace fun(...: any)
+---@field s_debug fun(...: any)
+---@field s_info fun(...: any)
+---@field s_warn fun(...: any)
+---@field s_error fun(...: any)
+---@field s_fatal fun(...: any)
 local logger = log.new({
   plugin = "diffview",
   highlights = false,
@@ -32,7 +32,7 @@ logger.outfile = string.format(
 
 -- Add scheduled variants of the different log methods.
 for _, kind in ipairs({ "trace", "debug", "info", "warn", "error", "fatal" }) do
-  logger["s_" .. kind] = vim.schedule_wrap(function (...)
+  logger["s_" .. kind] = vim.schedule_wrap(function(...)
     local args = vim.tbl_map(function(v)
       if type(v) == "table" and type(v.__tostring) == "function" then
         return tostring(v)
@@ -57,17 +57,25 @@ end
 ---@class LogJobSpec
 ---@field func function|string
 ---@field context string
+---@field no_stdout boolean
+---@field no_stderr boolean
+---@field debug_level integer
 
 ---@param job Job
 ---@param opt? LogJobSpec
 function logger.log_job(job, opt)
+  opt = opt or {}
+
+  if opt.debug_level and DiffviewGlobal.debug_level < opt.debug_level then
+    return
+  end
+
   local stdout, stderr = job:result(), job:stderr_result()
   local args = vim.tbl_map(function(arg)
     -- Simple shell escape. NOTE: not valid for windows shell.
     return ("'%s'"):format(arg:gsub("'", [['"'"']]))
   end, job.args)
 
-  opt = opt or {}
   local log_func = logger.s_debug
   local context = opt.context and ("[%s] "):format(opt.context) or ""
 
@@ -78,13 +86,13 @@ function logger.log_job(job, opt)
   end
 
   log_func(("%s[job-info] Exit code: %s"):format(context, job.code))
-  log_func(("%s[cmd] %s %s"):format(context, job.command, table.concat(args, " ")))
+  log_func(("%s     [cmd] %s %s"):format(context, job.command, table.concat(args, " ")))
 
-  if #stdout > 0 then
-    log_func(context .. "[stdout] " .. table.concat(stdout, "\n"))
+  if not opt.no_stdout and stdout[1] then
+    log_func(context .. "  [stdout] " .. table.concat(stdout, "\n"))
   end
-  if #stderr > 0 then
-    log_func(context .. "[stderr] " .. table.concat(stderr, "\n"))
+  if not opt.no_stderr and stderr[1] then
+    log_func(context .. "  [stderr] " .. table.concat(stderr, "\n"))
   end
 end
 

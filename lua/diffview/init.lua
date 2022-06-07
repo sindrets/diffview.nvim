@@ -23,8 +23,8 @@ local M = {}
 ---@type FlagValueMap
 local comp_open = arg_parser.FlagValueMap()
 comp_open:put({ "u", "untracked-files" }, { "true", "normal", "all", "false", "no" })
-comp_open:put({ "cached", "staged" }, { "true", "false" })
-comp_open:put({ "imply-local" }, { "true", "false" })
+comp_open:put({ "cached", "staged" })
+comp_open:put({ "imply-local" })
 comp_open:put({ "C" }, function(_, arg_lead)
   return vim.fn.getcompletion(arg_lead, "dir")
 end)
@@ -43,6 +43,26 @@ end)
 comp_file_history:put({ "C" }, function(_, arg_lead)
   return vim.fn.getcompletion(arg_lead, "dir")
 end)
+comp_file_history:put({ "--follow" })
+comp_file_history:put({ "--first-parent" })
+comp_file_history:put({ "--show-pulls" })
+comp_file_history:put({ "--reflog" })
+comp_file_history:put({ "--all" })
+comp_file_history:put({ "--merges" })
+comp_file_history:put({ "--no-merges" })
+comp_file_history:put({ "--reverse" })
+comp_file_history:put({ "--max-count", "-n" }, {})
+comp_file_history:put({ "--diff-merges" }, {
+  "off",
+  "on",
+  "first-parent",
+  "separate",
+  "combined",
+  "dense-combined",
+  "remerge",
+})
+comp_file_history:put({ "--author" }, {})
+comp_file_history:put({ "--grep" }, {})
 
 function M.setup(user_config)
   config.setup(user_config or {})
@@ -123,6 +143,14 @@ function M.init()
   DiffviewGlobal.emitter:on("diff_buf_win_enter", function(_)
     vim.cmd("do User DiffviewDiffBufWinEnter")
   end)
+
+  -- Set up completion wrapper used by `vim.ui.input()`
+  vim.cmd([[
+    function! Diffview__ui_input_completion(...) abort
+      return luaeval("DiffviewGlobal.state.current_completer(
+            \ unpack(vim.fn.eval('a:000')))")
+    endfunction
+  ]])
 end
 
 function M.open(...)

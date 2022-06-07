@@ -22,13 +22,32 @@ function ArgObject:init(flags, args, post_args)
   self.post_args = post_args
 end
 
+---@class ArgObjectGetFlagSpec
+---@field plain boolean Never cast string values to booleans.
+---@field expect_string boolean Inferred boolean values are changed to be empty strings.
+---@field no_empty boolean Return nil if the value is an empty string.
+
 ---Get a flag value.
----@vararg ... string[] Flag synonyms
----@return any
-function ArgObject:get_flag(...)
-  for _, name in ipairs({ ... }) do
-    if self.flags[name] ~= nil then
-      return self.flags[name]
+---@param names string|string[] Flag synonyms
+---@param opt? ArgObjectGetFlagSpec
+---@return string|boolean
+function ArgObject:get_flag(names, opt)
+  opt = opt or {}
+  if type(names) ~= "table" then
+    names = { names }
+  end
+  for _, name in ipairs(names) do
+    local v = self.flags[name]
+    if v ~= nil then
+      if opt.expect_string and v == "true" then
+        if opt.no_empty then
+          return nil
+        end
+        v = ""
+      elseif not opt.plain and (v == "true" or v == "false") then
+        v = v == "true" and true or false
+      end
+      return v
     end
   end
 end
@@ -44,7 +63,7 @@ function FlagValueMap:init()
 end
 
 ---@param flag_synonyms string[]
----@param producer string[]|fun(name_lead: string, arg_lead: string): string[]
+---@param producer? string[]|fun(name_lead: string, arg_lead: string): string[]
 function FlagValueMap:put(flag_synonyms, producer)
   for _, flag in ipairs(flag_synonyms) do
     if flag:sub(1, 1) ~= "-" then
@@ -54,7 +73,7 @@ function FlagValueMap:put(flag_synonyms, producer)
         flag = "-" .. flag
       end
     end
-    self.map[flag] = producer
+    self.map[flag] = producer or { "true", "false" }
     self.map[#self.map+1] = flag
   end
 end

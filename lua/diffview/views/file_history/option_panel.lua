@@ -1,8 +1,11 @@
+local EventEmitter = require("diffview.events").EventEmitter
+local JobStatus = require("diffview.git.utils").JobStatus
+local Panel = require("diffview.ui.panel").Panel
 local config = require("diffview.config")
+local diffview = require("diffview")
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
-local Panel = require("diffview.ui.panel").Panel
-local EventEmitter = require("diffview.events").EventEmitter
+
 local api = vim.api
 local M = {}
 
@@ -35,23 +38,64 @@ FHOptionPanel.bufopts = {
   bufhidden = "hide",
 }
 
+---@class FlagOption : string[]
+---@field key string
+---@field select string[]
+---@field completion string|fun(panel: FHOptionPanel): function
+
 FHOptionPanel.flags = {
+  ---@type FlagOption[]
   switches = {
-    { "-f", "--follow", "Follow renames (only for single file)", key = "follow" },
-    { "-a", "--all", "Include all refs", key = "all" },
-    { "-m", "--merges", "List only merge commits", key = "merges" },
-    { "-n", "--no-merges", "List no merge commits", key = "no_merges" },
-    { "-r", "--reverse", "List commits in reverse order", key = "reverse" },
+    { "-f", "--follow", "Follow renames (only for single file)" },
+    { "-p", "--first-parent", "Follow only the first parent upon seeing a merge commit" },
+    { "-s", "--show-pulls", "Show merge commits the first introduced a change to a branch" },
+    { "-R", "--reflog", "Include all reachable objects mentioned by reflogs" },
+    { "-a", "--all", "Include all refs" },
+    { "-m", "--merges", "List only merge commits" },
+    { "-n", "--no-merges", "List no merge commits" },
+    { "-r", "--reverse", "List commits in reverse order" },
   },
+  ---@type FlagOption[]
   options = {
-    { "=n", "--max-count=", "Limit number of commits", key = "max_count" },
-    { "=a", "--author=", "List only commits from a given author", key = "author" },
-    { "=g", "--grep=", "Filter commit messages", key = "grep" },
+    {
+      "=r", "++rev-range=", "Show only commits in the specified revision range",
+      ---@param panel FHOptionPanel
+      completion = function(panel)
+        return function(arg_lead, _, _)
+          local view = panel.parent.parent
+          return diffview.rev_completion(arg_lead, {
+            accept_range = true,
+            git_root = view.git_root,
+            git_dir = view.git_dir,
+          })
+        end
+      end,
+    },
+    { "=n", "--max-count=", "Limit the number of commits" },
+    {
+      "=d", "--diff-merges=", "Determines how merge commits are treated",
+      select = {
+        "",
+        "off",
+        "on",
+        "first-parent",
+        "separate",
+        "combined",
+        "dense-combined",
+        "remerge",
+      },
+    },
+    { "=a", "--author=", "List only commits from a given author" },
+    { "=g", "--grep=", "Filter commit messages" },
   },
 }
 
 for _, list in pairs(FHOptionPanel.flags) do
   for _, option in ipairs(list) do
+    option.key = utils.str_match(option[2], {
+      "^%-%-?([^=]+)=?",
+      "^%+%+?([^=]+)=?",
+    }):gsub("%-", "_")
     list[option.key] = option
   end
 end
@@ -61,30 +105,60 @@ end
 ---@return FHOptionPanel
 function FHOptionPanel:init(parent)
   FHOptionPanel:super().init(self, {
+    ---@type PanelSplitSpec
     config = {
       position = "bottom",
+      height = #FHOptionPanel.flags.switches + #FHOptionPanel.flags.options + 4,
     },
     bufname = "DiffviewFHOptionPanel",
   })
   self.parent = parent
   self.emitter = EventEmitter()
 
+  ---@param option_name string
   self.emitter:on("set_option", function(option_name)
-    local log_options = self.parent.log_options
+    local log_options = self.parent:get_log_options()
+
     if FHOptionPanel.flags.switches[option_name] then
-      self.parent.log_options[option_name] = not self.parent.log_options[option_name]
+      log_options[option_name] = not log_options[option_name]
+      self:render()
+      self:redraw()
+
     elseif FHOptionPanel.flags.options[option_name] then
       local o = FHOptionPanel.flags.options[option_name]
-      local new_value = utils.input(o[2], log_options[option_name])
-      if new_value ~= "__INPUT_CANCELLED__" then
-        if new_value == "" then
-          new_value = nil
-        end
-        log_options[option_name] = new_value
+
+      if o.select then
+        vim.ui.select(o.select, {
+          prompt = o[2],
+          format_item = function(item)
+            return item == "" and "<unset>" or item
+          end,
+        }, function(choice)
+          if choice then
+            log_options[option_name] = choice ~= "" and choice or nil
+          end
+
+          self:render()
+          self:redraw()
+        end)
+
+      else
+        local completion = type(o.completion) == "function" and o.completion(self) or o.completion
+
+        utils.input(o[2], {
+          default = log_options[option_name],
+          completion = completion,
+          callback = function(response)
+            if response ~= "__INPUT_CANCELLED__" then
+              log_options[option_name] = response
+            end
+
+            self:render()
+            self:redraw()
+          end,
+        })
       end
     end
-    self:render()
-    self:redraw()
   end)
 
   self:on_autocmd("BufNew", {
@@ -95,11 +169,14 @@ function FHOptionPanel:init(parent)
 
   self:on_autocmd("WinClosed", {
     callback = function()
-      if not vim.deep_equal(self.option_state, self.parent.log_options) then
+      if not vim.deep_equal(self.option_state, self.parent:get_log_options()) then
         vim.schedule(function ()
           self.option_state = nil
           self.winid = nil
-          self.parent:update_entries(function(_, _)
+          self.parent:update_entries(function(_, status)
+            if status == JobStatus.ERROR then
+              return
+            end
             if not self.parent:cur_file() then
               self.parent.parent:next_item()
             end
@@ -113,12 +190,12 @@ end
 ---@Override
 function FHOptionPanel:open()
   FHOptionPanel:super().open(self)
-  self.option_state = utils.tbl_deep_clone(self.parent.log_options)
+  self.option_state = utils.tbl_deep_clone(self.parent:get_log_options())
 end
 
 function FHOptionPanel:setup_buffer()
   local conf = config.get_config()
-  local default_opt = { silent = true, nowait = true, buffer = self.bufid }
+  local default_opt = { silent = true, buffer = self.bufid }
   for lhs, mapping in pairs(conf.keymaps.option_panel) do
     if type(lhs) == "number" then
       local opt = vim.tbl_extend("force", mapping[4] or {}, { buffer = self.bufid })

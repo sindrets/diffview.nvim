@@ -82,6 +82,7 @@ _G.DiffviewGlobal = {
   debug_level = tonumber(os.getenv("DEBUG_DIFFVIEW")) or 0,
   ---@type EventEmitter
   emitter = require("diffview.events").EventEmitter(),
+  state = {},
   bootstrap_done = true,
   bootstrap_ok = true,
 }

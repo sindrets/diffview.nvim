@@ -71,9 +71,20 @@ end
 local function render_entries(parent, entries, updating)
   local c = config.get_config()
   local max_num_files = -1
+  local max_len_stats = 7
   for _, entry in ipairs(entries) do
     if #entry.files > max_num_files then
       max_num_files = #entry.files
+    end
+    if entry.stats then
+      local adds = tostring(entry.stats.additions)
+      local dels = tostring(entry.stats.deletions)
+      local l = 7
+      local w = l - (#adds + #dels)
+      if w < 1 then
+        l = (#adds + #dels) - ((#adds + #dels) % 2) + 2
+      end
+      max_len_stats = l > max_len_stats and l or max_len_stats
     end
   end
 
@@ -108,12 +119,7 @@ local function render_entries(parent, entries, updating)
     if entry.stats then
       local adds = tostring(entry.stats.additions)
       local dels = tostring(entry.stats.deletions)
-      local l = 7
-      local w = l - (#adds + #dels)
-      if w < 1 then
-        l = (#adds + #dels) - ((#adds + #dels) % 2) + 2
-        w = l - (#adds + #dels)
-      end
+      local w = max_len_stats - (#adds + #dels)
 
       comp:add_hl("DiffviewNonText", line_idx, #s + 1, #s + 2)
       s = s .. " | "
@@ -138,6 +144,9 @@ local function render_entries(parent, entries, updating)
 
     offset = #s + 1
     local subject = utils.str_shorten(entry.commit.subject, 72)
+    if subject == "" then
+      subject = "[empty message]"
+    end
     comp:add_hl("DiffviewFilePanelFileName", line_idx, offset, offset + #subject)
     s = s .. " " .. subject
 
@@ -192,6 +201,7 @@ return {
     end
 
     local comp = panel.components.header.comp
+    local log_options = panel:get_log_options()
     local cached = cache[panel]
     local line_idx = 0
     local s
@@ -199,10 +209,10 @@ return {
     -- root path
     comp:add_hl("DiffviewFilePanelRootPath", line_idx, 0, #cached.root_path)
     comp:add_line(cached.root_path)
-    line_idx = line_idx + 1
 
     local offset
     if panel.single_file then
+      line_idx = line_idx + 1
       if #panel.entries > 0 then
         local file = panel.entries[1].files[1]
 
@@ -221,7 +231,8 @@ return {
         s = icon .. file.path
         comp:add_line(s)
       end
-    else
+    elseif #cached.args > 0 then
+      line_idx = line_idx + 1
       s = "Showing history for: "
       comp:add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
       offset = #s
@@ -230,12 +241,12 @@ return {
       comp:add_line(s .. paths)
     end
 
-    if panel.rev_arg then
+    if log_options.rev_range then
       line_idx = line_idx + 1
-      s = "Range: "
+      s = "Revision range: "
       comp:add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
       offset = #s
-      s = s .. panel.rev_arg
+      s = s .. log_options.rev_range
       comp:add_hl("DiffviewFilePanelFileName", line_idx, offset, offset + #s)
       comp:add_line(s)
     end
@@ -288,6 +299,7 @@ return {
     local comp = panel.components.switches.title.comp
     local line_idx = 0
     local offset
+    local log_options = panel.parent:get_log_options()
 
     local s = "Switches"
     comp:add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
@@ -297,10 +309,10 @@ return {
       ---@type RenderComponent
       comp = item.comp
       local option = comp.context[2]
-      local enabled = panel.parent.log_options[comp.context[1]]
+      local enabled = log_options[comp.context[1]]
 
       s = " " .. option[1] .. " "
-      comp:add_hl("DiffviewDim1", 0, 0, #s)
+      comp:add_hl("DiffviewSecondary", 0, 0, #s)
 
       offset = #s
       comp:add_hl("DiffviewFilePanelFileName", 0, offset, offset + #option[3])
@@ -331,10 +343,10 @@ return {
       ---@type RenderComponent
       comp = item.comp
       local option = comp.context[2]
-      local value = panel.parent.log_options[comp.context[1]] or ""
+      local value = log_options[comp.context[1]] or ""
 
       s = " " .. option[1] .. " "
-      comp:add_hl("DiffviewDim1", 0, 0, #s)
+      comp:add_hl("DiffviewSecondary", 0, 0, #s)
 
       offset = #s
       comp:add_hl("DiffviewFilePanelFileName", 0, offset, offset + #option[3])

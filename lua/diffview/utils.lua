@@ -45,11 +45,13 @@ function M.echo_multiln(msg, hl, schedule)
 
   vim.cmd("echohl " .. (hl or "None"))
   if type(msg) ~= "table" then
-    msg = vim.split(msg, "\n")
+    msg = { msg }
   end
-  for _, line in ipairs(msg) do
-    line = line:gsub('"', [[\"]])
-    vim.cmd(string.format('echom "%s"', line))
+  for _, chunk in ipairs(msg) do
+    for _, line in ipairs(vim.split(chunk, "\n", { trimempty = false })) do
+      line = line:gsub('["|\t]', { ['"'] = [[\"]], ["\t"] = "        " })
+      vim.cmd(string.format('echom "%s"', line))
+    end
   end
   vim.cmd("echohl None")
 end
@@ -58,11 +60,12 @@ end
 ---@param schedule? boolean Schedule the echo call.
 function M.info(msg, schedule)
   if type(msg) ~= "table" then
-    msg = vim.split(msg, "\n")
+    msg = { msg }
   end
   if not msg[1] or (msg[1] == "" and #msg == 1) then
     return
   end
+  msg = M.vec_slice(msg)
   msg[1] = "[Diffview.nvim] " .. msg[1]
   M.echo_multiln(msg, "Directory", schedule)
 end
@@ -71,11 +74,12 @@ end
 ---@param schedule? boolean Schedule the echo call.
 function M.warn(msg, schedule)
   if type(msg) ~= "table" then
-    msg = vim.split(msg, "\n")
+    msg = { msg }
   end
   if not msg[1] or (msg[1] == "" and #msg == 1) then
     return
   end
+  msg = M.vec_slice(msg)
   msg[1] = "[Diffview.nvim] " .. msg[1]
   M.echo_multiln(msg, "WarningMsg", schedule)
 end
@@ -84,11 +88,12 @@ end
 ---@param schedule? boolean Schedule the echo call.
 function M.err(msg, schedule)
   if type(msg) ~= "table" then
-    msg = vim.split(msg, "\n")
+    msg = { msg }
   end
   if not msg[1] or (msg[1] == "" and #msg == 1) then
     return
   end
+  msg = M.vec_slice(msg)
   msg[1] = "[Diffview.nvim] " .. msg[1]
   M.echo_multiln(msg, "ErrorMsg", schedule)
 end
@@ -229,6 +234,7 @@ end
 ---@field fail_on_empty boolean Consider the job as failed if the code is 0 and stdout is empty.
 ---@field log_func function|string
 ---@field context string Context for the logger.
+---@field debug_opt LogJobSpec
 
 ---Handles logging of failed jobs. If the given job hasn't failed, this does nothing.
 ---@param job Job
@@ -242,6 +248,9 @@ function M.handle_job(job, opt)
   end
 
   if job.code == 0 and not empty then
+    if opt.debug_opt then
+      require("diffview.logger").log_job(job, opt.debug_opt)
+    end
     return
   end
 
@@ -267,7 +276,7 @@ function M.handle_job(job, opt)
   end
 
   log_func(msg)
-  log_func(("%s[cmd] %s %s"):format(context, job.command, table.concat(args, " ")))
+  log_func(("%s   [cmd] %s %s"):format(context, job.command, table.concat(args, " ")))
 
   local stderr = job:stderr_result()
   if #stderr > 0 then
@@ -325,7 +334,7 @@ function M.system_list(cmd, cwd_or_opt)
   for i = 0, max_retries do
     if i > 0 then
       logger.warn(
-        ("%sJob silently returned nothing! Retrying %d more time(s)...")
+        ("%sJob expected output, but returned nothing! Retrying %d more time(s)...")
         :format(context, max_retries - i + 1)
       )
       logger.log_job(job, { func = logger.warn, context = opt.context })
@@ -470,10 +479,28 @@ function M.tbl_clear(t)
   end
 end
 
+---Try property access.
+---@param t table
+---@param table_path string A `.` separated string of table keys.
+---@return any?
+function M.tbl_access(t, table_path)
+  local keys = vim.split(table_path, ".", { plain = true })
+  local cur = t
+
+  for _, k in ipairs(keys) do
+    cur = cur[k]
+    if not cur then
+      return nil
+    end
+  end
+
+  return cur
+end
+
 ---Create a shallow copy of a portion of a vector.
 ---@param t vector
----@param first? integer First index, inclusive
----@param last? integer Last index, inclusive
+---@param first? integer First index, inclusive. (default: 1)
+---@param last? integer Last index, inclusive. (default: `#t`)
 ---@return vector
 function M.vec_slice(t, first, last)
   local slice = {}
@@ -770,15 +797,28 @@ function M.input_char(prompt, opt)
   return s, raw
 end
 
-function M.input(prompt, default, completion)
-  local v = vim.fn.input({
+---@class InputSpec
+---@field default string
+---@field completion string|function
+---@field cancelreturn string
+---@field callback fun(response: string?)
+
+---@param prompt string
+---@param opt InputSpec
+function M.input(prompt, opt)
+  local completion = opt.completion
+  if type(completion) == "function" then
+    DiffviewGlobal.state.current_completer = completion
+    completion = "customlist,Diffview__ui_input_completion"
+  end
+
+  vim.ui.input({
     prompt = prompt,
-    default = default,
+    default = opt.default,
     completion = completion,
-    cancelreturn = "__INPUT_CANCELLED__",
-  })
+    cancelreturn = opt.cancelreturn or "__INPUT_CANCELLED__",
+  }, opt.callback)
   M.clear_prompt()
-  return v
 end
 
 function M.raw_key(vim_key)

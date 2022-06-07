@@ -8,6 +8,7 @@ local Rev = require("diffview.git.rev").Rev
 local RevType = require("diffview.git.rev").RevType
 local Semaphore = require("diffview.control").Semaphore
 local async = require("plenary.async")
+local config = require("diffview.config")
 local logger = require("diffview.logger")
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
@@ -76,7 +77,7 @@ local ensure_output = async.wrap(function(max_retries, jobs, log_context, callba
 
       if job.code == 0 and #job:result() == 0 then
         logger.warn(
-          ("%sJob silently returned nothing! Retrying %d more times(s).")
+          ("%sJob expected output, but returned nothing! Retrying %d more times(s).")
           :format(context, max_retries - n)
         )
         logger.log_job(job, { func = logger.warn, context = log_context })
@@ -117,6 +118,23 @@ local ensure_output = async.wrap(function(max_retries, jobs, log_context, callba
 
   callback(JobStatus.ERROR)
 end, 4)
+
+---@param thread thread
+---@param ok boolean
+---@param result any
+---@return boolean ok
+---@return any result
+local function handle_co(thread, ok, result)
+  if not ok then
+    local err_msg = utils.vec_join(
+      "Coroutine failed!",
+      debug.traceback(thread, result, 1)
+    )
+    utils.err(err_msg, true)
+    logger.s_error(table.concat(err_msg, "\n"))
+  end
+  return ok, result
+end
 
 local tracked_files = async.void(function(git_root, left, right, args, kind, callback)
   ---@type FileEntry[]
@@ -331,31 +349,18 @@ end)
 local function prepare_fh_options(log_options, single_file)
   local o = log_options
   return utils.vec_join(
-    (o.follow and single_file) and { "--follow", "--first-parent" } or { "-m", "-c" },
-    o.all and { "--all" } or nil,
-    o.merges and { "--merges", "--first-parent" } or nil,
-    o.no_merges and { "--no-merges" } or nil,
-    o.reverse and { "--reverse" } or nil,
-    o.max_count and { "-n" .. o.max_count } or nil,
-    o.author and { "--author=" .. o.author } or nil,
-    o.grep and { "--grep=" .. o.grep } or nil
-  )
-end
-
----@param log_options LogOptions
----@param single_file boolean
----@return string[]
-local function describe_fh_options(log_options, single_file)
-  local o = log_options
-  return utils.vec_join(
     (o.follow and single_file) and { "--follow" } or nil,
+    o.first_parent and { "--first-parent" } or nil,
+    o.show_pulls and { "--show-pulls" } or nil,
+    o.reflog and { "--reflog" } or nil,
     o.all and { "--all" } or nil,
     o.merges and { "--merges" } or nil,
     o.no_merges and { "--no-merges" } or nil,
     o.reverse and { "--reverse" } or nil,
-    o.max_count and { "--max-count=" .. o.max_count } or nil,
+    o.max_count and { "-n" .. o.max_count } or nil,
+    o.diff_merges and { "--diff-merges=" .. o.diff_merges } or nil,
     o.author and { "--author=" .. o.author } or nil,
-    o.grep and { "--grep=" .. o.grep } or nil
+    o.grep and { "-E", "--grep=" .. o.grep } or nil
   )
 end
 
@@ -371,22 +376,18 @@ local function structure_fh_data(namestat_data, numstat_data)
     time = tonumber(time),
     time_offset = time_offset,
     rel_date = namestat_data[4],
-    subject = namestat_data[5],
+    subject = namestat_data[5]:sub(3),
     namestat = utils.vec_slice(namestat_data, 6),
     numstat = numstat_data,
   }
 end
 
----@class IncrementalFhDataSpec
----@field rev_arg string
-
 ---@param git_root string
 ---@param path_args string[]
 ---@param single_file boolean
 ---@param log_opt LogOptions
----@param opt IncrementalFhDataSpec
----@param callback function
-local incremental_fh_data = async.void(function(git_root, path_args, single_file, log_opt, opt, callback)
+---@param callback fun(status: JobStatus, data?: table, msg?: string[])
+local incremental_fh_data = async.void(function(git_root, path_args, single_file, log_opt, callback)
   local options = prepare_fh_options(log_opt, single_file)
   local raw = {}
   local namestat_job, numstat_job
@@ -441,8 +442,8 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
     command = "git",
     args = utils.vec_join(
       "log",
-      opt.rev_arg,
-      "--pretty=format:%x00%n%H %P%n%an%n%ad%n%ar%n%s",
+      log_opt.rev_range,
+      "--pretty=format:%x00%n%H %P%n%an%n%ad%n%ar%n  %s",
       "--date=raw",
       "--name-status",
       options,
@@ -458,7 +459,7 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
     command = "git",
     args = utils.vec_join(
       "log",
-      opt.rev_arg,
+      log_opt.rev_range,
       "--pretty=format:%x00",
       "--date=raw",
       "--numstat",
@@ -477,23 +478,33 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
   numstat_job:start()
 
   latch:await()
+
+  local debug_opt = {
+    context = "git.utils>incremental_fh_data()",
+    func = "s_debug",
+    debug_level = 1,
+    no_stdout = true,
+  }
+  utils.handle_job(namestat_job, { debug_opt = debug_opt })
+  utils.handle_job(numstat_job, { debug_opt = debug_opt })
+
   if namestat_job.code ~= 0 or numstat_job.code ~= 0 then
-    utils.handle_job(namestat_job)
-    utils.handle_job(numstat_job)
-    callback(JobStatus.ERROR)
+    callback(JobStatus.ERROR, nil, utils.vec_join(
+      namestat_job:stderr_result(),
+      numstat_job:stderr_result())
+    )
   else
     callback(JobStatus.SUCCESS)
   end
 end)
 
 ---@class ProcessFileHistorySpec
----@field rev_arg string
 ---@field base Rev
 
 ---@param thread thread
 ---@param git_root string
 ---@param path_args string[]
----@param log_opt LogOptions
+---@param log_opt ConfigLogOptions
 ---@param opt ProcessFileHistorySpec
 ---@param callback function
 local function process_file_history(thread, git_root, path_args, log_opt, opt, callback)
@@ -504,25 +515,34 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
   local last_status
   local resume_lock = false
   local old_path
+  local err_msg
 
   local single_file = #path_args == 1
     and not utils.path:is_directory(path_args[1])
     and #utils.system_list(utils.vec_join("git", "ls-files", "--", path_args), git_root) < 2
 
+  ---@type LogOptions
+  local log_options = config.get_log_options(
+    single_file,
+    single_file and log_opt.single_file or log_opt.multi_file
+  )
+
   incremental_fh_data(
     git_root,
     path_args,
     single_file,
-    log_opt,
-    { rev_arg = opt.rev_arg, },
-    function(status, d)
+    log_options,
+    function(status, d, msg)
       if status == JobStatus.PROGRESS then
         data[#data+1] = d
       end
 
       last_status = status
+      if msg then
+        err_msg = msg
+      end
       if not resume_lock and coroutine.status(thread) == "suspended" then
-        coroutine.resume(thread)
+        handle_co(thread, coroutine.resume(thread))
       end
     end
   )
@@ -534,7 +554,7 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
     end
 
     if last_status == JobStatus.ERROR then
-      callback(entries, JobStatus.ERROR)
+      callback(entries, JobStatus.ERROR, err_msg)
       return
     elseif last_status == JobStatus.SUCCESS and data_idx > #data then
       break
@@ -555,17 +575,16 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
     -- lists only an incomplete list of files at best. We need to use 'git
     -- show' to get file statuses for merge commits. And merges do not always
     -- have changes.
-    if cur.numstat[1] and cur.merge_hash then
+    if cur.merge_hash and cur.numstat[1] and #cur.numstat ~= #cur.namestat then
       local job
       local job_spec = {
         command = "git",
         args = utils.vec_join(
           "show",
           "--format=",
-          "-m",
-          "--first-parent",
+          "--diff-merges=first-parent",
           "--name-status",
-          (single_file and log_opt.follow) and "--follow" or nil,
+          (single_file and log_options.follow) and "--follow" or nil,
           cur.right_hash,
           "--",
           old_path or path_args
@@ -575,7 +594,7 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
           if j.code == 0 then
             cur.namestat = j:result()
           end
-          coroutine.resume(thread)
+          handle_co(thread, coroutine.resume(thread))
         end,
       }
 
@@ -608,7 +627,7 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
       resume_lock = false
 
       if job.code ~= 0 then
-        callback({}, JobStatus.ERROR)
+        callback({}, JobStatus.ERROR, job:stderr_result())
         return
       end
 
@@ -682,7 +701,7 @@ end
 
 ---@param git_root string
 ---@param path_args string[]
----@param log_opt LogOptions
+---@param log_opt ConfigLogOptions
 ---@param opt ProcessFileHistorySpec
 ---@param callback function
 function M.file_history(git_root, path_args, log_opt, opt, callback)
@@ -699,37 +718,35 @@ function M.file_history(git_root, path_args, log_opt, opt, callback)
     process_file_history(thread, git_root, path_args, log_opt, opt, callback)
   end)
 
-  coroutine.resume(thread)
+  handle_co(thread, coroutine.resume(thread))
 end
-
----@class FileHistoryDryRunSpec
----@field rev_arg string
 
 ---@param git_root string
 ---@param path_args string[]
 ---@param log_opt LogOptions
----@param opt FileHistoryDryRunSpec
 ---@return boolean ok, string description
-function M.file_history_dry_run(git_root, path_args, log_opt, opt)
+function M.file_history_dry_run(git_root, path_args, log_opt)
   local single_file = #path_args == 1
     and utils.path:is_directory(path_args[1])
     and #utils.system_list(utils.vec_join("git", "ls-files", "--", path_args), git_root) < 2
 
+  local log_options = config.get_log_options(single_file, log_opt)
+
   local options = vim.tbl_map(function(v)
     return vim.fn.shellescape(v)
-  end, describe_fh_options(log_opt, single_file))
+  end, prepare_fh_options(log_options, single_file))
 
   local description = utils.vec_join(
     ("Top-level path: '%s'"):format(utils.path:vim_fnamemodify(git_root, ":~")),
-    opt.rev_arg and ("Range: '%s'"):format(opt.rev_arg) or nil,
+    log_options.rev_range and ("Revision range: '%s'"):format(log_options.rev_range) or nil,
     ("Flags: %s"):format(table.concat(options, " "))
   )
 
-  log_opt = utils.tbl_clone(log_opt)
-  log_opt.max_count = 1
-  options = prepare_fh_options(log_opt, single_file)
+  log_options = utils.tbl_clone(log_options)
+  log_options.max_count = 1
+  options = prepare_fh_options(log_options, single_file)
   local out, code = utils.system_list(
-    utils.vec_join("git", "log", "--pretty=format:%H", "--name-status", options, opt.rev_arg, "--", path_args),
+    utils.vec_join("git", "log", "--pretty=format:%H", "--name-status", options, log_options.rev_range, "--", path_args),
     git_root
   )
 

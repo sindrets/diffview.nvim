@@ -1,4 +1,3 @@
-local CommitLogPanel = require("diffview.ui.panels.commit_log_panel").CommitLogPanel
 local Event = require("diffview.events").Event
 local FileEntry = require("diffview.views.file_entry").FileEntry
 local RevType = require("diffview.git.rev").RevType
@@ -6,9 +5,6 @@ local api = vim.api
 local async = require("plenary.async")
 local git = require("diffview.git.utils")
 local utils = require("diffview.utils")
-
----@type CommitLogPanel
-local log_panel
 
 ---@param view DiffView
 return function(view)
@@ -103,14 +99,8 @@ return function(view)
         return
       end
 
-      if not log_panel then
-        log_panel = CommitLogPanel(view.git_root, {
-          name = ("diffview://%s/log/%d/%s"):format(view.git_dir, view.tabpage, "commit_log"),
-        })
-      end
-
       local rev_arg = ("%s..%s"):format(view.left.commit, view.right.commit or "HEAD")
-      log_panel:update(rev_arg)
+      view.commit_log_panel:update(rev_arg)
     end,
     toggle_stage_entry = function()
       if not (view.left.type == RevType.INDEX and view.right.type == RevType.LOCAL) then

@@ -8,6 +8,8 @@ local FileHistoryView = lazy.access("diffview.views.file_history.file_history_vi
 local Rev = lazy.access("diffview.git.rev", "Rev")
 ---@type RevType|LazyModule
 local RevType = lazy.access("diffview.git.rev", "RevType")
+---@type StandardView|LazyModule
+local StandardView = lazy.access("diffview.views.standard.standard_view", "StandardView")
 ---@module "diffview.arg_parser"
 local arg_parser = lazy.require("diffview.arg_parser")
 ---@module "diffview.config"
@@ -16,8 +18,6 @@ local config = lazy.require("diffview.config")
 local git = lazy.require("diffview.git.utils")
 ---@module "diffview.utils"
 local utils = lazy.require("diffview.utils")
----@type StandardView|LazyModule
-local StandardView = lazy.access("diffview.views.standard.standard_view", "StandardView")
 
 local api = vim.api
 local path = utils.path
@@ -47,10 +47,7 @@ function M.diffview_open(args)
       and path:parent(path:absolute(cfile))
       or path:realpath(".")
     )
-  local cpath = argo:get_flag("C")
-  if vim.tbl_contains({ "true", "", nil }, cpath) then
-    cpath = nil
-  end
+  local cpath = argo:get_flag("C", { expect_string = true, no_empty = true })
   local p = cpath and path:realpath(cpath) or fpath
   if not path:is_directory(p) then
     p = path:parent(p)
@@ -68,8 +65,8 @@ function M.diffview_open(args)
     git_root,
     rev_arg,
     {
-      cached = argo:get_flag("cached", "staged") == "true",
-      imply_local = argo:get_flag("imply-local") == "true",
+      cached = argo:get_flag({ "cached", "staged" }),
+      imply_local = argo:get_flag("imply-local"),
     }
   )
 
@@ -80,12 +77,12 @@ function M.diffview_open(args)
   ---@type DiffViewOptions
   local options = {
     show_untracked = arg_parser.ambiguous_bool(
-      argo:get_flag("u", "untracked-files"),
+      argo:get_flag({ "u", "untracked-files" }, { plain = true }),
       nil,
       { "all", "normal", "true" },
       { "no", "false" }
     ),
-    selected_file = argo:get_flag("selected-file")
+    selected_file = argo:get_flag("selected-file", { expect_string = true, no_empty = true })
       or (vim.bo.buftype == "" and path:vim_expand("%:p"))
       or nil,
   }
@@ -118,29 +115,19 @@ function M.file_history(args)
 
   local cfile = path:vim_expand("%")
   cfile = path:readlink(cfile) or cfile
-  local fpath =
-      (paths[1] and path:absolute(paths[1]))
-      or (
-        vim.bo.buftype == ""
-        and path:readable(cfile)
-        and path:absolute(cfile)
-      )
+  local fpath = (paths[1] and path:absolute(paths[1]))
+      or (vim.bo.buftype == ""
+          and path:readable(cfile)
+          and path:absolute(cfile))
       or path:realpath(".")
 
-  local cpath = argo:get_flag("C")
-  if vim.tbl_contains({ "true", "", nil }, cpath) then
-    cpath = nil
-  end
-
-  if #paths == 0 then
-    paths[1] = cpath and path:realpath(cpath) or fpath
-  end
+  local cpath = argo:get_flag("C", { expect_string = true, no_empty = true })
 
   rel_paths = vim.tbl_map(function(v)
     return v == "." and "." or path:relative(v, ".")
   end, paths)
 
-  local p = paths[1]
+  local p = cpath and path:realpath(cpath) or fpath
   local stat = path:stat(p)
   if stat then
     if stat.type ~= "directory" then
@@ -152,7 +139,7 @@ function M.file_history(args)
 
   local git_root = git.toplevel(p)
   if not git_root then
-    utils.err(("Path not a git repo (or any parent): '%s'"):format(rel_paths[1]))
+    utils.err(("Path not a git repo (or any parent): '%s'"):format(path:relative(p, ".")))
     return
   end
 
@@ -161,7 +148,7 @@ function M.file_history(args)
     return git.pathspec_expand(git_root, cwd, pathspec)
   end, paths)
 
-  local range_arg = argo:get_flag("range")
+  local range_arg = argo:get_flag("range", { expect_string = true, no_empty = true })
   if range_arg then
     local ok = git.verify_rev_arg(git_root, range_arg)
     if not ok then
@@ -170,8 +157,35 @@ function M.file_history(args)
     end
   end
 
-  local log_options = config.get_config().file_history_panel.log_options
-  local ok, opt_description = git.file_history_dry_run(git_root, paths, log_options, { rev_arg = range_arg })
+  local log_flag_names = {
+    { "follow" },
+    { "first-parent" },
+    { "show-pulls" },
+    { "reflog" },
+    { "all" },
+    { "merges" },
+    { "no-merges" },
+    { "reverse" },
+    { "max-count", "n" },
+    { "diff-merges" },
+    { "author" },
+    { "grep" },
+  }
+
+  ---@type LogOptions
+  local log_options = { rev_range = range_arg }
+  for _, names in ipairs(log_flag_names) do
+    local key, _ = names[1]:gsub("%-", "_")
+    local v = argo:get_flag(
+      names,
+      type(config.log_option_defaults[key]) ~= "boolean"
+        and { expect_string = true }
+        or nil
+    )
+    log_options[key] = v
+  end
+
+  local ok, opt_description = git.file_history_dry_run(git_root, paths, log_options)
 
   if not ok then
     utils.info({
@@ -185,7 +199,7 @@ function M.file_history(args)
   end
 
   local base
-  local base_arg = argo:get_flag("base")
+  local base_arg = argo:get_flag("base", { expect_string = true, no_empty = true })
   if base_arg then
     if base_arg == "LOCAL" then
       base = Rev(RevType.LOCAL)
@@ -207,7 +221,6 @@ function M.file_history(args)
     raw_args = argo.args,
     log_options = log_options,
     base = base,
-    rev_arg = range_arg,
   })
 
   table.insert(M.views, v)

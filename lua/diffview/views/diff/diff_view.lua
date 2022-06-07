@@ -1,3 +1,4 @@
+local CommitLogPanel = require("diffview.ui.panels.commit_log_panel").CommitLogPanel
 local Diff = require("diffview.diff").Diff
 local EditToken = require("diffview.diff").EditToken
 local Event = require("diffview.events").Event
@@ -31,6 +32,7 @@ local M = {}
 ---@field right Rev
 ---@field options DiffViewOptions
 ---@field panel FilePanel
+---@field commit_log_panel CommitLogPanel
 ---@field files FileDict
 ---@field file_idx integer
 ---@field initialized boolean
@@ -66,6 +68,9 @@ function DiffView:init(opt)
 end
 
 function DiffView:post_open()
+  self.commit_log_panel = CommitLogPanel(self.git_root, {
+    name = ("diffview://%s/log/%d/%s"):format(self.git_dir, self.tabpage, "commit_log"),
+  })
   self:init_event_listeners()
   vim.schedule(function()
     self:file_safeguard()
@@ -82,6 +87,7 @@ function DiffView:close()
   for _, file in self.files:ipairs() do
     file:destroy()
   end
+  self.commit_log_panel:destroy()
   DiffView:super().close(self)
 end
 

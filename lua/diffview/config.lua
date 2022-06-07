@@ -17,6 +17,10 @@ function M.diffview_callback(cb_name)
   return actions[cb_name]
 end
 
+---@class ConfigLogOptions
+---@field single_file LogOptions
+---@field multi_file LogOptions
+
 -- stylua: ignore start
 M.defaults = {
   diff_binaries = false,
@@ -42,13 +46,14 @@ M.defaults = {
     },
   },
   file_history_panel = {
+    ---@type ConfigLogOptions
     log_options = {
-      max_count = 256,
-      follow = false,
-      all = false,
-      merges = false,
-      no_merges = false,
-      reverse = false,
+      single_file = {
+        diff_merges = "combined",
+      },
+      multi_file = {
+        diff_merges = "first-parent",
+      },
     },
     win_config = {
       position = "bottom",
@@ -136,8 +141,65 @@ M.defaults = {
 M.user_emitter = EventEmitter()
 M._config = M.defaults
 
+---@class LogOptions
+---@field follow boolean
+---@field first_parent boolean
+---@field show_pulls boolean
+---@field reflog boolean
+---@field all boolean
+---@field merges boolean
+---@field no_merges boolean
+---@field reverse boolean
+---@field max_count integer
+---@field author string
+---@field grep string
+---@field diff_merges string
+---@field rev_range string
+
+---@type LogOptions
+M.log_option_defaults = {
+  follow = false,
+  first_parent = false,
+  show_pulls = false,
+  reflog = false,
+  all = false,
+  merges = false,
+  no_merges = false,
+  reverse = false,
+  rev_range = nil,
+  max_count = 256,
+  diff_merges = nil,
+  author = nil,
+  grep = nil,
+}
+
 function M.get_config()
   return M._config
+end
+
+---@param single_file boolean
+---@param t LogOptions
+---@return LogOptions
+function M.get_log_options(single_file, t)
+  local log_options
+
+  if single_file then
+    log_options =  M._config.file_history_panel.log_options.single_file
+  else
+    log_options = M._config.file_history_panel.log_options.multi_file
+  end
+
+  if t then
+    log_options = vim.tbl_extend("force", log_options, t)
+
+    for k, _ in pairs(log_options) do
+      if t[k] == "" then
+        log_options[k] = nil
+      end
+    end
+  end
+
+  return log_options
 end
 
 function M.setup(user_config)
@@ -182,7 +244,42 @@ function M.setup(user_config)
     M._config.key_bindings = nil
   end
 
+  local user_log_options = utils.tbl_access(user_config, "file_history_panel.log_options")
+  if user_log_options then
+    local option_names = {
+      "max_count",
+      "follow",
+      "all",
+      "merges",
+      "no_merges",
+      "reverse",
+    }
+    for _, name in ipairs(option_names) do
+      if user_log_options[name] ~= nil then
+        utils.warn(
+          ("'file_history_panel.log_options.(%s)' has been deprecated. See ':h diffview.changelog-151'.")
+          :format(table.concat(option_names, "|"))
+        )
+        break
+      end
+    end
+  end
+
   --#endregion
+
+  for _, name in ipairs({ "single_file", "multi_file" }) do
+    local t = M._config.file_history_panel.log_options
+    t[name] = vim.tbl_extend(
+      "force",
+      M.log_option_defaults,
+      t[name]
+    )
+    for k, _ in pairs(t[name]) do
+      if t[name][k] == "" then
+        t[name][k] = nil
+      end
+    end
+  end
 
   for event, callback in pairs(M._config.hooks) do
     if type(callback) == "function" then
@@ -193,8 +290,7 @@ function M.setup(user_config)
   if M._config.keymaps.disable_defaults then
     for name, _ in pairs(M._config.keymaps) do
       if name ~= "disable_defaults" then
-        M._config.keymaps[name] = (user_config.keymaps and user_config.keymaps[name])
-          or {}
+        M._config.keymaps[name] = utils.tbl_access(user_config, "keymaps." .. name) or {}
       end
     end
   end

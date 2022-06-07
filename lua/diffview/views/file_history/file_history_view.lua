@@ -1,3 +1,4 @@
+local CommitLogPanel = require("diffview.ui.panels.commit_log_panel").CommitLogPanel
 local Event = require("diffview.events").Event
 local EventEmitter = require("diffview.events").EventEmitter
 local FileEntry = require("diffview.views.file_entry").FileEntry
@@ -16,9 +17,9 @@ local M = {}
 ---@field git_root string
 ---@field git_dir string
 ---@field panel FileHistoryPanel
+---@field commit_log_panel CommitLogPanel
 ---@field path_args string[]
 ---@field raw_args string[]
----@field rev_arg string?
 local FileHistoryView = oop.create_class("FileHistoryView", StandardView)
 
 function FileHistoryView:init(opt)
@@ -32,7 +33,6 @@ function FileHistoryView:init(opt)
   self.git_dir = git.git_dir(self.git_root)
   self.path_args = opt.path_args
   self.raw_args = opt.raw_args
-  self.rev_arg = opt.rev_arg
   self.panel = FileHistoryPanel(
     self,
     self.git_root,
@@ -40,14 +40,14 @@ function FileHistoryView:init(opt)
     self.path_args,
     self.raw_args,
     opt.log_options,
-    {
-      base = opt.base,
-      rev_arg = opt.rev_arg,
-    }
+    { base = opt.base, }
   )
 end
 
 function FileHistoryView:post_open()
+  self.commit_log_panel = CommitLogPanel(self.git_root, {
+    name = ("diffview://%s/log/%d/%s"):format(self.git_dir, self.tabpage, "commit_log"),
+  })
   self:init_event_listeners()
   vim.schedule(function()
     self:file_safeguard()
@@ -70,6 +70,7 @@ function FileHistoryView:close()
   for _, entry in ipairs(self.panel.entries or {}) do
     entry:destroy()
   end
+  self.commit_log_panel:destroy()
   FileHistoryView:super().close(self)
 end
 
