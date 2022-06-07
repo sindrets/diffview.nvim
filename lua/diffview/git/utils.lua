@@ -119,6 +119,21 @@ local ensure_output = async.wrap(function(max_retries, jobs, log_context, callba
   callback(JobStatus.ERROR)
 end, 4)
 
+---@param thread thread
+---@param ok boolean
+---@param result any
+---@return boolean ok
+---@return any result
+local function handle_co(thread, ok, result)
+  if not ok then
+    utils.err(utils.vec_join(
+      "Coroutine failed!",
+      debug.traceback(thread, result, 1)
+    ), true)
+  end
+  return ok, result
+end
+
 local tracked_files = async.void(function(git_root, left, right, args, kind, callback)
   ---@type FileEntry[]
   local files = {}
@@ -525,7 +540,7 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
         err_msg = msg
       end
       if not resume_lock and coroutine.status(thread) == "suspended" then
-        coroutine.resume(thread)
+        handle_co(thread, coroutine.resume(thread))
       end
     end
   )
@@ -577,7 +592,7 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
           if j.code == 0 then
             cur.namestat = j:result()
           end
-          coroutine.resume(thread)
+          handle_co(thread, coroutine.resume(thread))
         end,
       }
 
@@ -701,7 +716,7 @@ function M.file_history(git_root, path_args, log_opt, opt, callback)
     process_file_history(thread, git_root, path_args, log_opt, opt, callback)
   end)
 
-  coroutine.resume(thread)
+  handle_co(thread, coroutine.resume(thread))
 end
 
 ---@param git_root string

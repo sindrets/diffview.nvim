@@ -3,6 +3,67 @@
 
 CHANGELOG
 
+                                                *diffview.changelog-151*
+
+PR: https://github.com/sindrets/diffview.nvim/pull/151
+
+The config for log options has changed. The table is now divided into the
+sub-tables `single_file`, and `multi_file`. This allows you to define
+different default log options for history targeting singular files, and
+history targeting multiple paths, and/or directories. To update your config,
+just move all your log options into the new table keys `single_file` and
+`multi_file`:
+
+        Before: ~
+>
+                require("diffview").setup({
+                  -- ...
+                  file_history_panel = {
+                    log_options = {
+                      max_count = 512,
+                      follow = true,
+                    },
+                  },
+                })
+<
+
+        After: ~
+>
+                require("diffview").setup({
+                  -- ...
+                  file_history_panel = {
+                    log_options = {
+                      single_file = {
+                        max_count = 512,
+                        follow = true,
+                      },
+                      multi_file = {
+                        max_count = 128,
+                        -- follow = false   -- `follow` only applies to single-file history
+                      },
+                    },
+                  },
+                })
+<
+
+You only need to define the options you want to change from the defaults. To
+find all the available log options, see |diffview.git.LogOptions|.
+
+Calling `:DiffviewFileHistory` with no args would previously target the file
+in the current buffer. This has now been changed to instead target the
+top-level of the working tree. This was changed because with how it worked
+before, there was effectively no way to get the file history equivalent of
+running `git log` with no path args. If your cwd was some subdirectory of the
+working tree, and you wanted the full file history of the tree, you would have
+to manually type out the path to the top-level. On the contrary, getting the
+history for the current file is always as simple as just using `%`, which
+expands to the current file name.
+
+To get the file history for the current file like before, simply run: >
+
+        :DiffviewFileHistory %
+
+
                                                 *diffview.changelog-137*
 
 PR: https://github.com/sindrets/diffview.nvim/pull/137

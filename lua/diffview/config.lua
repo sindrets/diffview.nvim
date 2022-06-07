@@ -244,6 +244,27 @@ function M.setup(user_config)
     M._config.key_bindings = nil
   end
 
+  local user_log_options = utils.tbl_access(user_config, "file_history_panel.log_options")
+  if user_log_options then
+    local option_names = {
+      "max_count",
+      "follow",
+      "all",
+      "merges",
+      "no_merges",
+      "reverse",
+    }
+    for _, name in ipairs(option_names) do
+      if user_log_options[name] ~= nil then
+        utils.warn(
+          ("'file_history_panel.log_options.(%s)' has been deprecated. See ':h diffview.changelog-151'.")
+          :format(table.concat(option_names, "|"))
+        )
+        break
+      end
+    end
+  end
+
   --#endregion
 
   for _, name in ipairs({ "single_file", "multi_file" }) do
