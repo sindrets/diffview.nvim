@@ -12,7 +12,7 @@ return function(view)
     tab_enter = function()
       local file = view.panel.cur_file
       if file then
-        view:set_file(file)
+        view:set_file(file, false, true)
         file:attach_buffers()
       end
 

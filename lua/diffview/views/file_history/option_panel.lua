@@ -40,6 +40,7 @@ FHOptionPanel.bufopts = {
 
 ---@class FlagOption : string[]
 ---@field key string
+---@field prompt string
 ---@field select string[]
 ---@field completion string|fun(panel: FHOptionPanel): function
 
@@ -85,8 +86,8 @@ FHOptionPanel.flags = {
         "remerge",
       },
     },
-    { "=a", "--author=", "List only commits from a given author" },
-    { "=g", "--grep=", "Filter commit messages" },
+    { "=a", "--author=", "List only commits from a given author", prompt = "(Extended regular expression)" },
+    { "=g", "--grep=", "Filter commit messages", prompt = "(Extended regular expression)" },
   },
 }
 
@@ -126,10 +127,11 @@ function FHOptionPanel:init(parent)
 
     elseif FHOptionPanel.flags.options[option_name] then
       local o = FHOptionPanel.flags.options[option_name]
+      local prompt = o.prompt and (o.prompt .. " " .. o[2]) or o[2]
 
       if o.select then
         vim.ui.select(o.select, {
-          prompt = o[2],
+          prompt = prompt,
           format_item = function(item)
             return item == "" and "<unset>" or item
           end,
@@ -145,7 +147,7 @@ function FHOptionPanel:init(parent)
       else
         local completion = type(o.completion) == "function" and o.completion(self) or o.completion
 
-        utils.input(o[2], {
+        utils.input(prompt, {
           default = log_options[option_name],
           completion = completion,
           callback = function(response)

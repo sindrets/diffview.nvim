@@ -136,7 +136,7 @@ local function handle_co(thread, ok, result)
   return ok, result
 end
 
-local tracked_files = async.void(function(git_root, left, right, args, kind, callback)
+local tracked_files = async.wrap(function(git_root, left, right, args, kind, callback)
   ---@type FileEntry[]
   local files = {}
   ---@type CountDownLatch
@@ -210,38 +210,39 @@ local tracked_files = async.void(function(git_root, left, right, args, kind, cal
   end
 
   callback(nil, files)
-end)
+end, 6)
 
-local untracked_files = async.void(function(git_root, left, right, callback)
+local untracked_files = async.wrap(function(git_root, left, right, callback)
   Job:new({
     command = "git",
     args = { "ls-files", "--others", "--exclude-standard" },
     cwd = git_root,
     ---@type Job
     on_exit = function(j)
-      if j.code == 0 then
-        local files = {}
-        for _, s in ipairs(j:result()) do
-          table.insert(
-            files,
-            FileEntry({
-              path = s,
-              absolute_path = utils.path:join(git_root, s),
-              status = "?",
-              kind = "working",
-              left = left,
-              right = right,
-            })
-          )
-        end
-        callback(nil, files)
-      else
+      if j.code ~= 0 then
         utils.handle_job(j)
         callback(j:stderr_result() or {}, nil)
+        return
       end
+
+      local files = {}
+      for _, s in ipairs(j:result()) do
+        table.insert(
+          files,
+          FileEntry({
+            path = s,
+            absolute_path = utils.path:join(git_root, s),
+            status = "?",
+            kind = "working",
+            left = left,
+            right = right,
+          })
+        )
+      end
+      callback(nil, files)
     end
   }):start()
-end)
+end, 4)
 
 ---Get a list of files modified between two revs.
 ---@param git_root string
@@ -250,8 +251,9 @@ end)
 ---@param path_args string[]|nil
 ---@param opt DiffViewOptions
 ---@param callback function
+---@return string[] err
 ---@return FileDict
-M.diff_file_list = async.void(function(git_root, left, right, path_args, opt, callback)
+M.diff_file_list = async.wrap(function(git_root, left, right, path_args, opt, callback)
   ---@type FileDict
   local files = FileDict()
   ---@type CountDownLatch
@@ -274,37 +276,40 @@ M.diff_file_list = async.void(function(git_root, left, right, path_args, opt, ca
         errors[#errors+1] = err
         utils.err("Failed to get git status for tracked files!", true)
         latch:count_down()
+        return
+      end
+
+      files.working = tfiles
+      local show_untracked = opt.show_untracked
+      if show_untracked == nil then
+        show_untracked = M.show_untracked(git_root)
+      end
+
+      if not (show_untracked and M.has_local(left, right)) then
+        latch:count_down()
+        return
+      end
+
+      ---@diagnostic disable-next-line: redefined-local
+      local err, ufiles = untracked_files(git_root, left, right)
+      if err then
+        errors[#errors+1] = err
+        utils.err("Failed to get git status for untracked files!", true)
+        latch:count_down()
       else
-        files.working = tfiles
-        local show_untracked = opt.show_untracked
-        if show_untracked == nil then
-          show_untracked = M.show_untracked(git_root)
-        end
+        files.working = utils.vec_join(files.working, ufiles)
 
-        if show_untracked and M.has_local(left, right) then
-          ---@diagnostic disable-next-line: redefined-local
-          untracked_files(git_root, left, right, function(err, ufiles)
-            if err then
-              errors[#errors+1] = err
-              utils.err("Failed to get git status for untracked files!", true)
-              latch:count_down()
-            else
-              files.working = utils.vec_join(files.working, ufiles)
-
-              utils.merge_sort(files.working, function(a, b)
-                return a.path:lower() < b.path:lower()
-              end)
-              latch:count_down()
-            end
-          end)
-        else
-          latch:count_down()
-        end
+        utils.merge_sort(files.working, function(a, b)
+          return a.path:lower() < b.path:lower()
+        end)
+        latch:count_down()
       end
     end
   )
 
-  if left.type == RevType.INDEX and right.type == RevType.LOCAL then
+  if not (left.type == RevType.INDEX and right.type == RevType.LOCAL) then
+    latch:count_down()
+  else
     local left_rev = M.head_rev(git_root) or Rev.new_null_tree()
     local right_rev = Rev(RevType.INDEX)
     tracked_files(
@@ -323,14 +328,12 @@ M.diff_file_list = async.void(function(git_root, left, right, path_args, opt, ca
           errors[#errors+1] = err
           utils.err("Failed to get git status for staged files!", true)
           latch:count_down()
-        else
-          files.staged = tfiles
-          latch:count_down()
+          return
         end
+        files.staged = tfiles
+        latch:count_down()
       end
     )
-  else
-    latch:count_down()
   end
 
   latch:await()
@@ -341,7 +344,7 @@ M.diff_file_list = async.void(function(git_root, left, right, path_args, opt, ca
 
   files:update_file_trees()
   callback(nil, files)
-end)
+end, 6)
 
 ---@param log_options LogOptions
 ---@param single_file boolean
@@ -359,7 +362,7 @@ local function prepare_fh_options(log_options, single_file)
     o.reverse and { "--reverse" } or nil,
     o.max_count and { "-n" .. o.max_count } or nil,
     o.diff_merges and { "--diff-merges=" .. o.diff_merges } or nil,
-    o.author and { "--author=" .. o.author } or nil,
+    o.author and { "-E", "--author=" .. o.author } or nil,
     o.grep and { "-E", "--grep=" .. o.grep } or nil
   )
 end
@@ -889,18 +892,22 @@ M.show = async.wrap(function(git_root, args, callback)
       if j.code ~= 0 then
         utils.handle_job(j)
         callback(j:stderr_result() or {}, nil)
-      else
-        local out_status
-        if #j:result() == 0 then
-          async.util.scheduler()
-          out_status = ensure_output(2, { j }, "git.utils.show()")
-        end
-        if out_status == JobStatus.ERROR then
-          callback(j:stderr_result() or {}, nil)
-          return
-        end
-        callback(nil, j:result())
+        return
       end
+
+      local out_status
+
+      if #j:result() == 0 then
+        async.util.scheduler()
+        out_status = ensure_output(2, { j }, "git.utils.show()")
+      end
+
+      if out_status == JobStatus.ERROR then
+        callback(j:stderr_result() or {}, nil)
+        return
+      end
+
+      callback(nil, j:result())
     end),
   })
   -- Problem: Running multiple 'show' jobs simultaneously may cause them to fail

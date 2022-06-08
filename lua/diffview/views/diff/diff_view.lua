@@ -187,13 +187,14 @@ function DiffView:set_file_by_path(path, focus, highlight)
 end
 
 ---Get an updated list of files.
+---@return string[] err
 ---@return FileDict
 DiffView.get_updated_files = async.wrap(function(self, callback)
   git.diff_file_list(self.git_root, self.left, self.right, self.path_args, self.options, callback)
 end, 2)
 
 ---Update the file list, including stats and status for all files.
-function DiffView:update_files(callback)
+DiffView.update_files = async.void(function(self, callback)
   ---@type PerfTimer
   local perf = PerfTimer("[DiffView] Status Update")
   self:ensure_layout()
@@ -323,7 +324,7 @@ function DiffView:update_files(callback)
       end
     end
   end)
-end
+end)
 
 ---@Override
 ---Recover the layout after the user has messed it up.
