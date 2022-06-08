@@ -138,10 +138,10 @@ function M.init()
     vim.cmd("do <nomodeline> User DiffviewViewLeave")
   end)
   DiffviewGlobal.emitter:on("diff_buf_read", function(_)
-    vim.cmd("do User DiffviewDiffBufRead")
+    vim.cmd("do <nomodeline> User DiffviewDiffBufRead")
   end)
   DiffviewGlobal.emitter:on("diff_buf_win_enter", function(_)
-    vim.cmd("do User DiffviewDiffBufWinEnter")
+    vim.cmd("do <nomodeline> User DiffviewDiffBufWinEnter")
   end)
 
   -- Set up completion wrapper used by `vim.ui.input()`
