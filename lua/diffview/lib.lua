@@ -20,7 +20,9 @@ local git = lazy.require("diffview.git.utils")
 local utils = lazy.require("diffview.utils")
 
 local api = vim.api
-local path = utils.path
+
+---@type PathLib
+local pl = lazy.access(utils, "path")
 
 local M = {}
 
@@ -34,29 +36,29 @@ function M.diffview_open(args)
   local paths = {}
 
   for _, path_arg in ipairs(argo.post_args) do
-    local magic, pattern = git.pathspec_split(path:vim_expand(path_arg))
-    pattern = path:readlink(pattern) or pattern
+    local magic, pattern = git.pathspec_split(pl:vim_expand(path_arg))
+    pattern = pl:readlink(pattern) or pattern
     table.insert(paths, magic .. pattern)
   end
 
-  local cfile = path:vim_expand("%")
-  cfile = path:readlink(cfile) or cfile
+  local cfile = pl:vim_expand("%")
+  cfile = pl:readlink(cfile) or cfile
   local fpath = (
       vim.bo.buftype == ""
-      and path:readable(cfile)
-      and path:parent(path:absolute(cfile))
-      or path:realpath(".")
+      and pl:readable(cfile)
+      and pl:parent(pl:absolute(cfile))
+      or pl:realpath(".")
     )
   local cpath = argo:get_flag("C", { expect_string = true, no_empty = true })
-  local p = cpath and path:realpath(cpath) or fpath
-  if not path:is_directory(p) then
-    p = path:parent(p)
+  local p = cpath and pl:realpath(cpath) or fpath
+  if not pl:is_directory(p) then
+    p = pl:parent(p)
   end
 
   local git_root = git.toplevel(p)
   if not git_root then
     utils.err(
-      ("Path not a git repo (or any parent): '%s'"):format(path:relative(p, "."))
+      ("Path not a git repo (or any parent): '%s'"):format(pl:relative(p, "."))
     )
     return
   end
@@ -83,7 +85,7 @@ function M.diffview_open(args)
       { "no", "false" }
     ),
     selected_file = argo:get_flag("selected-file", { expect_string = true, no_empty = true })
-      or (vim.bo.buftype == "" and path:vim_expand("%:p"))
+      or (vim.bo.buftype == "" and pl:vim_expand("%:p"))
       or nil,
   }
 
@@ -108,38 +110,38 @@ function M.file_history(args)
   local rel_paths
 
   for _, path_arg in ipairs(argo.args) do
-    local magic, pattern = git.pathspec_split(path:vim_expand(path_arg))
-    pattern = path:readlink(pattern) or pattern
+    local magic, pattern = git.pathspec_split(pl:vim_expand(path_arg))
+    pattern = pl:readlink(pattern) or pattern
     table.insert(paths, magic .. pattern)
   end
 
-  local cfile = path:vim_expand("%")
-  cfile = path:readlink(cfile) or cfile
-  local fpath = (paths[1] and path:absolute(paths[1]))
+  local cfile = pl:vim_expand("%")
+  cfile = pl:readlink(cfile) or cfile
+  local fpath = (paths[1] and pl:absolute(paths[1]))
       or (vim.bo.buftype == ""
-          and path:readable(cfile)
-          and path:absolute(cfile))
-      or path:realpath(".")
+          and pl:readable(cfile)
+          and pl:absolute(cfile))
+      or pl:realpath(".")
 
   local cpath = argo:get_flag("C", { expect_string = true, no_empty = true })
 
   rel_paths = vim.tbl_map(function(v)
-    return v == "." and "." or path:relative(v, ".")
+    return v == "." and "." or pl:relative(v, ".")
   end, paths)
 
-  local p = cpath and path:realpath(cpath) or fpath
-  local stat = path:stat(p)
+  local p = cpath and pl:realpath(cpath) or fpath
+  local stat = pl:stat(p)
   if stat then
     if stat.type ~= "directory" then
-      p = path:parent(p)
+      p = pl:parent(p)
     end
   else
-    p = path:realpath(".")
+    p = pl:realpath(".")
   end
 
   local git_root = git.toplevel(p)
   if not git_root then
-    utils.err(("Path not a git repo (or any parent): '%s'"):format(path:relative(p, ".")))
+    utils.err(("Path not a git repo (or any parent): '%s'"):format(pl:relative(p, ".")))
     return
   end
 

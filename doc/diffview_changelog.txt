@@ -62,7 +62,7 @@ expands to the current file name.
 To get the file history for the current file like before, simply run: >
 
         :DiffviewFileHistory %
-
+<
 
                                                 *diffview.changelog-137*
 

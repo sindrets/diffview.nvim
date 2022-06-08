@@ -11,6 +11,7 @@ local PerfTimer = require("diffview.perf").PerfTimer
 local RevType = require("diffview.git.rev").RevType
 local StandardView = require("diffview.views.standard.standard_view").StandardView
 local async = require("plenary.async")
+local debounce = require("diffview.debounce")
 local git = require("diffview.git.utils")
 local logger = require("diffview.logger")
 local oop = require("diffview.oop")
@@ -36,6 +37,7 @@ local M = {}
 ---@field files FileDict
 ---@field file_idx integer
 ---@field initialized boolean
+---@field watcher any UV fs poll handle.
 local DiffView = oop.create_class("DiffView", StandardView)
 
 ---DiffView constructor
@@ -56,7 +58,7 @@ function DiffView:init(opt)
   self.right = opt.right
   self.options = opt.options or {}
   self.options.selected_file = self.options.selected_file
-    and utils.path:relative(utils.path:absolute(self.options.selected_file), opt.git_root)
+    and utils.path:chain(self.options.selected_file):absolute():relative(opt.git_root):get()
   self.files = FileDict()
   self.panel = FilePanel(
     self.git_root,
@@ -71,6 +73,19 @@ function DiffView:post_open()
   self.commit_log_panel = CommitLogPanel(self.git_root, {
     name = ("diffview://%s/log/%d/%s"):format(self.git_dir, self.tabpage, "commit_log"),
   })
+
+  self.watcher = vim.loop.new_fs_poll()
+  ---@diagnostic disable-next-line: unused-local
+  self.watcher:start(self.git_dir .. "/index", 1000, function(err, prev, cur)
+    if not err then
+      vim.schedule(function()
+        if self:is_cur_tabpage() then
+          self:update_files()
+        end
+      end)
+    end
+  end)
+
   self:init_event_listeners()
   vim.schedule(function()
     self:file_safeguard()
@@ -83,12 +98,21 @@ end
 
 ---@Override
 function DiffView:close()
-  self.closing = true
-  for _, file in self.files:ipairs() do
-    file:destroy()
+  if not self.closing then
+    self.closing = true
+    self.update_files:close()
+
+    if self.watcher then
+      self.watcher:stop()
+      self.watcher:close()
+    end
+
+    for _, file in self.files:ipairs() do
+      file:destroy()
+    end
+    self.commit_log_panel:destroy()
+    DiffView:super().close(self)
   end
-  self.commit_log_panel:destroy()
-  DiffView:super().close(self)
 end
 
 ---Open the next file.
@@ -194,137 +218,141 @@ DiffView.get_updated_files = async.wrap(function(self, callback)
 end, 2)
 
 ---Update the file list, including stats and status for all files.
-DiffView.update_files = async.void(function(self, callback)
-  ---@type PerfTimer
-  local perf = PerfTimer("[DiffView] Status Update")
-  self:ensure_layout()
+DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
+  ---@param self DiffView
+  ---@param callback fun(err?: string[])
+  async.void(function(self, callback)
+    ---@type PerfTimer
+    local perf = PerfTimer("[DiffView] Status Update")
+    self:ensure_layout()
 
-  -- If left is tracking HEAD and right is LOCAL: Update HEAD rev.
-  local new_head
-  if self.left.track_head and self.right.type == RevType.LOCAL then
-    new_head = git.head_rev(self.git_root)
-    if new_head and self.left.commit ~= new_head.commit then
-      self.left = new_head
-    else
-      new_head = nil
-    end
-    perf:lap("updated head rev")
-  end
-
-  local index_stat = utils.path:stat(utils.path:join(self.git_dir, "index"))
-  local last_winid = api.nvim_get_current_win()
-  self:get_updated_files(function(err, new_files)
-    if err then
-      utils.err("Failed to update files in a diff view!", true)
-      logger.s_error("[DiffView] Failed to update files!")
-      if type(callback) == "function" then
-        callback(err)
+    -- If left is tracking HEAD and right is LOCAL: Update HEAD rev.
+    local new_head
+    if self.left.track_head and self.right.type == RevType.LOCAL then
+      new_head = git.head_rev(self.git_root)
+      if new_head and self.left.commit ~= new_head.commit then
+        self.left = new_head
+      else
+        new_head = nil
       end
-      return
-    else
-      perf:lap("received new file list")
-      local files = {
-        { cur_files = self.files.working, new_files = new_files.working },
-        { cur_files = self.files.staged, new_files = new_files.staged },
-      }
+      perf:lap("updated head rev")
+    end
 
-      async.util.scheduler()
+    local index_stat = utils.path:stat(utils.path:join(self.git_dir, "index"))
+    local last_winid = api.nvim_get_current_win()
+    self:get_updated_files(function(err, new_files)
+      if err then
+        utils.err("Failed to update files in a diff view!", true)
+        logger.s_error("[DiffView] Failed to update files!")
+        if type(callback) == "function" then
+          callback(err)
+        end
+        return
+      else
+        perf:lap("received new file list")
+        local files = {
+          { cur_files = self.files.working, new_files = new_files.working },
+          { cur_files = self.files.staged, new_files = new_files.staged },
+        }
 
-      for _, v in ipairs(files) do
-        local diff = Diff(v.cur_files, v.new_files, function(aa, bb)
-          return aa.path == bb.path and aa.oldpath == bb.oldpath
-        end)
-        local script = diff:create_edit_script()
+        async.util.scheduler()
 
-        local ai = 1
-        local bi = 1
-        for _, opr in ipairs(script) do
-          if opr == EditToken.NOOP then
-            -- Update status and stats
-            v.cur_files[ai].status = v.new_files[bi].status
-            v.cur_files[ai].stats = v.new_files[bi].stats
-            v.cur_files[ai]:validate_index_buffers(self.git_root, self.git_dir, index_stat)
-            if new_head and v.cur_files[ai].left.head then
-              v.cur_files[ai].left = new_head
-              v.cur_files[ai]:dispose_buffer("left")
-            end
-            ai = ai + 1
-            bi = bi + 1
-          elseif opr == EditToken.DELETE then
-            if self.panel.cur_file == v.cur_files[ai] then
-              local file_list = self.panel:ordered_file_list()
-              if file_list[1] == self.panel.cur_file then
-                self.panel:set_cur_file(nil)
-              else
-                self.panel:set_cur_file(self.panel:prev_file())
+        for _, v in ipairs(files) do
+          local diff = Diff(v.cur_files, v.new_files, function(aa, bb)
+            return aa.path == bb.path and aa.oldpath == bb.oldpath
+          end)
+          local script = diff:create_edit_script()
+
+          local ai = 1
+          local bi = 1
+          for _, opr in ipairs(script) do
+            if opr == EditToken.NOOP then
+              -- Update status and stats
+              v.cur_files[ai].status = v.new_files[bi].status
+              v.cur_files[ai].stats = v.new_files[bi].stats
+              v.cur_files[ai]:validate_index_buffers(self.git_root, self.git_dir, index_stat)
+              if new_head and v.cur_files[ai].left.head then
+                v.cur_files[ai].left = new_head
+                v.cur_files[ai]:dispose_buffer("left")
               end
-            end
-            v.cur_files[ai]:destroy()
-            table.remove(v.cur_files, ai)
-          elseif opr == EditToken.INSERT then
-            table.insert(v.cur_files, ai, v.new_files[bi])
-            ai = ai + 1
-            bi = bi + 1
-          elseif opr == EditToken.REPLACE then
-            if self.panel.cur_file == v.cur_files[ai] then
-              local file_list = self.panel:ordered_file_list()
-              if file_list[1] == self.panel.cur_file then
-                self.panel:set_cur_file(nil)
-              else
-                self.panel:set_cur_file(self.panel:prev_file())
+              ai = ai + 1
+              bi = bi + 1
+            elseif opr == EditToken.DELETE then
+              if self.panel.cur_file == v.cur_files[ai] then
+                local file_list = self.panel:ordered_file_list()
+                if file_list[1] == self.panel.cur_file then
+                  self.panel:set_cur_file(nil)
+                else
+                  self.panel:set_cur_file(self.panel:prev_file())
+                end
               end
+              v.cur_files[ai]:destroy()
+              table.remove(v.cur_files, ai)
+            elseif opr == EditToken.INSERT then
+              table.insert(v.cur_files, ai, v.new_files[bi])
+              ai = ai + 1
+              bi = bi + 1
+            elseif opr == EditToken.REPLACE then
+              if self.panel.cur_file == v.cur_files[ai] then
+                local file_list = self.panel:ordered_file_list()
+                if file_list[1] == self.panel.cur_file then
+                  self.panel:set_cur_file(nil)
+                else
+                  self.panel:set_cur_file(self.panel:prev_file())
+                end
+              end
+              v.cur_files[ai]:destroy()
+              table.remove(v.cur_files, ai)
+              table.insert(v.cur_files, ai, v.new_files[bi])
+              ai = ai + 1
+              bi = bi + 1
             end
-            v.cur_files[ai]:destroy()
-            table.remove(v.cur_files, ai)
-            table.insert(v.cur_files, ai, v.new_files[bi])
-            ai = ai + 1
-            bi = bi + 1
           end
         end
-      end
 
-      perf:lap("updated file list")
-      FileEntry.update_index_stat(self.git_root, self.git_dir, index_stat)
-      self.files:update_file_trees()
-      self.panel:update_components()
-      self.panel:render()
-      self.panel:redraw()
-      perf:lap("panel redrawn")
-      self.panel:reconstrain_cursor()
+        perf:lap("updated file list")
+        FileEntry.update_index_stat(self.git_root, self.git_dir, index_stat)
+        self.files:update_file_trees()
+        self.panel:update_components()
+        self.panel:render()
+        self.panel:redraw()
+        perf:lap("panel redrawn")
+        self.panel:reconstrain_cursor()
 
-      if utils.vec_indexof(self.panel:ordered_file_list(), self.panel.cur_file) == -1 then
-        self.panel:set_cur_file(nil)
-      end
+        if utils.vec_indexof(self.panel:ordered_file_list(), self.panel.cur_file) == -1 then
+          self.panel:set_cur_file(nil)
+        end
 
-      -- Set initially selected file
-      if not self.initialized and self.options.selected_file then
-        for _, file in self.files:ipairs() do
-          if file.path == self.options.selected_file then
-            self.panel:set_cur_file(file)
-            break
+        -- Set initially selected file
+        if not self.initialized and self.options.selected_file then
+          for _, file in self.files:ipairs() do
+            if file.path == self.options.selected_file then
+              self.panel:set_cur_file(file)
+              break
+            end
           end
         end
-      end
-      self:set_file(self.panel.cur_file or self.panel:next_file(), false, not self.initialized)
+        self:set_file(self.panel.cur_file or self.panel:next_file(), false, not self.initialized)
 
-      if api.nvim_win_is_valid(last_winid) then
-        api.nvim_set_current_win(last_winid)
-      end
+        if api.nvim_win_is_valid(last_winid) then
+          api.nvim_set_current_win(last_winid)
+        end
 
-      self.update_needed = false
-      perf:time()
-      logger.lvl(5).s_debug(perf)
-      logger.s_info(
-        ("[DiffView] Completed update for %d files successfully (%.3f ms)")
-        :format(self.files:len(), perf.final_time)
-      )
-      self.emitter:emit("files_updated", self.files)
-      if type(callback) == "function" then
-        callback()
+        self.update_needed = false
+        perf:time()
+        logger.lvl(5).s_debug(perf)
+        logger.s_info(
+          ("[DiffView] Completed update for %d files successfully (%.3f ms)")
+          :format(self.files:len(), perf.final_time)
+        )
+        self.emitter:emit("files_updated", self.files)
+        if type(callback) == "function" then
+          callback()
+        end
       end
-    end
+    end)
   end)
-end)
+))
 
 ---@Override
 ---Recover the layout after the user has messed it up.

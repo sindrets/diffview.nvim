@@ -1,4 +1,3 @@
-local PathLib = require("diffview.path").PathLib
 local lazy = require("diffview.lazy")
 
 ---@module "plenary.job"
@@ -29,7 +28,9 @@ local setlocal_opr_templates = {
 }
 
 ---@type PathLib
-M.path = PathLib({ separator = "/" })
+M.path = lazy.require("diffview.path", function(module)
+  return module.PathLib({ separator = "/" })
+end)
 
 ---Echo string with multiple lines.
 ---@param msg string|string[]

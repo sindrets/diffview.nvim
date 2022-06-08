@@ -181,76 +181,73 @@ function FileHistoryPanel:update_entries(callback)
   local lock = false
   local update
 
-  update = debounce.throttle_trailing(
-    timeout,
-    function(entries, status, msg)
-      if status == JobStatus.ERROR then
-        self.updating = false
-        vim.schedule(function()
-          utils.err(utils.vec_join(
-            ("Updating file history failed! %s"):format(msg and "Error message:" or ""),
-            msg
-          ))
-          self:render()
-          self:redraw()
-          callback(nil, JobStatus.ERROR, msg)
-        end)
+  update = debounce.throttle_trailing(timeout, true, function(entries, status, msg)
+    if status == JobStatus.ERROR then
+      self.updating = false
+      vim.schedule(function()
+        utils.err(utils.vec_join(
+          ("Updating file history failed! %s"):format(msg and "Error message:" or ""),
+          msg
+        ))
+        self:render()
+        self:redraw()
+        callback(nil, JobStatus.ERROR, msg)
+      end)
 
-        update:close()
-        return
+      update:close()
+      return
 
-      elseif status == JobStatus.PROGRESS and (#entries <= c or lock) then
+    elseif status == JobStatus.PROGRESS and (#entries <= c or lock) then
+      return
+    end
+
+    lock = true
+
+    vim.schedule(function()
+      c = #entries
+      if ldt > timeout then
+        logger.lvl(10).debug(
+          string.format(
+            "[FH_PANEL] Rendering is slower than throttle timeout (%.3f ms). Skipping update.",
+            ldt
+          )
+        )
+        ldt = ldt - timeout
+        lock = false
         return
       end
 
-      lock = true
+      local was_empty = #self.entries == 0
+      self.entries = utils.vec_slice(entries)
 
-      vim.schedule(function()
-        c = #entries
-        if ldt > timeout then
-          logger.lvl(10).debug(
-            string.format(
-              "[FH_PANEL] Rendering is slower than throttle timeout (%.3f ms). Skipping update.",
-              ldt
-            )
-          )
-          ldt = ldt - timeout
-          lock = false
-          return
-        end
+      if was_empty then
+        self.single_file = self.entries[1] and self.entries[1].single_file
+      end
 
-        local was_empty = #self.entries == 0
-        self.entries = utils.vec_slice(entries)
+      if status == JobStatus.SUCCESS then self.updating = false end
+      self:update_components()
+      self:render()
+      self:redraw()
+      ldt = renderer.last_draw_time
 
-        if was_empty then
-          self.single_file = self.entries[1] and self.entries[1].single_file
-        end
+      if status == JobStatus.SUCCESS then
+        update:close()
+        perf_update:time()
+        logger.s_info(string.format(
+          "[FileHistory] Completed update for %d entries successfully (%.3f ms).",
+          #self.entries,
+          perf_update.final_time
+        ))
+      end
 
-        if status == JobStatus.SUCCESS then self.updating = false end
-        self:update_components()
-        self:render()
-        self:redraw()
-        ldt = renderer.last_draw_time
+      if (was_empty or status == JobStatus.SUCCESS) and type(callback) == "function" then
+        vim.cmd("redraw")
+        callback(entries, status)
+      end
 
-        if status == JobStatus.SUCCESS then
-          update:close()
-          perf_update:time()
-          logger.s_info(string.format(
-            "[FileHistory] Completed update for %d entries successfully (%.3f ms).",
-            #self.entries,
-            perf_update.final_time
-          ))
-        end
-
-        if (was_empty or status == JobStatus.SUCCESS) and type(callback) == "function" then
-          vim.cmd("redraw")
-          callback(entries, status)
-        end
-
-        lock = false
-      end)
-    end
-  )
+      lock = false
+    end)
+  end)
 
   for _, entry in ipairs(self.entries) do
     entry:destroy()

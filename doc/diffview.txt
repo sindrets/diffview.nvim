@@ -25,6 +25,7 @@ opens in its own tabpage. To close and dispose of a Diffview, call either
 Diffviews are automatically updated:
 
         • Every time you enter a Diffview
+        • Whenever `.git/index` changes.
         • On |BufWritePost|
         • On |User_FugitiveChanged|
 

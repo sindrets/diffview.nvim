@@ -1,25 +1,27 @@
 local utils = require "diffview.utils"
 local M = {}
 
----@class ManagedFunc
+---@class ManagedFn
 ---@field close fun() Release timer handle.
 
----@return ManagedFunc
+---@return ManagedFn
 local function wrap(timer, fn)
   local function close()
     timer:stop()
-    timer:close()
+    if not timer:is_closing() then
+      timer:close()
+    end
   end
 
   return setmetatable({}, {
     __call = function(_, ...)
       fn(...)
     end,
-    __index = function(self, k)
+    __index = function(_, k)
       if k == "close" then
         return close
       end
-      return self[k]
+      return nil
     end,
   })
 end
@@ -27,17 +29,19 @@ end
 ---Debounces a function on the leading edge.
 ---@param ms integer Timeout in ms
 ---@param fn function Function to debounce
----@returns ManagedFunc Debounced function.
+---@return ManagedFn # Debounced function.
 function M.debounce_leading(ms, fn)
   local timer = vim.loop.new_timer()
-  local running = false
+  local lock = false
+
   return wrap(timer, function(...)
     timer:start(ms, 0, function()
       timer:stop()
-      running = false
+      lock = false
     end)
-    if not running then
-      running = true
+
+    if not lock then
+      lock = true
       fn(...)
     end
   end)
@@ -45,33 +49,54 @@ end
 
 ---Debounces a function on the trailing edge.
 ---@param ms integer Timeout in ms
+---@param rush_first boolean If the managed fn is called and it's not recovering from a debounce: call the fn immediately.
 ---@param fn function Function to debounce
----@returns ManagedFunc Debounced function.
-function M.debounce_trailing(ms, fn)
+---@return ManagedFn # Debounced function.
+function M.debounce_trailing(ms, rush_first, fn)
   local timer = vim.loop.new_timer()
-  return wrap(timer, function(...)
-    local args = utils.tbl_pack(...)
+  local lock = false
+  local debounced_fn, args
+
+  debounced_fn = wrap(timer, function(...)
+    if lock then
+      args = utils.tbl_pack(...)
+    else
+      lock = true
+      if rush_first then
+        fn(...)
+      end
+    end
+
     timer:start(ms, 0, function()
+      lock = false
       timer:stop()
-      fn(utils.tbl_unpack(args))
+      if args then
+        local a = args
+        args = nil
+        debounced_fn(utils.tbl_unpack(a))
+      end
     end)
   end)
+
+  return debounced_fn
 end
 
 ---Throttles a function on the leading edge.
 ---@param ms integer Timeout in ms
 ---@param fn function Function to throttle
----@returns ManagedFunc throttled function.
+---@return ManagedFn # throttled function.
 function M.throttle_leading(ms, fn)
   local timer = vim.loop.new_timer()
-  local running = false
+  local lock = false
+
   return wrap(timer, function(...)
-    if not running then
+    if not lock then
       timer:start(ms, 0, function()
-        running = false
+        lock = false
         timer:stop()
       end)
-      running = true
+
+      lock = true
       fn(...)
     end
   end)
@@ -79,23 +104,37 @@ end
 
 ---Throttles a function on the trailing edge.
 ---@param ms integer Timeout in ms
+---@param rush_first boolean If the managed fn is called and it's not recovering from a throttle: call the fn immediately.
 ---@param fn function Function to throttle
----@returns ManagedFunc throttled function.
-function M.throttle_trailing(ms, fn)
+---@return ManagedFn # throttled function.
+function M.throttle_trailing(ms, rush_first, fn)
   local timer = vim.loop.new_timer()
-  local running = false
-  local args
-  return wrap(timer, function(...)
-    args = utils.tbl_pack(...)
-    if not running then
-      timer:start(ms, 0, function()
-        running = false
-        timer:stop()
-        fn(utils.tbl_unpack(args))
-      end)
-      running = true
+  local lock = false
+  local throttled_fn, args
+
+  throttled_fn = wrap(timer, function(...)
+    if lock then
+      args = utils.tbl_pack(...)
+      return
     end
+
+    lock = true
+
+    if rush_first then
+      fn(...)
+    end
+
+    timer:start(ms, 0, function()
+      lock = false
+      if args then
+        local a = args
+        args = nil
+        throttled_fn(utils.tbl_unpack(a))
+      end
+    end)
   end)
+
+  return throttled_fn
 end
 
 return M

@@ -2,17 +2,14 @@ local lazy = {}
 
 ---@class LazyModule : { [string] : any }
 ---@field __get fun(): any Load the module if needed, and return it.
+---@field __loaded boolean Indicates that the module has been loaded.
 
 local function wrap(t, handler)
   local use_handler = type(handler) == "function"
   local export = not use_handler and t or nil
 
   local function __get()
-    if export then
-      return export
-    end
-
-    if use_handler then
+    if not export and use_handler then
       ---@cast handler function
       export = handler(t)
     end
@@ -24,10 +21,14 @@ local function wrap(t, handler)
     __index = function(_, key)
       if key == "__get" then
         return __get
+      elseif key == "__loaded" then
+        return export ~= nil
       end
+
       if not export then
         __get()
       end
+
       ---@cast export table
       return export[key]
     end,
@@ -35,12 +36,14 @@ local function wrap(t, handler)
       if not export then
         __get()
       end
+
       export[key] = value
     end,
     __call = function(_, ...)
       if not export then
         __get()
       end
+
       ---@cast export table
       return export(...)
     end,
@@ -56,7 +59,7 @@ end
 ---
 ---Example:
 ---
----```
+---```lua
 --- local foo = require("bar")
 --- local foo = lazy.require("bar")
 ---
@@ -85,7 +88,7 @@ end
 ---
 ---Example:
 ---
----```
+---```lua
 --- -- table:
 --- local foo = bar.baz.qux.quux
 --- local foo = lazy.access(bar, "baz.qux.quux")

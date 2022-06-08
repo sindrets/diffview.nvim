@@ -66,12 +66,14 @@ end
 
 ---@Override
 function FileHistoryView:close()
-  self.closing = true
-  for _, entry in ipairs(self.panel.entries or {}) do
-    entry:destroy()
+  if not self.closing then
+    self.closing = true
+    for _, entry in ipairs(self.panel.entries or {}) do
+      entry:destroy()
+    end
+    self.commit_log_panel:destroy()
+    FileHistoryView:super().close(self)
   end
-  self.commit_log_panel:destroy()
-  FileHistoryView:super().close(self)
 end
 
 function FileHistoryView:next_item()
