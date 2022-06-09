@@ -100,7 +100,6 @@ end
 function DiffView:close()
   if not self.closing then
     self.closing = true
-    self.update_files:close()
 
     if self.watcher then
       self.watcher:stop()
