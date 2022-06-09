@@ -150,13 +150,13 @@ local tracked_files = async.wrap(function(git_root, left, right, args, kind, cal
 
   local namestat_job = Job:new({
     command = "git",
-    args = utils.vec_join("diff", "--name-status", args),
+    args = utils.vec_join("diff", "--ignore-submodules", "--name-status", args),
     cwd = git_root,
     on_exit = on_exit
   })
   local numstat_job = Job:new({
     command = "git",
-    args = utils.vec_join("diff", "--numstat", args),
+    args = utils.vec_join("diff", "--ignore-submodules", "--numstat", args),
     cwd = git_root,
     on_exit = on_exit
   })
