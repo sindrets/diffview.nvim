@@ -150,7 +150,19 @@ function M.scroll_view(distance)
         :format(distance, scroll_opr)
   end
 
-  return M.view_windo(scroll_cmd, { right = true })
+  return function()
+    local view = lib.get_current_view()
+    if view then
+      ---@cast view StandardView
+      local left_clines = api.nvim_buf_line_count(api.nvim_win_get_buf(view.left_winid))
+      local right_clines = api.nvim_buf_line_count(api.nvim_win_get_buf(view.right_winid))
+
+      M.view_windo(scroll_cmd, {
+        left = left_clines > right_clines,
+        right = right_clines > left_clines,
+      })()
+    end
+  end
 end
 
 local action_names = {
