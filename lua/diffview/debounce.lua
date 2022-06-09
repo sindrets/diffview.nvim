@@ -73,7 +73,7 @@ function M.debounce_trailing(ms, rush_first, fn)
       if args then
         local a = args
         args = nil
-        debounced_fn(utils.tbl_unpack(a))
+        fn(utils.tbl_unpack(a))
       end
     end)
   end)
@@ -129,7 +129,11 @@ function M.throttle_trailing(ms, rush_first, fn)
       if args then
         local a = args
         args = nil
-        throttled_fn(utils.tbl_unpack(a))
+        if rush_first then
+          throttled_fn(utils.tbl_unpack(a))
+        else
+          fn(utils.tbl_unpack(a))
+        end
       end
     end)
   end)
