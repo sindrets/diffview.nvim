@@ -121,6 +121,7 @@ M.hl_links = {
   NonText = "NonText",
   CursorLine = "CursorLine",
   VertSplit = "VertSplit",
+  WinSeparator = "WinSeparator",
   SignColumn = "Normal",
   StatusLine = "StatusLine",
   StatusLineNC = "StatusLineNC",

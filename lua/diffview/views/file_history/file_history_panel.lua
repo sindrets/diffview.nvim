@@ -44,6 +44,7 @@ FileHistoryPanel.winopts = vim.tbl_extend("force", Panel.winopts, {
     "Normal:DiffviewNormal",
     "CursorLine:DiffviewCursorLine",
     "VertSplit:DiffviewVertSplit",
+    "WinSeparator:DiffviewWinSeparator",
     "SignColumn:DiffviewNormal",
     "StatusLine:DiffviewStatusLine",
     "StatusLineNC:DiffviewStatuslineNC",
