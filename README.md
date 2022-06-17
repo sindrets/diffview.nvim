@@ -15,7 +15,7 @@ for any git rev.
 
 ## Requirements
 
-- Git
+- Git ≥ 2.31.0
 - Neovim ≥ 0.7.0
 - [plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
 - [nvim-web-devicons](https://github.com/kyazdani42/nvim-web-devicons) (optional) For file icons
