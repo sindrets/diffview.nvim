@@ -40,6 +40,7 @@ Example configuration with default settings:
     require("diffview").setup({
       diff_binaries = false,    -- Show diffs for binaries
       enhanced_diff_hl = false, -- See |diffview-config-enhanced_diff_hl|
+      git_cmd = { "git" },      -- The git executable followed by default args.
       use_icons = true,         -- Requires nvim-web-devicons
       icons = {                 -- Only applies when use_icons is true.
         folder_closed = "",
@@ -159,6 +160,13 @@ enhanced_diff_hl                                *diffview-config-enhanced_diff_h
         Enable/disable enhanced diff highlighting. When enabled, |hl-DiffAdd|
         in the left diff buffer will be highlighted as |hl-DiffDelete|, and
         the delete fill-chars will be highlighted more subtly.
+
+git_cmd                                         *diffview-config-git_cmd*
+        Type: `string[]`, Default: `{ "git" }`
+
+        This table forms the first part of all git commands used internally in
+        the plugin. The first element should be the git binary. The subsequent
+        elements are passed as arguments.
 
 win_config                                      *diffview-config-win_config*
         Type: `table | fun(): table`, Default: `{}`

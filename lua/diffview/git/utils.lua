@@ -34,6 +34,31 @@ local sync_jobs = {}
 ---@type Semaphore
 local job_queue_sem = Semaphore.new(1)
 
+---@return string cmd The git binary.
+local function git_bin()
+  return config.get_config().git_cmd[1]
+end
+
+---@return string[] args The default git args.
+local function git_args()
+  return utils.vec_slice(config.get_config().git_cmd, 2)
+end
+
+---Execute a git command synchronously.
+---@param args string[]
+---@param cwd_or_opt? string|SystemListSpec
+---@return string[] stdout
+---@return integer code
+---@return string[] stderr
+---@overload fun(args: string[], cwd: string?)
+---@overload fun(args: string[], opt: SystemListSpec?)
+function M.exec_sync(args, cwd_or_opt)
+  return utils.system_list(
+    vim.tbl_flatten({ config.get_config().git_cmd, args }),
+    cwd_or_opt
+  )
+end
+
 ---@param job Job
 local resume_sync_queue = async.void(function(job)
   local permit = job_queue_sem:acquire()
@@ -149,14 +174,14 @@ local tracked_files = async.wrap(function(git_root, left, right, args, kind, cal
   end
 
   local namestat_job = Job:new({
-    command = "git",
-    args = utils.vec_join("diff", "--ignore-submodules", "--name-status", args),
+    command = git_bin(),
+    args = utils.vec_join(git_args(), "diff", "--ignore-submodules", "--name-status", args),
     cwd = git_root,
     on_exit = on_exit
   })
   local numstat_job = Job:new({
-    command = "git",
-    args = utils.vec_join("diff", "--ignore-submodules", "--numstat", args),
+    command = git_bin(),
+    args = utils.vec_join(git_args(), "diff", "--ignore-submodules", "--numstat", args),
     cwd = git_root,
     on_exit = on_exit
   })
@@ -214,8 +239,8 @@ end, 6)
 
 local untracked_files = async.wrap(function(git_root, left, right, callback)
   Job:new({
-    command = "git",
-    args = { "ls-files", "--others", "--exclude-standard" },
+    command = git_bin(),
+    args = utils.vec_join(git_args(), "ls-files", "--others", "--exclude-standard" ),
     cwd = git_root,
     ---@type Job
     on_exit = function(j)
@@ -442,8 +467,9 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
   end
 
   namestat_job = Job:new({
-    command = "git",
+    command = git_bin(),
     args = utils.vec_join(
+      git_args(),
       "log",
       log_opt.rev_range,
       "--pretty=format:%x00%n%H %P%n%an%n%ad%n%ar%n  %s",
@@ -459,8 +485,9 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
   })
 
   numstat_job = Job:new({
-    command = "git",
+    command = git_bin(),
     args = utils.vec_join(
+      git_args(),
       "log",
       log_opt.rev_range,
       "--pretty=format:%x00",
@@ -522,7 +549,7 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
 
   local single_file = #path_args == 1
     and not utils.path:is_directory(path_args[1])
-    and #utils.system_list(utils.vec_join("git", "ls-files", "--", path_args), git_root) < 2
+    and #M.exec_sync({ "ls-files", "--", path_args }, git_root) < 2
 
   ---@type LogOptions
   local log_options = config.get_log_options(
@@ -581,8 +608,9 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
     if cur.merge_hash and cur.numstat[1] and #cur.numstat ~= #cur.namestat then
       local job
       local job_spec = {
-        command = "git",
+        command = git_bin(),
         args = utils.vec_join(
+          git_args(),
           "show",
           "--format=",
           "--diff-merges=first-parent",
@@ -731,7 +759,7 @@ end
 function M.file_history_dry_run(git_root, path_args, log_opt)
   local single_file = #path_args == 1
     and utils.path:is_directory(path_args[1])
-    and #utils.system_list(utils.vec_join("git", "ls-files", "--", path_args), git_root) < 2
+    and #M.exec_sync({ "ls-files", "--", path_args }, git_root) < 2
 
   local log_options = config.get_log_options(single_file, log_opt)
 
@@ -748,8 +776,8 @@ function M.file_history_dry_run(git_root, path_args, log_opt)
   log_options = utils.tbl_clone(log_options)
   log_options.max_count = 1
   options = prepare_fh_options(log_options, single_file)
-  local out, code = utils.system_list(
-    utils.vec_join("git", "log", "--pretty=format:%H", "--name-status", options, log_options.rev_range, "--", path_args),
+  local out, code = M.exec_sync(
+    utils.vec_join("log", "--pretty=format:%H", "--name-status", options, log_options.rev_range, "--", path_args),
     git_root
   )
 
@@ -810,8 +838,8 @@ end
 ---@param git_root string
 ---@return Rev
 function M.head_rev(git_root)
-  local out, code = utils.system_list(
-    { "git", "rev-parse", "HEAD", "--" },
+  local out, code = M.exec_sync(
+    { "rev-parse", "HEAD", "--" },
     { cwd = git_root, retry_on_empty = 2 }
   )
   if code ~= 0 then
@@ -839,13 +867,13 @@ function M.symmetric_diff_revs(git_root, rev_arg)
     ))
   end
 
-  out, code, stderr = utils.system_list({ "git", "merge-base", r1, r2 }, git_root)
+  out, code, stderr = M.exec_sync({ "merge-base", r1, r2 }, git_root)
   if code ~= 0 then
     return err()
   end
   local left_hash = out[1]:gsub("^%^", "")
 
-  out, code, stderr = utils.system_list({ "git", "rev-parse", "--revs-only", r2 }, git_root)
+  out, code, stderr = M.exec_sync({ "rev-parse", "--revs-only", r2 }, git_root)
   if code ~= 0 then
     return err()
   end
@@ -858,7 +886,7 @@ end
 ---@param path string
 ---@return string|nil
 function M.toplevel(path)
-  local out, code = utils.system_list({ "git", "rev-parse", "--show-toplevel" }, path)
+  local out, code = M.exec_sync({ "rev-parse", "--show-toplevel" }, path)
   if code ~= 0 then
     return nil
   end
@@ -869,10 +897,7 @@ end
 ---@param path string
 ---@return string|nil
 function M.git_dir(path)
-  local out, code = utils.system_list(
-    { "git", "rev-parse", "--path-format=absolute", "--git-dir" },
-    path
-  )
+  local out, code = M.exec_sync({ "rev-parse", "--path-format=absolute", "--git-dir" }, path)
   if code ~= 0 then
     return nil
   end
@@ -881,8 +906,9 @@ end
 
 M.show = async.wrap(function(git_root, args, callback)
   local job = Job:new({
-    command = "git",
+    command = git_bin(),
     args = utils.vec_join(
+      git_args(),
       "show",
       args
     ),
@@ -950,7 +976,7 @@ end
 ---@param rev Rev
 ---@return boolean -- True if the file was binary for the given rev, or it didn't exist.
 function M.is_binary(git_root, path, rev)
-  local cmd = { "git", "-c", "submodule.recurse=false", "grep", "-I", "--name-only", "-e", "." }
+  local cmd = { "-c", "submodule.recurse=false", "grep", "-I", "--name-only", "-e", "." }
   if rev.type == RevType.LOCAL then
     cmd[#cmd+1] = "--untracked"
   elseif rev.type == RevType.INDEX then
@@ -961,7 +987,7 @@ function M.is_binary(git_root, path, rev)
 
   utils.vec_push(cmd, "--", path)
 
-  local _, code = utils.system_list(cmd, { cwd = git_root, silent = true })
+  local _, code = M.exec_sync(cmd, { cwd = git_root, silent = true })
   return code ~= 0
 end
 
@@ -969,8 +995,8 @@ end
 ---@param git_root string
 ---@return boolean
 function M.show_untracked(git_root)
-  local out = utils.system_list(
-    { "git", "config", "--type=bool", "status.showUntrackedFiles" },
+  local out = M.exec_sync(
+    { "config", "--type=bool", "status.showUntrackedFiles" },
     { cwd = git_root, silent = true }
   )
   return vim.trim(out[1] or "") ~= "false"
@@ -982,8 +1008,8 @@ end
 ---@param rev_arg string
 ---@return string?
 function M.get_file_status(git_root, path, rev_arg)
-  local out, code = utils.system_list(
-    { "git", "diff", "--name-status", rev_arg, "--", path },
+  local out, code = M.exec_sync(
+    { "diff", "--name-status", rev_arg, "--", path },
     git_root
   )
   if code == 0 and (out[1] and #out[1] > 0) then
@@ -997,10 +1023,7 @@ end
 ---@param rev_arg string
 ---@return GitStats
 function M.get_file_stats(git_root, path, rev_arg)
-  local out, code = utils.system_list(
-    { "git", "diff", "--numstat", rev_arg, "--", path },
-    git_root
-  )
+  local out, code = M.exec_sync({ "diff", "--numstat", rev_arg, "--", path }, git_root)
   if code == 0 and (out[1] and #out[1] > 0) then
     local stats = {
       additions = tonumber(out[1]:match("^%d+")),
@@ -1019,7 +1042,7 @@ end
 ---@param rev_arg string
 ---@return boolean ok, string[] output
 function M.verify_rev_arg(git_root, rev_arg)
-  local out, code = utils.system_list({ "git", "rev-parse", "--revs-only", rev_arg }, git_root)
+  local out, code = M.exec_sync({ "rev-parse", "--revs-only", rev_arg }, git_root)
   return code == 0 and out[1] and out[1] ~= "", out
 end
 
@@ -1037,8 +1060,8 @@ M.restore_file = async.wrap(function(git_root, path, kind, commit, callback)
   local rel_path = utils.path:vim_fnamemodify(abs_path, ":~")
 
   -- Check if file exists in history
-  _, code = utils.system_list(
-    { "git", "cat-file", "-e", ("%s:%s"):format(kind == "staged" and "HEAD" or "", path) },
+  _, code = M.exec_sync(
+    { "cat-file", "-e", ("%s:%s"):format(kind == "staged" and "HEAD" or "", path) },
     git_root
   )
   local exists_git = code == 0
@@ -1046,7 +1069,7 @@ M.restore_file = async.wrap(function(git_root, path, kind, commit, callback)
 
   if exists_local then
     -- Wite file blob into db
-    out, code = utils.system_list({ "git", "hash-object", "-w", "--", path }, git_root)
+    out, code = M.exec_sync({ "hash-object", "-w", "--", path }, git_root)
     if code ~= 0 then
       utils.err("Failed to write file blob into the object database. Aborting file restoration.", true)
       return callback()
@@ -1089,15 +1112,15 @@ M.restore_file = async.wrap(function(git_root, path, kind, commit, callback)
       end
     else
       -- File only exists in index
-      out, code = utils.system_list(
-        { "git", "rm", "-f", "--", path },
+      out, code = M.exec_sync(
+        { "rm", "-f", "--", path },
         git_root
       )
     end
   else
     -- File exists in history: checkout
-    out, code = utils.system_list(
-      utils.vec_join("git", "checkout", commit or (kind == "staged" and "HEAD" or nil), "--", path),
+    out, code = M.exec_sync(
+      utils.vec_join("checkout", commit or (kind == "staged" and "HEAD" or nil), "--", path),
       git_root
     )
   end

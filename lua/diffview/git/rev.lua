@@ -1,5 +1,9 @@
-local utils = require("diffview.utils")
+local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
+
+---@module "diffview.git.utils"
+local git = lazy.require("diffview.git.utils")
+
 local M = {}
 
 ---@class RevType : EnumValue
@@ -46,7 +50,7 @@ end
 ---@param git_root? string
 ---@return Rev
 function Rev.from_name(name, git_root)
-  local out, code = utils.system_list({ "git", "rev-parse", "--revs-only", name }, git_root)
+  local out, code = git.exec_sync({ "rev-parse", "--revs-only", name }, git_root)
   if code ~= 0 then
     return
   end
@@ -57,8 +61,8 @@ end
 ---@param git_root string
 ---@return Rev
 function Rev.earliest_commit(git_root)
-  local out, code = utils.system_list({
-    "git", "rev-list", "--max-parents=0", "--first-parent", "HEAD"
+  local out, code = git.exec_sync({
+    "rev-list", "--max-parents=0", "--first-parent", "HEAD"
   }, git_root)
 
   if code ~= 0 then
@@ -86,7 +90,7 @@ function Rev:is_head(git_root)
     return false
   end
 
-  local out, code = utils.system_list({ "git", "rev-parse", "HEAD", "--" }, git_root)
+  local out, code = git.exec_sync({ "rev-parse", "HEAD", "--" }, git_root)
   if code ~= 0 or not (out[1] and out[1] ~= "") then
     return
   end

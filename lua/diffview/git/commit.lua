@@ -4,6 +4,8 @@ local utils = require("diffview.utils")
 
 ---@type ERevType|LazyModule
 local RevType = lazy.access("diffview.git.rev", "RevType")
+---@module "diffview.git.utils"
+local git = lazy.require("diffview.git.utils")
 
 local M = {}
 
@@ -40,8 +42,7 @@ end
 ---@param git_root string
 ---@return Commit
 function Commit.from_rev_arg(rev_arg, git_root)
-  local out, code = utils.system_list({
-    "git",
+  local out, code = git.exec_sync({
     "show",
     "--pretty=format:%H %P%n%an%n%ad%n%ar%n  %s",
     "--date=raw",
