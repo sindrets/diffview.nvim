@@ -260,8 +260,8 @@ function M.parse_revs(git_root, rev_arg, opt)
       left, right = M.imply_local(left, right, head)
     end
   else
-    local rev_strings, code, stderr = utils.system_list(
-      { "git", "rev-parse", "--revs-only", rev_arg }, git_root
+    local rev_strings, code, stderr = git.exec_sync(
+      { "rev-parse", "--revs-only", rev_arg }, git_root
     )
     if code ~= 0 then
       utils.err(utils.vec_join(

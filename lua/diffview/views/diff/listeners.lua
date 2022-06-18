@@ -111,9 +111,9 @@ return function(view)
       if item then
         local code
         if item.kind == "working" then
-          _, code = utils.system_list({ "git", "add", item.path }, view.git_root)
+          _, code = git.exec_sync({ "add", item.path }, view.git_root)
         elseif item.kind == "staged" then
-          _, code = utils.system_list({ "git", "reset", "--", item.path }, view.git_root)
+          _, code = git.exec_sync({ "reset", "--", item.path }, view.git_root)
         end
 
         if code ~= 0 then
@@ -162,7 +162,7 @@ return function(view)
       end, view.files.working)
 
       if #args > 0 then
-        local _, code = utils.system_list(utils.vec_join("git", "add", args), view.git_root)
+        local _, code = git.exec_sync({ "add", args }, view.git_root)
 
         if code ~= 0 then
           utils.err("Failed to stage files!")
@@ -174,7 +174,7 @@ return function(view)
       end
     end,
     unstage_all = function()
-      local _, code = utils.system_list({ "git", "reset" }, view.git_root)
+      local _, code = git.exec_sync({ "reset" }, view.git_root)
 
       if code ~= 0 then
         utils.err("Failed to unstage files!")

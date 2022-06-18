@@ -229,12 +229,12 @@ function M.rev_candidates(git_root, git_dir)
     )
   )
   -- stylua: ignore end
-  local revs = utils.system_list(
-    { "git", "rev-parse", "--symbolic", "--branches", "--tags", "--remotes" },
+  local revs = git.exec_sync(
+    { "rev-parse", "--symbolic", "--branches", "--tags", "--remotes" },
     { cwd = git_root, silent = true }
   )
-  local stashes = utils.system_list(
-    { "git", "stash", "list", "--pretty=format:%gd" },
+  local stashes = git.exec_sync(
+    { "stash", "list", "--pretty=format:%gd" },
     { cwd = git_root, silent = true }
   )
 
