@@ -164,8 +164,8 @@ enhanced_diff_hl                                *diffview-config-enhanced_diff_h
 git_cmd                                         *diffview-config-git_cmd*
         Type: `string[]`, Default: `{ "git" }`
 
-        This table forms the first part of the command used to run git
-        commands. The first element should be the git binary. The subsequent
+        This table forms the first part of all git commands used internally in
+        the plugin. The first element should be the git binary. The subsequent
         elements are passed as arguments.
 
 win_config                                      *diffview-config-win_config*
