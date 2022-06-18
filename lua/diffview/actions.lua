@@ -159,7 +159,7 @@ function M.scroll_view(distance)
 
       M.view_windo(scroll_cmd, {
         left = left_clines > right_clines,
-        right = right_clines > left_clines,
+        right = left_clines == right_clines or right_clines > left_clines,
       })()
     end
   end
