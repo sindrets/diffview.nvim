@@ -25,6 +25,7 @@ end
 M.defaults = {
   diff_binaries = false,
   enhanced_diff_hl = false,
+  git_cmd = { "git" },
   use_icons = true,
   icons = {
     folder_closed = "",
@@ -266,6 +267,10 @@ function M.setup(user_config)
   end
 
   --#endregion
+
+  if #M._config.git_cmd == 0 then
+    M._config.git_cmd = M.defaults.git_cmd
+  end
 
   for _, name in ipairs({ "single_file", "multi_file" }) do
     local t = M._config.file_history_panel.log_options
