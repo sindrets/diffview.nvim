@@ -150,8 +150,11 @@ function FileHistoryPanel:update_components()
     renderer.destroy_comp_struct(self.components)
   end
 
-  local entry_schema = {}
-  for _, entry in ipairs(self.entries) do
+  local entry_schema = { name = "entries" }
+  for i, entry in ipairs(self.entries) do
+    if self.updating and i > 128 then
+      break
+    end
     table.insert(entry_schema, {
       name = "entry",
       context = entry,
@@ -166,7 +169,7 @@ function FileHistoryPanel:update_components()
     {
       name = "log",
       { name = "title" },
-      { name = "entries", unpack(entry_schema) },
+      entry_schema,
     },
   })
 
