@@ -28,8 +28,6 @@ local JobStatus = oop.enum({
 })
 
 ---@type Job[]
-local file_history_jobs = {}
----@type Job[]
 local sync_jobs = {}
 ---@type Semaphore
 local job_queue_sem = Semaphore.new(1)
@@ -418,7 +416,7 @@ end
 local incremental_fh_data = async.void(function(git_root, path_args, single_file, log_opt, callback)
   local options = prepare_fh_options(log_opt, single_file)
   local raw = {}
-  local namestat_job, numstat_job
+  local namestat_job, numstat_job, shutdown
 
   local namestat_state = {
     data = {},
@@ -442,11 +440,19 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
 
         raw[state.idx][state.key] = state.data
 
-        if raw[state.idx].namestat and raw[state.idx].numstat then
-          callback(
+        if not shutdown and raw[state.idx].namestat and raw[state.idx].numstat then
+          shutdown = callback(
             JobStatus.PROGRESS,
             structure_fh_data(raw[state.idx].namestat, raw[state.idx].numstat)
           )
+
+          if shutdown then
+            logger.lvl(1).debug("Killing file history jobs...")
+            -- NOTE: The default `Job:shutdown` methods use `vim.wait` which
+            -- causes a segfault when called here.
+            namestat_job:_shutdown(64)
+            numstat_job:_shutdown(64)
+          end
         end
       end
       state.idx = state.idx + 1
@@ -502,8 +508,6 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
     on_exit = on_exit,
   })
 
-  table.insert(file_history_jobs, namestat_job)
-  table.insert(file_history_jobs, numstat_job)
   namestat_job:start()
   numstat_job:start()
 
@@ -518,7 +522,9 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
   utils.handle_job(namestat_job, { debug_opt = debug_opt })
   utils.handle_job(numstat_job, { debug_opt = debug_opt })
 
-  if namestat_job.code ~= 0 or numstat_job.code ~= 0 then
+  if shutdown then
+    callback(JobStatus.KILLED)
+  elseif namestat_job.code ~= 0 or numstat_job.code ~= 0 then
     callback(JobStatus.ERROR, nil, utils.vec_join(
       namestat_job:stderr_result(),
       numstat_job:stderr_result())
@@ -536,8 +542,9 @@ end)
 ---@param path_args string[]
 ---@param log_opt ConfigLogOptions
 ---@param opt ProcessFileHistorySpec
+---@param co_state table
 ---@param callback function
-local function process_file_history(thread, git_root, path_args, log_opt, opt, callback)
+local function process_file_history(thread, git_root, path_args, log_opt, opt, co_state, callback)
   ---@type LogEntry[]
   local entries = {}
   local data = {}
@@ -574,16 +581,23 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
       if not resume_lock and coroutine.status(thread) == "suspended" then
         handle_co(thread, coroutine.resume(thread))
       end
+
+      if co_state.shutdown then
+        return true
+      end
     end
   )
 
   while true do
-    if not (last_status == JobStatus.SUCCESS or last_status == JobStatus.ERROR)
+    if not vim.tbl_contains({ JobStatus.SUCCESS, JobStatus.ERROR, JobStatus.KILLED }, last_status)
         and not data[data_idx] then
       coroutine.yield()
     end
 
-    if last_status == JobStatus.ERROR then
+    if last_status == JobStatus.KILLED then
+      logger.lvl(1).debug("File history processing was killed.")
+      return
+    elseif last_status == JobStatus.ERROR then
       callback(entries, JobStatus.ERROR, err_msg)
       return
     elseif last_status == JobStatus.SUCCESS and data_idx > #data then
@@ -638,7 +652,6 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
         -- possibly because we are running multiple git opeartions on the same
         -- repo concurrently. Retrying the job usually solves this.
         job = Job:new(job_spec)
-        table.insert(file_history_jobs, job)
         job:start()
         coroutine.yield()
         utils.handle_job(job, { fail_on_empty = true, context = context, log_func = logger.warn })
@@ -735,21 +748,23 @@ end
 ---@param log_opt ConfigLogOptions
 ---@param opt ProcessFileHistorySpec
 ---@param callback function
+---@return fun() finalizer
 function M.file_history(git_root, path_args, log_opt, opt, callback)
   local thread
 
-  for _, job in ipairs(file_history_jobs) do
-    if not job.is_shutdown then
-      job:shutdown(JobStatus.KILLED)
-    end
-  end
-  file_history_jobs = {}
+  local co_state = {
+    shutdown = false,
+  }
 
   thread = coroutine.create(function()
-    process_file_history(thread, git_root, path_args, log_opt, opt, callback)
+    process_file_history(thread, git_root, path_args, log_opt, opt, co_state, callback)
   end)
 
   handle_co(thread, coroutine.resume(thread))
+
+  return function()
+    co_state.shutdown = true
+  end
 end
 
 ---@param git_root string

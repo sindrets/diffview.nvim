@@ -30,6 +30,7 @@ local perf_update = PerfTimer("[FileHistoryPanel] update")
 ---@field cur_item {[1]: LogEntry, [2]: FileEntry}
 ---@field single_file boolean
 ---@field updating boolean
+---@field shutdown boolean
 ---@field render_data RenderData
 ---@field option_panel FHOptionPanel
 ---@field option_mapping string
@@ -111,6 +112,7 @@ function FileHistoryPanel:destroy()
   for _, entry in ipairs(self.entries) do
     entry:destroy()
   end
+  self.shutdown = true
   self.entries = nil
   self.cur_item = nil
   self.option_panel:destroy()
@@ -182,7 +184,7 @@ function FileHistoryPanel:update_entries(callback)
   local timeout = 64
   local ldt = 0 -- Last draw time
   local lock = false
-  local update
+  local update, finalizer
 
   update = debounce.throttle_trailing(timeout, true, function(entries, status, msg)
     if status == JobStatus.ERROR then
@@ -200,8 +202,18 @@ function FileHistoryPanel:update_entries(callback)
       update:close()
       return
 
-    elseif status == JobStatus.PROGRESS and (#entries <= c or lock) then
-      return
+    elseif status == JobStatus.PROGRESS then
+      if self.shutdown then
+        -- The parent view has closed: shutdown git jobs and clean up.
+        finalizer()
+        update:close()
+        callback(nil, JobStatus.KILLED)
+        return
+      end
+
+      if #entries <= c or lock then
+        return
+      end
     end
 
     lock = true
@@ -228,10 +240,11 @@ function FileHistoryPanel:update_entries(callback)
       end
 
       if status == JobStatus.SUCCESS then self.updating = false end
-      self:update_components()
-      self:render()
-      self:redraw()
-      ldt = renderer.last_draw_time
+
+      if not (status == JobStatus.PROGRESS and not self.parent:is_cur_tabpage()) then
+        self:sync()
+        ldt = renderer.last_draw_time
+      end
 
       if status == JobStatus.SUCCESS then
         update:close()
@@ -259,16 +272,14 @@ function FileHistoryPanel:update_entries(callback)
   self.cur_item = {}
   self.entries = {}
   self.updating = true
-  git.file_history(
+  finalizer = git.file_history(
     self.git_root,
     self.path_args,
     self.log_options,
     { base = self.base, },
     update
   )
-  self:update_components()
-  self:render()
-  self:redraw()
+  self:sync()
 end
 
 function FileHistoryPanel:num_items()

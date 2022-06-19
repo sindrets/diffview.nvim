@@ -352,6 +352,13 @@ function Panel:redraw()
   logger.lvl(10).s_debug(perf)
 end
 
+---Update components, render and redraw.
+function Panel:sync()
+  self:update_components()
+  self:render()
+  self:redraw()
+end
+
 ---@class PanelAutocmdSpec
 ---@field callback function
 ---@field once? boolean

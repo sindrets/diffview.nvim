@@ -176,7 +176,7 @@ function FHOptionPanel:init(parent)
           self.option_state = nil
           self.winid = nil
           self.parent:update_entries(function(_, status)
-            if status == JobStatus.ERROR then
+            if status >= JobStatus.ERROR then
               return
             end
             if not self.parent:cur_file() then
