@@ -137,7 +137,7 @@ function FHOptionPanel:init(parent)
           end,
         }, function(choice)
           if choice then
-            log_options[option_name] = choice ~= "" and choice or nil
+            log_options[option_name] = choice
           end
 
           self:render()
@@ -152,7 +152,7 @@ function FHOptionPanel:init(parent)
           completion = completion,
           callback = function(response)
             if response ~= "__INPUT_CANCELLED__" then
-              log_options[option_name] = response
+              log_options[option_name] = response == nil and "" or response
             end
 
             self:render()
