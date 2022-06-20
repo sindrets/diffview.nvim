@@ -15,6 +15,19 @@ local utils = require("diffview.utils")
 
 local M = {}
 
+local bootstrap = {
+  done = false,
+  ok = false,
+  version_string = nil,
+  version = {},
+  target_version_string = nil,
+  target_version = {
+    major = 2,
+    minor = 31,
+    patch = 0,
+  },
+}
+
 ---@class JobStatus
 ---@field SUCCESS integer
 ---@field ERROR integer
@@ -31,6 +44,58 @@ local JobStatus = oop.enum({
 local sync_jobs = {}
 ---@type Semaphore
 local job_queue_sem = Semaphore.new(1)
+
+---Ensure that the configured git binary meets the version requirement.
+local function run_bootstrap()
+  bootstrap.done = true
+  local msg
+
+  local out, code = utils.system_list(
+    vim.tbl_flatten({ config.get_config().git_cmd, "version" })
+  )
+
+  if code ~= 0 or not out[1] then
+    msg = "Could not run `git_cmd`!"
+    logger.error(msg)
+    utils.err(msg)
+    return
+  end
+
+  bootstrap.version_string = out[1]:match("git version (%S+)")
+
+  if not bootstrap.version_string then
+    msg = "Could not get git version!"
+    logger.error(msg)
+    utils.err(msg)
+    return
+  end
+
+  -- Parse git version
+  local v, target = bootstrap.version, bootstrap.target_version
+  bootstrap.target_version_string = ("%d.%d.%d"):format(target.major, target.minor, target.patch)
+  local parts = vim.split(bootstrap.version_string, "%.")
+  v.major = tonumber(parts[1])
+  v.minor = tonumber(parts[2])
+  v.patch = tonumber(parts[3]) or 0
+
+  local vs = ("%08d%08d%08d"):format(v.major, v.minor, v.patch)
+  local ts = ("%08d%08d%08d"):format(target.major, target.minor, target.patch)
+
+  if vs < ts then
+    msg = (
+      "Git version is outdated! Some functionality might not work as expected, "
+      .. "or not at all! Target: %s, current: %s"
+    ):format(
+      bootstrap.target_version_string,
+      bootstrap.version_string
+    )
+    logger.error(msg)
+    utils.err(msg)
+    return
+  end
+
+  bootstrap.ok = true
+end
 
 ---@return string cmd The git binary.
 local function git_bin()
@@ -51,6 +116,10 @@ end
 ---@overload fun(args: string[], cwd: string?)
 ---@overload fun(args: string[], opt: SystemListSpec?)
 function M.exec_sync(args, cwd_or_opt)
+  if not bootstrap.done then
+    run_bootstrap()
+  end
+
   return utils.system_list(
     vim.tbl_flatten({ config.get_config().git_cmd, args }),
     cwd_or_opt
