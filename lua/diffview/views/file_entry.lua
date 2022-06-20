@@ -409,11 +409,11 @@ function FileEntry._create_buffer(git_root, rev, path, null, callback)
         if api.nvim_buf_is_valid(bn) then
           vim.bo[bn].modifiable = true
           api.nvim_buf_set_lines(bn, 0, -1, false, result)
-          vim.bo[bn].modifiable = false
           vim.api.nvim_buf_call(bn, function()
             vim.cmd("filetype detect")
           end)
           callback()
+          vim.bo[bn].modifiable = false
         end
       end)
     else
