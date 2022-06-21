@@ -253,7 +253,7 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid, callback)
 
   self.left_bufid = splits[1].bufid
   self.right_bufid = splits[2].bufid
-  vim.cmd("do WinEnter")
+  pcall(vim.cmd, "do WinEnter")
 
   perf:lap("load done")
 end
@@ -412,8 +412,8 @@ function FileEntry._create_buffer(git_root, rev, path, null, callback)
           vim.api.nvim_buf_call(bn, function()
             vim.cmd("filetype detect")
           end)
-          callback()
           vim.bo[bn].modifiable = false
+          callback()
         end
       end)
     else
@@ -493,7 +493,7 @@ function FileEntry._update_windows(left_winid, right_winid)
           -- consistently than calling `:syncbind`.
           vim.cmd([[exe "norm! \<c-e>\<c-y>"]])
         end
-        vim.cmd("do WinLeave")
+        vim.cmd("do <nomodeline> WinLeave")
       end)
     end
   end
