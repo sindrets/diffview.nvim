@@ -25,7 +25,8 @@ end
 ---@class ArgObjectGetFlagSpec
 ---@field plain boolean Never cast string values to booleans.
 ---@field expect_string boolean Inferred boolean values are changed to be empty strings.
----@field no_empty boolean Return nil if the value is an empty string.
+---@field no_empty boolean Return nil if the value is an empty string. Implies `expect_string`.
+---@field expand boolean Expand wildcards and special keywords (`:h expand()`).
 
 ---Get a flag value.
 ---@param names string|string[] Flag synonyms
@@ -33,9 +34,14 @@ end
 ---@return string|boolean
 function ArgObject:get_flag(names, opt)
   opt = opt or {}
+  if opt.no_empty then
+    opt.expect_string = true
+  end
+
   if type(names) ~= "table" then
     names = { names }
   end
+
   for _, name in ipairs(names) do
     local v = self.flags[name]
     if v ~= nil then
@@ -45,8 +51,13 @@ function ArgObject:get_flag(names, opt)
         end
         v = ""
       elseif not opt.plain and (v == "true" or v == "false") then
-        v = v == "true" and true or false
+        v = v == "true"
       end
+
+      if opt.expand then
+        v = vim.fn.expand(v)
+      end
+
       return v
     end
   end

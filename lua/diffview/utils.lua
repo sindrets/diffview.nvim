@@ -241,6 +241,8 @@ end
 ---@param job Job
 ---@param opt? HandleJobSpec
 function M.handle_job(job, opt)
+  ---@cast job Job|{ [string]: any }
+
   opt = opt or {}
   local empty = false
   if opt.fail_on_empty then
@@ -279,6 +281,10 @@ function M.handle_job(job, opt)
   log_func(msg)
   log_func(("%s   [cmd] %s %s"):format(context, job.command, table.concat(args, " ")))
 
+  if job._raw_cwd then
+    log_func(("%s   [cwd] %s"):format(context, job._raw_cwd))
+  end
+
   local stderr = job:stderr_result()
   if #stderr > 0 then
     log_func(("%s[stderr] %s"):format(context, table.concat(stderr, "\n")))
@@ -291,6 +297,7 @@ end
 ---@field fail_on_empty boolean Return code 1 if stdout is empty and code is 0.
 ---@field retry_on_empty integer Number of times to retry job if stdout is empty and code is 0. Implies `fail_on_empty`.
 ---@field context string Context for the logger.
+---@field debug_opt LogJobSpec
 
 ---Get the output of a system command.
 ---@param cmd string[]
@@ -313,7 +320,7 @@ function M.system_list(cmd, cwd_or_opt)
     opt = cwd_or_opt or {}
   end
 
-  opt.fail_on_empty = vim.F.if_nil(opt.fail_on_empty, opt.retry_on_empty ~= nil)
+  opt.fail_on_empty = vim.F.if_nil(opt.fail_on_empty, (opt.retry_on_empty or 0) > 0)
   opt.context = opt.context or "system_list()"
   local context = ("[%s] "):format(opt.context)
   local logger = require("diffview.logger")
@@ -352,7 +359,9 @@ function M.system_list(cmd, cwd_or_opt)
     end
   end
 
-  if not opt.silent then
+  if opt.debug_opt then
+    M.handle_job(job, { fail_on_empty = opt.fail_on_empty, debug_opt = opt.debug_opt })
+  elseif not opt.silent then
     M.handle_job(job, { fail_on_empty = opt.fail_on_empty, context = opt.context })
   end
 

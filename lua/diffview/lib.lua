@@ -49,7 +49,7 @@ function M.diffview_open(args)
       and pl:parent(pl:absolute(cfile))
       or pl:realpath(".")
     )
-  local cpath = argo:get_flag("C", { expect_string = true, no_empty = true })
+  local cpath = argo:get_flag("C", { no_empty = true, expand = true })
   local p = cpath and pl:realpath(cpath) or fpath
   if not pl:is_directory(p) then
     p = pl:parent(p)
@@ -84,7 +84,7 @@ function M.diffview_open(args)
       { "all", "normal", "true" },
       { "no", "false" }
     ),
-    selected_file = argo:get_flag("selected-file", { expect_string = true, no_empty = true })
+    selected_file = argo:get_flag("selected-file", { no_empty = true, expand = true })
       or (vim.bo.buftype == "" and pl:vim_expand("%:p"))
       or nil,
   }
@@ -115,21 +115,30 @@ function M.file_history(args)
     table.insert(paths, magic .. pattern)
   end
 
+  local cpath = argo:get_flag("C", { no_empty = true, expand = true })
+  cpath = cpath and pl:realpath(cpath)
   local cfile = pl:vim_expand("%")
   cfile = pl:readlink(cfile) or cfile
-  local fpath = (paths[1] and pl:absolute(paths[1]))
+
+  local top_indicator
+  for _, path in ipairs(paths) do
+    if select(1, git.pathspec_split(path)) == "" then
+      top_indicator = pl:absolute(path, cpath)
+      break
+    end
+  end
+
+  local fpath = top_indicator
       or (vim.bo.buftype == ""
           and pl:readable(cfile)
           and pl:absolute(cfile))
       or pl:realpath(".")
 
-  local cpath = argo:get_flag("C", { expect_string = true, no_empty = true })
-
   rel_paths = vim.tbl_map(function(v)
     return v == "." and "." or pl:relative(v, ".")
   end, paths)
 
-  local p = cpath and pl:realpath(cpath) or fpath
+  local p = cpath or fpath
   local stat = pl:stat(p)
   if stat then
     if stat.type ~= "directory" then
@@ -145,12 +154,12 @@ function M.file_history(args)
     return
   end
 
-  local cwd = vim.loop.cwd()
+  local cwd = cpath or vim.loop.cwd()
   paths = vim.tbl_map(function(pathspec)
     return git.pathspec_expand(git_root, cwd, pathspec)
   end, paths)
 
-  local range_arg = argo:get_flag("range", { expect_string = true, no_empty = true })
+  local range_arg = argo:get_flag("range", { no_empty = true })
   if range_arg then
     local ok = git.verify_rev_arg(git_root, range_arg)
     if not ok then
@@ -201,7 +210,7 @@ function M.file_history(args)
   end
 
   local base
-  local base_arg = argo:get_flag("base", { expect_string = true, no_empty = true })
+  local base_arg = argo:get_flag("base", { no_empty = true })
   if base_arg then
     if base_arg == "LOCAL" then
       base = Rev(RevType.LOCAL)

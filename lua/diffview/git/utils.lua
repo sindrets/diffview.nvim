@@ -862,7 +862,13 @@ function M.file_history_dry_run(git_root, path_args, log_opt)
   options = prepare_fh_options(log_options, single_file)
   local out, code = M.exec_sync(
     utils.vec_join("log", "--pretty=format:%H", "--name-status", options, log_options.rev_range, "--", path_args),
-    git_root
+    {
+      cwd = git_root,
+      debug_opt = {
+        context = "git.utils.file_history_dry_run()",
+        no_stdout = true,
+      },
+    }
   )
 
   return code == 0 and #out > 0, table.concat(description, ", ")
