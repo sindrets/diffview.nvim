@@ -233,10 +233,16 @@ local tracked_files = async.wrap(function(git_root, left, right, args, kind, cal
   local files = {}
   ---@type CountDownLatch
   local latch = CountDownLatch(2)
+  local debug_opt = {
+    context = "git.utils>tracked_files()",
+    func = "s_debug",
+    debug_level = 1,
+    no_stdout = true,
+  }
 
   ---@param job Job
   local function on_exit(job)
-    utils.handle_job(job)
+    utils.handle_job(job, { debug_opt = debug_opt })
     latch:count_down()
   end
 
@@ -311,8 +317,15 @@ local untracked_files = async.wrap(function(git_root, left, right, callback)
     cwd = git_root,
     ---@type Job
     on_exit = function(j)
+      utils.handle_job(j, {
+          debug_opt = {
+            context = "git.utils>untracked_files()",
+            func = "s_debug",
+            debug_level = 1,
+            no_stdout = true,
+          }
+        })
       if j.code ~= 0 then
-        utils.handle_job(j)
         callback(j:stderr_result() or {}, nil)
         return
       end

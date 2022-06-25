@@ -71,6 +71,8 @@ function M.diffview_open(args)
     return
   end
 
+  logger.lvl(1).s_debug(("Found git top-level: %s"):format(utils.str_quote(git_root)))
+
   local left, right = M.parse_revs(
     git_root,
     rev_arg,
@@ -83,6 +85,8 @@ function M.diffview_open(args)
   if not (left and right) then
     return
   end
+
+  logger.lvl(1).s_debug(("Parsed revs: left = %s, right = %s"):format(left, right))
 
   ---@type DiffViewOptions
   local options = {
@@ -112,6 +116,7 @@ function M.diffview_open(args)
   end
 
   table.insert(M.views, v)
+  logger.lvl(1).s_debug("DiffView instantiation successful!")
 
   return v
 end
@@ -162,6 +167,8 @@ function M.file_history(args)
     return
   end
 
+  logger.lvl(1).s_debug(("Found git top-level: %s"):format(utils.str_quote(git_root)))
+
   rel_paths = vim.tbl_map(function(v)
     return v == "." and "." or pl:relative(v, ".")
   end, paths)
@@ -178,6 +185,8 @@ function M.file_history(args)
       utils.err(("Bad revision: %s"):format(utils.str_quote(range_arg)))
       return
     end
+
+    logger.lvl(1).s_debug(("Verified range rev: %s"):format(range_arg))
   end
 
   local log_flag_names = {
@@ -251,6 +260,7 @@ function M.file_history(args)
   end
 
   table.insert(M.views, v)
+  logger.lvl(1).s_debug("FileHistoryView instantiation successful!")
 
   return v
 end

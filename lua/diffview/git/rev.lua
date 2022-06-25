@@ -46,6 +46,18 @@ function Rev:init(rev_type, commit, track_head)
   self.track_head = track_head or false
 end
 
+function Rev:__tostring()
+  if self.type == RevType.COMMIT then
+    return self.commit
+  elseif self.type == RevType.LOCAL then
+    return "LOCAL"
+  elseif self.type == RevType.INDEX then
+    return "INDEX"
+  elseif self.type == RevType.CUSTOM then
+    return "CUSTOM"
+  end
+end
+
 ---@param name string
 ---@param git_root? string
 ---@return Rev

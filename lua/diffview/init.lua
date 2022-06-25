@@ -13,6 +13,8 @@ local config = lazy.require("diffview.config")
 local git = lazy.require("diffview.git.utils")
 ---@module "diffview.lib"
 local lib = lazy.require("diffview.lib")
+---@module "diffview.logger"
+local logger = lazy.require("diffview.logger")
 ---@module "diffview.utils"
 local utils = lazy.require("diffview.utils")
 
@@ -200,6 +202,7 @@ function M.completion(arg_lead, cmd_line, cur_pos)
 end
 
 function M.rev_candidates(git_root, git_dir)
+  logger.lvl(1).debug("[completion] Revision candidates requested.")
   local top_indicators
   if not (git_root and git_dir) then
     local cfile = utils.path:vim_expand("%")
