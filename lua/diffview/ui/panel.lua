@@ -304,6 +304,10 @@ end
 function Panel:init_buffer()
   local bn = api.nvim_create_buf(false, false)
 
+  for k, v in pairs(self.class().bufopts) do
+    api.nvim_buf_set_option(bn, k, v)
+  end
+
   local bufname
   if utils.path:is_abs(self.bufname) or utils.path:is_uri(self.bufname) then
     bufname = self.bufname
@@ -315,10 +319,6 @@ function Panel:init_buffer()
   if not ok then
     utils.wipe_named_buffer(bufname)
     api.nvim_buf_set_name(bn, bufname)
-  end
-
-  for k, v in pairs(self.class().bufopts) do
-    api.nvim_buf_set_option(bn, k, v)
   end
 
   self.bufid = bn

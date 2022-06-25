@@ -347,11 +347,11 @@ end
 function FileEntry._get_null_buffer()
   if not (FileEntry._null_buffer and api.nvim_buf_is_loaded(FileEntry._null_buffer)) then
     local bn = api.nvim_create_buf(false, false)
-    local bufname = "diffview:///null"
     for option, value in pairs(FileEntry.bufopts) do
       api.nvim_buf_set_option(bn, option, value)
     end
 
+    local bufname = "diffview:///null"
     local ok = pcall(api.nvim_buf_set_name, bn, bufname)
     if not ok then
       utils.wipe_named_buffer(bufname)
@@ -386,11 +386,11 @@ function FileEntry._create_buffer(git_root, rev, path, null, callback)
   end
 
   -- stylua: ignore
-  local fullname = utils.path:join("diffview://", git_root, ".git", context, path)
   for option, value in pairs(FileEntry.bufopts) do
     api.nvim_buf_set_option(bn, option, value)
   end
 
+  local fullname = utils.path:join("diffview://", git_root, ".git", context, path)
   local ok = pcall(api.nvim_buf_set_name, bn, fullname)
   if not ok then
     -- Resolve name conflict
