@@ -169,7 +169,7 @@ local ensure_output = async.wrap(function(max_retries, jobs, log_context, callba
 
       if job.code == 0 and #job:result() == 0 then
         logger.warn(
-          ("%sJob expected output, but returned nothing! Retrying %d more times(s).")
+          ("%sJob expected output, but returned nothing! Retrying %d more times(s)...")
           :format(context, max_retries - n)
         )
         logger.log_job(job, { func = logger.warn, context = log_context })
@@ -860,18 +860,25 @@ function M.file_history_dry_run(git_root, path_args, log_opt)
   log_options = utils.tbl_clone(log_options)
   log_options.max_count = 1
   options = prepare_fh_options(log_options, single_file)
+  local context = "git.utils.file_history_dry_run()"
   local out, code = M.exec_sync(
     utils.vec_join("log", "--pretty=format:%H", "--name-status", options, log_options.rev_range, "--", path_args),
     {
       cwd = git_root,
       debug_opt = {
-        context = "git.utils.file_history_dry_run()",
+        context = context,
         no_stdout = true,
       },
     }
   )
 
-  return code == 0 and #out > 0, table.concat(description, ", ")
+  local ok = code == 0 and #out > 0
+
+  if not ok then
+    logger.lvl(1).s_debug(("[%s] Dry run failed."):format(context))
+  end
+
+  return ok, table.concat(description, ", ")
 end
 
 ---Determine whether a rev arg is a range.
@@ -976,7 +983,7 @@ end
 ---@param path string
 ---@return string|nil
 function M.toplevel(path)
-  local out, code = M.exec_sync({ "rev-parse", "--show-toplevel" }, path)
+  local out, code = M.exec_sync({ "rev-parse", "--path-format=absolute", "--show-toplevel" }, path)
   if code ~= 0 then
     return nil
   end

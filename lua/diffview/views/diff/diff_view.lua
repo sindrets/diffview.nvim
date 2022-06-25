@@ -37,12 +37,24 @@ local M = {}
 ---@field files FileDict
 ---@field file_idx integer
 ---@field initialized boolean
+---@field valid boolean
 ---@field watcher any UV fs poll handle.
 local DiffView = oop.create_class("DiffView", StandardView)
 
 ---DiffView constructor
 ---@return DiffView
 function DiffView:init(opt)
+  self.valid = false
+  self.git_dir = git.git_dir(opt.git_root)
+
+  if not self.git_dir then
+    utils.err(
+      ("Failed to find the git dir for the repository: %s")
+      :format(utils.str_quote(opt.git_root))
+    )
+    return
+  end
+
   self.emitter = EventEmitter()
   self.layout_mode = DiffView.get_layout_mode()
   self.ready = false
@@ -51,7 +63,6 @@ function DiffView:init(opt)
   self.winopts = { left = {}, right = {} }
   self.initialized = false
   self.git_root = opt.git_root
-  self.git_dir = git.git_dir(opt.git_root)
   self.rev_arg = opt.rev_arg
   self.path_args = opt.path_args
   self.left = opt.left
@@ -67,6 +78,7 @@ function DiffView:init(opt)
     self.rev_arg or git.rev_to_pretty_string(self.left, self.right)
   )
   FileEntry.update_index_stat(self.git_root, self.git_dir)
+  self.valid = true
 end
 
 function DiffView:post_open()
@@ -438,6 +450,12 @@ function DiffView:infer_cur_file(allow_dir)
   else
     return self.panel.cur_file
   end
+end
+
+---Check whether or not the instantiation was successful.
+---@return boolean
+function DiffView:is_valid()
+  return self.valid
 end
 
 M.DiffView = DiffView

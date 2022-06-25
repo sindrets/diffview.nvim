@@ -231,6 +231,21 @@ function M.str_match(str, patterns)
   end
 end
 
+---@param s string
+---@param esc_char? string
+function M.str_quote(s, esc_char)
+  esc_char = esc_char or "\\"
+  local has_single = s:find([[']]) ~= nil
+  local has_double = s:find([["]]) ~= nil
+
+  if has_double and not has_single then
+    return "'" .. s .. "'"
+  else
+    local result, _ = s:gsub('"', esc_char .. '"')
+    return '"' .. result .. '"'
+  end
+end
+
 ---@class HandleJobSpec
 ---@field fail_on_empty boolean Consider the job as failed if the code is 0 and stdout is empty.
 ---@field log_func function|string
@@ -272,7 +287,7 @@ function M.handle_job(job, opt)
 
   local msg
   local context = opt.context and ("[%s] "):format(opt.context) or ""
-  if empty then
+  if empty and job.code == 0 then
     msg = ("%sJob expected output, but returned nothing! Code: %s"):format(context, job.code)
   else
     msg = ("%sJob exited with a non-zero exit status! Code: %s"):format(context, job.code)

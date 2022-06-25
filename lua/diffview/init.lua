@@ -200,18 +200,28 @@ function M.completion(arg_lead, cmd_line, cur_pos)
 end
 
 function M.rev_candidates(git_root, git_dir)
-  local cfile, fpath
+  local top_indicators
   if not (git_root and git_dir) then
-    cfile = utils.path:vim_expand("%")
-    fpath =
-        vim.bo.buftype == ""
-        and utils.path:readable(cfile)
-        and utils.path:parent(cfile)
-        or "."
+    local cfile = utils.path:vim_expand("%")
+    top_indicators = utils.vec_join(
+      vim.bo.buftype == ""
+          and utils.path:absolute(cfile)
+          or nil,
+      utils.path:realpath(".")
+    )
   end
 
-  git_root = git_root or git.toplevel(fpath)
-  git_dir = git_dir or git.git_dir(fpath)
+  if not (git_root and git_dir) then
+    local err
+    err, git_root = lib.find_git_toplevel(top_indicators)
+
+    if err then
+      return {}
+    end
+
+    git_dir = git.git_dir(git_root)
+  end
+
   if not (git_root and git_dir) then
     return {}
   end
@@ -273,14 +283,20 @@ end
 M.completers = {
   DiffviewOpen = function(args, argidx, divideridx, arg_lead)
     local cfile = utils.path:vim_expand("%")
-    local fpath =
-        vim.bo.buftype == ""
-        and utils.path:readable(cfile)
-        and utils.path:parent(cfile)
-        or "."
-    local git_dir = git.git_dir(fpath)
-    local git_root = git.toplevel(fpath)
+    local top_indicators = utils.vec_join(
+      vim.bo.buftype == ""
+          and utils.path:absolute(cfile)
+          or nil,
+      utils.path:realpath(".")
+    )
+
     local has_rev_arg = false
+    local git_dir
+    local err, git_root = lib.find_git_toplevel(top_indicators)
+
+    if not err then
+      git_dir = git.git_dir(git_root)
+    end
 
     for i = 2, math.min(#args, divideridx) do
       if args[i]:sub(1, 1) ~= "-" and i ~= argidx then

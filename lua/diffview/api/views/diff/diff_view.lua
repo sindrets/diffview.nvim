@@ -31,6 +31,17 @@ local CDiffView = oop.create_class("CDiffView", DiffView)
 ---CDiffView constructor.
 ---@param opt any
 function CDiffView:init(opt)
+  self.valid = false
+  self.git_dir = git.git_dir(opt.git_root)
+
+  if not self.git_dir then
+    utils.err(
+      ("Failed to find the git dir for the repository: %s")
+      :format(utils.str_quote(opt.git_root))
+    )
+    return
+  end
+
   self.emitter = EventEmitter()
   self.layout_mode = CDiffView.get_layout_mode()
   self.nulled = false
@@ -38,7 +49,6 @@ function CDiffView:init(opt)
   self.closing = false
   self.winopts = { left = {}, right = {} }
   self.git_root = opt.git_root
-  self.git_dir = git.git_dir(opt.git_root)
   self.rev_arg = opt.rev_arg
   self.path_args = opt.path_args
   self.left = opt.left
@@ -70,6 +80,8 @@ function CDiffView:init(opt)
       end)
     end
   end
+
+  self.valid = true
 end
 
 ---@Override

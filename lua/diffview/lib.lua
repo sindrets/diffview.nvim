@@ -16,6 +16,8 @@ local arg_parser = lazy.require("diffview.arg_parser")
 local config = lazy.require("diffview.config")
 ---@module "diffview.git.utils"
 local git = lazy.require("diffview.git.utils")
+---@module "diffview.logger"
+local logger = lazy.require("diffview.logger")
 ---@module "diffview.utils"
 local utils = lazy.require("diffview.utils")
 
@@ -35,6 +37,11 @@ function M.diffview_open(args)
   local rev_arg = argo.args[1]
   local paths = {}
 
+  logger.info("[command call] :DiffviewOpen " .. table.concat(vim.tbl_flatten({
+    default_args,
+    args,
+  }), " "))
+
   for _, path_arg in ipairs(argo.post_args) do
     local magic, pattern = git.pathspec_split(pl:vim_expand(path_arg))
     pattern = pl:readlink(pattern) or pattern
@@ -43,23 +50,24 @@ function M.diffview_open(args)
 
   local cfile = pl:vim_expand("%")
   cfile = pl:readlink(cfile) or cfile
-  local fpath = (
-      vim.bo.buftype == ""
-      and pl:readable(cfile)
-      and pl:parent(pl:absolute(cfile))
-      or pl:realpath(".")
-    )
   local cpath = argo:get_flag("C", { no_empty = true, expand = true })
-  local p = cpath and pl:realpath(cpath) or fpath
-  if not pl:is_directory(p) then
-    p = pl:parent(p)
+
+  local top_indicators = {
+    cpath and pl:realpath(cpath) or (
+      vim.bo.buftype == ""
+      and pl:absolute(cfile)
+      or nil
+    ),
+  }
+
+  if not cpath then
+    table.insert(top_indicators, pl:realpath("."))
   end
 
-  local git_root = git.toplevel(p)
-  if not git_root then
-    utils.err(
-      ("Path not a git repo (or any parent): '%s'"):format(pl:relative(p, "."))
-    )
+  local err, git_root = M.find_git_toplevel(top_indicators)
+
+  if err then
+    utils.err(err)
     return
   end
 
@@ -89,6 +97,7 @@ function M.diffview_open(args)
       or nil,
   }
 
+  ---@type DiffView
   local v = DiffView({
     git_root = git_root,
     rev_arg = rev_arg,
@@ -97,6 +106,10 @@ function M.diffview_open(args)
     right = right,
     options = options,
   })
+
+  if not v:is_valid() then
+    return
+  end
 
   table.insert(M.views, v)
 
@@ -109,6 +122,11 @@ function M.file_history(args)
   local paths = {}
   local rel_paths
 
+  logger.info("[command call] :DiffviewFileHistory " .. table.concat(vim.tbl_flatten({
+    default_args,
+    args,
+  }), " "))
+
   for _, path_arg in ipairs(argo.args) do
     local magic, pattern = git.pathspec_split(pl:vim_expand(path_arg))
     pattern = pl:readlink(pattern) or pattern
@@ -116,43 +134,37 @@ function M.file_history(args)
   end
 
   local cpath = argo:get_flag("C", { no_empty = true, expand = true })
-  cpath = cpath and pl:realpath(cpath)
   local cfile = pl:vim_expand("%")
   cfile = pl:readlink(cfile) or cfile
 
-  local top_indicator
+  local top_indicators = {}
   for _, path in ipairs(paths) do
     if select(1, git.pathspec_split(path)) == "" then
-      top_indicator = pl:absolute(path, cpath)
+      table.insert(top_indicators, pl:absolute(path, cpath))
       break
     end
   end
 
-  local fpath = top_indicator
-      or (vim.bo.buftype == ""
-          and pl:readable(cfile)
-          and pl:absolute(cfile))
-      or pl:realpath(".")
+  table.insert(top_indicators, cpath and pl:realpath(cpath) or (
+      vim.bo.buftype == ""
+      and pl:absolute(cfile)
+      or nil
+    ))
+
+  if not cpath then
+    table.insert(top_indicators, pl:realpath("."))
+  end
+
+  local err, git_root = M.find_git_toplevel(top_indicators)
+
+  if err then
+    utils.err(err)
+    return
+  end
 
   rel_paths = vim.tbl_map(function(v)
     return v == "." and "." or pl:relative(v, ".")
   end, paths)
-
-  local p = cpath or fpath
-  local stat = pl:stat(p)
-  if stat then
-    if stat.type ~= "directory" then
-      p = pl:parent(p)
-    end
-  else
-    p = pl:realpath(".")
-  end
-
-  local git_root = git.toplevel(p)
-  if not git_root then
-    utils.err(("Path not a git repo (or any parent): '%s'"):format(pl:relative(p, ".")))
-    return
-  end
 
   local cwd = cpath or vim.loop.cwd()
   paths = vim.tbl_map(function(pathspec)
@@ -163,7 +175,7 @@ function M.file_history(args)
   if range_arg then
     local ok = git.verify_rev_arg(git_root, range_arg)
     if not ok then
-      utils.err(("Bad revision: '%s'"):format(range_arg))
+      utils.err(("Bad revision: %s"):format(utils.str_quote(range_arg)))
       return
     end
   end
@@ -200,8 +212,8 @@ function M.file_history(args)
 
   if not ok then
     utils.info({
-      ("No git history for target(s) given the current options! Targets: %s")
-        :format(table.concat(vim.tbl_map(function(v)
+      ("No git history for the target(s) given the current options! Targets: %s")
+        :format(#rel_paths == 0 and "':(top)'" or table.concat(vim.tbl_map(function(v)
           return "'" .. v .. "'"
         end, rel_paths), ", ")),
       ("Current options: [ %s ]"):format(opt_description)
@@ -218,7 +230,7 @@ function M.file_history(args)
       ---@diagnostic disable-next-line: redefined-local
       local ok, out = git.verify_rev_arg(git_root, base_arg)
       if not ok then
-        utils.warn(("Bad base revision, ignoring: '%s'"):format(base_arg))
+        utils.warn(("Bad base revision, ignoring: %s"):format(utils.str_quote(base_arg)))
       else
         base = Rev(RevType.COMMIT, out[1])
       end
@@ -234,9 +246,43 @@ function M.file_history(args)
     base = base,
   })
 
+  if not v:is_valid() then
+    return
+  end
+
   table.insert(M.views, v)
 
   return v
+end
+
+---Try to find the top-level of a working tree by using the given indicative
+---paths.
+---@param top_indicators string[] A list of paths that might indicate what working tree we are in.
+---@return string? err
+---@return string? toplevel # The absolute path to the git top-level.
+function M.find_git_toplevel(top_indicators)
+  local toplevel
+  for _, p in ipairs(top_indicators) do
+    if not pl:is_directory(p) then
+      p = pl:parent(p)
+    end
+
+    if pl:readable(p) then
+      toplevel = git.toplevel(p)
+
+      if toplevel then
+        return nil, toplevel
+      end
+    end
+  end
+
+  return (
+    ("Path not a git repo (or any parent): %s")
+    :format(table.concat(vim.tbl_map(function(v)
+      local rel_path = pl:relative(v, ".")
+      return utils.str_quote(rel_path == "" and "." or rel_path)
+    end, top_indicators), ", "))
+  )
 end
 
 ---Parse a given rev arg.
@@ -274,13 +320,13 @@ function M.parse_revs(git_root, rev_arg, opt)
     )
     if code ~= 0 then
       utils.err(utils.vec_join(
-        ("Failed to parse rev '%s'!"):format(rev_arg),
+        ("Failed to parse rev %s!"):format(utils.str_quote(rev_arg)),
         "Git output: ",
         stderr
       ))
       return
     elseif #rev_strings == 0 then
-      utils.err("Bad revision: '" .. rev_arg .. "'")
+      utils.err("Bad revision: " .. utils.str_quote(rev_arg))
       return
     end
 

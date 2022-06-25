@@ -7,6 +7,7 @@ local LayoutMode = require("diffview.views.view").LayoutMode
 local StandardView = require("diffview.views.standard.standard_view").StandardView
 local git = require("diffview.git.utils")
 local oop = require("diffview.oop")
+local utils = require("diffview.utils")
 
 local JobStatus = git.JobStatus
 local api = vim.api
@@ -20,9 +21,21 @@ local M = {}
 ---@field commit_log_panel CommitLogPanel
 ---@field path_args string[]
 ---@field raw_args string[]
+---@field valid boolean
 local FileHistoryView = oop.create_class("FileHistoryView", StandardView)
 
 function FileHistoryView:init(opt)
+  self.valid = false
+  self.git_dir = git.git_dir(opt.git_root)
+
+  if not self.git_dir then
+    utils.err(
+      ("Failed to find the git dir for the repository: %s")
+      :format(utils.str_quote(opt.git_root))
+    )
+    return
+  end
+
   self.emitter = EventEmitter()
   self.layout_mode = FileHistoryView.get_layout_mode()
   self.ready = false
@@ -30,7 +43,6 @@ function FileHistoryView:init(opt)
   self.nulled = false
   self.winopts = { left = {}, right = {} }
   self.git_root = opt.git_root
-  self.git_dir = git.git_dir(self.git_root)
   self.path_args = opt.path_args
   self.raw_args = opt.raw_args
   self.panel = FileHistoryPanel(
@@ -42,6 +54,7 @@ function FileHistoryView:init(opt)
     opt.log_options,
     { base = opt.base, }
   )
+  self.valid = true
 end
 
 function FileHistoryView:post_open()
@@ -222,6 +235,12 @@ function FileHistoryView:infer_cur_file()
   else
     return self.panel.cur_item[2]
   end
+end
+
+---Check whether or not the instantiation was successful.
+---@return boolean
+function FileHistoryView:is_valid()
+  return self.valid
 end
 
 M.FileHistoryView = FileHistoryView
