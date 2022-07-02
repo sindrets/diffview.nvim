@@ -29,26 +29,41 @@ end
 
 function LogEntry:update_status()
   self.status = nil
+  local missing_status = 0
+
   for _, file in ipairs(self.files) do
-    if self.status and file.status ~= self.status then
-      self.status = "M"
-      return
-    elseif self.status ~= file.status then
-      self.status = file.status
+    if not file.status then
+      missing_status = missing_status + 1
+    else
+      if self.status and file.status ~= self.status then
+        self.status = "M"
+        return
+      elseif self.status ~= file.status then
+        self.status = file.status
+      end
     end
   end
-  if not self.status then
+
+  if missing_status < #self.files and not self.status then
     self.status = "X"
   end
 end
 
 function LogEntry:update_stats()
   self.stats = { additions = 0, deletions = 0 }
+  local missing_stats = 0
+
   for _, file in ipairs(self.files) do
-    if file.stats then
+    if not file.stats then
+      missing_stats = missing_stats + 1
+    else
       self.stats.additions = self.stats.additions + file.stats.additions
       self.stats.deletions = self.stats.deletions + file.stats.deletions
     end
+  end
+
+  if missing_stats == #self.files then
+    self.stats = nil
   end
 end
 

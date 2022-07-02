@@ -22,10 +22,14 @@ local function render_files(comp, files)
       s = "│   "
     end
     comp:add_hl("DiffviewNonText", line_idx, 0, #s)
+    local offset
 
-    local offset = #s
-    comp:add_hl(renderer.get_git_hl(file.status), line_idx, offset, offset + 1)
-    s = s .. file.status .. " "
+    if file.status then
+      offset = #s
+      comp:add_hl(renderer.get_git_hl(file.status), line_idx, offset, offset + 1)
+      s = s .. file.status .. " "
+    end
+
     offset = #s
     local icon = renderer.get_file_icon(file.basename, file.extension, comp, line_idx, offset)
     offset = offset + #icon
@@ -103,9 +107,11 @@ local function render_entries(parent, entries, updating)
       s = (entry.folded and c.signs.fold_closed or c.signs.fold_open) .. " "
     end
 
-    offset = #s
-    comp:add_hl(renderer.get_git_hl(entry.status), line_idx, offset, offset + 1)
-    s = s .. entry.status
+    if entry.status then
+      offset = #s
+      comp:add_hl(renderer.get_git_hl(entry.status), line_idx, offset, offset + 1)
+      s = s .. entry.status
+    end
 
     if not entry.single_file then
       offset = #s

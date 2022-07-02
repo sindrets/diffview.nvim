@@ -192,7 +192,7 @@ function FHOptionPanel:init(parent)
     local log_options = self.parent:get_log_options()
 
     if FHOptionPanel.flags.switches[option_name] then
-      log_options[option_name] = not log_options[option_name]
+      self:_set_option(option_name, not log_options[option_name])
       self:render()
       self:redraw()
 
@@ -212,7 +212,7 @@ function FHOptionPanel:init(parent)
           end,
         }, function(choice)
           if choice then
-            log_options[option_name] = choice
+            self:_set_option(option_name, choice)
           end
 
           self:render()
@@ -244,7 +244,7 @@ function FHOptionPanel:init(parent)
                 end
               end
 
-              log_options[option_name] = response
+              self:_set_option(option_name, response)
             end
 
             self:render()
@@ -279,6 +279,11 @@ function FHOptionPanel:init(parent)
       end
     end,
   })
+end
+
+function FHOptionPanel:_set_option(name, value)
+  self.parent.log_options.single_file[name] = value
+  self.parent.log_options.multi_file[name] = value
 end
 
 ---@Override

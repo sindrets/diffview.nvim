@@ -33,11 +33,13 @@ local bootstrap = {
 ---@field ERROR integer
 ---@field PROGRESS integer
 ---@field KILLED integer
+---@field FATAL integer
 local JobStatus = oop.enum({
   "SUCCESS",
   "PROGRESS",
   "ERROR",
   "KILLED",
+  "FATAL",
 })
 
 ---@type Job[]
@@ -457,6 +459,7 @@ end, 6)
 local function prepare_fh_options(log_options, single_file)
   local o = log_options
   return utils.vec_join(
+    o.L,
     (o.follow and single_file) and { "--follow" } or nil,
     o.first_parent and { "--first-parent" } or nil,
     o.show_pulls and { "--show-pulls" } or nil,
@@ -616,6 +619,321 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
   end
 end)
 
+---@param git_root string
+---@param log_opt LogOptions
+---@param callback fun(status: JobStatus, data?: table, msg?: string[])
+local incremental_line_trace_data = async.void(function(git_root, log_opt, callback)
+  local options = prepare_fh_options(log_opt, true)
+  local raw = {}
+  local trace_job, shutdown
+
+  local trace_state = {
+    data = {},
+    key = "trace",
+    idx = 0,
+  }
+
+  local function on_stdout(_, line)
+    if line == "\0" then
+      if trace_state.idx > 0 then
+        if not raw[trace_state.idx] then
+          raw[trace_state.idx] = {}
+        end
+
+        raw[trace_state.idx] = trace_state.data
+
+        if not shutdown then
+          shutdown = callback(
+            JobStatus.PROGRESS,
+            structure_fh_data(raw[trace_state.idx])
+          )
+
+          if shutdown then
+            logger.lvl(1).debug("Killing file history jobs...")
+            -- NOTE: The default `Job:shutdown` methods use `vim.wait` which
+            -- causes a segfault when called here.
+            trace_job:_shutdown(64)
+          end
+        end
+      end
+      trace_state.idx = trace_state.idx + 1
+      trace_state.data = {}
+    elseif line ~= "" then
+      table.insert(trace_state.data, line)
+    end
+  end
+
+  ---@type CountDownLatch
+  local latch = CountDownLatch(1)
+
+  local function on_exit(_, code)
+    if code == 0 then
+      on_stdout(nil, "\0")
+    end
+    latch:count_down()
+  end
+
+  trace_job = Job:new({
+    command = git_bin(),
+    args = utils.vec_join(
+      git_args(),
+      "-P",
+      "log",
+      log_opt.rev_range,
+      "--color=never",
+      "--no-ext-diff",
+      "--pretty=format:%x00%n%H %P%n%an%n%ad%n%ar%n  %s",
+      "--date=raw",
+      options,
+      "--"
+    ),
+    cwd = git_root,
+    on_stdout = on_stdout,
+    on_exit = on_exit,
+  })
+
+  trace_job:start()
+
+  latch:await()
+
+  utils.handle_job(trace_job, {
+    debug_opt = {
+      context = "git.utils>incremental_line_trace_data()",
+      func = "s_debug",
+      debug_level = 1,
+      no_stdout = true,
+    }
+  })
+
+  if shutdown then
+    callback(JobStatus.KILLED)
+  elseif trace_job.code ~= 0 then
+    callback(JobStatus.ERROR, nil, trace_job:stderr_result())
+  else
+    callback(JobStatus.SUCCESS)
+  end
+end)
+
+---@param git_root string
+---@param path_args string[]
+---@param lflags string[]
+---@return boolean
+local function is_single_file(git_root, path_args, lflags)
+  if lflags and #lflags > 0 then
+    local seen = {}
+    for i, v in ipairs(lflags) do
+      local path = v:match(".*:(.*)")
+      if i > 1 and not seen[path] then
+        return false
+      end
+      seen[path] = true
+    end
+
+  elseif path_args and git_root then
+    return #path_args == 1
+        and not utils.path:is_directory(path_args[1])
+        and #M.exec_sync({ "ls-files", "--", path_args }, git_root) < 2
+  end
+
+  return true
+end
+
+---@class ParseFHDataSpec
+---@field thread thread
+---@field git_root string
+---@field path_args string[]
+---@field log_options LogOptions
+---@field opt ProcessFileHistorySpec
+---@field single_file boolean
+---@field resume_lock boolean
+---@field cur table
+---@field commit Commit
+---@field entries LogEntry[]
+---@field callback function
+
+---@param state ParseFHDataSpec
+---@return boolean ok, JobStatus status?
+local function parse_fh_data(state)
+  local cur, single_file, log_options, git_root, thread, path_args, callback, opt, commit, entries
+      = state.cur, state.single_file, state.log_options, state.git_root, state.thread,
+        state.path_args, state.callback, state.opt, state.commit, state.entries
+
+  -- 'git log --name-status' doesn't work properly for merge commits. It
+  -- lists only an incomplete list of files at best. We need to use 'git
+  -- show' to get file statuses for merge commits. And merges do not always
+  -- have changes.
+  if cur.merge_hash and cur.numstat[1] and #cur.numstat ~= #cur.namestat then
+    local job
+    local job_spec = {
+      command = git_bin(),
+      args = utils.vec_join(
+        git_args(),
+        "show",
+        "--format=",
+        "--diff-merges=first-parent",
+        "--name-status",
+        (single_file and log_options.follow) and "--follow" or nil,
+        cur.right_hash,
+        "--",
+        state.old_path or path_args
+      ),
+      cwd = git_root,
+      on_exit = function(j)
+        if j.code == 0 then
+          cur.namestat = j:result()
+        end
+        handle_co(thread, coroutine.resume(thread))
+      end,
+    }
+
+    local max_retries = 2
+    local context = "git.utils.process_file_history()"
+    state.resume_lock = true
+
+    for i = 0, max_retries do
+      -- Git sometimes fails this job silently (exit code 0). Not sure why,
+      -- possibly because we are running multiple git opeartions on the same
+      -- repo concurrently. Retrying the job usually solves this.
+      job = Job:new(job_spec)
+      job:start()
+      coroutine.yield()
+      utils.handle_job(job, { fail_on_empty = true, context = context, log_func = logger.warn })
+
+      if #cur.namestat == 0 then
+        if i < max_retries then
+          logger.warn(("[%s] Retrying %d more time(s)."):format(context, max_retries - i))
+        end
+      else
+        if i > 0 then
+          logger.info(("[%s] Retry successful!"):format(context))
+        end
+        break
+      end
+    end
+
+    state.resume_lock = false
+
+    if job.code ~= 0 then
+      callback({}, JobStatus.ERROR, job:stderr_result())
+      return false, JobStatus.FATAL
+    end
+
+    if #cur.namestat == 0 then
+      -- Give up: something has been renamed. We can no longer track the
+      -- history.
+      logger.warn(("[%s] Giving up."):format(context))
+      utils.warn("Displayed history may be incomplete. Check ':DiffviewLog' for details.", true)
+      return false
+    end
+  end
+
+  local files = {}
+  for i = 1, #cur.numstat do
+    local status = cur.namestat[i]:sub(1, 1):gsub("%s", " ")
+    local name = cur.namestat[i]:match("[%a%s][^%s]*\t(.*)")
+    local oldname
+
+    if name:match("\t") ~= nil then
+      oldname = name:match("(.*)\t")
+      name = name:gsub("^.*\t", "")
+      if single_file then
+        state.old_path = oldname
+      end
+    end
+
+    local stats = {
+      additions = tonumber(cur.numstat[i]:match("^%d+")),
+      deletions = tonumber(cur.numstat[i]:match("^%d+%s+(%d+)")),
+    }
+
+    if not stats.additions or not stats.deletions then
+      stats = nil
+    end
+
+    table.insert(
+      files,
+      FileEntry({
+        path = name,
+        oldpath = oldname,
+        absolute_path = utils.path:join(git_root, name),
+        status = status,
+        stats = stats,
+        kind = "working",
+        commit = commit,
+        left = cur.left_hash and Rev(RevType.COMMIT, cur.left_hash) or Rev.new_null_tree(),
+        right = opt.base or Rev(RevType.COMMIT, cur.right_hash),
+      })
+    )
+  end
+
+  if files[1] then
+    table.insert(
+      entries,
+      LogEntry({
+        path_args = path_args,
+        commit = commit,
+        files = files,
+        single_file = single_file,
+      })
+    )
+
+    callback(entries, JobStatus.PROGRESS)
+  end
+
+  return true
+end
+
+---@param state ParseFHDataSpec
+---@return boolean ok
+local function parse_fh_line_trace_data(state)
+  local cur, single_file, git_root, path_args, callback, opt, commit, entries
+      = state.cur, state.single_file, state.git_root, state.path_args, state.callback,
+        state.opt, state.commit, state.entries
+
+  local files = {}
+
+  for _, line in ipairs(cur.namestat) do
+    if line:match("^diff %-%-git ") then
+      local a_path = line:match('^diff %-%-git "?a/(.-)"? "?b/')
+      local b_path = line:match('.*"? "?b/(.-)"?$')
+      local oldpath = a_path ~= b_path and a_path or nil
+
+      if single_file and oldpath then
+        state.old_path = oldpath
+      end
+
+      table.insert(
+        files,
+        FileEntry({
+          path = b_path,
+          oldpath = oldpath,
+          absolute_path = utils.path:join(git_root, b_path),
+          kind = "working",
+          commit = commit,
+          left = cur.left_hash and Rev(RevType.COMMIT, cur.left_hash) or Rev.new_null_tree(),
+          right = opt.base or Rev(RevType.COMMIT, cur.right_hash),
+        })
+      )
+    end
+  end
+
+  if files[1] then
+    table.insert(
+      entries,
+      LogEntry({
+        path_args = path_args,
+        commit = commit,
+        files = files,
+        single_file = single_file,
+      })
+    )
+
+    callback(entries, JobStatus.PROGRESS)
+  end
+
+  return true
+end
+
 ---@class ProcessFileHistorySpec
 ---@field base Rev
 
@@ -632,13 +950,9 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
   local data = {}
   local data_idx = 1
   local last_status
-  local resume_lock = false
-  local old_path
   local err_msg
 
-  local single_file = #path_args == 1
-    and not utils.path:is_directory(path_args[1])
-    and #M.exec_sync({ "ls-files", "--", path_args }, git_root) < 2
+  local single_file = is_single_file(git_root, path_args, log_opt.single_file.L)
 
   ---@type LogOptions
   local log_options = config.get_log_options(
@@ -646,29 +960,44 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
     single_file and log_opt.single_file or log_opt.multi_file
   )
 
-  incremental_fh_data(
-    git_root,
-    path_args,
-    single_file,
-    log_options,
-    function(status, d, msg)
-      if status == JobStatus.PROGRESS then
-        data[#data+1] = d
-      end
+  local is_trace = #log_options.L > 0
 
-      last_status = status
-      if msg then
-        err_msg = msg
-      end
-      if not resume_lock and coroutine.status(thread) == "suspended" then
-        handle_co(thread, coroutine.resume(thread))
-      end
+  ---@type ParseFHDataSpec
+  local state = {
+    thread = thread,
+    git_root = git_root,
+    path_args = path_args,
+    log_options = log_options,
+    opt = opt,
+    callback = callback,
+    entries = entries,
+    single_file = single_file,
+    resume_lock = false,
+  }
 
-      if co_state.shutdown then
-        return true
-      end
+  local function data_callback(status, d, msg)
+    if status == JobStatus.PROGRESS then
+      data[#data+1] = d
     end
-  )
+
+    last_status = status
+    if msg then
+      err_msg = msg
+    end
+    if not state.resume_lock and coroutine.status(thread) == "suspended" then
+      handle_co(thread, coroutine.resume(thread))
+    end
+
+    if co_state.shutdown then
+      return true
+    end
+  end
+
+  if is_trace then
+    incremental_line_trace_data(git_root, log_options, data_callback)
+  else
+    incremental_fh_data(git_root, path_args, single_file, log_options, data_callback)
+  end
 
   while true do
     if not vim.tbl_contains({ JobStatus.SUCCESS, JobStatus.ERROR, JobStatus.KILLED }, last_status)
@@ -686,137 +1015,29 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
       break
     end
 
-    local cur = data[data_idx]
+    state.cur = data[data_idx]
 
-    local commit = Commit({
-      hash = cur.right_hash,
-      author = cur.author,
-      time = tonumber(cur.time),
-      time_offset = cur.time_offset,
-      rel_date = cur.rel_date,
-      subject = cur.subject,
+    state.commit = Commit({
+      hash = state.cur.right_hash,
+      author = state.cur.author,
+      time = tonumber(state.cur.time),
+      time_offset = state.cur.time_offset,
+      rel_date = state.cur.rel_date,
+      subject = state.cur.subject,
     })
 
-    -- 'git log --name-status' doesn't work properly for merge commits. It
-    -- lists only an incomplete list of files at best. We need to use 'git
-    -- show' to get file statuses for merge commits. And merges do not always
-    -- have changes.
-    if cur.merge_hash and cur.numstat[1] and #cur.numstat ~= #cur.namestat then
-      local job
-      local job_spec = {
-        command = git_bin(),
-        args = utils.vec_join(
-          git_args(),
-          "show",
-          "--format=",
-          "--diff-merges=first-parent",
-          "--name-status",
-          (single_file and log_options.follow) and "--follow" or nil,
-          cur.right_hash,
-          "--",
-          old_path or path_args
-        ),
-        cwd = git_root,
-        on_exit = function(j)
-          if j.code == 0 then
-            cur.namestat = j:result()
-          end
-          handle_co(thread, coroutine.resume(thread))
-        end,
-      }
+    local ok, status
+    if #log_options.L > 0 then
+      ok, status = parse_fh_line_trace_data(state)
+    else
+      ok, status = parse_fh_data(state)
+    end
 
-      local max_retries = 2
-      local context = "git.utils.process_file_history()"
-      resume_lock = true
-
-      for i = 0, max_retries do
-        -- Git sometimes fails this job silently (exit code 0). Not sure why,
-        -- possibly because we are running multiple git opeartions on the same
-        -- repo concurrently. Retrying the job usually solves this.
-        job = Job:new(job_spec)
-        job:start()
-        coroutine.yield()
-        utils.handle_job(job, { fail_on_empty = true, context = context, log_func = logger.warn })
-
-        if #cur.namestat == 0 then
-          if i < max_retries then
-            logger.warn(("[%s] Retrying %d more time(s)."):format(context, max_retries - i))
-          end
-        else
-          if i > 0 then
-            logger.info(("[%s] Retry successful!"):format(context))
-          end
-          break
-        end
-      end
-
-      resume_lock = false
-
-      if job.code ~= 0 then
-        callback({}, JobStatus.ERROR, job:stderr_result())
+    if not ok then
+      if status == JobStatus.FATAL then
         return
       end
-
-      if #cur.namestat == 0 then
-        -- Give up: something has been renamed. We can no longer track the
-        -- history.
-        logger.warn(("[%s] Giving up."):format(context))
-        utils.warn("Displayed history may be incomplete. Check ':DiffviewLog' for details.", true)
-        break
-      end
-    end
-
-    local files = {}
-    for i = 1, #cur.numstat do
-      local status = cur.namestat[i]:sub(1, 1):gsub("%s", " ")
-      local name = cur.namestat[i]:match("[%a%s][^%s]*\t(.*)")
-      local oldname
-
-      if name:match("\t") ~= nil then
-        oldname = name:match("(.*)\t")
-        name = name:gsub("^.*\t", "")
-        if single_file then
-          old_path = oldname
-        end
-      end
-
-      local stats = {
-        additions = tonumber(cur.numstat[i]:match("^%d+")),
-        deletions = tonumber(cur.numstat[i]:match("^%d+%s+(%d+)")),
-      }
-
-      if not stats.additions or not stats.deletions then
-        stats = nil
-      end
-
-      table.insert(
-        files,
-        FileEntry({
-          path = name,
-          oldpath = oldname,
-          absolute_path = utils.path:join(git_root, name),
-          status = status,
-          stats = stats,
-          kind = "working",
-          commit = commit,
-          left = cur.left_hash and Rev(RevType.COMMIT, cur.left_hash) or Rev.new_null_tree(),
-          right = opt.base or Rev(RevType.COMMIT, cur.right_hash),
-        })
-      )
-    end
-
-    if files[1] then
-      table.insert(
-        entries,
-        LogEntry({
-          path_args = path_args,
-          commit = commit,
-          files = files,
-          single_file = single_file,
-        })
-      )
-
-      callback(entries, JobStatus.PROGRESS)
+      break
     end
 
     data_idx = data_idx + 1
@@ -854,10 +1075,7 @@ end
 ---@param log_opt LogOptions
 ---@return boolean ok, string description
 function M.file_history_dry_run(git_root, path_args, log_opt)
-  local single_file = #path_args == 1
-    and utils.path:is_directory(path_args[1])
-    and #M.exec_sync({ "ls-files", "--", path_args }, git_root) < 2
-
+  local single_file = is_single_file(git_root, path_args, log_opt.L)
   local log_options = config.get_log_options(single_file, log_opt)
 
   local options = vim.tbl_map(function(v)
