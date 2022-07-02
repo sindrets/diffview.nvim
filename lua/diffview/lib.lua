@@ -199,6 +199,7 @@ function M.file_history(args)
     { "no-merges" },
     { "reverse" },
     { "max-count", "n" },
+    { "L" },
     { "diff-merges" },
     { "author" },
     { "grep" },

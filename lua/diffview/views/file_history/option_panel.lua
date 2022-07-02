@@ -83,6 +83,11 @@ FHOptionPanel.flags = {
       "=L", "-L", "Trace line evolution",
       prompt_label = "(Accepts multiple values)",
       prompt_fmt = "${label} ",
+      completion = function(_)
+        return function(arg_lead, _, _)
+          return diffview.line_trace_completion(arg_lead)
+        end
+      end,
       transform = function(values)
         return utils.tbl_fmap(values, function(v)
           if v == "-L" then

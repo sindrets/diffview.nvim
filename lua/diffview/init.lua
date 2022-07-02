@@ -54,6 +54,9 @@ comp_file_history:put({ "--merges" })
 comp_file_history:put({ "--no-merges" })
 comp_file_history:put({ "--reverse" })
 comp_file_history:put({ "--max-count", "-n" }, {})
+comp_file_history:put({ "-L" }, function (_, arg_lead)
+  return M.line_trace_completion(arg_lead)
+end)
 comp_file_history:put({ "--diff-merges" }, {
   "off",
   "on",
@@ -234,6 +237,8 @@ function M.rev_candidates(git_root, git_dir)
     "HEAD", "FETCH_HEAD", "ORIG_HEAD", "MERGE_HEAD",
     "REBASE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD"
   }
+  -- stylua: ignore end
+
   local heads = vim.tbl_filter(
     function(name) return vim.tbl_contains(targets, name) end,
     vim.tbl_map(
@@ -241,7 +246,6 @@ function M.rev_candidates(git_root, git_dir)
       vim.fn.glob(git_dir .. "/*", false, true)
     )
   )
-  -- stylua: ignore end
   local revs = git.exec_sync(
     { "rev-parse", "--symbolic", "--branches", "--tags", "--remotes" },
     { cwd = git_root, silent = true }
@@ -259,6 +263,7 @@ end
 ---@field git_root string
 ---@field git_dir string
 
+---Completion for git revisions.
 ---@param arg_lead string
 ---@param opt? RevCompletionSpec
 ---@return string[]
@@ -281,6 +286,24 @@ function M.rev_completion(arg_lead, opt)
   end
 
   return M.filter_completion(arg_lead, candidates)
+end
+
+---Completion for the git-log `-L` flag.
+---@param arg_lead string
+---@return string[]
+function M.line_trace_completion(arg_lead)
+  local range_end = arg_lead:match(".*:()")
+
+  if not range_end then
+    return
+  else
+    local lead = arg_lead:sub(1, range_end - 1)
+    local path_lead = arg_lead:sub(range_end)
+
+    return vim.tbl_map(function(v)
+      return lead .. v
+    end, vim.fn.getcompletion(path_lead, "file"))
+  end
 end
 
 M.completers = {
