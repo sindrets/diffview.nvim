@@ -342,6 +342,7 @@ return {
     for _, item in ipairs(panel.components.options.items) do
       ---@type RenderComponent
       comp = item.comp
+      ---@type FlagOption
       local option = comp.context[2]
       local value = log_options[comp.context[1]] or ""
 
@@ -353,14 +354,14 @@ return {
       s = s .. option[3] .. " ("
 
       offset = #s
-      local flag = option[2] .. value
+      local empty, display_value = option:render_value(value)
       comp:add_hl(
-        value ~= "" and "DiffviewFilePanelCounter" or "DiffviewDim1",
+        not empty and "DiffviewFilePanelCounter" or "DiffviewDim1",
         0,
         offset,
-        offset + #flag
+        offset + #display_value
       )
-      s = s .. flag
+      s = s .. display_value
 
       offset = #s
       comp:add_hl("DiffviewFilePanelFileName", 0, offset, offset + 1)

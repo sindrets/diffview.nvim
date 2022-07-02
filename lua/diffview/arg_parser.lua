@@ -185,7 +185,7 @@ function M.parse(args)
   return ArgObject(flags, pre_args, post_args)
 end
 
----Scan an EX arg string and split into individual args.
+---Scan an EX command string and split it into individual args.
 ---@param cmd_line string
 ---@param cur_pos number
 ---@return string[] args
@@ -218,12 +218,86 @@ function M.scan_ex_args(cmd_line, cur_pos)
         end
       end
       arg = ""
+      -- Skip whitespace
       i = i + cmd_line:sub(i, -1):match("^%s+()") - 2
     else
       arg = arg .. char
     end
 
     i = i + 1
+  end
+
+  if #arg > 0 then
+    table.insert(args, arg)
+    if arg == "--" and cmd_line:sub(#cmd_line, #cmd_line) ~= "-" then
+      divideridx = #args
+    end
+  end
+
+  if not argidx then
+    argidx = #args
+    if cmd_line:sub(#cmd_line, #cmd_line):match("%s") then
+      argidx = argidx + 1
+    end
+  end
+
+  return args, argidx, divideridx
+end
+
+---Scan a shell-like string and split it into individual args. This scanner
+---understands quoted args.
+---@param cmd_line string
+---@param cur_pos number
+---@return string[] args
+---@return integer argidx
+---@return integer divideridx
+function M.scan_sh_args(cmd_line, cur_pos)
+  local args = {}
+  local divideridx = math.huge
+  local argidx
+  local cur_quote
+  local arg = ""
+
+  local i = 1
+  while i <= #cmd_line do
+    if not argidx and i > cur_pos then
+      argidx = #args + 1
+    end
+
+    local char = cmd_line:sub(i, i)
+    if char == "\\" then
+      arg = arg .. char
+      if i < #cmd_line then
+        i = i + 1
+        arg = arg .. cmd_line:sub(i, i)
+      end
+    elseif cur_quote then
+      if char == cur_quote then
+        cur_quote = nil
+      else
+        arg = arg .. char
+      end
+    elseif char == [[']] or char == [["]] then
+      cur_quote = char
+    elseif char:match("%s") then
+      if arg ~= "" then
+        table.insert(args, arg)
+        if arg == "--" and i - 1 < #cmd_line then
+          divideridx = #args
+        end
+      end
+      arg = ""
+      -- Skip whitespace
+      i = i + cmd_line:sub(i, -1):match("^%s+()") - 2
+    else
+      arg = arg .. char
+    end
+
+    i = i + 1
+  end
+
+  if cur_quote then
+    error("The given command line contains a non-terminated string!")
   end
 
   if #arg > 0 then

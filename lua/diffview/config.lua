@@ -152,6 +152,7 @@ M._config = M.defaults
 ---@field no_merges boolean
 ---@field reverse boolean
 ---@field max_count integer
+---@field L string[]
 ---@field author string
 ---@field grep string
 ---@field diff_merges string
@@ -169,6 +170,7 @@ M.log_option_defaults = {
   reverse = false,
   rev_range = nil,
   max_count = 256,
+  L = {},
   diff_merges = nil,
   author = nil,
   grep = nil,
