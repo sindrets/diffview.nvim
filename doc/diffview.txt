@@ -733,17 +733,22 @@ COMMANDS                                        *diffview-commands*
                         the initial set of files, this option does nothing.
 
                                                 *:DiffviewFileHistory*
-:DiffviewFileHistory [paths] [options]
+:[range]DiffviewFileHistory [paths] [options]
                         Opens a new file history view that lists all commits
                         that affected the given paths. This is a porcelain
-                        interface for git-log.
+                        interface for git-log. Both [paths] and [options] may
+                        be specified in any order, even interchangeably.
 
                         If no [paths] are given, defaults to the top-level of
-                        the git repository. The top-level will be inferred
-                        from the current buffer when possible, otherwise the
-                        cwd is used. Multiple [paths] may be provided and git
+                        the working tree. The top-level will be inferred from
+                        the current buffer when possible, otherwise the cwd is
+                        used. Multiple [paths] may be provided and git
                         pathspec is supported (see `:Man gitglossary(7)` for
                         information about pathspec).
+
+                        If [range] is given, the file history view will trace
+                        the line evolution of the given range in the current
+                        file (see the `-L` flag below).
 
                         From the file history panel (the panel listing the
                         commits) you can open an option panel by pressing
@@ -775,6 +780,7 @@ COMMANDS                                        *diffview-commands*
         :DiffviewFileHistory --base=LOCAL
         :DiffviewFileHistory --range=origin..HEAD
         :DiffviewFileHistory --range=feat/some-branch
+        :'<,'>DiffviewFileHistory
 <
 
     Options:~
@@ -812,6 +818,12 @@ COMMANDS                                        *diffview-commands*
 
         -n{n}, --max-count={n}
                         Limit the number of commits.
+
+        -L{start},{end}:{file}, -L:{funcname}:{file}
+                        Trace the evolution of the line range given by
+                        {start},{end}, or by the function name regex
+                        {funcname}, within the {file}. You can specify this
+                        option more than once.
 
         --diff-merges={value}
                         Determines how merge commits are treated. {value} can
@@ -1182,6 +1194,12 @@ LogOptions                                      *diffview.git.LogOptions*
 
             {max_count} (integer)
                 Limit the number of commits.
+
+            {L} (string[])
+                `{ ("<start>,<end>:<file>" | ":<funcname>:<file>")... }`
+
+                Trace the evolution of the line range given by <start>,<end>,
+                or by the function name regex <funcname>, within the <file>.
 
             {diff_merges} (string)
                 Determines how merge commits are treated. The value can be one
