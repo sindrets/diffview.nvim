@@ -78,7 +78,6 @@ FHOptionPanel.flags = {
       end,
     },
     { "=n", "--max-count=", "Limit the number of commits" },
-    -- TODO: Add this as a flag option to :DiffviewFileHistory
     {
       "=L", "-L", "Trace line evolution",
       prompt_label = "(Accepts multiple values)",
@@ -93,10 +92,11 @@ FHOptionPanel.flags = {
           if v == "-L" then
             -- Filter out empty flag options
             return nil
-          elseif not v:match("^-L") then
-            -- Prepend the flag if it wasn't specified by the user.
-            v = "-L" .. v
+          elseif v:match("^-L") then
+            -- Remove the flag name
+            return v:sub(3)
           end
+
           return v
         end)
       end,
@@ -110,6 +110,10 @@ FHOptionPanel.flags = {
 
         -- Render a string of quoted args
         return false, table.concat(vim.tbl_map(function(v)
+          if not v:match("^-L") then
+            -- Prepend the flag if it wasn't specified by the user.
+            v = "-L" .. v
+          end
           return utils.str_quote(v, { only_if_whitespace = true })
         end, value), " ")
       end,

@@ -22,15 +22,16 @@ function ArgObject:init(flags, args, post_args)
   self.post_args = post_args
 end
 
----@class ArgObjectGetFlagSpec
+---@class ArgObject.GetFlagSpec
 ---@field plain boolean Never cast string values to booleans.
+---@field expect_list boolean Return a list of all defined values for the given flag.
 ---@field expect_string boolean Inferred boolean values are changed to be empty strings.
 ---@field no_empty boolean Return nil if the value is an empty string. Implies `expect_string`.
 ---@field expand boolean Expand wildcards and special keywords (`:h expand()`).
 
 ---Get a flag value.
 ---@param names string|string[] Flag synonyms
----@param opt? ArgObjectGetFlagSpec
+---@param opt? ArgObject.GetFlagSpec
 ---@return string|boolean
 function ArgObject:get_flag(names, opt)
   opt = opt or {}
@@ -42,25 +43,34 @@ function ArgObject:get_flag(names, opt)
     names = { names }
   end
 
+  local values = {}
   for _, name in ipairs(names) do
-    local v = self.flags[name]
-    if v ~= nil then
-      if opt.expect_string and v == "true" then
-        if opt.no_empty then
-          return nil
-        end
-        v = ""
-      elseif not opt.plain and (v == "true" or v == "false") then
-        v = v == "true"
-      end
-
-      if opt.expand then
-        v = vim.fn.expand(v)
-      end
-
-      return v
+    if self.flags[name] then
+      utils.vec_push(values, unpack(self.flags[name]))
     end
   end
+
+  values = utils.tbl_fmap(values, function(v)
+    if opt.expect_string and v == "true" then
+      -- Undo inferred boolean values
+      if opt.no_empty then
+        return nil
+      end
+      v = ""
+    elseif not opt.plain and (v == "true" or v == "false") then
+      -- Cast to boolean
+      v = v == "true"
+    end
+
+    if opt.expand then
+      v = vim.fn.expand(v)
+    end
+
+    return v
+  end)
+
+  -- If a list isn't expcted: return the last defined value for this flag.
+  return opt.expect_list and values or values[#values]
 end
 
 ---@class FlagValueMap : Object
@@ -166,14 +176,24 @@ function M.parse(args)
     flag, value = arg:match(short_flag_pat)
     if flag then
       value = (value == "") and "true" or value
-      flags[flag] = value
+
+      if not flags[flag] then
+        flags[flag] = {}
+      end
+
+      table.insert(flags[flag], value)
       goto continue
     end
 
     flag, value = arg:match(long_flag_pat)
     if flag then
       value = (value == "") and "true" or value
-      flags[flag] = value
+
+      if not flags[flag] then
+        flags[flag] = {}
+      end
+
+      table.insert(flags[flag], value)
       goto continue
     end
 

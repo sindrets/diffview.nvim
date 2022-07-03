@@ -209,12 +209,10 @@ function M.file_history(args)
   local log_options = { rev_range = range_arg }
   for _, names in ipairs(log_flag_names) do
     local key, _ = names[1]:gsub("%-", "_")
-    local v = argo:get_flag(
-      names,
-      type(config.log_option_defaults[key]) ~= "boolean"
-        and { expect_string = true }
-        or nil
-    )
+    local v = argo:get_flag(names, {
+      expect_string = type(config.log_option_defaults[key]) ~= "boolean",
+      expect_list = names[1] == "L",
+    })
     log_options[key] = v
   end
 

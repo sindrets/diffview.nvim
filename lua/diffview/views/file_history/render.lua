@@ -76,10 +76,12 @@ local function render_entries(parent, entries, updating)
   local c = config.get_config()
   local max_num_files = -1
   local max_len_stats = 7
+
   for _, entry in ipairs(entries) do
     if #entry.files > max_num_files then
       max_num_files = #entry.files
     end
+
     if entry.stats then
       local adds = tostring(entry.stats.additions)
       local dels = tostring(entry.stats.deletions)
@@ -96,12 +98,13 @@ local function render_entries(parent, entries, updating)
     if i > #parent or (updating and i > 128) then
       break
     end
+
     local entry_struct = parent[i]
     local line_idx = 0
     local offset = 0
-
     local comp = entry_struct.commit.comp
     local s = ""
+
     if not entry.single_file then
       comp:add_hl("CursorLineNr", line_idx, 0, 3)
       s = (entry.folded and c.signs.fold_closed or c.signs.fold_open) .. " "

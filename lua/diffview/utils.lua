@@ -625,9 +625,12 @@ end
 ---@param t vector
 ---@return vector t
 function M.vec_push(t, ...)
-  for _, v in ipairs({...}) do
-    t[#t + 1] = v
+  local args = {...}
+
+  for i = 1, select("#", ...) do
+    t[#t + 1] = args[i]
   end
+
   return t
 end
 

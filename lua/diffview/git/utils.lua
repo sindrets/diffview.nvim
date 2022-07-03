@@ -458,8 +458,15 @@ end, 6)
 ---@return string[]
 local function prepare_fh_options(log_options, single_file)
   local o = log_options
+  local line_trace = vim.tbl_map(function(v)
+    if not v:match("^-L") then
+      return "-L" .. v
+    end
+    return v
+  end, o.L or {})
+
   return utils.vec_join(
-    o.L,
+    line_trace,
     (o.follow and single_file) and { "--follow" } or nil,
     o.first_parent and { "--first-parent" } or nil,
     o.show_pulls and { "--show-pulls" } or nil,
@@ -1091,17 +1098,25 @@ function M.file_history_dry_run(git_root, path_args, log_opt)
   log_options = utils.tbl_clone(log_options)
   log_options.max_count = 1
   options = prepare_fh_options(log_options, single_file)
+
   local context = "git.utils.file_history_dry_run()"
-  local out, code = M.exec_sync(
-    utils.vec_join("log", "--pretty=format:%H", "--name-status", options, log_options.rev_range, "--", path_args),
-    {
-      cwd = git_root,
-      debug_opt = {
-        context = context,
-        no_stdout = true,
-      },
-    }
-  )
+  local cmd
+
+  if #log_options.L > 0 then
+    -- cmd = utils.vec_join("-P", "log", "--no-ext-diff", "--color=never", "--pretty=format:%H", "-s", options, log_options.rev_range, "--")
+    -- NOTE: Running the dry-run for line tracing is slow. Just skip for now.
+    return true, table.concat(description, ", ")
+  else
+    cmd = utils.vec_join("log", "--pretty=format:%H", "--name-status", options, log_options.rev_range, "--", path_args)
+  end
+
+  local out, code = M.exec_sync(cmd, {
+    cwd = git_root,
+    debug_opt = {
+      context = context,
+      no_stdout = true,
+    },
+  })
 
   local ok = code == 0 and #out > 0
 
