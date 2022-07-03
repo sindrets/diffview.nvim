@@ -121,7 +121,9 @@ function M.diffview_open(args)
   return v
 end
 
-function M.file_history(args)
+---@param range? { [1]: integer, [2]: integer }
+---@param args string[]
+function M.file_history(range, args)
   local default_args = config.get_config().default_args.DiffviewFileHistory
   local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
   local paths = {}
@@ -214,6 +216,13 @@ function M.file_history(args)
       expect_list = names[1] == "L",
     })
     log_options[key] = v
+  end
+
+  if range then
+    paths, rel_paths = {}, {}
+    log_options.L = {
+      ("%d,%d:%s"):format(range[1], range[2], pl:relative(pl:absolute(cfile), git_root))
+    }
   end
 
   local ok, opt_description = git.file_history_dry_run(git_root, paths, log_options)

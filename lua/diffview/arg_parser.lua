@@ -205,6 +205,25 @@ function M.parse(args)
   return ArgObject(flags, pre_args, post_args)
 end
 
+---Split the line range from an EX command arg.
+---@param arg string
+---@return string range, string command
+function M.split_ex_range(arg)
+  local idx = arg:match(".*()%A")
+  if not idx then
+    return  "", arg
+  end
+
+  local slice = arg:sub(idx or 1)
+  idx = slice:match("[^']()%a")
+
+  if idx then
+    return  arg:sub(1, (#arg - #slice) + idx - 1), slice:sub(idx)
+  end
+
+  return  arg, ""
+end
+
 ---Scan an EX command string and split it into individual args.
 ---@param cmd_line string
 ---@param cur_pos number

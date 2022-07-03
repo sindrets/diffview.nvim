@@ -165,8 +165,9 @@ function M.open(...)
   end
 end
 
-function M.file_history(...)
-  local view = lib.file_history(utils.tbl_pack(...))
+---@param range? { [1]: integer, [2]: integer }
+function M.file_history(range, ...)
+  local view = lib.file_history(range, utils.tbl_pack(...))
   if view then
     view:open()
   end
@@ -199,8 +200,14 @@ end
 
 function M.completion(arg_lead, cmd_line, cur_pos)
   local args, argidx, divideridx = arg_parser.scan_ex_args(cmd_line, cur_pos)
-  if M.completers[args[1]] then
-    return M.filter_completion(arg_lead, M.completers[args[1]](args, argidx, divideridx, arg_lead))
+  local _, cmd = arg_parser.split_ex_range(args[1])
+
+  if cmd == "" then
+    cmd = args[2]
+  end
+
+  if cmd and M.completers[cmd] then
+    return M.filter_completion(arg_lead, M.completers[cmd](args, argidx, divideridx, arg_lead))
   end
 end
 
