@@ -1,6 +1,7 @@
 local EventEmitter = require("diffview.events").EventEmitter
 local JobStatus = require("diffview.git.utils").JobStatus
 local Panel = require("diffview.ui.panel").Panel
+local arg_parser = require("diffview.arg_parser")
 local config = require("diffview.config")
 local diffview = require("diffview")
 local oop = require("diffview.oop")
@@ -40,9 +41,13 @@ FHOptionPanel.bufopts = {
 
 ---@class FlagOption : string[]
 ---@field key string
----@field prompt string
+---@field prompt_label string
+---@field prompt_fmt string
 ---@field select string[]
 ---@field completion string|fun(panel: FHOptionPanel): function
+---@field transform fun(values: string[]): any
+---@field render_value fun(option: FlagOption, value: string|string[]): boolean, string
+---@field render_default fun(options: FlagOption, value: string|string[]): string
 
 FHOptionPanel.flags = {
   ---@type FlagOption[]
@@ -74,6 +79,56 @@ FHOptionPanel.flags = {
     },
     { "=n", "--max-count=", "Limit the number of commits" },
     {
+      "=L", "-L", "Trace line evolution",
+      prompt_label = "(Accepts multiple values)",
+      prompt_fmt = "${label} ",
+      completion = function(_)
+        return function(arg_lead, _, _)
+          return diffview.line_trace_completion(arg_lead)
+        end
+      end,
+      transform = function(values)
+        return utils.tbl_fmap(values, function(v)
+          v = utils.str_match(v, { "^-L(.*)", ".*" })
+
+          if v == "" then
+            return nil
+          end
+
+          return v
+        end)
+      end,
+      ---@param self FlagOption
+      ---@param value string|string[]
+      render_value = function(self, value)
+        if #value == 0 then
+          -- Just render the flag name
+          return true, self[2]
+        end
+
+        -- Render a string of quoted args
+        return false, table.concat(vim.tbl_map(function(v)
+          if not v:match("^-L") then
+            -- Prepend the flag if it wasn't specified by the user.
+            v = "-L" .. v
+          end
+          return utils.str_quote(v, { only_if_whitespace = true })
+        end, value), " ")
+      end,
+      render_default = function(_, value)
+        if #value == 0 then
+          -- Just render the flag name
+          return "-L"
+        end
+
+        -- Render a string of quoted args
+        return table.concat(vim.tbl_map(function(v)
+          v = select(1, v:gsub("\\", "\\\\"))
+          return utils.str_quote("-L" .. v, { only_if_whitespace = true })
+        end, value), " ")
+      end,
+    },
+    {
       "=d", "--diff-merges=", "Determines how merge commits are treated",
       select = {
         "",
@@ -86,17 +141,42 @@ FHOptionPanel.flags = {
         "remerge",
       },
     },
-    { "=a", "--author=", "List only commits from a given author", prompt = "(Extended regular expression)" },
-    { "=g", "--grep=", "Filter commit messages", prompt = "(Extended regular expression)" },
+    { "=a", "--author=", "List only commits from a given author", prompt_label = "(Extended regular expression)" },
+    { "=g", "--grep=", "Filter commit messages", prompt_label = "(Extended regular expression)" },
   },
 }
 
 for _, list in pairs(FHOptionPanel.flags) do
-  for _, option in ipairs(list) do
-    option.key = utils.str_match(option[2], {
-      "^%-%-?([^=]+)=?",
-      "^%+%+?([^=]+)=?",
-    }):gsub("%-", "_")
+  for i, option in ipairs(list) do
+    option = vim.tbl_extend("keep", option, {
+      prompt_fmt = "${label}${flag_name}",
+
+      key = utils.str_match(option[2], {
+        "^%-%-?([^=]+)=?",
+        "^%+%+?([^=]+)=?",
+      }):gsub("%-", "_"),
+
+      ---@param self FlagOption
+      ---@param value string|string[]
+      render_value = function(self, value)
+        return value == "", self[2] .. utils.str_quote(value, { only_if_whitespace = true })
+      end,
+
+      ---@param value string|string[]
+      render_default = function(_, value)
+        if value == nil then
+          return ""
+        elseif type(value) == "table" then
+          return table.concat(vim.tbl_map(function(v)
+            v = select(1, v:gsub("\\", "\\\\"))
+            return utils.str_quote(v, { only_if_whitespace = true })
+          end, value), " ")
+        end
+        return utils.str_quote(value, { only_if_whitespace = true })
+      end,
+    })
+
+    list[i] = option
     list[option.key] = option
   end
 end
@@ -119,15 +199,20 @@ function FHOptionPanel:init(parent)
   ---@param option_name string
   self.emitter:on("set_option", function(option_name)
     local log_options = self.parent:get_log_options()
+    local cur_value = log_options[option_name]
 
     if FHOptionPanel.flags.switches[option_name] then
-      log_options[option_name] = not log_options[option_name]
+      self:_set_option(option_name, not cur_value)
       self:render()
       self:redraw()
 
     elseif FHOptionPanel.flags.options[option_name] then
       local o = FHOptionPanel.flags.options[option_name]
-      local prompt = o.prompt and (o.prompt .. " " .. o[2]) or o[2]
+      local prompt = utils.str_template(o.prompt_fmt, {
+        label = o.prompt_label and o.prompt_label .. " " or "",
+        flag_name = o[2] .. " ",
+      })
+      prompt = prompt:sub(1, -2)
 
       if o.select then
         vim.ui.select(o.select, {
@@ -137,7 +222,7 @@ function FHOptionPanel:init(parent)
           end,
         }, function(choice)
           if choice then
-            log_options[option_name] = choice
+            self:_set_option(option_name, choice)
           end
 
           self:render()
@@ -148,11 +233,30 @@ function FHOptionPanel:init(parent)
         local completion = type(o.completion) == "function" and o.completion(self) or o.completion
 
         utils.input(prompt, {
-          default = log_options[option_name],
+          default = o:render_default(cur_value),
           completion = completion,
           callback = function(response)
             if response ~= "__INPUT_CANCELLED__" then
-              log_options[option_name] = response == nil and "" or response
+              local values
+
+              if response == nil then
+                values = { "" }
+              else
+                local ok
+                ok, values = pcall(arg_parser.scan_sh_args, response, 1)
+                if not ok then
+                  utils.err(values, true)
+                  return
+                end
+              end
+
+              if o.transform then
+                values = o.transform(values)
+              else
+                values = values[1]
+              end
+
+              self:_set_option(option_name, values)
             end
 
             self:render()
@@ -187,6 +291,11 @@ function FHOptionPanel:init(parent)
       end
     end,
   })
+end
+
+function FHOptionPanel:_set_option(name, value)
+  self.parent.log_options.single_file[name] = value
+  self.parent.log_options.multi_file[name] = value
 end
 
 ---@Override

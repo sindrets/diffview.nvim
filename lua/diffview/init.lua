@@ -54,6 +54,9 @@ comp_file_history:put({ "--merges" })
 comp_file_history:put({ "--no-merges" })
 comp_file_history:put({ "--reverse" })
 comp_file_history:put({ "--max-count", "-n" }, {})
+comp_file_history:put({ "-L" }, function (_, arg_lead)
+  return M.line_trace_completion(arg_lead)
+end)
 comp_file_history:put({ "--diff-merges" }, {
   "off",
   "on",
@@ -162,8 +165,9 @@ function M.open(...)
   end
 end
 
-function M.file_history(...)
-  local view = lib.file_history(utils.tbl_pack(...))
+---@param range? { [1]: integer, [2]: integer }
+function M.file_history(range, ...)
+  local view = lib.file_history(range, utils.tbl_pack(...))
   if view then
     view:open()
   end
@@ -196,8 +200,14 @@ end
 
 function M.completion(arg_lead, cmd_line, cur_pos)
   local args, argidx, divideridx = arg_parser.scan_ex_args(cmd_line, cur_pos)
-  if M.completers[args[1]] then
-    return M.filter_completion(arg_lead, M.completers[args[1]](args, argidx, divideridx, arg_lead))
+  local _, cmd = arg_parser.split_ex_range(args[1])
+
+  if cmd == "" then
+    cmd = args[2]
+  end
+
+  if cmd and M.completers[cmd] then
+    return M.filter_completion(arg_lead, M.completers[cmd](args, argidx, divideridx, arg_lead))
   end
 end
 
@@ -234,6 +244,8 @@ function M.rev_candidates(git_root, git_dir)
     "HEAD", "FETCH_HEAD", "ORIG_HEAD", "MERGE_HEAD",
     "REBASE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD"
   }
+  -- stylua: ignore end
+
   local heads = vim.tbl_filter(
     function(name) return vim.tbl_contains(targets, name) end,
     vim.tbl_map(
@@ -241,7 +253,6 @@ function M.rev_candidates(git_root, git_dir)
       vim.fn.glob(git_dir .. "/*", false, true)
     )
   )
-  -- stylua: ignore end
   local revs = git.exec_sync(
     { "rev-parse", "--symbolic", "--branches", "--tags", "--remotes" },
     { cwd = git_root, silent = true }
@@ -259,6 +270,7 @@ end
 ---@field git_root string
 ---@field git_dir string
 
+---Completion for git revisions.
 ---@param arg_lead string
 ---@param opt? RevCompletionSpec
 ---@return string[]
@@ -281,6 +293,24 @@ function M.rev_completion(arg_lead, opt)
   end
 
   return M.filter_completion(arg_lead, candidates)
+end
+
+---Completion for the git-log `-L` flag.
+---@param arg_lead string
+---@return string[]
+function M.line_trace_completion(arg_lead)
+  local range_end = arg_lead:match(".*:()")
+
+  if not range_end then
+    return
+  else
+    local lead = arg_lead:sub(1, range_end - 1)
+    local path_lead = arg_lead:sub(range_end)
+
+    return vim.tbl_map(function(v)
+      return lead .. v
+    end, vim.fn.getcompletion(path_lead, "file"))
+  end
 end
 
 M.completers = {
@@ -348,17 +378,31 @@ function M.update_colors()
   lib.update_colors()
 end
 
-function M.emit(event_name, ...)
+local function _emit(no_recursion, event_name, ...)
   local view = lib.get_current_view()
+
   if view and not view.closing then
-    view.emitter:emit(event_name, ...)
+    local that = view.emitter
+    local fn = no_recursion and that.nore_emit or that.emit
+    fn(that, event_name, ...)
+
+    that = DiffviewGlobal.emitter
+    fn = no_recursion and that.nore_emit or that.emit
 
     if event_name == "tab_enter" then
-      DiffviewGlobal.emitter:emit("view_enter", view)
+      fn(that, "view_enter", view)
     elseif event_name == "tab_leave" then
-      DiffviewGlobal.emitter:emit("view_leave", view)
+      fn(that, "view_enter", view)
     end
   end
+end
+
+function M.emit(event_name, ...)
+  _emit(false, event_name, ...)
+end
+
+function M.nore_emit(event_name, ...)
+  _emit(true, event_name, ...)
 end
 
 M.init()

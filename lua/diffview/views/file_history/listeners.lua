@@ -32,6 +32,33 @@ return function(view)
         end
       end
     end,
+    diff_buf_read = function(bufid)
+      -- Set the cursor at the beginning of the -L range if possible.
+
+      local log_options = view.panel:get_log_options()
+      local cur = view.panel:cur_file()
+
+      if log_options.L[1] and bufid == cur.right_bufid then
+        for _, value in ipairs(log_options.L) do
+          local l1, lpath = value:match("^(%d+),.*:(.*)")
+
+          if l1 then
+            l1 = tonumber(l1)
+            lpath = utils.path:chain(lpath)
+                :normalize({ cwd = view.git_root, absolute = true })
+                :relative(view.git_root)
+                :get()
+
+            print(l1, lpath)
+            if lpath == cur.path then
+              vim.fn.cursor(l1, 1)
+              vim.cmd("norm! zt")
+              break
+            end
+          end
+        end
+      end
+    end,
     open_in_diffview = function()
       if view.panel:is_focused() then
         local item = view.panel:get_item_at_cursor()

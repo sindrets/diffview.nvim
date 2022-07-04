@@ -231,18 +231,42 @@ function M.str_match(str, patterns)
   end
 end
 
----@param s string
----@param esc_char? string
-function M.str_quote(s, esc_char)
-  esc_char = esc_char or "\\"
-  local has_single = s:find([[']]) ~= nil
-  local has_double = s:find([["]]) ~= nil
+---@class StrQuoteSpec
+---@field esc_fmt string Format string for escaping quotes. Passed to `string.format()`.
+---@field prefer_single boolean Prefer single quotes.
+---@field only_if_whitespace boolean Only quote the string if it contains whitespace.
 
-  if has_double and not has_single then
-    return "'" .. s .. "'"
+---@param s string
+---@param opt? StrQuoteSpec
+function M.str_quote(s, opt)
+  ---@cast opt StrQuoteSpec
+  s = tostring(s)
+  opt = vim.tbl_extend("keep", opt or {}, {
+    esc_fmt = [[\%s]],
+    prefer_single = false,
+    only_if_whitespace = false,
+  })
+
+  if opt.only_if_whitespace and not s:find("%s") then
+    return s
+  end
+
+  local primary, secondary = [["]], [[']]
+  if opt.prefer_single then
+    primary, secondary = [[']], [["]]
+  end
+
+  local has_primary = s:find(primary) ~= nil
+  local has_secondary = s:find(secondary) ~= nil
+
+  if has_primary and not has_secondary then
+    return secondary .. s .. secondary
   else
-    local result, _ = s:gsub('"', esc_char .. '"')
-    return '"' .. result .. '"'
+    local esc = opt.esc_fmt:format(primary)
+    -- First un-escape already escaped quotes to avoid incorrectly applied escapes.
+    s, _ = s:gsub(vim.pesc(esc), primary)
+    s, _ = s:gsub(primary, esc)
+    return primary .. s .. primary
   end
 end
 
@@ -522,6 +546,27 @@ function M.tbl_access(t, table_path)
   return cur
 end
 
+---Perform a map and also filter out index values that would become `nil`.
+---@param t table
+---@param func fun(value: any): any?
+---@return table
+function M.tbl_fmap(t, func)
+  local ret = {}
+
+  for key, item in pairs(t) do
+    local v = func(item)
+    if v ~= nil then
+      if type(key) == "number" then
+        table.insert(ret, v)
+      else
+        ret[key] = v
+      end
+    end
+  end
+
+  return ret
+end
+
 ---Create a shallow copy of a portion of a vector.
 ---@param t vector
 ---@param first? integer First index, inclusive. (default: 1)
@@ -580,9 +625,12 @@ end
 ---@param t vector
 ---@return vector t
 function M.vec_push(t, ...)
-  for _, v in ipairs({...}) do
-    t[#t + 1] = v
+  local args = {...}
+
+  for i = 1, select("#", ...) do
+    t[#t + 1] = args[i]
   end
+
   return t
 end
 

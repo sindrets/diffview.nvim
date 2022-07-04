@@ -281,14 +281,18 @@ Additional commands for convenience:
 With a Diffview open and the default key bindings, you can cycle through changed
 files with `<tab>` and `<s-tab>` (see configuration to change the key bindings).
 
-### `:DiffviewFileHistory [paths] [options]`
+### `:[range]DiffviewFileHistory [paths] [options]`
 
 Opens a new file history view that lists all commits that affected the given
-paths. This is a porcelain interface for git-log.
+paths. This is a porcelain interface for git-log. Both `[paths]` and
+`[options]` may be specified in any order, even interchangeably.
 
-If no `[paths]` are given, defaults to the top-level of the git repository. The
+If no `[paths]` are given, defaults to the top-level of the working tree. The
 top-level will be inferred from the current buffer when possible, otherwise the
 cwd is used. Multiple `[paths]` may be provided and git pathspec is supported.
+
+If `[range]` is given, the file history view will trace the line evolution of the
+given range in the current file (for more info, see the `-L` flag in the docs).
 
 Examples:
 
@@ -299,6 +303,7 @@ Examples:
 - `:DiffviewFileHistory include/this and/this :!but/not/this`
 - `:DiffviewFileHistory --range=origin..HEAD`
 - `:DiffviewFileHistory --range=feat/example-branch`
+- `:'<,'>DiffviewFileHistory`
 
 ## Restoring Files
 

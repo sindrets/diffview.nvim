@@ -3,6 +3,14 @@
 
 CHANGELOG
 
+                                                *diffview.changelog-169*
+
+PR: https://github.com/sindrets/diffview.nvim/pull/169
+
+The file history option panel is now able to accept multiple values separated
+by whitespace. This means that if you want to specify values with whitespace,
+you need to quote the value, or escape the whitespace with a backslash (`\`).
+
                                                 *diffview.changelog-151*
 
 PR: https://github.com/sindrets/diffview.nvim/pull/151

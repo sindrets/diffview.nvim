@@ -22,10 +22,14 @@ local function render_files(comp, files)
       s = "│   "
     end
     comp:add_hl("DiffviewNonText", line_idx, 0, #s)
+    local offset
 
-    local offset = #s
-    comp:add_hl(renderer.get_git_hl(file.status), line_idx, offset, offset + 1)
-    s = s .. file.status .. " "
+    if file.status then
+      offset = #s
+      comp:add_hl(renderer.get_git_hl(file.status), line_idx, offset, offset + 1)
+      s = s .. file.status .. " "
+    end
+
     offset = #s
     local icon = renderer.get_file_icon(file.basename, file.extension, comp, line_idx, offset)
     offset = offset + #icon
@@ -72,10 +76,12 @@ local function render_entries(parent, entries, updating)
   local c = config.get_config()
   local max_num_files = -1
   local max_len_stats = 7
+
   for _, entry in ipairs(entries) do
     if #entry.files > max_num_files then
       max_num_files = #entry.files
     end
+
     if entry.stats then
       local adds = tostring(entry.stats.additions)
       local dels = tostring(entry.stats.deletions)
@@ -92,20 +98,23 @@ local function render_entries(parent, entries, updating)
     if i > #parent or (updating and i > 128) then
       break
     end
+
     local entry_struct = parent[i]
     local line_idx = 0
     local offset = 0
-
     local comp = entry_struct.commit.comp
     local s = ""
+
     if not entry.single_file then
       comp:add_hl("CursorLineNr", line_idx, 0, 3)
       s = (entry.folded and c.signs.fold_closed or c.signs.fold_open) .. " "
     end
 
-    offset = #s
-    comp:add_hl(renderer.get_git_hl(entry.status), line_idx, offset, offset + 1)
-    s = s .. entry.status
+    if entry.status then
+      offset = #s
+      comp:add_hl(renderer.get_git_hl(entry.status), line_idx, offset, offset + 1)
+      s = s .. entry.status
+    end
 
     if not entry.single_file then
       offset = #s
@@ -131,26 +140,26 @@ local function render_entries(parent, entries, updating)
         offset + #adds + w,
         offset + #adds + w + #dels
       )
-      s = s .. adds .. string.rep(" ", w) .. dels .. " |"
-      comp:add_hl("DiffviewNonText", line_idx, #s - 1, #s)
+      s = s .. adds .. string.rep(" ", w) .. dels .. " | "
+      comp:add_hl("DiffviewNonText", line_idx, #s - 2, #s)
     end
 
-    offset = #s + 1
+    offset = #s
     if entry.commit.hash then
       local hash = entry.commit.hash:sub(1, 8)
       comp:add_hl("DiffviewSecondary", line_idx, offset, offset + #hash)
-      s = s .. " " .. hash
+      s = s .. hash .. " "
     end
 
-    offset = #s + 1
+    offset = #s
     local subject = utils.str_shorten(entry.commit.subject, 72)
     if subject == "" then
       subject = "[empty message]"
     end
     comp:add_hl("DiffviewFilePanelFileName", line_idx, offset, offset + #subject)
-    s = s .. " " .. subject
+    s = s .. subject .. " "
 
-    offset = #s + 1
+    offset = #s
     if entry.commit then
       -- 3 months
       local date = (
@@ -160,7 +169,7 @@ local function render_entries(parent, entries, updating)
         )
       local info = entry.commit.author .. ", " .. date
       comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #info)
-      s = s .. " " .. info
+      s = s .. info
     end
 
     comp:add_line(s)
@@ -241,7 +250,7 @@ return {
       comp:add_line(s .. paths)
     end
 
-    if log_options.rev_range then
+    if log_options.rev_range and log_options.rev_range ~= "" then
       line_idx = line_idx + 1
       s = "Revision range: "
       comp:add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
@@ -342,6 +351,7 @@ return {
     for _, item in ipairs(panel.components.options.items) do
       ---@type RenderComponent
       comp = item.comp
+      ---@type FlagOption
       local option = comp.context[2]
       local value = log_options[comp.context[1]] or ""
 
@@ -353,14 +363,14 @@ return {
       s = s .. option[3] .. " ("
 
       offset = #s
-      local flag = option[2] .. value
+      local empty, display_value = option:render_value(value)
       comp:add_hl(
-        value ~= "" and "DiffviewFilePanelCounter" or "DiffviewDim1",
+        not empty and "DiffviewFilePanelCounter" or "DiffviewDim1",
         0,
         offset,
-        offset + #flag
+        offset + #display_value
       )
-      s = s .. flag
+      s = s .. display_value
 
       offset = #s
       comp:add_hl("DiffviewFilePanelFileName", 0, offset, offset + 1)

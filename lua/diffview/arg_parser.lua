@@ -22,15 +22,16 @@ function ArgObject:init(flags, args, post_args)
   self.post_args = post_args
 end
 
----@class ArgObjectGetFlagSpec
+---@class ArgObject.GetFlagSpec
 ---@field plain boolean Never cast string values to booleans.
+---@field expect_list boolean Return a list of all defined values for the given flag.
 ---@field expect_string boolean Inferred boolean values are changed to be empty strings.
 ---@field no_empty boolean Return nil if the value is an empty string. Implies `expect_string`.
 ---@field expand boolean Expand wildcards and special keywords (`:h expand()`).
 
 ---Get a flag value.
 ---@param names string|string[] Flag synonyms
----@param opt? ArgObjectGetFlagSpec
+---@param opt? ArgObject.GetFlagSpec
 ---@return string|boolean
 function ArgObject:get_flag(names, opt)
   opt = opt or {}
@@ -42,25 +43,34 @@ function ArgObject:get_flag(names, opt)
     names = { names }
   end
 
+  local values = {}
   for _, name in ipairs(names) do
-    local v = self.flags[name]
-    if v ~= nil then
-      if opt.expect_string and v == "true" then
-        if opt.no_empty then
-          return nil
-        end
-        v = ""
-      elseif not opt.plain and (v == "true" or v == "false") then
-        v = v == "true"
-      end
-
-      if opt.expand then
-        v = vim.fn.expand(v)
-      end
-
-      return v
+    if self.flags[name] then
+      utils.vec_push(values, unpack(self.flags[name]))
     end
   end
+
+  values = utils.tbl_fmap(values, function(v)
+    if opt.expect_string and v == "true" then
+      -- Undo inferred boolean values
+      if opt.no_empty then
+        return nil
+      end
+      v = ""
+    elseif not opt.plain and (v == "true" or v == "false") then
+      -- Cast to boolean
+      v = v == "true"
+    end
+
+    if opt.expand then
+      v = vim.fn.expand(v)
+    end
+
+    return v
+  end)
+
+  -- If a list isn't expcted: return the last defined value for this flag.
+  return opt.expect_list and values or values[#values]
 end
 
 ---@class FlagValueMap : Object
@@ -166,14 +176,24 @@ function M.parse(args)
     flag, value = arg:match(short_flag_pat)
     if flag then
       value = (value == "") and "true" or value
-      flags[flag] = value
+
+      if not flags[flag] then
+        flags[flag] = {}
+      end
+
+      table.insert(flags[flag], value)
       goto continue
     end
 
     flag, value = arg:match(long_flag_pat)
     if flag then
       value = (value == "") and "true" or value
-      flags[flag] = value
+
+      if not flags[flag] then
+        flags[flag] = {}
+      end
+
+      table.insert(flags[flag], value)
       goto continue
     end
 
@@ -185,7 +205,26 @@ function M.parse(args)
   return ArgObject(flags, pre_args, post_args)
 end
 
----Scan an EX arg string and split into individual args.
+---Split the line range from an EX command arg.
+---@param arg string
+---@return string range, string command
+function M.split_ex_range(arg)
+  local idx = arg:match(".*()%A")
+  if not idx then
+    return  "", arg
+  end
+
+  local slice = arg:sub(idx or 1)
+  idx = slice:match("[^']()%a")
+
+  if idx then
+    return  arg:sub(1, (#arg - #slice) + idx - 1), slice:sub(idx)
+  end
+
+  return  arg, ""
+end
+
+---Scan an EX command string and split it into individual args.
 ---@param cmd_line string
 ---@param cur_pos number
 ---@return string[] args
@@ -218,12 +257,85 @@ function M.scan_ex_args(cmd_line, cur_pos)
         end
       end
       arg = ""
+      -- Skip whitespace
       i = i + cmd_line:sub(i, -1):match("^%s+()") - 2
     else
       arg = arg .. char
     end
 
     i = i + 1
+  end
+
+  if #arg > 0 then
+    table.insert(args, arg)
+    if arg == "--" and cmd_line:sub(#cmd_line, #cmd_line) ~= "-" then
+      divideridx = #args
+    end
+  end
+
+  if not argidx then
+    argidx = #args
+    if cmd_line:sub(#cmd_line, #cmd_line):match("%s") then
+      argidx = argidx + 1
+    end
+  end
+
+  return args, argidx, divideridx
+end
+
+---Scan a shell-like string and split it into individual args. This scanner
+---understands quoted args.
+---@param cmd_line string
+---@param cur_pos number
+---@return string[] args
+---@return integer argidx
+---@return integer divideridx
+function M.scan_sh_args(cmd_line, cur_pos)
+  local args = {}
+  local divideridx = math.huge
+  local argidx
+  local cur_quote
+  local arg = ""
+
+  local i = 1
+  while i <= #cmd_line do
+    if not argidx and i > cur_pos then
+      argidx = #args + 1
+    end
+
+    local char = cmd_line:sub(i, i)
+    if char == "\\" then
+      if i < #cmd_line then
+        i = i + 1
+        arg = arg .. cmd_line:sub(i, i)
+      end
+    elseif cur_quote then
+      if char == cur_quote then
+        cur_quote = nil
+      else
+        arg = arg .. char
+      end
+    elseif char == [[']] or char == [["]] then
+      cur_quote = char
+    elseif char:match("%s") then
+      if arg ~= "" then
+        table.insert(args, arg)
+        if arg == "--" and i - 1 < #cmd_line then
+          divideridx = #args
+        end
+      end
+      arg = ""
+      -- Skip whitespace
+      i = i + cmd_line:sub(i, -1):match("^%s+()") - 2
+    else
+      arg = arg .. char
+    end
+
+    i = i + 1
+  end
+
+  if cur_quote then
+    error("The given command line contains a non-terminated string!")
   end
 
   if #arg > 0 then

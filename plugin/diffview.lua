@@ -22,21 +22,33 @@ end
 command("DiffviewOpen", function(state)
   diffview.open(unpack(state.fargs))
 end, { nargs = "*", complete = completion })
+
 command("DiffviewFileHistory", function(state)
-  diffview.file_history(unpack(state.fargs))
-end, { nargs = "*", complete = completion })
+  local range
+
+  if state.range > 0 then
+    range = { state.line1, state.line2 }
+  end
+
+  diffview.file_history(range, unpack(state.fargs))
+end, { nargs = "*", complete = completion, range = true })
+
 command("DiffviewClose", function()
   diffview.close()
 end, { nargs = 0, bang = true })
+
 command("DiffviewFocusFiles", function()
   diffview.emit("focus_files")
 end, { nargs = 0, bang = true })
+
 command("DiffviewToggleFiles", function()
   diffview.emit("toggle_files")
 end, { nargs = 0, bang = true })
+
 command("DiffviewRefresh", function()
   diffview.emit("refresh_files")
 end, { nargs = 0, bang = true })
+
 command("DiffviewLog", function()
   vim.cmd(("sp %s | norm! G"):format(
     vim.fn.fnameescape(require("diffview.logger").outfile)

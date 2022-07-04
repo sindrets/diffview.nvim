@@ -121,7 +121,9 @@ function M.diffview_open(args)
   return v
 end
 
-function M.file_history(args)
+---@param range? { [1]: integer, [2]: integer }
+---@param args string[]
+function M.file_history(range, args)
   local default_args = config.get_config().default_args.DiffviewFileHistory
   local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
   local paths = {}
@@ -199,6 +201,7 @@ function M.file_history(args)
     { "no-merges" },
     { "reverse" },
     { "max-count", "n" },
+    { "L" },
     { "diff-merges" },
     { "author" },
     { "grep" },
@@ -208,13 +211,18 @@ function M.file_history(args)
   local log_options = { rev_range = range_arg }
   for _, names in ipairs(log_flag_names) do
     local key, _ = names[1]:gsub("%-", "_")
-    local v = argo:get_flag(
-      names,
-      type(config.log_option_defaults[key]) ~= "boolean"
-        and { expect_string = true }
-        or nil
-    )
+    local v = argo:get_flag(names, {
+      expect_string = type(config.log_option_defaults[key]) ~= "boolean",
+      expect_list = names[1] == "L",
+    })
     log_options[key] = v
+  end
+
+  if range then
+    paths, rel_paths = {}, {}
+    log_options.L = {
+      ("%d,%d:%s"):format(range[1], range[2], pl:relative(pl:absolute(cfile), git_root))
+    }
   end
 
   local ok, opt_description = git.file_history_dry_run(git_root, paths, log_options)
