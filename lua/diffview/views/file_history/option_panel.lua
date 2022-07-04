@@ -89,12 +89,10 @@ FHOptionPanel.flags = {
       end,
       transform = function(values)
         return utils.tbl_fmap(values, function(v)
-          if v == "-L" then
-            -- Filter out empty flag options
+          v = utils.str_match(v, { "^-L(.*)", ".*" })
+
+          if v == "" then
             return nil
-          elseif v:match("^-L") then
-            -- Remove the flag name
-            return v:sub(3)
           end
 
           return v
@@ -125,7 +123,8 @@ FHOptionPanel.flags = {
 
         -- Render a string of quoted args
         return table.concat(vim.tbl_map(function(v)
-          return utils.str_quote(v, { only_if_whitespace = true })
+          v = select(1, v:gsub("\\", "\\\\"))
+          return utils.str_quote("-L" .. v, { only_if_whitespace = true })
         end, value), " ")
       end,
     },
@@ -169,6 +168,7 @@ for _, list in pairs(FHOptionPanel.flags) do
           return ""
         elseif type(value) == "table" then
           return table.concat(vim.tbl_map(function(v)
+            v = select(1, v:gsub("\\", "\\\\"))
             return utils.str_quote(v, { only_if_whitespace = true })
           end, value), " ")
         end
@@ -199,16 +199,17 @@ function FHOptionPanel:init(parent)
   ---@param option_name string
   self.emitter:on("set_option", function(option_name)
     local log_options = self.parent:get_log_options()
+    local cur_value = log_options[option_name]
 
     if FHOptionPanel.flags.switches[option_name] then
-      self:_set_option(option_name, not log_options[option_name])
+      self:_set_option(option_name, not cur_value)
       self:render()
       self:redraw()
 
     elseif FHOptionPanel.flags.options[option_name] then
       local o = FHOptionPanel.flags.options[option_name]
       local prompt = utils.str_template(o.prompt_fmt, {
-        label = o.prompt_label and o.prompt_label .. " " or nil,
+        label = o.prompt_label and o.prompt_label .. " " or "",
         flag_name = o[2] .. " ",
       })
       prompt = prompt:sub(1, -2)
@@ -232,28 +233,30 @@ function FHOptionPanel:init(parent)
         local completion = type(o.completion) == "function" and o.completion(self) or o.completion
 
         utils.input(prompt, {
-          default = o:render_default(log_options[option_name]),
+          default = o:render_default(cur_value),
           completion = completion,
           callback = function(response)
             if response ~= "__INPUT_CANCELLED__" then
+              local values
+
               if response == nil then
-                response = ""
+                values = { "" }
               else
                 local ok
-                ok, response = pcall(arg_parser.scan_sh_args, response, 1)
+                ok, values = pcall(arg_parser.scan_sh_args, response, 1)
                 if not ok then
-                  utils.err(response, true)
+                  utils.err(values, true)
                   return
-                end
-
-                if o.transform then
-                  response = o.transform(response)
-                else
-                  response = response[1]
                 end
               end
 
-              self:_set_option(option_name, response)
+              if o.transform then
+                values = o.transform(values)
+              else
+                values = values[1]
+              end
+
+              self:_set_option(option_name, values)
             end
 
             self:render()

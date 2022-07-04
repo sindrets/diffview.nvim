@@ -745,12 +745,12 @@ local function is_single_file(git_root, path_args, lflags)
   return true
 end
 
----@class ParseFHDataSpec
+---@class git.utils.ParseFHDataSpec
 ---@field thread thread
 ---@field git_root string
 ---@field path_args string[]
 ---@field log_options LogOptions
----@field opt ProcessFileHistorySpec
+---@field opt git.utils.FileHistoryWorkerSpec
 ---@field single_file boolean
 ---@field resume_lock boolean
 ---@field cur table
@@ -758,7 +758,7 @@ end
 ---@field entries LogEntry[]
 ---@field callback function
 
----@param state ParseFHDataSpec
+---@param state git.utils.ParseFHDataSpec
 ---@return boolean ok, JobStatus status?
 local function parse_fh_data(state)
   local cur, single_file, log_options, git_root, thread, path_args, callback, opt, commit, entries
@@ -794,7 +794,7 @@ local function parse_fh_data(state)
     }
 
     local max_retries = 2
-    local context = "git.utils.process_file_history()"
+    local context = "git.utils.file_history_worker()"
     state.resume_lock = true
 
     for i = 0, max_retries do
@@ -890,7 +890,7 @@ local function parse_fh_data(state)
   return true
 end
 
----@param state ParseFHDataSpec
+---@param state git.utils.ParseFHDataSpec
 ---@return boolean ok
 local function parse_fh_line_trace_data(state)
   local cur, single_file, git_root, path_args, callback, opt, commit, entries
@@ -941,17 +941,17 @@ local function parse_fh_line_trace_data(state)
   return true
 end
 
----@class ProcessFileHistorySpec
+---@class git.utils.FileHistoryWorkerSpec
 ---@field base Rev
 
 ---@param thread thread
 ---@param git_root string
 ---@param path_args string[]
 ---@param log_opt ConfigLogOptions
----@param opt ProcessFileHistorySpec
+---@param opt git.utils.FileHistoryWorkerSpec
 ---@param co_state table
 ---@param callback function
-local function process_file_history(thread, git_root, path_args, log_opt, opt, co_state, callback)
+local function file_history_worker(thread, git_root, path_args, log_opt, opt, co_state, callback)
   ---@type LogEntry[]
   local entries = {}
   local data = {}
@@ -969,7 +969,7 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
 
   local is_trace = #log_options.L > 0
 
-  ---@type ParseFHDataSpec
+  ---@type git.utils.ParseFHDataSpec
   local state = {
     thread = thread,
     git_root = git_root,
@@ -1034,7 +1034,7 @@ local function process_file_history(thread, git_root, path_args, log_opt, opt, c
     })
 
     local ok, status
-    if #log_options.L > 0 then
+    if log_options.L[1] then
       ok, status = parse_fh_line_trace_data(state)
     else
       ok, status = parse_fh_data(state)
@@ -1056,7 +1056,7 @@ end
 ---@param git_root string
 ---@param path_args string[]
 ---@param log_opt ConfigLogOptions
----@param opt ProcessFileHistorySpec
+---@param opt git.utils.FileHistoryWorkerSpec
 ---@param callback function
 ---@return fun() finalizer
 function M.file_history(git_root, path_args, log_opt, opt, callback)
@@ -1067,7 +1067,7 @@ function M.file_history(git_root, path_args, log_opt, opt, callback)
   }
 
   thread = coroutine.create(function()
-    process_file_history(thread, git_root, path_args, log_opt, opt, co_state, callback)
+    file_history_worker(thread, git_root, path_args, log_opt, opt, co_state, callback)
   end)
 
   handle_co(thread, coroutine.resume(thread))
@@ -1476,16 +1476,6 @@ M.restore_file = async.wrap(function(git_root, path, kind, commit, callback)
   utils.info(("File restored from %s. Undo with %s"):format(rev_name, undo), true)
   callback()
 end, 5)
-
----@class NextLogSectionSpec
----@field git_root string
----@field path_args string[]
----@field opt LogOptions
----@field single_file boolean
----@field last_commit string
----@field i integer
----@field max integer
----@field callback function
 
 M.JobStatus = JobStatus
 return M

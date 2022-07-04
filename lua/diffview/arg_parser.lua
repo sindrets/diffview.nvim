@@ -305,7 +305,6 @@ function M.scan_sh_args(cmd_line, cur_pos)
 
     local char = cmd_line:sub(i, i)
     if char == "\\" then
-      arg = arg .. char
       if i < #cmd_line then
         i = i + 1
         arg = arg .. cmd_line:sub(i, i)

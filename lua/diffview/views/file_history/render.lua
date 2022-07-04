@@ -140,26 +140,26 @@ local function render_entries(parent, entries, updating)
         offset + #adds + w,
         offset + #adds + w + #dels
       )
-      s = s .. adds .. string.rep(" ", w) .. dels .. " |"
-      comp:add_hl("DiffviewNonText", line_idx, #s - 1, #s)
+      s = s .. adds .. string.rep(" ", w) .. dels .. " | "
+      comp:add_hl("DiffviewNonText", line_idx, #s - 2, #s)
     end
 
-    offset = #s + 1
+    offset = #s
     if entry.commit.hash then
       local hash = entry.commit.hash:sub(1, 8)
       comp:add_hl("DiffviewSecondary", line_idx, offset, offset + #hash)
-      s = s .. " " .. hash
+      s = s .. hash .. " "
     end
 
-    offset = #s + 1
+    offset = #s
     local subject = utils.str_shorten(entry.commit.subject, 72)
     if subject == "" then
       subject = "[empty message]"
     end
     comp:add_hl("DiffviewFilePanelFileName", line_idx, offset, offset + #subject)
-    s = s .. " " .. subject
+    s = s .. subject .. " "
 
-    offset = #s + 1
+    offset = #s
     if entry.commit then
       -- 3 months
       local date = (
@@ -169,7 +169,7 @@ local function render_entries(parent, entries, updating)
         )
       local info = entry.commit.author .. ", " .. date
       comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #info)
-      s = s .. " " .. info
+      s = s .. info
     end
 
     comp:add_line(s)
@@ -250,7 +250,7 @@ return {
       comp:add_line(s .. paths)
     end
 
-    if log_options.rev_range then
+    if log_options.rev_range and log_options.rev_range ~= "" then
       line_idx = line_idx + 1
       s = "Revision range: "
       comp:add_hl("DiffviewFilePanelPath", line_idx, 0, #s)
