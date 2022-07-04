@@ -378,17 +378,31 @@ function M.update_colors()
   lib.update_colors()
 end
 
-function M.emit(event_name, ...)
+local function _emit(no_recursion, event_name, ...)
   local view = lib.get_current_view()
+
   if view and not view.closing then
-    view.emitter:emit(event_name, ...)
+    local that = view.emitter
+    local fn = no_recursion and that.nore_emit or that.emit
+    fn(that, event_name, ...)
+
+    that = DiffviewGlobal.emitter
+    fn = no_recursion and that.nore_emit or that.emit
 
     if event_name == "tab_enter" then
-      DiffviewGlobal.emitter:emit("view_enter", view)
+      fn(that, "view_enter", view)
     elseif event_name == "tab_leave" then
-      DiffviewGlobal.emitter:emit("view_leave", view)
+      fn(that, "view_enter", view)
     end
   end
+end
+
+function M.emit(event_name, ...)
+  _emit(false, event_name, ...)
+end
+
+function M.nore_emit(event_name, ...)
+  _emit(true, event_name, ...)
 end
 
 M.init()

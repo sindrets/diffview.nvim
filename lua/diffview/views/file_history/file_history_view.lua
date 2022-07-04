@@ -61,7 +61,9 @@ function FileHistoryView:post_open()
   self.commit_log_panel = CommitLogPanel(self.git_root, {
     name = ("diffview://%s/log/%d/%s"):format(self.git_dir, self.tabpage, "commit_log"),
   })
+
   self:init_event_listeners()
+
   vim.schedule(function()
     self:file_safeguard()
     ---@diagnostic disable-next-line: unused-local
