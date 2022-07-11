@@ -14,7 +14,7 @@ local M = {}
 ---@class Semaphore
 ---@field acquire function
 
----@class CountDownLatch : Object
+---@class CountDownLatch : diffview.Object
 ---@field initial_count integer
 ---@field counter integer
 ---@field sem Semaphore

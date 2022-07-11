@@ -18,7 +18,7 @@ local fstat_cache = {}
 ---@field additions integer
 ---@field deletions integer
 
----@class FileEntry : Object
+---@class FileEntry : diffview.Object
 ---@field path string
 ---@field oldpath string
 ---@field absolute_path string

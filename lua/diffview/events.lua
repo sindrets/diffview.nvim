@@ -21,7 +21,7 @@ local Event = oop.enum({
 ---@field callback function The original callback
 ---@field call function
 
----@class EventEmitter : Object
+---@class EventEmitter : diffview.Object
 ---@field event_map table<Event, Listener[]> # Registered events mapped to subscribed listeners.
 ---@field any_listeners Listener[] # Listeners subscribed to all events.
 ---@field emit_lock table<Event, boolean>

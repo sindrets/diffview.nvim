@@ -2,7 +2,7 @@ local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local M = {}
 
----@class Node : Object
+---@class Node : diffview.Object
 ---@field parent Node
 ---@field name string
 ---@field data any

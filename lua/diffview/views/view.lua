@@ -14,7 +14,7 @@ local LayoutMode = oop.enum({
   "VERTICAL",
 })
 
----@class View : Object
+---@class View : diffview.Object
 ---@field tabpage integer
 ---@field emitter EventEmitter
 ---@field layout_mode LayoutMode

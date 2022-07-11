@@ -24,7 +24,7 @@ M.last_draw_time = 0
 ---@field name? string
 ---@field context? table
 
----@class RenderComponent : Object
+---@class RenderComponent : diffview.Object
 ---@field name string
 ---@field context? table
 ---@field parent RenderComponent
@@ -253,7 +253,7 @@ function RenderComponent:pretty_print()
   recurse(0, self)
 end
 
----@class RenderData : Object
+---@class RenderData : diffview.Object
 ---@field lines string[]
 ---@field hl HlData[]
 ---@field components RenderComponent[]

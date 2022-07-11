@@ -9,7 +9,7 @@ local git = lazy.require("diffview.git.utils")
 
 local M = {}
 
----@class Commit : Object
+---@class Commit : diffview.Object
 ---@field hash string
 ---@field author string
 ---@field time number

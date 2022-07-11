@@ -17,7 +17,7 @@ local EditToken = oop.enum({
   "REPLACE",
 })
 
----@class Diff : Object
+---@class Diff : diffview.Object
 ---@field a any[]
 ---@field b any[]
 ---@field moda boolean[]

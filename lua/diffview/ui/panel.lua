@@ -16,7 +16,7 @@ local uid_counter = 0
 ---@type PerfTimer
 local perf = PerfTimer("[Panel] redraw")
 
----@class Panel : Object
+---@class Panel : diffview.Object
 ---@field type PanelType
 ---@field config_producer PanelConfig|fun(): PanelConfig
 ---@field state table

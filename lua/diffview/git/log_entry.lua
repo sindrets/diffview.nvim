@@ -1,7 +1,7 @@
 local oop = require("diffview.oop")
 local M = {}
 
----@class LogEntry : Object
+---@class LogEntry : diffview.Object
 ---@field path_args string[]
 ---@field commit Commit
 ---@field files FileEntry[]

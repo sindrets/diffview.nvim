@@ -22,7 +22,7 @@ local RevType = oop.enum({
 
 ---@alias RevRange { first: Rev, last: Rev }
 
----@class Rev : Object
+---@class Rev : diffview.Object
 ---@field type integer
 ---@field commit string A commit SHA.
 ---@field track_head boolean If true, indicates that the rev should be updated when HEAD changes.

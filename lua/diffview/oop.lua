@@ -121,7 +121,7 @@ local function subclass(base_class, name)
     name = "Unnamed"
   end
 
-  ---@type Object
+  ---@type diffview.Object
   local the_class = {}
 
   -- need to copy everything here because events can't be found through metatables
@@ -204,7 +204,7 @@ local function subclass(base_class, name)
   return the_class
 end
 
----@class Object
+---@class diffview.Object
 ---@field init function
 ---@field class function
 ---@field instanceof function
@@ -260,9 +260,9 @@ setmetatable(Object, {
 })
 
 ---Create a new class.
----@generic T : Object
+---@generic T : diffview.Object
 ---@param name `T`
----@param super_class? Object
+---@param super_class? diffview.Object
 ---@return T
 function M.create_class(name, super_class)
   super_class = super_class or Object

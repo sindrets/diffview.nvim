@@ -6,7 +6,7 @@ local M = {}
 local short_flag_pat = "^%-(%a)=?(.*)"
 local long_flag_pat = "^%-%-(%a[%a%d-]*)=?(.*)"
 
----@class ArgObject : Object
+---@class ArgObject : diffview.Object
 ---@field flags table<string, string>
 ---@field args string[]
 ---@field post_args string[]
@@ -73,7 +73,7 @@ function ArgObject:get_flag(names, opt)
   return opt.expect_list and values or values[#values]
 end
 
----@class FlagValueMap : Object
+---@class FlagValueMap : diffview.Object
 ---@field map table<string, string[]>
 local FlagValueMap = oop.create_class("FlagValueMap")
 

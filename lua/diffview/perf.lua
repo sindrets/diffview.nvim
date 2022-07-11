@@ -4,7 +4,7 @@ local utils = require("diffview.utils")
 local luv = vim.loop
 local M = {}
 
----@class PerfTimer : Object
+---@class PerfTimer : diffview.Object
 ---@field subject string|nil
 ---@field first integer Start time (ns)
 ---@field last integer Stop time (ns)

@@ -2,7 +2,7 @@ local oop = require("diffview.oop")
 
 local M = {}
 
----@class Model : Object
+---@class Model : diffview.Object
 ---@field create_comp_schema? fun(data: table): CompSchema
 ---@field render? fun(render_data: RenderData)
 local Model = oop.create_class("Model")
