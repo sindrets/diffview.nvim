@@ -1,5 +1,5 @@
 local Event = require("diffview.events").Event
-local FileEntry = require("diffview.views.file_entry").FileEntry
+local FileEntry = require("diffview.scene.file_entry").FileEntry
 local RevType = require("diffview.git.rev").RevType
 local api = vim.api
 local async = require("plenary.async")

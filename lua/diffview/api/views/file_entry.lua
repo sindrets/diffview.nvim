@@ -1,7 +1,12 @@
+------------------------------------
+-- FIXME: Refactor all the api stuff
+------------------------------------
+
+
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local async = require("plenary.async")
-local FileEntry = require("diffview.views.file_entry").FileEntry
+local FileEntry = require("diffview.scene.file_entry").FileEntry
 local RevType = require("diffview.git.rev").RevType
 local api = vim.api
 

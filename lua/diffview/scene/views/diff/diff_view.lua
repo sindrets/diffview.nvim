@@ -4,12 +4,12 @@ local EditToken = require("diffview.diff").EditToken
 local Event = require("diffview.events").Event
 local EventEmitter = require("diffview.events").EventEmitter
 local FileDict = require("diffview.git.file_dict").FileDict
-local FileEntry = require("diffview.views.file_entry").FileEntry
-local FilePanel = require("diffview.views.diff.file_panel").FilePanel
-local LayoutMode = require("diffview.views.view").LayoutMode
+local FileEntry = require("diffview.scene.file_entry").FileEntry
+local FilePanel = require("diffview.scene.views.diff.file_panel").FilePanel
+local LayoutMode = require("diffview.scene.view").LayoutMode
 local PerfTimer = require("diffview.perf").PerfTimer
 local RevType = require("diffview.git.rev").RevType
-local StandardView = require("diffview.views.standard.standard_view").StandardView
+local StandardView = require("diffview.scene.views.standard.standard_view").StandardView
 local async = require("plenary.async")
 local debounce = require("diffview.debounce")
 local git = require("diffview.git.utils")
@@ -426,7 +426,7 @@ function DiffView:on_files_staged(callback)
 end
 
 function DiffView:init_event_listeners()
-  local listeners = require("diffview.views.diff.listeners")(self)
+  local listeners = require("diffview.scene.views.diff.listeners")(self)
   for event, callback in pairs(listeners) do
     self.emitter:on(event, callback)
   end

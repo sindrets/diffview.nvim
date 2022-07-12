@@ -1,5 +1,5 @@
-local DiffView = require("diffview.views.diff.diff_view").DiffView
-local FileEntry = require("diffview.views.file_entry").FileEntry
+local DiffView = require("diffview.scene.views.diff.diff_view").DiffView
+local FileEntry = require("diffview.scene.file_entry").FileEntry
 local api = vim.api
 local git = require("diffview.git.utils")
 local lib = require("diffview.lib")

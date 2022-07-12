@@ -8,7 +8,7 @@ local logger = require("diffview.logger")
 local PerfTimer = require("diffview.perf").PerfTimer
 local Panel = require("diffview.ui.panel").Panel
 local LogEntry = require("diffview.git.log_entry").LogEntry
-local FHOptionPanel = require("diffview.views.file_history.option_panel").FHOptionPanel
+local FHOptionPanel = require("diffview.scene.views.file_history.option_panel").FHOptionPanel
 local JobStatus = git.JobStatus
 local api = vim.api
 local M = {}
@@ -485,7 +485,7 @@ end
 
 function FileHistoryPanel:render()
   perf_render:reset()
-  require("diffview.views.file_history.render").file_history_panel(self)
+  require("diffview.scene.views.file_history.render").file_history_panel(self)
   perf_render:time()
   logger.lvl(10).s_debug(perf_render)
 end

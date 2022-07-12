@@ -327,7 +327,7 @@ function FilePanel:toggle_item_fold(item)
 end
 
 function FilePanel:render()
-  require("diffview.views.diff.render")(self)
+  require("diffview.scene.views.diff.render")(self)
 end
 
 M.FilePanel = FilePanel

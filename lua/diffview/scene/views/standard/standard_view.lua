@@ -1,9 +1,9 @@
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local config = require("diffview.config")
-local FileEntry = require("diffview.views.file_entry").FileEntry
-local View = require("diffview.views.view").View
-local LayoutMode = require("diffview.views.view").LayoutMode
+local FileEntry = require("diffview.scene.file_entry").FileEntry
+local View = require("diffview.scene.view").View
+local LayoutMode = require("diffview.scene.view").LayoutMode
 local Panel = require("diffview.ui.panel").Panel
 local api = vim.api
 

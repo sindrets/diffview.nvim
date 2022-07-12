@@ -1,5 +1,5 @@
 local EventEmitter = require("diffview.events").EventEmitter
-local FileEntry = require("diffview.views.file_entry").FileEntry
+local FileEntry = require("diffview.scene.file_entry").FileEntry
 local PerfTimer = require("diffview.perf").PerfTimer
 local logger = require("diffview.logger")
 local oop = require("diffview.oop")

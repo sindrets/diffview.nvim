@@ -1,9 +1,9 @@
 local lazy = require("diffview.lazy")
 
 ---@type DiffView|LazyModule
-local DiffView = lazy.access("diffview.views.diff.diff_view", "DiffView")
+local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView")
 ---@type FileHistoryView|LazyModule
-local FileHistoryView = lazy.access("diffview.views.file_history.file_history_view", "FileHistoryView")
+local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView")
 ---@module "diffview.lib"
 local lib = lazy.require("diffview.lib")
 ---@module "diffview.utils"

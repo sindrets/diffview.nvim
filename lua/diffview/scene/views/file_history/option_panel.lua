@@ -372,7 +372,7 @@ function FHOptionPanel:get_item_at_cursor()
 end
 
 function FHOptionPanel:render()
-  require("diffview.views.file_history.render").fh_option_panel(self)
+  require("diffview.scene.views.file_history.render").fh_option_panel(self)
 end
 
 M.FHOptionPanel = FHOptionPanel

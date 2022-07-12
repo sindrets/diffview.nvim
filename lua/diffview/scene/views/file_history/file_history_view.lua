@@ -1,10 +1,10 @@
 local CommitLogPanel = require("diffview.ui.panels.commit_log_panel").CommitLogPanel
 local Event = require("diffview.events").Event
 local EventEmitter = require("diffview.events").EventEmitter
-local FileEntry = require("diffview.views.file_entry").FileEntry
-local FileHistoryPanel = require("diffview.views.file_history.file_history_panel").FileHistoryPanel
-local LayoutMode = require("diffview.views.view").LayoutMode
-local StandardView = require("diffview.views.standard.standard_view").StandardView
+local FileEntry = require("diffview.scene.file_entry").FileEntry
+local FileHistoryPanel = require("diffview.scene.views.file_history.file_history_panel").FileHistoryPanel
+local LayoutMode = require("diffview.scene.view").LayoutMode
+local StandardView = require("diffview.scene.views.standard.standard_view").StandardView
 local git = require("diffview.git.utils")
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
@@ -216,7 +216,7 @@ function FileHistoryView:on_files_staged(callback)
 end
 
 function FileHistoryView:init_event_listeners()
-  local listeners = require("diffview.views.file_history.listeners")(self)
+  local listeners = require("diffview.scene.views.file_history.listeners")(self)
   for event, callback in pairs(listeners) do
     self.emitter:on(event, callback)
   end
