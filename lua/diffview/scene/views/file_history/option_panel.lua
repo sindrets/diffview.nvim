@@ -71,7 +71,7 @@ FHOptionPanel.flags = {
           local view = panel.parent.parent
           return diffview.rev_completion(arg_lead, {
             accept_range = true,
-            git_root = view.git_root,
+            git_toplevel = view.git_toplevel,
             git_dir = view.git_dir,
           })
         end

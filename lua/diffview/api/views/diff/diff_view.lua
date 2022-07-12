@@ -32,12 +32,12 @@ local CDiffView = oop.create_class("CDiffView", DiffView)
 ---@param opt any
 function CDiffView:init(opt)
   self.valid = false
-  self.git_dir = git.git_dir(opt.git_root)
+  self.git_dir = git.git_dir(opt.git_toplevel)
 
   if not self.git_dir then
     utils.err(
       ("Failed to find the git dir for the repository: %s")
-      :format(utils.str_quote(opt.git_root))
+      :format(utils.str_quote(opt.git_toplevel))
     )
     return
   end
@@ -48,7 +48,7 @@ function CDiffView:init(opt)
   self.ready = false
   self.closing = false
   self.winopts = { left = {}, right = {} }
-  self.git_root = opt.git_root
+  self.git_toplevel = opt.git_toplevel
   self.rev_arg = opt.rev_arg
   self.path_args = opt.path_args
   self.left = opt.left
@@ -58,7 +58,7 @@ function CDiffView:init(opt)
   self.fetch_files = opt.update_files
   self.get_file_data = opt.get_file_data
   self.panel = FilePanel(
-    self.git_root,
+    self.git_toplevel,
     self.files,
     self.path_args,
     self.rev_arg or git.rev_to_pretty_string(self.left, self.right)
@@ -122,8 +122,8 @@ function CDiffView:create_file_entries(files)
     {
       kind = "staged",
       files = files.staged,
-      left = git.head_rev(self.git_root),
-      right = Rev(RevType.INDEX),
+      left = git.head_rev(self.git_toplevel),
+      right = Rev(RevType.STAGE),
     },
   }
 
@@ -135,7 +135,7 @@ function CDiffView:create_file_entries(files)
         CFileEntry({
           path = file_data.path,
           oldpath = file_data.oldpath,
-          absolute_path = utils.path:join(self.git_root, file_data.path),
+          absolute_path = utils.path:join(self.git_toplevel, file_data.path),
           status = file_data.status,
           stats = file_data.stats,
           kind = v.kind,

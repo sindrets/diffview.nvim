@@ -15,7 +15,7 @@ local api = vim.api
 local M = {}
 
 ---@class FileHistoryView : StandardView
----@field git_root string
+---@field git_toplevel string
 ---@field git_dir string
 ---@field panel FileHistoryPanel
 ---@field commit_log_panel CommitLogPanel
@@ -26,12 +26,12 @@ local FileHistoryView = oop.create_class("FileHistoryView", StandardView)
 
 function FileHistoryView:init(opt)
   self.valid = false
-  self.git_dir = git.git_dir(opt.git_root)
+  self.git_dir = git.git_dir(opt.git_toplevel)
 
   if not self.git_dir then
     utils.err(
       ("Failed to find the git dir for the repository: %s")
-      :format(utils.str_quote(opt.git_root))
+      :format(utils.str_quote(opt.git_toplevel))
     )
     return
   end
@@ -42,12 +42,12 @@ function FileHistoryView:init(opt)
   self.closing = false
   self.nulled = false
   self.winopts = { left = {}, right = {} }
-  self.git_root = opt.git_root
+  self.git_toplevel = opt.git_toplevel
   self.path_args = opt.path_args
   self.raw_args = opt.raw_args
   self.panel = FileHistoryPanel(
     self,
-    self.git_root,
+    self.git_toplevel,
     {},
     self.path_args,
     self.raw_args,
@@ -58,7 +58,7 @@ function FileHistoryView:init(opt)
 end
 
 function FileHistoryView:post_open()
-  self.commit_log_panel = CommitLogPanel(self.git_root, {
+  self.commit_log_panel = CommitLogPanel(self.git_toplevel, {
     name = ("diffview://%s/log/%d/%s"):format(self.git_dir, self.tabpage, "commit_log"),
   })
 
@@ -103,7 +103,7 @@ function FileHistoryView:next_item()
     if cur then
       self.panel:highlight_item(cur)
       self.nulled = false
-      cur:load_buffers(self.git_root, self.left_winid, self.right_winid, function()
+      cur:load_buffers(self.git_toplevel, self.left_winid, self.right_winid, function()
         self:update_windows()
       end)
 
@@ -124,7 +124,7 @@ function FileHistoryView:prev_item()
     if cur then
       self.panel:highlight_item(cur)
       self.nulled = false
-      cur:load_buffers(self.git_root, self.left_winid, self.right_winid, function()
+      cur:load_buffers(self.git_toplevel, self.left_winid, self.right_winid, function()
         self:update_windows()
       end)
 
@@ -145,7 +145,7 @@ function FileHistoryView:set_file(file, focus)
     self.panel:set_cur_item({ entry, file })
     self.panel:highlight_item(file)
     self.nulled = false
-    file:load_buffers(self.git_root, self.left_winid, self.right_winid, function()
+    file:load_buffers(self.git_toplevel, self.left_winid, self.right_winid, function()
       self:update_windows()
     end)
 
@@ -157,7 +157,7 @@ end
 
 ---@Override
 ---Recover the layout after the user has messed it up.
----@param state LayoutState
+---@param state ViewLayoutState
 function FileHistoryView:recover_layout(state)
   self.ready = false
 

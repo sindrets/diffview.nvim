@@ -1,7 +1,7 @@
 local Commit = require("diffview.git.commit").Commit
 local CountDownLatch = require("diffview.control").CountDownLatch
 local FileDict = require("diffview.git.file_dict").FileDict
-local FileEntry = require("diffview.views.file_entry").FileEntry
+local FileEntry = require("diffview.scene.file_entry").FileEntry
 local Job = require("plenary.job")
 local LogEntry = require("diffview.git.log_entry").LogEntry
 local Rev = require("diffview.git.rev").Rev
@@ -14,6 +14,10 @@ local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 
 local M = {}
+
+---@class GitContext
+---@field toplevel string Path to the top-level directory of the working tree.
+---@field dir string Path to the .git directory.
 
 local bootstrap = {
   done = false,
@@ -230,7 +234,7 @@ local function handle_co(thread, ok, result)
   return ok, result
 end
 
-local tracked_files = async.wrap(function(git_root, left, right, args, kind, callback)
+local tracked_files = async.wrap(function(toplevel, left, right, args, kind, callback)
   ---@type FileEntry[]
   local files = {}
   ---@type CountDownLatch
@@ -251,13 +255,13 @@ local tracked_files = async.wrap(function(git_root, left, right, args, kind, cal
   local namestat_job = Job:new({
     command = git_bin(),
     args = utils.vec_join(git_args(), "diff", "--ignore-submodules", "--name-status", args),
-    cwd = git_root,
+    cwd = toplevel,
     on_exit = on_exit
   })
   local numstat_job = Job:new({
     command = git_bin(),
     args = utils.vec_join(git_args(), "diff", "--ignore-submodules", "--numstat", args),
-    cwd = git_root,
+    cwd = toplevel,
     on_exit = on_exit
   })
 
@@ -299,7 +303,7 @@ local tracked_files = async.wrap(function(git_root, left, right, args, kind, cal
       FileEntry({
         path = name,
         oldpath = oldname,
-        absolute_path = utils.path:join(git_root, name),
+        absolute_path = utils.path:join(toplevel, name),
         status = status,
         stats = stats,
         kind = kind,
@@ -312,11 +316,11 @@ local tracked_files = async.wrap(function(git_root, left, right, args, kind, cal
   callback(nil, files)
 end, 6)
 
-local untracked_files = async.wrap(function(git_root, left, right, callback)
+local untracked_files = async.wrap(function(toplevel, left, right, callback)
   Job:new({
     command = git_bin(),
     args = utils.vec_join(git_args(), "ls-files", "--others", "--exclude-standard" ),
-    cwd = git_root,
+    cwd = toplevel,
     ---@type Job
     on_exit = function(j)
       utils.handle_job(j, {
@@ -338,7 +342,7 @@ local untracked_files = async.wrap(function(git_root, left, right, callback)
           files,
           FileEntry({
             path = s,
-            absolute_path = utils.path:join(git_root, s),
+            absolute_path = utils.path:join(toplevel, s),
             status = "?",
             kind = "working",
             left = left,
@@ -352,7 +356,7 @@ local untracked_files = async.wrap(function(git_root, left, right, callback)
 end, 4)
 
 ---Get a list of files modified between two revs.
----@param git_root string
+---@param toplevel string
 ---@param left Rev
 ---@param right Rev
 ---@param path_args string[]|nil
@@ -360,7 +364,7 @@ end, 4)
 ---@param callback function
 ---@return string[] err
 ---@return FileDict
-M.diff_file_list = async.wrap(function(git_root, left, right, path_args, opt, callback)
+M.diff_file_list = async.wrap(function(toplevel, left, right, path_args, opt, callback)
   ---@type FileDict
   local files = FileDict()
   ---@type CountDownLatch
@@ -369,7 +373,7 @@ M.diff_file_list = async.wrap(function(git_root, left, right, path_args, opt, ca
   local errors = {}
 
   tracked_files(
-    git_root,
+    toplevel,
     left,
     right,
     utils.vec_join(
@@ -389,7 +393,7 @@ M.diff_file_list = async.wrap(function(git_root, left, right, path_args, opt, ca
       files.working = tfiles
       local show_untracked = opt.show_untracked
       if show_untracked == nil then
-        show_untracked = M.show_untracked(git_root)
+        show_untracked = M.show_untracked(toplevel)
       end
 
       if not (show_untracked and M.has_local(left, right)) then
@@ -398,7 +402,7 @@ M.diff_file_list = async.wrap(function(git_root, left, right, path_args, opt, ca
       end
 
       ---@diagnostic disable-next-line: redefined-local
-      local err, ufiles = untracked_files(git_root, left, right)
+      local err, ufiles = untracked_files(toplevel, left, right)
       if err then
         errors[#errors+1] = err
         utils.err("Failed to get git status for untracked files!", true)
@@ -414,13 +418,13 @@ M.diff_file_list = async.wrap(function(git_root, left, right, path_args, opt, ca
     end
   )
 
-  if not (left.type == RevType.INDEX and right.type == RevType.LOCAL) then
+  if not (left.type == RevType.STAGE and right.type == RevType.LOCAL) then
     latch:count_down()
   else
-    local left_rev = M.head_rev(git_root) or Rev.new_null_tree()
-    local right_rev = Rev(RevType.INDEX)
+    local left_rev = M.head_rev(toplevel) or Rev.new_null_tree()
+    local right_rev = Rev(RevType.STAGE)
     tracked_files(
-      git_root,
+      toplevel,
       left_rev,
       right_rev,
       utils.vec_join(
@@ -500,12 +504,12 @@ local function structure_fh_data(namestat_data, numstat_data)
   }
 end
 
----@param git_root string
+---@param toplevel string
 ---@param path_args string[]
 ---@param single_file boolean
 ---@param log_opt LogOptions
 ---@param callback fun(status: JobStatus, data?: table, msg?: string[])
-local incremental_fh_data = async.void(function(git_root, path_args, single_file, log_opt, callback)
+local incremental_fh_data = async.void(function(toplevel, path_args, single_file, log_opt, callback)
   local options = prepare_fh_options(log_opt, single_file)
   local raw = {}
   local namestat_job, numstat_job, shutdown
@@ -577,7 +581,7 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
       "--",
       path_args
     ),
-    cwd = git_root,
+    cwd = toplevel,
     on_stdout = on_stdout,
     on_exit = on_exit,
   })
@@ -595,7 +599,7 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
       "--",
       path_args
     ),
-    cwd = git_root,
+    cwd = toplevel,
     on_stdout = on_stdout,
     on_exit = on_exit,
   })
@@ -626,10 +630,10 @@ local incremental_fh_data = async.void(function(git_root, path_args, single_file
   end
 end)
 
----@param git_root string
+---@param toplevel string
 ---@param log_opt LogOptions
 ---@param callback fun(status: JobStatus, data?: table, msg?: string[])
-local incremental_line_trace_data = async.void(function(git_root, log_opt, callback)
+local incremental_line_trace_data = async.void(function(toplevel, log_opt, callback)
   local options = prepare_fh_options(log_opt, true)
   local raw = {}
   local trace_job, shutdown
@@ -694,7 +698,7 @@ local incremental_line_trace_data = async.void(function(git_root, log_opt, callb
       options,
       "--"
     ),
-    cwd = git_root,
+    cwd = toplevel,
     on_stdout = on_stdout,
     on_exit = on_exit,
   })
@@ -721,11 +725,11 @@ local incremental_line_trace_data = async.void(function(git_root, log_opt, callb
   end
 end)
 
----@param git_root string
+---@param toplevel string
 ---@param path_args string[]
 ---@param lflags string[]
 ---@return boolean
-local function is_single_file(git_root, path_args, lflags)
+local function is_single_file(toplevel, path_args, lflags)
   if lflags and #lflags > 0 then
     local seen = {}
     for i, v in ipairs(lflags) do
@@ -736,10 +740,10 @@ local function is_single_file(git_root, path_args, lflags)
       seen[path] = true
     end
 
-  elseif path_args and git_root then
+  elseif path_args and toplevel then
     return #path_args == 1
         and not utils.path:is_directory(path_args[1])
-        and #M.exec_sync({ "ls-files", "--", path_args }, git_root) < 2
+        and #M.exec_sync({ "ls-files", "--", path_args }, toplevel) < 2
   end
 
   return true
@@ -747,7 +751,7 @@ end
 
 ---@class git.utils.ParseFHDataSpec
 ---@field thread thread
----@field git_root string
+---@field toplevel string
 ---@field path_args string[]
 ---@field log_options LogOptions
 ---@field opt git.utils.FileHistoryWorkerSpec
@@ -761,8 +765,8 @@ end
 ---@param state git.utils.ParseFHDataSpec
 ---@return boolean ok, JobStatus status?
 local function parse_fh_data(state)
-  local cur, single_file, log_options, git_root, thread, path_args, callback, opt, commit, entries
-      = state.cur, state.single_file, state.log_options, state.git_root, state.thread,
+  local cur, single_file, log_options, toplevel, thread, path_args, callback, opt, commit, entries
+      = state.cur, state.single_file, state.log_options, state.toplevel, state.thread,
         state.path_args, state.callback, state.opt, state.commit, state.entries
 
   -- 'git log --name-status' doesn't work properly for merge commits. It
@@ -784,7 +788,7 @@ local function parse_fh_data(state)
         "--",
         state.old_path or path_args
       ),
-      cwd = git_root,
+      cwd = toplevel,
       on_exit = function(j)
         if j.code == 0 then
           cur.namestat = j:result()
@@ -862,7 +866,7 @@ local function parse_fh_data(state)
       FileEntry({
         path = name,
         oldpath = oldname,
-        absolute_path = utils.path:join(git_root, name),
+        absolute_path = utils.path:join(toplevel, name),
         status = status,
         stats = stats,
         kind = "working",
@@ -893,8 +897,8 @@ end
 ---@param state git.utils.ParseFHDataSpec
 ---@return boolean ok
 local function parse_fh_line_trace_data(state)
-  local cur, single_file, git_root, path_args, callback, opt, commit, entries
-      = state.cur, state.single_file, state.git_root, state.path_args, state.callback,
+  local cur, single_file, toplevel, path_args, callback, opt, commit, entries
+      = state.cur, state.single_file, state.toplevel, state.path_args, state.callback,
         state.opt, state.commit, state.entries
 
   local files = {}
@@ -914,7 +918,7 @@ local function parse_fh_line_trace_data(state)
         FileEntry({
           path = b_path,
           oldpath = oldpath,
-          absolute_path = utils.path:join(git_root, b_path),
+          absolute_path = utils.path:join(toplevel, b_path),
           kind = "working",
           commit = commit,
           left = cur.left_hash and Rev(RevType.COMMIT, cur.left_hash) or Rev.new_null_tree(),
@@ -945,13 +949,13 @@ end
 ---@field base Rev
 
 ---@param thread thread
----@param git_root string
+---@param toplevel string
 ---@param path_args string[]
 ---@param log_opt ConfigLogOptions
 ---@param opt git.utils.FileHistoryWorkerSpec
 ---@param co_state table
 ---@param callback function
-local function file_history_worker(thread, git_root, path_args, log_opt, opt, co_state, callback)
+local function file_history_worker(thread, toplevel, path_args, log_opt, opt, co_state, callback)
   ---@type LogEntry[]
   local entries = {}
   local data = {}
@@ -959,7 +963,7 @@ local function file_history_worker(thread, git_root, path_args, log_opt, opt, co
   local last_status
   local err_msg
 
-  local single_file = is_single_file(git_root, path_args, log_opt.single_file.L)
+  local single_file = is_single_file(toplevel, path_args, log_opt.single_file.L)
 
   ---@type LogOptions
   local log_options = config.get_log_options(
@@ -972,7 +976,7 @@ local function file_history_worker(thread, git_root, path_args, log_opt, opt, co
   ---@type git.utils.ParseFHDataSpec
   local state = {
     thread = thread,
-    git_root = git_root,
+    toplevel = toplevel,
     path_args = path_args,
     log_options = log_options,
     opt = opt,
@@ -1001,9 +1005,9 @@ local function file_history_worker(thread, git_root, path_args, log_opt, opt, co
   end
 
   if is_trace then
-    incremental_line_trace_data(git_root, log_options, data_callback)
+    incremental_line_trace_data(toplevel, log_options, data_callback)
   else
-    incremental_fh_data(git_root, path_args, single_file, log_options, data_callback)
+    incremental_fh_data(toplevel, path_args, single_file, log_options, data_callback)
   end
 
   while true do
@@ -1053,13 +1057,13 @@ local function file_history_worker(thread, git_root, path_args, log_opt, opt, co
   callback(entries, JobStatus.SUCCESS)
 end
 
----@param git_root string
+---@param toplevel string
 ---@param path_args string[]
 ---@param log_opt ConfigLogOptions
 ---@param opt git.utils.FileHistoryWorkerSpec
 ---@param callback function
 ---@return fun() finalizer
-function M.file_history(git_root, path_args, log_opt, opt, callback)
+function M.file_history(toplevel, path_args, log_opt, opt, callback)
   local thread
 
   local co_state = {
@@ -1067,7 +1071,7 @@ function M.file_history(git_root, path_args, log_opt, opt, callback)
   }
 
   thread = coroutine.create(function()
-    file_history_worker(thread, git_root, path_args, log_opt, opt, co_state, callback)
+    file_history_worker(thread, toplevel, path_args, log_opt, opt, co_state, callback)
   end)
 
   handle_co(thread, coroutine.resume(thread))
@@ -1077,12 +1081,12 @@ function M.file_history(git_root, path_args, log_opt, opt, callback)
   end
 end
 
----@param git_root string
+---@param toplevel string
 ---@param path_args string[]
 ---@param log_opt LogOptions
 ---@return boolean ok, string description
-function M.file_history_dry_run(git_root, path_args, log_opt)
-  local single_file = is_single_file(git_root, path_args, log_opt.L)
+function M.file_history_dry_run(toplevel, path_args, log_opt)
+  local single_file = is_single_file(toplevel, path_args, log_opt.L)
   local log_options = config.get_log_options(single_file, log_opt)
 
   local options = vim.tbl_map(function(v)
@@ -1090,7 +1094,7 @@ function M.file_history_dry_run(git_root, path_args, log_opt)
   end, prepare_fh_options(log_options, single_file))
 
   local description = utils.vec_join(
-    ("Top-level path: '%s'"):format(utils.path:vim_fnamemodify(git_root, ":~")),
+    ("Top-level path: '%s'"):format(utils.path:vim_fnamemodify(toplevel, ":~")),
     log_options.rev_range and ("Revision range: '%s'"):format(log_options.rev_range) or nil,
     ("Flags: %s"):format(table.concat(options, " "))
   )
@@ -1111,7 +1115,7 @@ function M.file_history_dry_run(git_root, path_args, log_opt)
   end
 
   local out, code = M.exec_sync(cmd, {
-    cwd = git_root,
+    cwd = toplevel,
     debug_opt = {
       context = context,
       no_stdout = true,
@@ -1154,9 +1158,9 @@ function M.rev_to_args(left, right)
 
   if left.type == RevType.COMMIT and right.type == RevType.COMMIT then
     return { left.commit .. ".." .. right.commit }
-  elseif left.type == RevType.INDEX and right.type == RevType.LOCAL then
+  elseif left.type == RevType.STAGE and right.type == RevType.LOCAL then
     return {}
-  elseif left.type == RevType.COMMIT and right.type == RevType.INDEX then
+  elseif left.type == RevType.COMMIT and right.type == RevType.STAGE then
     return { "--cached", left.commit }
   else
     return { left.commit }
@@ -1178,12 +1182,12 @@ function M.rev_to_pretty_string(left, right)
   return nil
 end
 
----@param git_root string
+---@param toplevel string
 ---@return Rev
-function M.head_rev(git_root)
+function M.head_rev(toplevel)
   local out, code = M.exec_sync(
     { "rev-parse", "HEAD", "--" },
-    { cwd = git_root, retry_on_empty = 2 }
+    { cwd = toplevel, retry_on_empty = 2 }
   )
   if code ~= 0 then
     return
@@ -1193,11 +1197,11 @@ function M.head_rev(git_root)
 end
 
 ---Parse two endpoint, commit revs from a symmetric difference notated rev arg.
----@param git_root string
+---@param toplevel string
 ---@param rev_arg string
 ---@return Rev left The left rev.
 ---@return Rev right The right rev.
-function M.symmetric_diff_revs(git_root, rev_arg)
+function M.symmetric_diff_revs(toplevel, rev_arg)
   local r1 = rev_arg:match("(.+)%.%.%.") or "HEAD"
   local r2 = rev_arg:match("%.%.%.(.+)") or "HEAD"
   local out, code, stderr
@@ -1210,13 +1214,13 @@ function M.symmetric_diff_revs(git_root, rev_arg)
     ))
   end
 
-  out, code, stderr = M.exec_sync({ "merge-base", r1, r2 }, git_root)
+  out, code, stderr = M.exec_sync({ "merge-base", r1, r2 }, toplevel)
   if code ~= 0 then
     return err()
   end
   local left_hash = out[1]:gsub("^%^", "")
 
-  out, code, stderr = M.exec_sync({ "rev-parse", "--revs-only", r2 }, git_root)
+  out, code, stderr = M.exec_sync({ "rev-parse", "--revs-only", r2 }, toplevel)
   if code ~= 0 then
     return err()
   end
@@ -1247,7 +1251,7 @@ function M.git_dir(path)
   return out[1] and vim.trim(out[1])
 end
 
-M.show = async.wrap(function(git_root, args, callback)
+M.show = async.wrap(function(toplevel, args, callback)
   local job = Job:new({
     command = git_bin(),
     args = utils.vec_join(
@@ -1255,11 +1259,13 @@ M.show = async.wrap(function(git_root, args, callback)
       "show",
       args
     ),
-    cwd = git_root,
+    cwd = toplevel,
     ---@type Job
     on_exit = async.void(function(j)
+      local context = "git.utils.show()"
+      utils.handle_job(j, { fail_on_empty = true, context = context })
+
       if j.code ~= 0 then
-        utils.handle_job(j)
         callback(j:stderr_result() or {}, nil)
         return
       end
@@ -1268,7 +1274,7 @@ M.show = async.wrap(function(git_root, args, callback)
 
       if #j:result() == 0 then
         async.util.scheduler()
-        out_status = ensure_output(2, { j }, "git.utils.show()")
+        out_status = ensure_output(2, { j }, context)
       end
 
       if out_status == JobStatus.ERROR then
@@ -1292,10 +1298,10 @@ function M.pathspec_split(pathspec)
   return magic or "", pattern or ""
 end
 
-function M.pathspec_expand(git_root, cwd, pathspec)
+function M.pathspec_expand(toplevel, cwd, pathspec)
   local magic, pattern = M.pathspec_split(pathspec)
   if not utils.path:is_abs(pattern) then
-    pattern = utils.path:join(utils.path:relative(cwd, git_root), pattern)
+    pattern = utils.path:join(utils.path:relative(cwd, toplevel), pattern)
   end
   return magic .. utils.path:convert(pattern)
 end
@@ -1314,15 +1320,15 @@ function M.has_local(left, right)
 end
 
 ---Strange trick to check if a file is binary using only git.
----@param git_root string
+---@param toplevel string
 ---@param path string
 ---@param rev Rev
 ---@return boolean -- True if the file was binary for the given rev, or it didn't exist.
-function M.is_binary(git_root, path, rev)
+function M.is_binary(toplevel, path, rev)
   local cmd = { "-c", "submodule.recurse=false", "grep", "-I", "--name-only", "-e", "." }
   if rev.type == RevType.LOCAL then
     cmd[#cmd+1] = "--untracked"
-  elseif rev.type == RevType.INDEX then
+  elseif rev.type == RevType.STAGE then
     cmd[#cmd+1] = "--cached"
   else
     cmd[#cmd+1] = rev.commit
@@ -1330,30 +1336,30 @@ function M.is_binary(git_root, path, rev)
 
   utils.vec_push(cmd, "--", path)
 
-  local _, code = M.exec_sync(cmd, { cwd = git_root, silent = true })
+  local _, code = M.exec_sync(cmd, { cwd = toplevel, silent = true })
   return code ~= 0
 end
 
 ---Check if status for untracked files is disabled for a given git repo.
----@param git_root string
+---@param toplevel string
 ---@return boolean
-function M.show_untracked(git_root)
+function M.show_untracked(toplevel)
   local out = M.exec_sync(
     { "config", "--type=bool", "status.showUntrackedFiles" },
-    { cwd = git_root, silent = true }
+    { cwd = toplevel, silent = true }
   )
   return vim.trim(out[1] or "") ~= "false"
 end
 
 ---Get the diff status letter for a file for a given rev.
----@param git_root string
+---@param toplevel string
 ---@param path string
 ---@param rev_arg string
 ---@return string?
-function M.get_file_status(git_root, path, rev_arg)
+function M.get_file_status(toplevel, path, rev_arg)
   local out, code = M.exec_sync(
     { "diff", "--name-status", rev_arg, "--", path },
-    git_root
+    toplevel
   )
   if code == 0 and (out[1] and #out[1] > 0) then
     return out[1]:sub(1, 1)
@@ -1361,12 +1367,12 @@ function M.get_file_status(git_root, path, rev_arg)
 end
 
 ---Get diff stats for a file for a given rev.
----@param git_root string
+---@param toplevel string
 ---@param path string
 ---@param rev_arg string
 ---@return GitStats
-function M.get_file_stats(git_root, path, rev_arg)
-  local out, code = M.exec_sync({ "diff", "--numstat", rev_arg, "--", path }, git_root)
+function M.get_file_stats(toplevel, path, rev_arg)
+  local out, code = M.exec_sync({ "diff", "--numstat", rev_arg, "--", path }, toplevel)
   if code == 0 and (out[1] and #out[1] > 0) then
     local stats = {
       additions = tonumber(out[1]:match("^%d+")),
@@ -1381,11 +1387,11 @@ function M.get_file_stats(git_root, path, rev_arg)
 end
 
 ---Verify that a given git rev is valid.
----@param git_root string
+---@param toplevel string
 ---@param rev_arg string
 ---@return boolean ok, string[] output
-function M.verify_rev_arg(git_root, rev_arg)
-  local out, code = M.exec_sync({ "rev-parse", "--revs-only", rev_arg }, git_root)
+function M.verify_rev_arg(toplevel, rev_arg)
+  local out, code = M.exec_sync({ "rev-parse", "--revs-only", rev_arg }, toplevel)
   return code == 0 and out[1] and out[1] ~= "", out
 end
 
@@ -1393,26 +1399,26 @@ end
 ---is given, unstaged files are restored to the state in index, and staged files
 ---are restored to the state in HEAD. The file will also be written into the
 ---object database such that the action can be undone.
----@param git_root string
+---@param toplevel string
 ---@param path string
 ---@param kind '"staged"'|'"working"'
 ---@param commit string
-M.restore_file = async.wrap(function(git_root, path, kind, commit, callback)
+M.restore_file = async.wrap(function(toplevel, path, kind, commit, callback)
   local out, code
-  local abs_path = utils.path:join(git_root, path)
+  local abs_path = utils.path:join(toplevel, path)
   local rel_path = utils.path:vim_fnamemodify(abs_path, ":~")
 
   -- Check if file exists in history
   _, code = M.exec_sync(
     { "cat-file", "-e", ("%s:%s"):format(kind == "staged" and "HEAD" or "", path) },
-    git_root
+    toplevel
   )
   local exists_git = code == 0
   local exists_local = utils.path:readable(abs_path)
 
   if exists_local then
     -- Wite file blob into db
-    out, code = M.exec_sync({ "hash-object", "-w", "--", path }, git_root)
+    out, code = M.exec_sync({ "hash-object", "-w", "--", path }, toplevel)
     if code ~= 0 then
       utils.err("Failed to write file blob into the object database. Aborting file restoration.", true)
       return callback()
@@ -1457,14 +1463,14 @@ M.restore_file = async.wrap(function(git_root, path, kind, commit, callback)
       -- File only exists in index
       out, code = M.exec_sync(
         { "rm", "-f", "--", path },
-        git_root
+        toplevel
       )
     end
   else
     -- File exists in history: checkout
     out, code = M.exec_sync(
       utils.vec_join("checkout", commit or (kind == "staged" and "HEAD" or nil), "--", path),
-      git_root
+      toplevel
     )
   end
   if code ~= 0 then

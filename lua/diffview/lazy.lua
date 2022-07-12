@@ -1,6 +1,6 @@
 local lazy = {}
 
----@class LazyModule : { [string] : any }
+---@class LazyModule : { [string] : unknown }
 ---@field __get fun(): any Load the module if needed, and return it.
 ---@field __loaded boolean Indicates that the module has been loaded.
 

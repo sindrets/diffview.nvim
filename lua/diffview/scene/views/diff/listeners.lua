@@ -89,11 +89,11 @@ return function(view)
       end
     end,
     open_commit_log = function()
-      if (view.left.type == RevType.INDEX and view.right.type == RevType.LOCAL)
+      if (view.left.type == RevType.STAGE and view.right.type == RevType.LOCAL)
         or (
           view.left.type == RevType.COMMIT
-          and vim.tbl_contains({ RevType.INDEX, RevType.LOCAL }, view.right.type)
-          and view.left:is_head(view.git_root)
+          and vim.tbl_contains({ RevType.STAGE, RevType.LOCAL }, view.right.type)
+          and view.left:is_head(view.git_toplevel)
         ) then
         utils.info("Changes not commited yet. No log available for these changes.")
         return
@@ -103,7 +103,7 @@ return function(view)
       view.commit_log_panel:update(rev_arg)
     end,
     toggle_stage_entry = function()
-      if not (view.left.type == RevType.INDEX and view.right.type == RevType.LOCAL) then
+      if not (view.left.type == RevType.STAGE and view.right.type == RevType.LOCAL) then
         return
       end
 
@@ -111,9 +111,9 @@ return function(view)
       if item then
         local code
         if item.kind == "working" then
-          _, code = git.exec_sync({ "add", item.path }, view.git_root)
+          _, code = git.exec_sync({ "add", item.path }, view.git_toplevel)
         elseif item.kind == "staged" then
-          _, code = git.exec_sync({ "reset", "--", item.path }, view.git_root)
+          _, code = git.exec_sync({ "reset", "--", item.path }, view.git_toplevel)
         end
 
         if code ~= 0 then
@@ -162,7 +162,7 @@ return function(view)
       end, view.files.working)
 
       if #args > 0 then
-        local _, code = git.exec_sync({ "add", args }, view.git_root)
+        local _, code = git.exec_sync({ "add", args }, view.git_toplevel)
 
         if code ~= 0 then
           utils.err("Failed to stage files!")
@@ -174,7 +174,7 @@ return function(view)
       end
     end,
     unstage_all = function()
-      local _, code = git.exec_sync({ "reset" }, view.git_root)
+      local _, code = git.exec_sync({ "reset" }, view.git_toplevel)
 
       if code ~= 0 then
         utils.err("Failed to unstage files!")
@@ -190,7 +190,7 @@ return function(view)
         utils.err("The right side of the diff is not local! Aborting file restoration.")
         return
       end
-      if not (view.left.type == RevType.INDEX) then
+      if not (view.left.type == RevType.STAGE) then
         commit = view.left.commit
       end
       local file = view:infer_cur_file()
@@ -200,7 +200,7 @@ return function(view)
           utils.err("The file is open with unsaved changes! Aborting file restoration.")
           return
         end
-        git.restore_file(view.git_root, file.path, file.kind, commit, function()
+        git.restore_file(view.git_toplevel, file.path, file.kind, commit, function()
           async.util.scheduler()
           view:update_files()
         end)

@@ -31,7 +31,7 @@ function CFileEntry:init(opt)
 end
 
 ---@Override
-function CFileEntry:load_buffers(git_root, left_winid, right_winid, callback)
+function CFileEntry:load_buffers(git_toplevel, left_winid, right_winid, callback)
   local splits = {
     {
       winid = left_winid,
@@ -112,7 +112,7 @@ function CFileEntry:load_buffers(git_root, left_winid, right_winid, callback)
         if split.rev.type == RevType.LOCAL then
           if split.null or CFileEntry.should_null(split.rev, self.status, split.pos) then
             local bn = CFileEntry._create_buffer(
-              git_root,
+              git_toplevel,
               split.rev,
               self.path,
               split.producer,
@@ -135,13 +135,13 @@ function CFileEntry:load_buffers(git_root, left_winid, right_winid, callback)
             on_ready()
           end
         elseif
-          vim.tbl_contains({ RevType.COMMIT, RevType.INDEX, RevType.CUSTOM }, split.rev.type)
+          vim.tbl_contains({ RevType.COMMIT, RevType.STAGE, RevType.CUSTOM }, split.rev.type)
         then
           -- Load custom file data
           local bn
           if self.oldpath and split.pos == "left" then
             bn = CFileEntry._create_buffer(
-              git_root,
+              git_toplevel,
               split.rev,
               self.oldpath,
               split.producer,
@@ -150,7 +150,7 @@ function CFileEntry:load_buffers(git_root, left_winid, right_winid, callback)
             )
           else
             bn = CFileEntry._create_buffer(
-              git_root,
+              git_toplevel,
               split.rev,
               self.path,
               split.producer,
@@ -177,7 +177,7 @@ end
 
 ---@static
 ---@Override
-function CFileEntry._create_buffer(git_root, rev, path, producer, null, callback)
+function CFileEntry._create_buffer(git_toplevel, rev, path, producer, null, callback)
   if null or type(producer) ~= "function" then
     callback()
     return CFileEntry._get_null_buffer()
@@ -188,14 +188,14 @@ function CFileEntry._create_buffer(git_root, rev, path, producer, null, callback
   local context
   if rev.type == RevType.COMMIT then
     context = rev:abbrev(11)
-  elseif rev.type == RevType.INDEX then
+  elseif rev.type == RevType.STAGE then
     context = ":0:"
   elseif rev.type == RevType.CUSTOM then
     context = "[diff]"
   end
 
   -- stylua: ignore
-  local fullname = utils.path:join("diffview://", git_root, ".git", context, path)
+  local fullname = utils.path:join("diffview://", git_toplevel, ".git", context, path)
   for option, value in pairs(FileEntry.bufopts) do
     api.nvim_buf_set_option(bn, option, value)
   end
@@ -206,7 +206,7 @@ function CFileEntry._create_buffer(git_root, rev, path, producer, null, callback
     local i = 1
     while not ok do
       -- stylua: ignore
-      fullname = utils.path:join("diffview://", git_root, ".git", context, i, path)
+      fullname = utils.path:join("diffview://", git_toplevel, ".git", context, i, path)
       ok = pcall(api.nvim_buf_set_name, bn, fullname)
       i = i + 1
     end

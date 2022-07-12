@@ -189,10 +189,10 @@ local function prepare_panel_cache(panel)
   cache[panel] = c
   c.root_path = panel.state.form == "column"
       and utils.path:shorten(
-        utils.path:vim_fnamemodify(panel.git_root, ":~"),
+        utils.path:vim_fnamemodify(panel.git_toplevel, ":~"),
         panel:get_config().width - 6
       )
-    or utils.path:vim_fnamemodify(panel.git_root, ":~")
+    or utils.path:vim_fnamemodify(panel.git_toplevel, ":~")
   c.args = table.concat(panel.raw_args, " ")
 end
 

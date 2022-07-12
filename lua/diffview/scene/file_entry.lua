@@ -104,18 +104,18 @@ function FileEntry:destroy()
 end
 
 ---Load the buffers.
----@param git_root string
+---@param git_toplevel string
 ---@param left_winid integer
 ---@param right_winid integer
 ---@param callback function
-function FileEntry:load_buffers(git_root, left_winid, right_winid, callback)
+function FileEntry:load_buffers(git_toplevel, left_winid, right_winid, callback)
   ---@type PerfTimer
   local perf = PerfTimer("[FileEntry] Buffer load")
 
   if not config.get_config().diff_binaries then
     if self.left_binary == nil then
-      self.left_binary = git.is_binary(git_root, self.oldpath or self.path, self.left)
-      self.right_binary = git.is_binary(git_root, self.path, self.right)
+      self.left_binary = git.is_binary(git_toplevel, self.oldpath or self.path, self.left)
+      self.right_binary = git.is_binary(git_toplevel, self.path, self.right)
       perf:lap("binary check")
     end
   end
@@ -198,7 +198,7 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid, callback)
       if not (split.bufid and api.nvim_buf_is_loaded(split.bufid)) then
         if split.rev.type == RevType.LOCAL then
           if split.binary or FileEntry.should_null(split.rev, self.status, split.pos) then
-            local bn = FileEntry._create_buffer(git_root, split.rev, self.path, true, on_ready)
+            local bn = FileEntry._create_buffer(git_toplevel, split.rev, self.path, true, on_ready)
             split.bufid = bn
             FileEntry._attach_buffer(split.bufid)
           else
@@ -215,16 +215,16 @@ function FileEntry:load_buffers(git_root, left_winid, right_winid, callback)
             end
             on_ready()
           end
-        elseif split.rev.type == RevType.COMMIT or split.rev.type == RevType.INDEX then
+        elseif split.rev.type == RevType.COMMIT or split.rev.type == RevType.STAGE then
           -- Create file from git
           local bn
           if self.oldpath and split.pos == "left" then
             bn = FileEntry._create_buffer(
-              git_root, split.rev, self.oldpath, split.binary, on_ready
+              git_toplevel, split.rev, self.oldpath, split.binary, on_ready
             )
           else
             bn = FileEntry._create_buffer(
-              git_root,
+              git_toplevel,
               split.rev,
               self.path,
               split.binary or FileEntry.should_null(split.rev, self.status, split.pos),
@@ -292,17 +292,17 @@ end
 
 function FileEntry:dispose_index_buffers()
   for _, split in ipairs({ "left", "right" }) do
-    if self[split].type == RevType.INDEX then
+    if self[split].type == RevType.STAGE then
       self:dispose_buffer(split)
     end
   end
 end
 
-function FileEntry:validate_index_buffers(git_root, git_dir, stat)
+function FileEntry:validate_index_buffers(git_toplevel, git_dir, stat)
   stat = stat or utils.path:stat(utils.path:join(git_dir, "index"))
   local cached_stat
-  if fstat_cache[git_root] then
-    cached_stat = fstat_cache[git_root].index
+  if fstat_cache[git_toplevel] then
+    cached_stat = fstat_cache[git_toplevel].index
   end
 
   if stat then
@@ -365,12 +365,12 @@ function FileEntry._get_null_buffer()
 end
 
 ---@static
----@param git_root string
+---@param git_toplevel string
 ---@param rev Rev
 ---@param path string
 ---@param null boolean
 ---@param callback function
-function FileEntry._create_buffer(git_root, rev, path, null, callback)
+function FileEntry._create_buffer(git_toplevel, rev, path, null, callback)
   if null then
     vim.schedule(callback)
     return FileEntry._get_null_buffer()
@@ -381,7 +381,7 @@ function FileEntry._create_buffer(git_root, rev, path, null, callback)
   local context
   if rev.type == RevType.COMMIT then
     context = rev:abbrev(11)
-  elseif rev.type == RevType.INDEX then
+  elseif rev.type == RevType.STAGE then
     context = ":0:"
   end
 
@@ -390,20 +390,20 @@ function FileEntry._create_buffer(git_root, rev, path, null, callback)
     api.nvim_buf_set_option(bn, option, value)
   end
 
-  local fullname = utils.path:join("diffview://", git_root, ".git", context, path)
+  local fullname = utils.path:join("diffview://", git_toplevel, ".git", context, path)
   local ok = pcall(api.nvim_buf_set_name, bn, fullname)
   if not ok then
     -- Resolve name conflict
     local i = 1
     repeat
       -- stylua: ignore
-      fullname = utils.path:join("diffview://", git_root, ".git", context, i, path)
+      fullname = utils.path:join("diffview://", git_toplevel, ".git", context, i, path)
       ok = pcall(api.nvim_buf_set_name, bn, fullname)
       i = i + 1
     until ok
   end
 
-  git.show(git_root, { (rev.commit or "") .. ":" .. path }, function(err, result)
+  git.show(git_toplevel, { (rev.commit or "") .. ":" .. path }, function(err, result)
     if not err then
       vim.schedule(function()
         if api.nvim_buf_is_valid(bn) then
@@ -543,13 +543,13 @@ function FileEntry._detach_buffer(bufid, force)
 end
 
 ---@static
-function FileEntry.update_index_stat(git_root, git_dir, stat)
+function FileEntry.update_index_stat(git_toplevel, git_dir, stat)
   stat = stat or utils.path:stat(utils.path:join(git_dir, "index"))
   if stat then
-    if not fstat_cache[git_root] then
-      fstat_cache[git_root] = {}
+    if not fstat_cache[git_toplevel] then
+      fstat_cache[git_toplevel] = {}
     end
-    fstat_cache[git_root].index = {
+    fstat_cache[git_toplevel].index = {
       mtime = stat.mtime.sec,
     }
   end

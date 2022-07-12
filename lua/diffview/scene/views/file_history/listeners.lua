@@ -45,8 +45,8 @@ return function(view)
           if l1 then
             l1 = tonumber(l1)
             lpath = utils.path:chain(lpath)
-                :normalize({ cwd = view.git_root, absolute = true })
-                :relative(view.git_root)
+                :normalize({ cwd = view.git_toplevel, absolute = true })
+                :relative(view.git_toplevel)
                 :get()
 
             print(l1, lpath)
@@ -74,7 +74,7 @@ return function(view)
           if file then
             ---@type DiffView
             local new_view = DiffView({
-              git_root = view.git_root,
+              git_toplevel = view.git_toplevel,
               rev_arg = git.rev_to_pretty_string(file.left, file.right),
               left = file.left,
               right = file.right,

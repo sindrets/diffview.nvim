@@ -11,12 +11,12 @@ local M = {}
 ---@class ERevType
 ---@field LOCAL RevType
 ---@field COMMIT RevType
----@field INDEX RevType
+---@field STAGE RevType
 ---@field CUSTOM RevType
 local RevType = oop.enum({
   "LOCAL",
   "COMMIT",
-  "INDEX",
+  "STAGE",
   "CUSTOM",
 })
 
@@ -51,18 +51,18 @@ function Rev:__tostring()
     return self.commit
   elseif self.type == RevType.LOCAL then
     return "LOCAL"
-  elseif self.type == RevType.INDEX then
-    return "INDEX"
+  elseif self.type == RevType.STAGE then
+    return "STAGE"
   elseif self.type == RevType.CUSTOM then
     return "CUSTOM"
   end
 end
 
 ---@param name string
----@param git_root? string
+---@param git_toplevel? string
 ---@return Rev
-function Rev.from_name(name, git_root)
-  local out, code = git.exec_sync({ "rev-parse", "--revs-only", name }, git_root)
+function Rev.from_name(name, git_toplevel)
+  local out, code = git.exec_sync({ "rev-parse", "--revs-only", name }, git_toplevel)
   if code ~= 0 then
     return
   end
@@ -70,12 +70,12 @@ function Rev.from_name(name, git_root)
   return Rev(RevType.COMMIT, out[1]:gsub("^%^", ""))
 end
 
----@param git_root string
+---@param git_toplevel string
 ---@return Rev
-function Rev.earliest_commit(git_root)
+function Rev.earliest_commit(git_toplevel)
   local out, code = git.exec_sync({
     "rev-list", "--max-parents=0", "--first-parent", "HEAD"
-  }, git_root)
+  }, git_toplevel)
 
   if code ~= 0 then
     return
@@ -95,14 +95,14 @@ function Rev:abbrev(length)
 end
 
 ---Determine if this rev is currently the head.
----@param git_root string
+---@param git_toplevel string
 ---@return boolean
-function Rev:is_head(git_root)
+function Rev:is_head(git_toplevel)
   if not self.type == RevType.COMMIT then
     return false
   end
 
-  local out, code = git.exec_sync({ "rev-parse", "HEAD", "--" }, git_root)
+  local out, code = git.exec_sync({ "rev-parse", "HEAD", "--" }, git_toplevel)
   if code ~= 0 or not (out[1] and out[1] ~= "") then
     return
   end

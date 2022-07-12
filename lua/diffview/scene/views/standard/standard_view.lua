@@ -72,9 +72,9 @@ end
 
 ---@Override
 ---Checks the state of the view layout.
----@return LayoutState
+---@return ViewLayoutState
 function StandardView:validate_layout()
-  ---@class LayoutState
+  ---@class ViewLayoutState
   ---@field tabpage boolean
   ---@field left_win boolean
   ---@field right_win boolean
@@ -90,7 +90,7 @@ end
 
 ---@Override
 ---Recover the layout after the user has messed it up.
----@param state LayoutState
+---@param state ViewLayoutState
 function StandardView:recover_layout(state)
   self.ready = false
 
