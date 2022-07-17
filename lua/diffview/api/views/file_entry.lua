@@ -20,7 +20,6 @@ local CFileEntry = oop.create_class("CFileEntry", FileEntry)
 
 ---CFileEntry constructor.
 ---@param opt any
----@return CFileEntry
 function CFileEntry:init(opt)
   self.super:init(opt)
   self.left_binary = opt.left_binary
@@ -30,7 +29,7 @@ function CFileEntry:init(opt)
   self.get_file_data = opt.get_file_data
 end
 
----@Override
+---@override
 function CFileEntry:load_buffers(git_toplevel, left_winid, right_winid, callback)
   local splits = {
     {
@@ -176,7 +175,7 @@ function CFileEntry:load_buffers(git_toplevel, left_winid, right_winid, callback
 end
 
 ---@static
----@Override
+---@override
 function CFileEntry._create_buffer(git_toplevel, rev, path, producer, null, callback)
   if null or type(producer) ~= "function" then
     callback()

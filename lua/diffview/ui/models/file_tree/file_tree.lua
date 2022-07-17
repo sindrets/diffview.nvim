@@ -19,9 +19,9 @@ local FileTree = oop.create_class("FileTree", Model)
 
 ---FileTree constructor
 ---@param files FileEntry[]|nil
----@return FileTree
 function FileTree:init(files)
   self.root = Node("__ROOT__")
+
   for _, file in ipairs(files) do
     self:add_file_entry(file)
   end
@@ -32,8 +32,9 @@ function FileTree:add_file_entry(file)
   local parts = utils.path:explode(file.path)
   local cur_node = self.root
 
-  -- Create missing intermediate pathname components
   local path = parts[1]
+
+  -- Create missing intermediate pathname components
   for i = 1, #parts - 1 do
     local name = parts[i]
 
@@ -66,6 +67,7 @@ local function combine_statuses(a, b)
   if a == " " or a == "?" or a == "!" or a == b then
     return b
   end
+
   return "M"
 end
 
@@ -77,12 +79,14 @@ function FileTree:update_statuses()
     end
 
     local parent_status = " "
+
     for _, child in ipairs(node.children) do
       local child_status = recurse(child)
       parent_status = combine_statuses(parent_status, child_status)
     end
 
     node.data.status = parent_status
+
     return parent_status
   end
 
@@ -137,6 +141,7 @@ function FileTree:create_comp_schema(data)
   for _, node in ipairs(self.root.children) do
     recurse(schema, node)
   end
+
   return schema
 end
 

@@ -40,7 +40,7 @@ end
 
 ---@param rev_arg string
 ---@param git_toplevel string
----@return Commit
+---@return Commit?
 function Commit.from_rev_arg(rev_arg, git_toplevel)
   local out, code = git.exec_sync({
     "show",
@@ -70,18 +70,21 @@ end
 
 ---@param rev Rev
 ---@param git_toplevel string
----@return Commit
+---@return Commit?
 function Commit.from_rev(rev, git_toplevel)
   assert(rev.type == RevType.COMMIT, "Rev must be of type COMMIT!")
+
   return Commit.from_rev_arg(rev.commit, git_toplevel)
 end
 
 function Commit.parse_time_offset(iso_date)
   local sign, h, m = vim.trim(iso_date):match("([+-])(%d%d):?(%d%d)$")
   local offset = tonumber(h) * 60 * 60 + tonumber(m) * 60
+
   if sign == "-" then
     offset = -offset
   end
+
   return offset
 end
 

@@ -16,6 +16,9 @@ M.last_draw_time = 0
 ---@field first integer 0 indexed, inclusive
 ---@field last integer Exclusive
 
+---@class HlList : { [integer]: HlData }
+---@field offset integer
+
 ---@class CompStruct : { [integer|string]: CompStruct }
 ---@field _name string
 ---@field comp RenderComponent
@@ -29,7 +32,7 @@ M.last_draw_time = 0
 ---@field context? table
 ---@field parent RenderComponent
 ---@field lines string[]
----@field hl HlData[]
+---@field hl HlList
 ---@field components RenderComponent[]
 ---@field lstart integer 0 indexed, Inclusive
 ---@field lend integer Exclusive
@@ -39,7 +42,6 @@ M.last_draw_time = 0
 local RenderComponent = oop.create_class("RenderComponent")
 
 ---RenderComponent constructor.
----@return RenderComponent
 function RenderComponent:init(name)
   self.name = name or RenderComponent.next_uid()
   self.lines = {}
@@ -58,6 +60,7 @@ local function create_subcomponents(parent, comp_struct, schema)
   for i, v in ipairs(schema) do
     v.name = v.name or RenderComponent.next_uid()
     local sub_comp = parent:create_component()
+    ---@cast sub_comp RenderComponent
     sub_comp.name = v.name
     sub_comp.context = v.context
     sub_comp.parent = parent
@@ -99,7 +102,8 @@ end
 
 ---Create and add a new component.
 ---@param schema? CompSchema
----@return RenderComponent|CompStruct
+---@overload fun(): RenderComponent
+---@overload fun(schema: CompSchema): CompStruct
 function RenderComponent:create_component(schema)
   local new_comp, comp_struct = RenderComponent.create_static_component(schema)
   new_comp.data_root = self.data_root
@@ -255,13 +259,12 @@ end
 
 ---@class RenderData : diffview.Object
 ---@field lines string[]
----@field hl HlData[]
+---@field hl HlList
 ---@field components RenderComponent[]
 ---@field namespace integer
 local RenderData = oop.create_class("RenderData")
 
 ---RenderData constructor.
----@return RenderData
 function RenderData:init(ns_name)
   self.lines = {}
   self.hl = {}

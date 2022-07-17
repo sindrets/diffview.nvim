@@ -232,6 +232,7 @@ function M.rev_candidates(git_toplevel, git_dir)
       return {}
     end
 
+    ---@cast git_toplevel string
     git_dir = git.git_dir(git_toplevel)
   end
 
@@ -297,7 +298,7 @@ end
 
 ---Completion for the git-log `-L` flag.
 ---@param arg_lead string
----@return string[]
+---@return string[]?
 function M.line_trace_completion(arg_lead)
   local range_end = arg_lead:match(".*:()")
 
@@ -328,6 +329,7 @@ M.completers = {
     local err, git_toplevel = lib.find_git_toplevel(top_indicators)
 
     if not err then
+      ---@cast git_toplevel string
       git_dir = git.git_dir(git_toplevel)
     end
 

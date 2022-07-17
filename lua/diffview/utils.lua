@@ -20,12 +20,6 @@ local M = {}
 
 local mapping_callbacks = {}
 local path_sep = package.config:sub(1, 1)
-local setlocal_opr_templates = {
-  set = [[setl ${option}=${value}]],
-  remove = [[exe 'setl ${option}-=${value}']],
-  append = [[exe 'setl ${option}=' . (&${option} == "" ? "" : &${option} . ",") . '${value}']],
-  prepend = [[exe 'setl ${option}=${value}' . (&${option} == "" ? "" : "," . &${option})]],
-}
 
 ---@type PathLib
 M.path = lazy.require("diffview.path", function(module)
@@ -127,6 +121,28 @@ function M.update_win(winid)
       error(err)
     end
   end
+end
+
+---Pick the argument at the given index. A negative number is indexed from the
+---end (`-1` is the last argument).
+---@param index integer
+---@param ... unknown
+---@return unknown
+function M.pick(index, ...)
+  local args = { ... }
+
+  if index < 0 then
+    index = #args - index + 1
+  end
+
+  return args[index]
+end
+
+---Get the first non-nil value among the given arguments.
+---@param ... unknown
+---@return unknown
+function M.sate(...)
+  return ({ ... })[1]
 end
 
 function M.clamp(value, min, max)
@@ -302,6 +318,7 @@ function M.handle_job(job, opt)
   if type(opt.log_func) == "string" then
     log_func = logger[opt.log_func]
   elseif type(opt.log_func) == "function" then
+    ---@diagnostic disable-next-line: cast-local-type
     log_func = opt.log_func
   end
 
@@ -415,45 +432,83 @@ function M.system_list(cmd, cwd_or_opt)
   return stdout, code, stderr
 end
 
----@class SetLocalSpec
+---Map of options that accept comma separated, list-like values, but don't work
+---correctly with Option:set(), Option:append(), Option:prepend(), and
+---Option:remove() (seemingly for legacy reasons).
+---WARN: This map is incomplete!
+local list_like_options = {
+  winhighlight = true,
+  listchars = true,
+  fillchars = true,
+}
+
+---@class utils.set_local.Opt
 ---@field method '"set"'|'"remove"'|'"append"'|'"prepend"' Assignment method. (default: "set")
 
----@class SetLocalListSpec : string[]
----@field opt SetLocalSpec
+---@class utils.set_local.ListSpec : string[]
+---@field opt utils.set_local.Opt
 
----HACK: workaround for inconsistent behavior from `vim.opt_local`.
----@see [Neovim issue](https://github.com/neovim/neovim/issues/14670)
+---@alias WindowOptions table<string, boolean|integer|string|utils.set_local.ListSpec>
+
 ---@param winids number[]|number Either a list of winids, or a single winid (0 for current window).
----@param option_map table<string, SetLocalListSpec|string|boolean>
----@param opt? SetLocalSpec
+---@param option_map WindowOptions
+---@param opt? utils.set_local.Opt
 function M.set_local(winids, option_map, opt)
   if type(winids) ~= "table" then
     winids = { winids }
   end
 
+  ---@cast opt -?
   opt = vim.tbl_extend("keep", opt or {}, { method = "set" })
 
-  local cmd
   for _, id in ipairs(winids) do
     api.nvim_win_call(id, function()
       for option, value in pairs(option_map) do
-        if type(value) == "boolean" then
-          cmd = string.format("setl %s%s", value and "" or "no", option)
-        else
-          ---@type SetLocalSpec
-          local o = opt
-          if type(value) == "table" then
-            o = vim.tbl_extend("force", opt, value.opt or {})
-            value = table.concat(value, ",")
+        local o = opt
+        local fullname = api.nvim_get_option_info(option).name
+        local is_list_like = list_like_options[fullname]
+        local cur_value = vim.o[fullname]
+
+        if type(value) == "table" then
+          if value.opt then
+            o = vim.tbl_extend("force", opt, value.opt)
           end
 
-          cmd = M.str_template(
-            setlocal_opr_templates[o.method],
-            { option = option, value = tostring(value):gsub("'", "''") }
-          )
+          if is_list_like then
+            value = table.concat(value, ",")
+          end
         end
 
-        vim.cmd(cmd)
+        if o.method == "set" then
+          vim.opt_local[option] = value
+
+        else
+          if o.method == "remove" then
+            if is_list_like then
+              vim.opt_local[fullname] = cur_value:gsub(",?" .. vim.pesc(value), "")
+            else
+              vim.opt_local[fullname]:remove(value)
+            end
+
+          elseif o.method == "append" then
+            if is_list_like then
+              vim.opt_local[fullname] = ("%s%s"):format(cur_value ~= "" and cur_value .. ",", value)
+            else
+              vim.opt_local[fullname]:append(value)
+            end
+
+          elseif o.method == "prepend" then
+            if is_list_like then
+              vim.opt_local[fullname] = ("%s%s%s"):format(
+                value,
+                cur_value ~= "" and "," or "",
+                cur_value
+              )
+            else
+              vim.opt_local[fullname]:prepend(value)
+            end
+          end
+        end
       end
     end)
   end
@@ -468,7 +523,7 @@ function M.unset_local(winids, option)
 
   for _, id in ipairs(winids) do
     api.nvim_win_call(id, function()
-      vim.cmd(string.format("set %s<", option))
+      vim.opt_local[option] = nil
     end)
   end
 end
@@ -485,9 +540,6 @@ end
 ---@param t `T`
 ---@return T
 function M.tbl_clone(t)
-  if not t then
-    return
-  end
   local clone = {}
 
   for k, v in pairs(t) do
@@ -582,7 +634,7 @@ function M.vec_slice(t, first, last)
 end
 
 ---Join multiple vectors into one.
----@vararg vector
+---@param ... any
 ---@return vector
 function M.vec_join(...)
   local result = {}
@@ -623,6 +675,7 @@ end
 ---Append any number of objects to the end of a vector. Pushing `nil`
 ---effectively does nothing.
 ---@param t vector
+---@param ... any
 ---@return vector t
 function M.vec_push(t, ...)
   local args = {...}
@@ -722,7 +775,7 @@ end
 ---buffer to the alt buffer if available, and then deletes it.
 ---@param force boolean Ignore unsaved changes.
 ---@param bn? integer
----@return boolean ok, string err
+---@return boolean ok, string? err
 function M.remove_buffer(force, bn)
   bn = bn or api.nvim_get_current_buf()
   if not force then
@@ -839,7 +892,7 @@ end
 
 ---@param prompt string
 ---@param opt InputCharSpec
----@return string Char
+---@return string? Char
 ---@return string Raw
 function M.input_char(prompt, opt)
   opt = vim.tbl_extend("keep", opt or {}, {
@@ -866,7 +919,9 @@ function M.input_char(prompt, opt)
   end
 
   local s = type(c) == "number" and vim.fn.nr2char(c) or nil
+  ---@type string
   local raw = type(c) == "number" and s or c
+
   return s, raw
 end
 
@@ -935,6 +990,19 @@ end
 function M.buf_map(bufid, t)
   local prepared = prepare_mapping(t)
   vim.api.nvim_buf_set_keymap(bufid, prepared[1], prepared[2], prepared[3], prepared[4])
+end
+
+---Open a temporary window.
+---@param bufnr? integer Buffer to display.
+---@param enter? boolean Enter the window.
+---@return integer winid The window handle, or 0 on error.
+function M.temp_win(bufnr, enter)
+  return api.nvim_open_win(bufnr or 0, not not enter, {
+    relative = "editor",
+    width = 1,
+    height = 1,
+    noautocmd = true,
+  })
 end
 
 local function merge(t, first, mid, last, comparator)

@@ -31,7 +31,6 @@ local Diff = oop.create_class("Diff")
 ---@param a any[]
 ---@param b any[]
 ---@param eql_fn function|nil
----@return Diff
 function Diff:init(a, b, eql_fn)
   self.a = a
   self.b = b

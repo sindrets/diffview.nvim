@@ -3,12 +3,20 @@ local oop = require("diffview.oop")
 local M = {}
 
 ---@class Model : diffview.Object
----@field create_comp_schema? fun(data: table): CompSchema
----@field render? fun(render_data: RenderData)
 local Model = oop.create_class("Model")
 
-Model:virtual("create_comp_schema")
-Model:virtual("render")
+---@diagnostic disable unused-local
+
+---@abstract
+---@param data table
+---@return CompSchema
+function Model:create_comp_schema(data) oop.abstract_stub() end
+
+---@abstract
+---@param render_data RenderData
+function Model:render(render_data) oop.abstract_stub() end
+
+---@diagnostic enable unused-local
 
 M.Model = Model
 return M

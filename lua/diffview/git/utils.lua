@@ -1,5 +1,6 @@
 local Commit = require("diffview.git.commit").Commit
 local CountDownLatch = require("diffview.control").CountDownLatch
+local Diff2Hor = require("diffview.scene.layouts.diff_2_hor").Diff2Hor
 local FileDict = require("diffview.git.file_dict").FileDict
 local FileEntry = require("diffview.scene.file_entry").FileEntry
 local Job = require("plenary.job")
@@ -10,7 +11,6 @@ local Semaphore = require("diffview.control").Semaphore
 local async = require("plenary.async")
 local config = require("diffview.config")
 local logger = require("diffview.logger")
-local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 
 local M = {}
@@ -32,19 +32,14 @@ local bootstrap = {
   },
 }
 
----@class JobStatus
----@field SUCCESS integer
----@field ERROR integer
----@field PROGRESS integer
----@field KILLED integer
----@field FATAL integer
-local JobStatus = oop.enum({
-  "SUCCESS",
-  "PROGRESS",
-  "ERROR",
-  "KILLED",
-  "FATAL",
-})
+---@enum JobStatus
+local JobStatus = {
+  SUCCESS = 1,
+  PROGRESS = 2,
+  ERROR = 3,
+  KILLED = 4,
+  FATAL = 5,
+}
 
 ---@type Job[]
 local sync_jobs = {}
@@ -234,7 +229,13 @@ local function handle_co(thread, ok, result)
   return ok, result
 end
 
-local tracked_files = async.wrap(function(toplevel, left, right, args, kind, callback)
+---@param ctx GitContext
+---@param left Rev
+---@param right Rev
+---@param args string[]
+---@param kind git.FileKind
+---@param callback function
+local tracked_files = async.wrap(function(ctx, left, right, args, kind, callback)
   ---@type FileEntry[]
   local files = {}
   ---@type CountDownLatch
@@ -255,13 +256,13 @@ local tracked_files = async.wrap(function(toplevel, left, right, args, kind, cal
   local namestat_job = Job:new({
     command = git_bin(),
     args = utils.vec_join(git_args(), "diff", "--ignore-submodules", "--name-status", args),
-    cwd = toplevel,
+    cwd = ctx.toplevel,
     on_exit = on_exit
   })
   local numstat_job = Job:new({
     command = git_bin(),
     args = utils.vec_join(git_args(), "diff", "--ignore-submodules", "--numstat", args),
-    cwd = toplevel,
+    cwd = ctx.toplevel,
     on_exit = on_exit
   })
 
@@ -298,39 +299,41 @@ local tracked_files = async.wrap(function(toplevel, left, right, args, kind, cal
       stats = nil
     end
 
-    table.insert(
-      files,
-      FileEntry({
-        path = name,
-        oldpath = oldname,
-        absolute_path = utils.path:join(toplevel, name),
-        status = status,
-        stats = stats,
-        kind = kind,
-        left = left,
-        right = right,
-      })
-    )
+    table.insert(files, FileEntry.for_d2(Diff2Hor, {
+      git_ctx = ctx,
+      path = name,
+      oldpath = oldname,
+      status = status,
+      stats = stats,
+      kind = kind,
+      rev_a = left,
+      rev_b = right,
+    }))
   end
 
   callback(nil, files)
 end, 6)
 
-local untracked_files = async.wrap(function(toplevel, left, right, callback)
+---@param ctx GitContext
+---@param left Rev
+---@param right Rev
+---@param callback function
+local untracked_files = async.wrap(function(ctx, left, right, callback)
   Job:new({
     command = git_bin(),
     args = utils.vec_join(git_args(), "ls-files", "--others", "--exclude-standard" ),
-    cwd = toplevel,
+    cwd = ctx.toplevel,
     ---@type Job
     on_exit = function(j)
       utils.handle_job(j, {
-          debug_opt = {
-            context = "git.utils>untracked_files()",
-            func = "s_debug",
-            debug_level = 1,
-            no_stdout = true,
-          }
-        })
+        debug_opt = {
+          context = "git.utils>untracked_files()",
+          func = "s_debug",
+          debug_level = 1,
+          no_stdout = true,
+        }
+      })
+
       if j.code ~= 0 then
         callback(j:stderr_result() or {}, nil)
         return
@@ -338,17 +341,14 @@ local untracked_files = async.wrap(function(toplevel, left, right, callback)
 
       local files = {}
       for _, s in ipairs(j:result()) do
-        table.insert(
-          files,
-          FileEntry({
-            path = s,
-            absolute_path = utils.path:join(toplevel, s),
-            status = "?",
-            kind = "working",
-            left = left,
-            right = right,
-          })
-        )
+        table.insert(files, FileEntry.for_d2(Diff2Hor, {
+          git_ctx = ctx,
+          path = s,
+          status = "?",
+          kind = "working",
+          rev_a = left,
+          rev_b = right,
+        }))
       end
       callback(nil, files)
     end
@@ -356,15 +356,15 @@ local untracked_files = async.wrap(function(toplevel, left, right, callback)
 end, 4)
 
 ---Get a list of files modified between two revs.
----@param toplevel string
+---@param ctx GitContext
 ---@param left Rev
 ---@param right Rev
 ---@param path_args string[]|nil
 ---@param opt DiffViewOptions
 ---@param callback function
----@return string[] err
----@return FileDict
-M.diff_file_list = async.wrap(function(toplevel, left, right, path_args, opt, callback)
+---@return string[]? err
+---@return FileDict?
+M.diff_file_list = async.wrap(function(ctx, left, right, path_args, opt, callback)
   ---@type FileDict
   local files = FileDict()
   ---@type CountDownLatch
@@ -373,7 +373,7 @@ M.diff_file_list = async.wrap(function(toplevel, left, right, path_args, opt, ca
   local errors = {}
 
   tracked_files(
-    toplevel,
+    ctx,
     left,
     right,
     utils.vec_join(
@@ -390,10 +390,10 @@ M.diff_file_list = async.wrap(function(toplevel, left, right, path_args, opt, ca
         return
       end
 
-      files.working = tfiles
+      files:set_working(tfiles)
       local show_untracked = opt.show_untracked
       if show_untracked == nil then
-        show_untracked = M.show_untracked(toplevel)
+        show_untracked = M.show_untracked(ctx.toplevel)
       end
 
       if not (show_untracked and M.has_local(left, right)) then
@@ -402,13 +402,13 @@ M.diff_file_list = async.wrap(function(toplevel, left, right, path_args, opt, ca
       end
 
       ---@diagnostic disable-next-line: redefined-local
-      local err, ufiles = untracked_files(toplevel, left, right)
+      local err, ufiles = untracked_files(ctx, left, right)
       if err then
         errors[#errors+1] = err
         utils.err("Failed to get git status for untracked files!", true)
         latch:count_down()
       else
-        files.working = utils.vec_join(files.working, ufiles)
+        files:set_working(utils.vec_join(files.working, ufiles))
 
         utils.merge_sort(files.working, function(a, b)
           return a.path:lower() < b.path:lower()
@@ -421,10 +421,10 @@ M.diff_file_list = async.wrap(function(toplevel, left, right, path_args, opt, ca
   if not (left.type == RevType.STAGE and right.type == RevType.LOCAL) then
     latch:count_down()
   else
-    local left_rev = M.head_rev(toplevel) or Rev.new_null_tree()
+    local left_rev = M.head_rev(ctx.toplevel) or Rev.new_null_tree()
     local right_rev = Rev(RevType.STAGE)
     tracked_files(
-      toplevel,
+      ctx,
       left_rev,
       right_rev,
       utils.vec_join(
@@ -441,7 +441,7 @@ M.diff_file_list = async.wrap(function(toplevel, left, right, path_args, opt, ca
           latch:count_down()
           return
         end
-        files.staged = tfiles
+        files:set_staged(tfiles)
         latch:count_down()
       end
     )
@@ -742,7 +742,7 @@ local function is_single_file(toplevel, path_args, lflags)
 
   elseif path_args and toplevel then
     return #path_args == 1
-        and not utils.path:is_directory(path_args[1])
+        and not utils.path:is_dir(path_args[1])
         and #M.exec_sync({ "ls-files", "--", path_args }, toplevel) < 2
   end
 
@@ -751,7 +751,7 @@ end
 
 ---@class git.utils.ParseFHDataSpec
 ---@field thread thread
----@field toplevel string
+---@field ctx GitContext
 ---@field path_args string[]
 ---@field log_options LogOptions
 ---@field opt git.utils.FileHistoryWorkerSpec
@@ -763,10 +763,10 @@ end
 ---@field callback function
 
 ---@param state git.utils.ParseFHDataSpec
----@return boolean ok, JobStatus status?
+---@return boolean ok, JobStatus? status
 local function parse_fh_data(state)
-  local cur, single_file, log_options, toplevel, thread, path_args, callback, opt, commit, entries
-      = state.cur, state.single_file, state.log_options, state.toplevel, state.thread,
+  local cur, single_file, log_options, ctx, thread, path_args, callback, opt, commit, entries
+      = state.cur, state.single_file, state.log_options, state.ctx, state.thread,
         state.path_args, state.callback, state.opt, state.commit, state.entries
 
   -- 'git log --name-status' doesn't work properly for merge commits. It
@@ -788,7 +788,7 @@ local function parse_fh_data(state)
         "--",
         state.old_path or path_args
       ),
-      cwd = toplevel,
+      cwd = ctx.toplevel,
       on_exit = function(j)
         if j.code == 0 then
           cur.namestat = j:result()
@@ -861,20 +861,17 @@ local function parse_fh_data(state)
       stats = nil
     end
 
-    table.insert(
-      files,
-      FileEntry({
-        path = name,
-        oldpath = oldname,
-        absolute_path = utils.path:join(toplevel, name),
-        status = status,
-        stats = stats,
-        kind = "working",
-        commit = commit,
-        left = cur.left_hash and Rev(RevType.COMMIT, cur.left_hash) or Rev.new_null_tree(),
-        right = opt.base or Rev(RevType.COMMIT, cur.right_hash),
-      })
-    )
+    table.insert(files, FileEntry.for_d2(Diff2Hor, {
+      git_ctx = ctx,
+      path = name,
+      oldpath = oldname,
+      status = status,
+      stats = stats,
+      kind = "working",
+      commit = commit,
+      rev_a = cur.left_hash and Rev(RevType.COMMIT, cur.left_hash) or Rev.new_null_tree(),
+      rev_b = opt.base or Rev(RevType.COMMIT, cur.right_hash),
+    }))
   end
 
   if files[1] then
@@ -897,8 +894,8 @@ end
 ---@param state git.utils.ParseFHDataSpec
 ---@return boolean ok
 local function parse_fh_line_trace_data(state)
-  local cur, single_file, toplevel, path_args, callback, opt, commit, entries
-      = state.cur, state.single_file, state.toplevel, state.path_args, state.callback,
+  local cur, single_file, ctx, path_args, callback, opt, commit, entries
+      = state.cur, state.single_file, state.ctx, state.path_args, state.callback,
         state.opt, state.commit, state.entries
 
   local files = {}
@@ -913,18 +910,15 @@ local function parse_fh_line_trace_data(state)
         state.old_path = oldpath
       end
 
-      table.insert(
-        files,
-        FileEntry({
-          path = b_path,
-          oldpath = oldpath,
-          absolute_path = utils.path:join(toplevel, b_path),
-          kind = "working",
-          commit = commit,
-          left = cur.left_hash and Rev(RevType.COMMIT, cur.left_hash) or Rev.new_null_tree(),
-          right = opt.base or Rev(RevType.COMMIT, cur.right_hash),
-        })
-      )
+      table.insert(files, FileEntry.for_d2(Diff2Hor, {
+        git_ctx = ctx,
+        path = b_path,
+        oldpath = oldpath,
+        kind = "working",
+        commit = commit,
+        rev_a = cur.left_hash and Rev(RevType.COMMIT, cur.left_hash) or Rev.new_null_tree(),
+        rev_b = opt.base or Rev(RevType.COMMIT, cur.right_hash),
+      }))
     end
   end
 
@@ -949,13 +943,13 @@ end
 ---@field base Rev
 
 ---@param thread thread
----@param toplevel string
+---@param ctx GitContext
 ---@param path_args string[]
 ---@param log_opt ConfigLogOptions
 ---@param opt git.utils.FileHistoryWorkerSpec
 ---@param co_state table
 ---@param callback function
-local function file_history_worker(thread, toplevel, path_args, log_opt, opt, co_state, callback)
+local function file_history_worker(thread, ctx, path_args, log_opt, opt, co_state, callback)
   ---@type LogEntry[]
   local entries = {}
   local data = {}
@@ -963,7 +957,7 @@ local function file_history_worker(thread, toplevel, path_args, log_opt, opt, co
   local last_status
   local err_msg
 
-  local single_file = is_single_file(toplevel, path_args, log_opt.single_file.L)
+  local single_file = is_single_file(ctx.toplevel, path_args, log_opt.single_file.L)
 
   ---@type LogOptions
   local log_options = config.get_log_options(
@@ -976,7 +970,7 @@ local function file_history_worker(thread, toplevel, path_args, log_opt, opt, co
   ---@type git.utils.ParseFHDataSpec
   local state = {
     thread = thread,
-    toplevel = toplevel,
+    ctx = ctx,
     path_args = path_args,
     log_options = log_options,
     opt = opt,
@@ -1005,9 +999,9 @@ local function file_history_worker(thread, toplevel, path_args, log_opt, opt, co
   end
 
   if is_trace then
-    incremental_line_trace_data(toplevel, log_options, data_callback)
+    incremental_line_trace_data(ctx.toplevel, log_options, data_callback)
   else
-    incremental_fh_data(toplevel, path_args, single_file, log_options, data_callback)
+    incremental_fh_data(ctx.toplevel, path_args, single_file, log_options, data_callback)
   end
 
   while true do
@@ -1057,13 +1051,13 @@ local function file_history_worker(thread, toplevel, path_args, log_opt, opt, co
   callback(entries, JobStatus.SUCCESS)
 end
 
----@param toplevel string
+---@param ctx GitContext
 ---@param path_args string[]
 ---@param log_opt ConfigLogOptions
 ---@param opt git.utils.FileHistoryWorkerSpec
 ---@param callback function
 ---@return fun() finalizer
-function M.file_history(toplevel, path_args, log_opt, opt, callback)
+function M.file_history(ctx, path_args, log_opt, opt, callback)
   local thread
 
   local co_state = {
@@ -1071,7 +1065,7 @@ function M.file_history(toplevel, path_args, log_opt, opt, callback)
   }
 
   thread = coroutine.create(function()
-    file_history_worker(thread, toplevel, path_args, log_opt, opt, co_state, callback)
+    file_history_worker(thread, ctx, path_args, log_opt, opt, co_state, callback)
   end)
 
   handle_co(thread, coroutine.resume(thread))
@@ -1183,24 +1177,27 @@ function M.rev_to_pretty_string(left, right)
 end
 
 ---@param toplevel string
----@return Rev
+---@return Rev?
 function M.head_rev(toplevel)
   local out, code = M.exec_sync(
     { "rev-parse", "HEAD", "--" },
     { cwd = toplevel, retry_on_empty = 2 }
   )
+
   if code ~= 0 then
     return
   end
+
   local s = vim.trim(out[1]):gsub("^%^", "")
+
   return Rev(RevType.COMMIT, s, true)
 end
 
 ---Parse two endpoint, commit revs from a symmetric difference notated rev arg.
 ---@param toplevel string
 ---@param rev_arg string
----@return Rev left The left rev.
----@return Rev right The right rev.
+---@return Rev? left The left rev.
+---@return Rev? right The right rev.
 function M.symmetric_diff_revs(toplevel, rev_arg)
   local r1 = rev_arg:match("(.+)%.%.%.") or "HEAD"
   local r2 = rev_arg:match("%.%.%.(.+)") or "HEAD"
@@ -1229,9 +1226,9 @@ function M.symmetric_diff_revs(toplevel, rev_arg)
   return Rev(RevType.COMMIT, left_hash), Rev(RevType.COMMIT, right_hash)
 end
 
----Get the git root path of a given path.
+---Derive the top-level path of the working tree of the given path.
 ---@param path string
----@return string|nil
+---@return string?
 function M.toplevel(path)
   local out, code = M.exec_sync({ "rev-parse", "--path-format=absolute", "--show-toplevel" }, path)
   if code ~= 0 then
@@ -1249,6 +1246,18 @@ function M.git_dir(path)
     return nil
   end
   return out[1] and vim.trim(out[1])
+end
+
+---@param path string
+---@return GitContext?
+function M.git_context(path)
+  local toplevel = M.toplevel(path)
+  if toplevel then
+    return {
+      toplevel = toplevel,
+      dir = M.git_dir(toplevel),
+    }
+  end
 end
 
 M.show = async.wrap(function(toplevel, args, callback)
@@ -1370,9 +1379,10 @@ end
 ---@param toplevel string
 ---@param path string
 ---@param rev_arg string
----@return GitStats
+---@return GitStats?
 function M.get_file_stats(toplevel, path, rev_arg)
   local out, code = M.exec_sync({ "diff", "--numstat", rev_arg, "--", path }, toplevel)
+
   if code == 0 and (out[1] and #out[1] > 0) then
     local stats = {
       additions = tonumber(out[1]:match("^%d+")),
@@ -1380,8 +1390,9 @@ function M.get_file_stats(toplevel, path, rev_arg)
     }
 
     if not stats.additions or not stats.deletions then
-      stats = nil
+      return
     end
+
     return stats
   end
 end

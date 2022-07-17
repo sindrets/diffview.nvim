@@ -38,6 +38,7 @@ CommitLogPanel.default_config_float = function()
   c.height = math.min(24, viewport_height)
   c.col = math.floor(viewport_width * 0.5 - c.width * 0.5)
   c.row = math.floor(viewport_height * 0.5 - c.height * 0.5)
+
   return c
 end
 
@@ -53,6 +54,7 @@ function CommitLogPanel:init(git_toplevel, opt)
     bufname = opt.name,
     config = opt.config or get_user_config().commit_log_panel.win_config,
   })
+
   self.git_toplevel = git_toplevel
   self.args = opt.args or { "-n256" }
 
@@ -87,12 +89,14 @@ CommitLogPanel.update = async.void(function(self, args)
       end
 
       self.job_out = job:result()
+
       if not self:is_open() then
         self:init_buffer()
       else
         self:render()
         self:redraw()
       end
+
       self:focus()
       vim.cmd("norm! gg")
     end),
@@ -104,6 +108,7 @@ end
 
 function CommitLogPanel:render()
   self.render_data:clear()
+
   if self.job_out then
     self.render_data.lines = utils.vec_slice(self.job_out)
   end

@@ -37,8 +37,10 @@ for _, kind in ipairs({ "trace", "debug", "info", "warn", "error", "fatal" }) do
       if type(v) == "table" and type(v.__tostring) == "function" then
         return tostring(v)
       end
+
       return v
     end, utils.tbl_pack(...))
+
     logger[kind](utils.tbl_unpack(args))
   end)
 end
@@ -51,6 +53,7 @@ function logger.lvl(min_level)
   if DiffviewGlobal.debug_level >= min_level then
     return logger
   end
+
   return logger.mock
 end
 
@@ -84,6 +87,7 @@ function logger.log_job(job, opt)
   if type(opt.func) == "string" then
     log_func = logger[opt.func]
   elseif type(opt.func) == "function" then
+    ---@diagnostic disable-next-line: cast-local-type
     log_func = opt.func
   end
 

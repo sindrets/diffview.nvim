@@ -84,7 +84,7 @@ function CDiffView:init(opt)
   self.valid = true
 end
 
----@Override
+---@override
 CDiffView.get_updated_files = async.wrap(function(self, callback)
   local err
   callback = async.void(callback)

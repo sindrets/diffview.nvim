@@ -25,7 +25,7 @@ local M = setmetatable({}, {
 local function prepare_goto_file()
   local view = lib.get_current_view()
 
-  if not (view:instanceof(DiffView.__get()) or view:instanceof(FileHistoryView.__get())) then
+  if view and not (view:instanceof(DiffView.__get()) or view:instanceof(FileHistoryView.__get())) then
     return
   end
 
@@ -56,14 +56,17 @@ end
 
 function M.goto_file()
   local file, cursor = prepare_goto_file()
+
   if file then
     local target_tab = lib.get_prev_non_view_tabpage()
+
     if target_tab then
       api.nvim_set_current_tabpage(target_tab)
       vim.cmd("sp " .. vim.fn.fnameescape(file.absolute_path))
     else
       vim.cmd("tabe " .. vim.fn.fnameescape(file.absolute_path))
     end
+
     vim.cmd("diffoff")
 
     if cursor then
@@ -76,14 +79,17 @@ end
 
 function M.goto_file_edit()
   local file, cursor = prepare_goto_file()
+
   if file then
     local target_tab = lib.get_prev_non_view_tabpage()
+
     if target_tab then
       api.nvim_set_current_tabpage(target_tab)
       vim.cmd("e " .. vim.fn.fnameescape(file.absolute_path))
     else
       vim.cmd("tabe " .. vim.fn.fnameescape(file.absolute_path))
     end
+
     vim.cmd("diffoff")
 
     if cursor then
@@ -94,6 +100,7 @@ end
 
 function M.goto_file_split()
   local file, cursor = prepare_goto_file()
+
   if file then
     vim.cmd("sp " .. vim.fn.fnameescape(file.absolute_path))
     vim.cmd("diffoff")
@@ -106,6 +113,7 @@ end
 
 function M.goto_file_tab()
   local file, cursor = prepare_goto_file()
+
   if file then
     vim.cmd("tabe " .. vim.fn.fnameescape(file.absolute_path))
     vim.cmd("diffoff")
@@ -124,8 +132,10 @@ end
 function M.view_windo(cmd, targets)
   return function()
     local view = lib.get_current_view()
+
     if view then
       targets = targets or { left = true, right = true }
+
       for _, side in ipairs({ "left", "right" }) do
         if targets[side] then
           api.nvim_win_call(view[side .. "_winid"], function()
@@ -152,7 +162,9 @@ function M.scroll_view(distance)
 
   return function()
     local view = lib.get_current_view()
+
     if view then
+      --FIXME
       ---@cast view StandardView
       local left_clines = api.nvim_buf_line_count(api.nvim_win_get_buf(view.left_winid))
       local right_clines = api.nvim_buf_line_count(api.nvim_win_get_buf(view.right_winid))

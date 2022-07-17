@@ -45,7 +45,6 @@ FilePanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 ---@param git_toplevel string
 ---@param files FileEntry[]
 ---@param path_args string[]
----@return FilePanel
 function FilePanel:init(git_toplevel, files, path_args, rev_pretty_name)
   local conf = config.get_config()
   FilePanel:super().init(self, {
@@ -66,7 +65,7 @@ function FilePanel:init(git_toplevel, files, path_args, rev_pretty_name)
   })
 end
 
----@Override
+---@override
 function FilePanel:open()
   FilePanel:super().open(self)
   vim.cmd("wincmd =")

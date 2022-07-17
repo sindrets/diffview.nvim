@@ -177,7 +177,9 @@ M.log_option_defaults = {
 }
 
 function M.get_config()
-  return M._config
+  local conf = M._config
+  ---@cast conf -nil
+  return conf
 end
 
 ---@param single_file boolean
@@ -223,6 +225,7 @@ function M.setup(user_config)
   local old_win_config_spec = { "position", "width", "height" }
   for _, panel_name in ipairs({ "file_panel", "file_history_panel" }) do
     local panel_config = M._config[panel_name]
+      ---@cast panel_config table
     local notified = false
 
     for _, option in ipairs(old_win_config_spec) do

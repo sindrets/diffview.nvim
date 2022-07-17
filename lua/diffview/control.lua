@@ -31,11 +31,13 @@ end
 
 CountDownLatch.count_down = async.void(function(self)
   local permit = self.sem:acquire()
+
   if self.counter == 0 then
     -- The counter reached 0 while we were waiting for the permit
     permit:forget()
     return
   end
+
   self.counter = self.counter - 1
   permit:forget()
 

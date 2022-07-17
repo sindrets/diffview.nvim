@@ -65,7 +65,6 @@ FileHistoryPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 ---@param path_args string[]
 ---@param log_options LogOptions
 ---@param opt FileHistoryPanelSpec
----@return FileHistoryPanel
 function FileHistoryPanel:init(parent, git_toplevel, entries, path_args, raw_args, log_options, opt)
   local conf = config.get_config()
   FileHistoryPanel:super().init(self, {
@@ -101,13 +100,13 @@ function FileHistoryPanel:init(parent, git_toplevel, entries, path_args, raw_arg
   })
 end
 
----@Override
+---@override
 function FileHistoryPanel:open()
   FileHistoryPanel:super().open(self)
   vim.cmd("wincmd =")
 end
 
----@Override
+---@override
 function FileHistoryPanel:destroy()
   for _, entry in ipairs(self.entries) do
     entry:destroy()

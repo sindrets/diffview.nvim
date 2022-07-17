@@ -135,12 +135,14 @@ end
 function Panel:get_config()
   local subject = "Panel:get_config() -"
   local config
+
   if utils.is_callable(self.config_producer) then
     config = self.config_producer()
   elseif type(self.config_producer) == "table" then
     config = utils.tbl_deep_clone(self.config_producer)
   end
 
+  ---@cast config table
   local default_config = self:get_default_config(config.type)
   config = vim.tbl_extend("force", default_config, config or {})
 
@@ -254,7 +256,7 @@ function Panel:open()
   end
 
   self:resize()
-  utils.set_local(self.winid, self.class().winopts)
+  utils.set_local(self.winid, self:class().winopts)
 end
 
 function Panel:close()
@@ -263,6 +265,7 @@ function Panel:close()
     if #num_wins == 1 then
       -- Ensure that the tabpage doesn't close if the panel is the last window.
       vim.cmd("sp")
+      --FIXME
       FileEntry.load_null_buffer(0)
     elseif self:is_focused() then
       vim.cmd("wincmd p")
@@ -304,7 +307,7 @@ end
 function Panel:init_buffer()
   local bn = api.nvim_create_buf(false, false)
 
-  for k, v in pairs(self.class().bufopts) do
+  for k, v in pairs(self:class().bufopts) do
     api.nvim_buf_set_option(bn, k, v)
   end
 
@@ -438,6 +441,8 @@ function Panel:get_width()
   if self:is_open() then
     return api.nvim_win_get_width(self.winid)
   end
+
+  return -1
 end
 
 ---@return integer
@@ -445,6 +450,8 @@ function Panel:get_height()
   if self:is_open() then
     return api.nvim_win_get_height(self.winid)
   end
+
+  return -1
 end
 
 function Panel.next_uid()

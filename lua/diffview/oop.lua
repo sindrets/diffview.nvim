@@ -5,11 +5,13 @@
 
 local M = {}
 
+---@alias method fun(self: unknown, ...): unknown
+
 ---@class EnumValue : integer
 
 ---Enum creator
 ---@param t string[]
----@return table<string, EnumValue>
+---@return { [string]: integer }
 function M.enum(t)
   local enum = {}
   for i, v in ipairs(t) do
@@ -101,6 +103,23 @@ local function secure_cast(class, inst)
   return casted
 end
 
+---Get a dot separated path of class names indicating the hierarchy of inheritance.
+---@generic T : diffview.Class
+---@param class T
+---@return string
+local function class_path(class)
+  ---@cast class diffview.Class
+  local s
+  local cur = class
+
+  while cur do
+    s = ("%s%s%s"):format(cur:name(), s and "." or "", s or "")
+    cur = cur:super()
+  end
+
+  return s
+end
+
 local function inst_init_def(inst)
   inst.super:init()
 end
@@ -163,6 +182,17 @@ local function subclass(base_class, name)
     return res
   end
 
+  ---@class diffview.Class
+  ---@field static table
+  ---@field new method
+  ---@field subclass method
+  ---@field virtual method
+  ---@field cast method
+  ---@field trycast method
+  ---@field path method
+  ---@field name method
+  ---@field super method
+  ---@field isa method
   local class_internals = {
     static = inst_internals,
     new = new_instance,
@@ -170,6 +200,7 @@ local function subclass(base_class, name)
     virtual = make_virtual,
     cast = secure_cast,
     trycast = try_cast,
+    path = class_path,
     name = function(_)
       return name
     end,
@@ -205,12 +236,12 @@ local function subclass(base_class, name)
 end
 
 ---@class diffview.Object
----@field init function
----@field class function
----@field instanceof function
----@field virtual function
----@field super function
----@field subclass function
+---@field init method
+---@field class method
+---@field instanceof method
+---@field virtual method
+---@field super diffview.Object
+---@field subclass method
 local Object = {}
 
 local function obj_newitem()
@@ -267,6 +298,10 @@ setmetatable(Object, {
 function M.create_class(name, super_class)
   super_class = super_class or Object
   return super_class:subclass(name)
+end
+
+function M.abstract_stub()
+  error("Unimplemented abstract method!")
 end
 
 M.Object = Object

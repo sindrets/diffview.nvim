@@ -79,7 +79,7 @@ function FileHistoryView:post_open()
   end)
 end
 
----@Override
+---@override
 function FileHistoryView:close()
   if not self.closing then
     self.closing = true
@@ -155,7 +155,7 @@ function FileHistoryView:set_file(file, focus)
   end
 end
 
----@Override
+---@override
 ---Recover the layout after the user has messed it up.
 ---@param state ViewLayoutState
 function FileHistoryView:recover_layout(state)

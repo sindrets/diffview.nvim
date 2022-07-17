@@ -6,14 +6,17 @@ local M = {}
 ---@param no_trans? boolean Don't translate the syntax group (follow links).
 function M.get_hl_attr(name, attr, no_trans)
   local id = api.nvim_get_hl_id_by_name(name)
+
   if id and not no_trans then
     id = vim.fn.synIDtrans(id)
   end
+
   if not id then
     return
   end
 
   local value = vim.fn.synIDattr(id, attr)
+
   if not value or value == "" then
     return
   end
@@ -33,6 +36,7 @@ function M.get_fg(groups, no_trans)
       v = M.get_hl_attr(group, "fg", no_trans)
       if v then return v end
     end
+
     return
   end
 
@@ -62,9 +66,10 @@ end
 ---@param no_trans? boolean Don't translate the syntax group (follow links).
 function M.get_gui(groups, no_trans)
   no_trans = not not no_trans
+  local hls
+
   if type(groups) ~= "table" then groups = { groups } end
 
-  local hls
   for _, group in ipairs(groups) do
     hls = {}
     local attributes = {

@@ -49,7 +49,6 @@ return function(view)
                 :relative(view.git_toplevel)
                 :get()
 
-            print(l1, lpath)
             if lpath == cur.path then
               vim.fn.cursor(l1, 1)
               vim.cmd("norm! zt")
