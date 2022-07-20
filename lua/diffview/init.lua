@@ -37,7 +37,7 @@ end)
 ---@type FlagValueMap
 local comp_file_history = arg_parser.FlagValueMap()
 comp_file_history:put({ "base" }, function(_, arg_lead)
-  return M.rev_completion(arg_lead)
+  return utils.vec_join("LOCAL", M.rev_completion(arg_lead))
 end)
 comp_file_history:put({ "range" }, function(_, arg_lead)
   return M.rev_completion(arg_lead, { accept_range = true })
