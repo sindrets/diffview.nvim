@@ -139,7 +139,10 @@ return function(view)
     open_commit_log = function()
       local file = view:infer_cur_file()
       if file then
-        view.commit_log_panel:update(file.right.commit .. "^!")
+        local entry = view.panel:find_entry(file)
+        if entry then
+          view.commit_log_panel:update(entry.commit.hash .. "^!")
+        end
       end
     end,
     focus_files = function()
