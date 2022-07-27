@@ -2,7 +2,6 @@ local CommitLogPanel = require("diffview.ui.panels.commit_log_panel").CommitLogP
 local Diff = require("diffview.diff").Diff
 local EditToken = require("diffview.diff").EditToken
 local Event = require("diffview.events").Event
-local EventEmitter = require("diffview.events").EventEmitter
 local FileDict = require("diffview.git.file_dict").FileDict
 local FileEntry = require("diffview.scene.file_entry").FileEntry
 local FilePanel = require("diffview.scene.views.diff.file_panel").FilePanel
@@ -25,8 +24,7 @@ local M = {}
 ---@field selected_file? string Path to the preferred initially selected file.
 
 ---@class DiffView : StandardView
----@field git_toplevel string Absolute path the root of the git directory.
----@field git_dir string Absolute path to the '.git' directory.
+---@field git_ctx GitContext
 ---@field rev_arg string
 ---@field path_args string[]
 ---@field left Rev
@@ -42,53 +40,42 @@ local M = {}
 local DiffView = oop.create_class("DiffView", StandardView)
 
 ---DiffView constructor
----@return DiffView
 function DiffView:init(opt)
   self.valid = false
-  self.git_dir = git.git_dir(opt.git_toplevel)
-
-  if not self.git_dir then
-    utils.err(
-      ("Failed to find the git dir for the repository: %s")
-      :format(utils.str_quote(opt.git_toplevel))
-    )
-    return
-  end
-
-  self.emitter = EventEmitter()
-  self.layout_mode = DiffView.get_layout_mode()
-  self.ready = false
-  self.closing = false
-  self.nulled = false
-  self.winopts = { left = {}, right = {} }
-  self.initialized = false
-  self.git_toplevel = opt.git_toplevel
-  self.rev_arg = opt.rev_arg
+  self.files = FileDict()
+  self.git_ctx = opt.git_ctx
   self.path_args = opt.path_args
+  self.rev_arg = opt.rev_arg
   self.left = opt.left
   self.right = opt.right
+  self.initialized = false
   self.options = opt.options or {}
   self.options.selected_file = self.options.selected_file
-    and utils.path:chain(self.options.selected_file):absolute():relative(opt.git_toplevel):get()
-  self.files = FileDict()
-  self.panel = FilePanel(
-    self.git_toplevel,
-    self.files,
-    self.path_args,
-    self.rev_arg or git.rev_to_pretty_string(self.left, self.right)
-  )
-  FileEntry.update_index_stat(self.git_toplevel, self.git_dir)
+    and utils.path:chain(self.options.selected_file)
+        :absolute()
+        :relative(self.git_ctx.toplevel)
+        :get()
+
+  DiffView:super().init(self, {
+    panel = FilePanel(
+      self.git_ctx,
+      self.files,
+      self.path_args,
+      self.rev_arg or git.rev_to_pretty_string(self.left, self.right)
+    ),
+  })
+
   self.valid = true
 end
 
 function DiffView:post_open()
-  self.commit_log_panel = CommitLogPanel(self.git_toplevel, {
-    name = ("diffview://%s/log/%d/%s"):format(self.git_dir, self.tabpage, "commit_log"),
+  self.commit_log_panel = CommitLogPanel(self.git_ctx.toplevel, {
+    name = ("diffview://%s/log/%d/%s"):format(self.git_ctx.dir, self.tabpage, "commit_log"),
   })
 
   self.watcher = vim.loop.new_fs_poll()
   ---@diagnostic disable-next-line: unused-local
-  self.watcher:start(self.git_dir .. "/index", 1000, function(err, prev, cur)
+  self.watcher:start(self.git_ctx.dir .. "/index", 1000, function(err, prev, cur)
     if not err then
       vim.schedule(function()
         if self:is_cur_tabpage() then
@@ -108,7 +95,7 @@ function DiffView:post_open()
   end)
 end
 
----@Override
+---@override
 function DiffView:close()
   if not self.closing then
     self.closing = true
@@ -222,10 +209,12 @@ function DiffView:set_file_by_path(path, focus, highlight)
 end
 
 ---Get an updated list of files.
+---@param self DiffView
+---@param callback function
 ---@return string[] err
 ---@return FileDict
 DiffView.get_updated_files = async.wrap(function(self, callback)
-  git.diff_file_list(self.git_toplevel, self.left, self.right, self.path_args, self.options, callback)
+  git.diff_file_list(self.git_ctx, self.left, self.right, self.path_args, self.options, callback)
 end, 2)
 
 ---Update the file list, including stats and status for all files.
@@ -240,7 +229,7 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
     -- If left is tracking HEAD and right is LOCAL: Update HEAD rev.
     local new_head
     if self.left.track_head and self.right.type == RevType.LOCAL then
-      new_head = git.head_rev(self.git_toplevel)
+      new_head = git.head_rev(self.git_ctx.toplevel)
       if new_head and self.left.commit ~= new_head.commit then
         self.left = new_head
       else
@@ -249,7 +238,7 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
       perf:lap("updated head rev")
     end
 
-    local index_stat = utils.path:stat(utils.path:join(self.git_dir, "index"))
+    local index_stat = utils.path:stat(utils.path:join(self.git_ctx.dir, "index"))
     local last_winid = api.nvim_get_current_win()
     self:get_updated_files(function(err, new_files)
       if err then
@@ -365,7 +354,7 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
   end)
 ))
 
----@Override
+---@override
 ---Recover the layout after the user has messed it up.
 ---@param state ViewLayoutState
 function DiffView:recover_layout(state)
