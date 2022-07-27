@@ -1,6 +1,18 @@
-local oop = require("diffview.oop")
-local utils = require("diffview.utils")
-local EventEmitter = require("diffview.events").EventEmitter
+-- FIXME: Implement Diff2Ver
+
+local lazy = require("diffview.lazy")
+
+---@type Diff2Hor
+local Diff2Hor = lazy.access("diffview.scene.layouts.diff_2_hor", "Diff2Hor")
+---@type EventEmitter
+local EventEmitter = lazy.access("diffview.events", "EventEmitter")
+---@type git.File
+local File = lazy.access("diffview.git.file", "File")
+---@module "diffview.oop"
+local oop = lazy.require("diffview.oop")
+---@module "diffview.utils"
+local utils = lazy.require("diffview.utils")
+
 local api = vim.api
 local M = {}
 
@@ -17,27 +29,28 @@ local LayoutMode = oop.enum({
 ---@class View : diffview.Object
 ---@field tabpage integer
 ---@field emitter EventEmitter
----@field layout_mode LayoutMode
+---@field default_layout Layout (class)
 ---@field ready boolean
 ---@field closing boolean
----@field init_layout function Abstract
----@field post_open function Abstract
----@field validate_layout function Abstract
----@field recover_layout function Abstract
 local View = oop.create_class("View")
 
-View:virtual("init_layout")
-View:virtual("post_open")
-View:virtual("validate_layout")
-View:virtual("recover_layout")
+---@diagnostic disable unused-local
+
+---@abstract
+function View:init_layout() oop.abstract_stub() end
+
+---@abstract
+function View:post_open() oop.abstract_stub() end
+
+---@diagnostic enable unused-local
 
 ---View constructor
----@return View
-function View:init()
-  self.emitter = EventEmitter()
-  self.layout_mode = View.get_layout_mode()
-  self.ready = false
-  self.closing = false
+function View:init(opt)
+  opt = opt or {}
+  self.emitter = opt.emitter or EventEmitter()
+  self.default_layout = opt.default_layout or View.get_default_layout()
+  self.ready = utils.sate(opt.ready, false)
+  self.closing = utils.sate(opt.closing, false)
 end
 
 function View:open()
@@ -66,21 +79,24 @@ function View:is_cur_tabpage()
   return self.tabpage == api.nvim_get_current_tabpage()
 end
 
----Ensure both left and right windows exist in the view's tabpage.
-function View:ensure_layout()
-  local state = self:validate_layout()
-  if not state.valid then
-    self:recover_layout(state)
+---@return Diff2 # (class) The default layout class.
+function View.get_default_layout()
+  local diffopts = utils.str_split(vim.o.diffopt, ",")
+  if vim.tbl_contains(diffopts, "horizontal") then
+    -- return Diff2Ver
+    error("Not implemented!")
+  else
+    return Diff2Hor
   end
 end
 
-function View.get_layout_mode()
-  local diffopts = utils.str_split(vim.o.diffopt, ",")
-  if vim.tbl_contains(diffopts, "horizontal") then
-    return LayoutMode.VERTICAL
-  else
-    return LayoutMode.HORIZONTAL
-  end
+---@return Diff2
+function View.get_temp_layout()
+  local layout_class = View.get_default_layout()
+  return layout_class({
+    a = File.NULL_FILE,
+    b = File.NULL_FILE,
+  })
 end
 
 M.LayoutMode = LayoutMode

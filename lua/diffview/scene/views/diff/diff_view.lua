@@ -2,11 +2,9 @@ local CommitLogPanel = require("diffview.ui.panels.commit_log_panel").CommitLogP
 local Diff = require("diffview.diff").Diff
 local EditToken = require("diffview.diff").EditToken
 local Event = require("diffview.events").Event
-local EventEmitter = require("diffview.events").EventEmitter
 local FileDict = require("diffview.git.file_dict").FileDict
 local FileEntry = require("diffview.scene.file_entry").FileEntry
 local FilePanel = require("diffview.scene.views.diff.file_panel").FilePanel
-local LayoutMode = require("diffview.scene.view").LayoutMode
 local PerfTimer = require("diffview.perf").PerfTimer
 local RevType = require("diffview.git.rev").RevType
 local StandardView = require("diffview.scene.views.standard.standard_view").StandardView
@@ -25,8 +23,7 @@ local M = {}
 ---@field selected_file? string Path to the preferred initially selected file.
 
 ---@class DiffView : StandardView
----@field git_toplevel string Absolute path the root of the git directory.
----@field git_dir string Absolute path to the '.git' directory.
+---@field git_ctx GitContext
 ---@field rev_arg string
 ---@field path_args string[]
 ---@field left Rev
@@ -42,53 +39,42 @@ local M = {}
 local DiffView = oop.create_class("DiffView", StandardView)
 
 ---DiffView constructor
----@return DiffView
 function DiffView:init(opt)
   self.valid = false
-  self.git_dir = git.git_dir(opt.git_toplevel)
-
-  if not self.git_dir then
-    utils.err(
-      ("Failed to find the git dir for the repository: %s")
-      :format(utils.str_quote(opt.git_toplevel))
-    )
-    return
-  end
-
-  self.emitter = EventEmitter()
-  self.layout_mode = DiffView.get_layout_mode()
-  self.ready = false
-  self.closing = false
-  self.nulled = false
-  self.winopts = { left = {}, right = {} }
-  self.initialized = false
-  self.git_toplevel = opt.git_toplevel
-  self.rev_arg = opt.rev_arg
+  self.files = FileDict()
+  self.git_ctx = opt.git_ctx
   self.path_args = opt.path_args
+  self.rev_arg = opt.rev_arg
   self.left = opt.left
   self.right = opt.right
+  self.initialized = false
   self.options = opt.options or {}
   self.options.selected_file = self.options.selected_file
-    and utils.path:chain(self.options.selected_file):absolute():relative(opt.git_toplevel):get()
-  self.files = FileDict()
-  self.panel = FilePanel(
-    self.git_toplevel,
-    self.files,
-    self.path_args,
-    self.rev_arg or git.rev_to_pretty_string(self.left, self.right)
-  )
-  FileEntry.update_index_stat(self.git_toplevel, self.git_dir)
+    and utils.path:chain(self.options.selected_file)
+        :absolute()
+        :relative(self.git_ctx.toplevel)
+        :get()
+
+  DiffView:super().init(self, {
+    panel = FilePanel(
+      self.git_ctx,
+      self.files,
+      self.path_args,
+      self.rev_arg or git.rev_to_pretty_string(self.left, self.right)
+    ),
+  })
+
   self.valid = true
 end
 
 function DiffView:post_open()
-  self.commit_log_panel = CommitLogPanel(self.git_toplevel, {
-    name = ("diffview://%s/log/%d/%s"):format(self.git_dir, self.tabpage, "commit_log"),
+  self.commit_log_panel = CommitLogPanel(self.git_ctx.toplevel, {
+    name = ("diffview://%s/log/%d/%s"):format(self.git_ctx.dir, self.tabpage, "commit_log"),
   })
 
   self.watcher = vim.loop.new_fs_poll()
   ---@diagnostic disable-next-line: unused-local
-  self.watcher:start(self.git_dir .. "/index", 1000, function(err, prev, cur)
+  self.watcher:start(self.git_ctx.dir .. "/index", 1000, function(err, prev, cur)
     if not err then
       vim.schedule(function()
         if self:is_cur_tabpage() then
@@ -108,7 +94,7 @@ function DiffView:post_open()
   end)
 end
 
----@Override
+---@override
 function DiffView:close()
   if not self.closing then
     self.closing = true
@@ -121,6 +107,7 @@ function DiffView:close()
     for _, file in self.files:ipairs() do
       file:destroy()
     end
+
     self.commit_log_panel:destroy()
     DiffView:super().close(self)
   end
@@ -131,21 +118,20 @@ end
 ---@return FileEntry?
 function DiffView:next_file(highlight)
   self:ensure_layout()
-  if self:file_safeguard() then
-    return
-  end
+
+  if self:file_safeguard() then return end
 
   if self.files:len() > 1 or self.nulled then
     vim.cmd("diffoff!")
     local cur = self.panel:next_file()
+
     if cur then
       if highlight or not self.panel:is_focused() then
         self.panel:highlight_file(cur)
       end
+
       self.nulled = false
-      cur:load_buffers(self.git_toplevel, self.left_winid, self.right_winid, function()
-        self:update_windows()
-      end)
+      self:use_entry(cur)
 
       return cur
     end
@@ -157,21 +143,20 @@ end
 ---@return FileEntry?
 function DiffView:prev_file(highlight)
   self:ensure_layout()
-  if self:file_safeguard() then
-    return
-  end
+
+  if self:file_safeguard() then return end
 
   if self.files:len() > 1 or self.nulled then
     vim.cmd("diffoff!")
     local cur = self.panel:prev_file()
+
     if cur then
       if highlight or not self.panel:is_focused() then
         self.panel:highlight_file(cur)
       end
+
       self.nulled = false
-      cur:load_buffers(self.git_toplevel, self.left_winid, self.right_winid, function()
-        self:update_windows()
-      end)
+      self:use_entry(cur)
 
       return cur
     end
@@ -184,24 +169,23 @@ end
 ---@param highlight? boolean Bring the cursor to the file entry in the panel.
 function DiffView:set_file(file, focus, highlight)
   self:ensure_layout()
-  if self:file_safeguard() or not file then
-    return
-  end
+
+  if self:file_safeguard() or not file then return end
 
   for _, f in self.files:ipairs() do
     if f == file then
       vim.cmd("diffoff!")
       self.panel:set_cur_file(file)
+
       if highlight or not self.panel:is_focused() then
         self.panel:highlight_file(file)
       end
+
       self.nulled = false
-      file:load_buffers(self.git_toplevel, self.left_winid, self.right_winid, function()
-        self:update_windows()
-      end)
+      self:use_entry(file)
 
       if focus then
-        api.nvim_set_current_win(self.right_winid)
+        api.nvim_set_current_win(self.cur_layout:get_main_win().id)
       end
     end
   end
@@ -222,10 +206,13 @@ function DiffView:set_file_by_path(path, focus, highlight)
 end
 
 ---Get an updated list of files.
+---@param self DiffView
+---@param callback function
 ---@return string[] err
 ---@return FileDict
 DiffView.get_updated_files = async.wrap(function(self, callback)
-  git.diff_file_list(self.git_toplevel, self.left, self.right, self.path_args, self.options, callback)
+  ---@diagnostic disable-next-line: missing-return
+  git.diff_file_list(self.git_ctx, self.left, self.right, self.path_args, self.options, callback)
 end, 2)
 
 ---Update the file list, including stats and status for all files.
@@ -240,7 +227,7 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
     -- If left is tracking HEAD and right is LOCAL: Update HEAD rev.
     local new_head
     if self.left.track_head and self.right.type == RevType.LOCAL then
-      new_head = git.head_rev(self.git_toplevel)
+      new_head = git.head_rev(self.git_ctx.toplevel)
       if new_head and self.left.commit ~= new_head.commit then
         self.left = new_head
       else
@@ -249,7 +236,7 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
       perf:lap("updated head rev")
     end
 
-    local index_stat = utils.path:stat(utils.path:join(self.git_dir, "index"))
+    local index_stat = utils.path:stat(utils.path:join(self.git_ctx.dir, "index"))
     local last_winid = api.nvim_get_current_win()
     self:get_updated_files(function(err, new_files)
       if err then
@@ -269,6 +256,8 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
         async.util.scheduler()
 
         for _, v in ipairs(files) do
+          ---@param aa FileEntry
+          ---@param bb FileEntry
           local diff = Diff(v.cur_files, v.new_files, function(aa, bb)
             return aa.path == bb.path and aa.oldpath == bb.oldpath
           end)
@@ -276,18 +265,21 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
 
           local ai = 1
           local bi = 1
+
           for _, opr in ipairs(script) do
             if opr == EditToken.NOOP then
               -- Update status and stats
               v.cur_files[ai].status = v.new_files[bi].status
               v.cur_files[ai].stats = v.new_files[bi].stats
-              v.cur_files[ai]:validate_index_buffers(self.git_toplevel, self.git_dir, index_stat)
-              if new_head and v.cur_files[ai].left.head then
-                v.cur_files[ai].left = new_head
-                v.cur_files[ai]:dispose_buffer("left")
+              v.cur_files[ai]:validate_stage_buffers(self.git_ctx, index_stat)
+
+              if new_head then
+                v.cur_files[ai]:update_heads(new_head)
               end
+
               ai = ai + 1
               bi = bi + 1
+
             elseif opr == EditToken.DELETE then
               if self.panel.cur_file == v.cur_files[ai] then
                 local file_list = self.panel:ordered_file_list()
@@ -297,12 +289,15 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
                   self.panel:set_cur_file(self.panel:prev_file())
                 end
               end
+
               v.cur_files[ai]:destroy()
               table.remove(v.cur_files, ai)
+
             elseif opr == EditToken.INSERT then
               table.insert(v.cur_files, ai, v.new_files[bi])
               ai = ai + 1
               bi = bi + 1
+
             elseif opr == EditToken.REPLACE then
               if self.panel.cur_file == v.cur_files[ai] then
                 local file_list = self.panel:ordered_file_list()
@@ -312,6 +307,7 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
                   self.panel:set_cur_file(self.panel:prev_file())
                 end
               end
+
               v.cur_files[ai]:destroy()
               table.remove(v.cur_files, ai)
               table.insert(v.cur_files, ai, v.new_files[bi])
@@ -322,7 +318,7 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
         end
 
         perf:lap("updated file list")
-        FileEntry.update_index_stat(self.git_toplevel, self.git_dir, index_stat)
+        FileEntry.update_index_stat(self.git_ctx, index_stat)
         self.files:update_file_trees()
         self.panel:update_components()
         self.panel:render()
@@ -363,59 +359,21 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
       end
     end)
   end)
-))
-
----@Override
----Recover the layout after the user has messed it up.
----@param state ViewLayoutState
-function DiffView:recover_layout(state)
-  self.ready = false
-
-  if not state.tabpage then
-    vim.cmd("tab split")
-    self.tabpage = api.nvim_get_current_tabpage()
-    self.panel:close()
-    self:init_layout()
-    self.ready = true
-    return
-  end
-
-  api.nvim_set_current_tabpage(self.tabpage)
-  self.panel:close()
-  local split_cmd = self.layout_mode == LayoutMode.VERTICAL and "sp" or "vsp"
-
-  if not state.left_win and not state.right_win then
-    self:init_layout()
-  elseif not state.left_win then
-    api.nvim_set_current_win(self.right_winid)
-    vim.cmd("aboveleft " .. split_cmd)
-    self.left_winid = api.nvim_get_current_win()
-    self.panel:open()
-    self:post_layout()
-    self:set_file(self.panel.cur_file)
-  elseif not state.right_win then
-    api.nvim_set_current_win(self.left_winid)
-    vim.cmd("belowright " .. split_cmd)
-    self.right_winid = api.nvim_get_current_win()
-    self.panel:open()
-    self:post_layout()
-    self:set_file(self.panel.cur_file)
-  end
-
-  self.ready = true
-end
+) --[[@as function ]])
 
 ---Ensures there are files to load, and loads the null buffer otherwise.
 ---@return boolean
 function DiffView:file_safeguard()
   if self.files:len() == 0 then
     local cur = self.panel.cur_file
+
     if cur then
-      cur:detach_buffers()
+      cur.layout:detach_files()
     end
-    FileEntry.load_null_buffer(self.left_winid)
-    FileEntry.load_null_buffer(self.right_winid)
+
+    self.cur_layout:open_null()
     self.nulled = true
+
     return true
   end
   return false

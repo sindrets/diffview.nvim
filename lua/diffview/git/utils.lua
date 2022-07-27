@@ -110,12 +110,12 @@ end
 
 ---Execute a git command synchronously.
 ---@param args string[]
----@param cwd_or_opt? string|SystemListSpec
+---@param cwd_or_opt? string|utils.system_list.Opt
 ---@return string[] stdout
 ---@return integer code
 ---@return string[] stderr
 ---@overload fun(args: string[], cwd: string?)
----@overload fun(args: string[], opt: SystemListSpec?)
+---@overload fun(args: string[], opt: utils.system_list.Opt?)
 function M.exec_sync(args, cwd_or_opt)
   if not bootstrap.done then
     run_bootstrap()
@@ -422,7 +422,7 @@ M.diff_file_list = async.wrap(function(ctx, left, right, path_args, opt, callbac
     latch:count_down()
   else
     local left_rev = M.head_rev(ctx.toplevel) or Rev.new_null_tree()
-    local right_rev = Rev(RevType.STAGE)
+    local right_rev = Rev(RevType.STAGE, 0)
     tracked_files(
       ctx,
       left_rev,
@@ -1085,7 +1085,7 @@ function M.file_history_dry_run(toplevel, path_args, log_opt)
 
   local options = vim.tbl_map(function(v)
     return vim.fn.shellescape(v)
-  end, prepare_fh_options(log_options, single_file))
+  end, prepare_fh_options(log_options, single_file)) --[[@as vector ]]
 
   local description = utils.vec_join(
     ("Top-level path: '%s'"):format(utils.path:vim_fnamemodify(toplevel, ":~")),

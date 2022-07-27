@@ -4,6 +4,8 @@ local lazy = require("diffview.lazy")
 local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView")
 ---@type FileHistoryView|LazyModule
 local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView")
+---@type StandardView|LazyModule
+local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView")
 ---@module "diffview.lib"
 local lib = lazy.require("diffview.lib")
 ---@module "diffview.utils"
@@ -30,6 +32,7 @@ local function prepare_goto_file()
   end
 
   ---@cast view DiffView|FileHistoryView
+
   local file = view:infer_cur_file()
   if file then
     ---@cast file FileEntry
@@ -47,7 +50,8 @@ local function prepare_goto_file()
     local cursor
     local cur_file = (view.panel.cur_item and view.panel.cur_item[2]) or view.panel.cur_file
     if file == cur_file then
-      cursor = api.nvim_win_get_cursor(view.right_winid)
+      local win = view.cur_layout:get_main_win()
+      cursor = api.nvim_win_get_cursor(win.id)
     end
 
     return file, cursor
@@ -124,6 +128,7 @@ function M.goto_file_tab()
   end
 end
 
+---FIXME
 ---Execute `cmd` for each target window in the current view. If no targets
 ---are given, all windows are targeted.
 ---@param cmd string The vim cmd to execute.
@@ -163,16 +168,24 @@ function M.scroll_view(distance)
   return function()
     local view = lib.get_current_view()
 
-    if view then
-      --FIXME
+    if view and view:instanceof(StandardView.__get()) then
       ---@cast view StandardView
-      local left_clines = api.nvim_buf_line_count(api.nvim_win_get_buf(view.left_winid))
-      local right_clines = api.nvim_buf_line_count(api.nvim_win_get_buf(view.right_winid))
+      local max = -1
+      local target
 
-      M.view_windo(scroll_cmd, {
-        left = left_clines > right_clines,
-        right = left_clines == right_clines or right_clines > left_clines,
-      })()
+      for _, win in ipairs(view.cur_layout.windows) do
+        local c = api.nvim_buf_line_count(api.nvim_win_get_buf(win.id))
+        if c > max then
+          max = c
+          target = win.id
+        end
+      end
+
+      if target then
+        api.nvim_win_call(target, function()
+          vim.cmd(scroll_cmd)
+        end)
+      end
     end
   end
 end

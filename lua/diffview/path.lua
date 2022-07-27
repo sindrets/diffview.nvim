@@ -104,6 +104,7 @@ end
 ---@return string
 function PathLib:absolute(path, cwd)
   path, cwd = self:_clean(path, cwd)
+  path = self:expand(path)
   cwd = cwd or self:_cwd()
 
   if self:is_uri(path) then
@@ -214,6 +215,28 @@ function PathLib:normalize(path, opt)
   end
 
   return normal == "" and "." or normal
+end
+
+---Expand environment variables and `~`.
+---@param path string
+---@return string
+function PathLib:expand(path)
+  local segments = self:explode(path)
+  local idx = 1
+
+  if segments[1] == "~" then
+    segments[1] = uv.os_homedir()
+    idx = 2
+  end
+
+  for i = idx, #segments do
+    local env_var = segments[i]:match("^%$(%S+)$")
+    if env_var then
+      segments[i] = uv.os_getenv(env_var) or env_var
+    end
+  end
+
+  return self:join(unpack(segments))
 end
 
 ---Joins an ordered list of path segments into a path string.
@@ -422,7 +445,7 @@ end
 ---@param path string
 ---@return string
 function PathLib:vim_expand(path)
-  return self:convert(vim.fn.expand(path))
+  return self:convert(vim.fn.expand(path) --[[@as string ]])
 end
 
 ---@param path string

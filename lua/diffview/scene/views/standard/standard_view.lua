@@ -1,32 +1,38 @@
-local oop = require("diffview.oop")
-local utils = require("diffview.utils")
-local config = require("diffview.config")
-local FileEntry = require("diffview.scene.file_entry").FileEntry
-local View = require("diffview.scene.view").View
-local LayoutMode = require("diffview.scene.view").LayoutMode
-local Panel = require("diffview.ui.panel").Panel
-local api = vim.api
+local lazy = require("diffview.lazy")
 
+---@type Diff2
+local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2")
+---@type Panel
+local Panel = lazy.access("diffview.ui.panel", "Panel")
+---@type View
+local View = lazy.access("diffview.scene.view", "View")
+---@module "diffview.config"
+local config = lazy.require("diffview.config")
+---@module "diffview.oop"
+local oop = lazy.require("diffview.oop")
+---@module "diffview.utils"
+local utils = lazy.require("diffview.utils")
+
+local api = vim.api
 local M = {}
 
 ---@class StandardView : View
 ---@field panel Panel
 ---@field winopts table
----@field left_winid integer
----@field right_winid integer
 ---@field nulled boolean
+---@field cur_layout Layout
 local StandardView = oop.create_class("StandardView", View)
 
 ---StandardView constructor
----@return StandardView
-function StandardView:init()
-  StandardView:super().init(self)
-  self.nulled = false
-  self.panel = Panel()
-  self.winopts = { left = {}, right = {} }
+function StandardView:init(opt)
+  opt = opt or {}
+  StandardView:super().init(self, opt)
+  self.nulled = utils.sate(opt.nulled, false)
+  self.panel = opt.panel or Panel()
+  self.winopts = opt.winopts or { a = {}, b = {} }
 end
 
----@Override
+---@override
 function StandardView:close()
   self.closing = true
   self.panel:destroy()
@@ -41,97 +47,90 @@ function StandardView:close()
   DiffviewGlobal.emitter:emit("view_closed", self)
 end
 
----@Override
+---@override
 function StandardView:init_layout()
-  local split_cmd = self.layout_mode == LayoutMode.VERTICAL and "sp" or "vsp"
-  self.left_winid = api.nvim_get_current_win()
-  FileEntry.load_null_buffer(self.left_winid)
-  vim.cmd("belowright " .. split_cmd)
-  self.right_winid = api.nvim_get_current_win()
-  FileEntry.load_null_buffer(self.right_winid)
+  local first_init = not vim.t[self.tabpage].diffview_view_initialized
+  local curwin = api.nvim_get_current_win()
+  print(self.tabpage)
+
+  self:use_layout(StandardView.get_temp_layout())
+  self.cur_layout:create()
+  vim.t[self.tabpage].diffview_view_initialized = true
+
+  if first_init then
+    api.nvim_win_close(curwin, false)
+  end
+
   self.panel:focus()
   self:post_layout()
 end
 
 function StandardView:post_layout()
   if config.get_config().enhanced_diff_hl then
-    self.winopts.left.winhl = {
+    self.winopts.a.winhl = {
       "DiffAdd:DiffviewDiffAddAsDelete",
       "DiffDelete:DiffviewDiffDelete",
     }
-    self.winopts.right.winhl = {
+    self.winopts.b.winhl = {
       "DiffDelete:DiffviewDiffDelete",
     }
   end
 end
 
 function StandardView:update_windows()
-  utils.set_local(self.left_winid, self.winopts.left)
-  utils.set_local(self.right_winid, self.winopts.right)
+  -- FIXME: Window local options should be added to the git.File instances, and
+  -- then later set by the Layout through the Window class.
+
+  -- if self.cur_layout and self.cur_layout:is_valid() then
+  --   utils.set_local(self.cur_layout.a.id, self.winopts.a)
+  --   utils.set_local(self.cur_layout.b.id, self.winopts.b)
+  -- end
 end
 
----@Override
----Checks the state of the view layout.
----@return ViewLayoutState
-function StandardView:validate_layout()
-  ---@class ViewLayoutState
-  ---@field tabpage boolean
-  ---@field left_win boolean
-  ---@field right_win boolean
-  ---@field valid boolean
-  local state = {
-    tabpage = api.nvim_tabpage_is_valid(self.tabpage),
-    left_win = api.nvim_win_is_valid(self.left_winid),
-    right_win = api.nvim_win_is_valid(self.right_winid),
-  }
-  state.valid = state.tabpage and state.left_win and state.right_win
-  return state
-end
-
----@Override
----Recover the layout after the user has messed it up.
----@param state ViewLayoutState
-function StandardView:recover_layout(state)
-  self.ready = false
-
-  if not state.tabpage then
-    vim.cmd("tab split")
-    self.tabpage = api.nvim_get_current_tabpage()
-    self.panel:close()
-    self:init_layout()
-    self.ready = true
-    return
-  end
-
-  api.nvim_set_current_tabpage(self.tabpage)
-  self.panel:close()
-  local split_cmd = self.layout_mode == LayoutMode.VERTICAL and "sp" or "vsp"
-
-  if not state.left_win and not state.right_win then
-    self:init_layout()
-  elseif not state.left_win then
-    api.nvim_set_current_win(self.right_winid)
-    vim.cmd("aboveleft " .. split_cmd)
-    self.left_winid = api.nvim_get_current_win()
-    self.panel:open()
-    self:post_layout()
-  elseif not state.right_win then
-    api.nvim_set_current_win(self.left_winid)
-    vim.cmd("belowright " .. split_cmd)
-    self.right_winid = api.nvim_get_current_win()
-    self.panel:open()
-    self:post_layout()
-  end
-
-  self.ready = true
-end
-
----@Override
+---@override
 ---Ensure both left and right windows exist in the view's tabpage.
 function StandardView:ensure_layout()
-  local state = self:validate_layout()
-  if not state.valid then
-    self:recover_layout(state)
+  if self.cur_layout then
+    self.cur_layout:ensure()
+  else
+    self:init_layout()
+  end
+end
+
+---@param layout Layout
+function StandardView:use_layout(layout)
+  self.cur_layout = layout
+
+  layout.pivot_producer = function()
+    local was_open = self.panel:is_open()
+    self.panel:close()
+
+    vim.cmd("1windo aboveleft vsp")
+    local pivot = api.nvim_get_current_win()
+
+    if was_open then
+      self.panel:open()
+    end
+
+    return pivot
+  end
+end
+
+---@param entry FileEntry
+function StandardView:use_entry(entry)
+  if entry.layout:instanceof(Diff2) then
+    local layout = entry.layout --[[@as Diff2 ]]
+    layout.a.file.winopts = vim.tbl_extend("force", layout.a.file.winopts, self.winopts.a or {})
+    layout.b.file.winopts = vim.tbl_extend("force", layout.b.file.winopts, self.winopts.b or {})
+  end
+
+  if entry.layout:class():path() == self.cur_layout:class():path() then
+    self.cur_layout:use_entry(entry)
+  else
+    local old_layout = self.cur_layout
+    self:use_layout(entry.layout)
+    self.cur_layout:create()
+    old_layout:destroy()
   end
 end
 

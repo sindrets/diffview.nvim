@@ -1,5 +1,5 @@
 local EventEmitter = require("diffview.events").EventEmitter
-local FileEntry = require("diffview.scene.file_entry").FileEntry
+local File = require("diffview.git.file").File
 local PerfTimer = require("diffview.perf").PerfTimer
 local logger = require("diffview.logger")
 local oop = require("diffview.oop")
@@ -144,9 +144,10 @@ function Panel:get_config()
 
   ---@cast config table
   local default_config = self:get_default_config(config.type)
-  config = vim.tbl_extend("force", default_config, config or {})
+  config = vim.tbl_extend("force", default_config, config or {}) --[[@as table ]]
 
   if config.type == "split" then
+    ---@cast config PanelSplitSpec
     self.state.form = vim.tbl_contains({ "top", "bottom" }, config.position) and "row" or "column"
     local pos = { "left", "top", "right", "bottom" }
     local rel = { "editor", "win" }
@@ -228,7 +229,7 @@ function Panel:open()
   local config = self:get_config()
 
   if config.type == "split" then
-    local split_dir = vim.tbl_contains({ "top", "left" }, config) and "aboveleft" or "belowright"
+    local split_dir = vim.tbl_contains({ "top", "left" }, config.position) and "aboveleft" or "belowright"
     local split_cmd = self.state.form == "row" and "sp" or "vsp"
     local rel_winid = config.relative == "win"
       and api.nvim_win_is_valid(config.win or -1)
@@ -265,8 +266,7 @@ function Panel:close()
     if #num_wins == 1 then
       -- Ensure that the tabpage doesn't close if the panel is the last window.
       vim.cmd("sp")
-      --FIXME
-      FileEntry.load_null_buffer(0)
+      File.load_null_buffer(0)
     elseif self:is_focused() then
       vim.cmd("wincmd p")
     end

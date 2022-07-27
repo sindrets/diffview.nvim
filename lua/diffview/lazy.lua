@@ -1,10 +1,17 @@
 local lazy = {}
 
 ---@class LazyModule : { [string] : unknown }
----@field __get fun(): any Load the module if needed, and return it.
+---@field __get fun(): unknown Load the module if needed, and return it.
 ---@field __loaded boolean Indicates that the module has been loaded.
 
-local function wrap(t, handler)
+---Create a table the triggers a given handler every time it's accessed or
+---called, until the handler returns a table. Once the handler has returned a
+---table, any subsequent accessing of the wrapper will instead access the table
+---returned from the handler.
+---@param t any
+---@param handler fun(t: any): table?
+---@return LazyModule
+function lazy.wrap(t, handler)
   local use_handler = type(handler) == "function"
   local export = not use_handler and t or nil
 
@@ -74,7 +81,7 @@ end
 function lazy.require(require_path, handler)
   local use_handler = type(handler) == "function"
 
-  return wrap(require_path, function(s)
+  return lazy.wrap(require_path, function(s)
     if use_handler then
       ---@cast handler function
       return handler(require(s))
@@ -83,8 +90,8 @@ function lazy.require(require_path, handler)
   end)
 end
 
----Lazily access a table value. The `access_path` is a `.` separated string of
----table keys. If `x` is a string, it's treated as a lazy require.
+---Lazily access a table value. If `x` is a string, it's treated as a lazy
+---require.
 ---
 ---Example:
 ---
@@ -92,16 +99,20 @@ end
 --- -- table:
 --- local foo = bar.baz.qux.quux
 --- local foo = lazy.access(bar, "baz.qux.quux")
+--- local foo = lazy.access(bar, { "baz", "qux", "quux" })
 ---
 --- -- require:
 --- local foo = require("bar").baz.qux.quux
 --- local foo = lazy.access("bar", "baz.qux.quux")
+--- local foo = lazy.access("bar", { "baz", "qux", "quux" })
 ---```
 ---@param x table|string Either the table to be accessed, or a module require path.
----@param access_path string
+---@param access_path string|string[] Either a `.` separated string of table keys, or a list.
 ---@return LazyModule
 function lazy.access(x, access_path)
-  local keys = vim.split(access_path, ".", { plain = true })
+  local keys = type(access_path) == "table"
+      and access_path
+      or vim.split(access_path, ".", { plain = true })
 
   local handler = function(module)
     local export = module
@@ -114,7 +125,7 @@ function lazy.access(x, access_path)
   if type(x) == "string" then
     return lazy.require(x, handler)
   else
-    return wrap(x, handler)
+    return lazy.wrap(x, handler)
   end
 end
 

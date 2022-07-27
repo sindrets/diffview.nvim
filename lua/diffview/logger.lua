@@ -79,7 +79,7 @@ function logger.log_job(job, opt)
   local args = vim.tbl_map(function(arg)
     -- Simple shell escape. NOTE: not valid for windows shell.
     return ("'%s'"):format(arg:gsub("'", [['"'"']]))
-  end, job.args)
+  end, job.args) --[[@as vector ]]
 
   local log_func = logger.s_debug
   local context = opt.context and ("[%s] "):format(opt.context) or ""

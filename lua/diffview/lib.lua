@@ -195,7 +195,7 @@ function M.file_history(range, args)
   local cwd = cpath or vim.loop.cwd()
   paths = vim.tbl_map(function(pathspec)
     return git.pathspec_expand(git_toplevel, cwd, pathspec)
-  end, paths)
+  end, paths) --[[@as string[] ]]
 
   ---@type string
   local range_arg = argo:get_flag("range", { no_empty = true })
@@ -250,7 +250,7 @@ function M.file_history(range, args)
       ("No git history for the target(s) given the current options! Targets: %s")
         :format(#rel_paths == 0 and "':(top)'" or table.concat(vim.tbl_map(function(v)
           return "'" .. v .. "'"
-        end, rel_paths), ", ")),
+        end, rel_paths) --[[@as vector ]], ", ")),
       ("Current options: [ %s ]"):format(opt_description)
     })
     return
@@ -331,7 +331,7 @@ function M.find_git_toplevel(top_indicators)
     :format(table.concat(vim.tbl_map(function(v)
       local rel_path = pl:relative(v, ".")
       return utils.str_quote(rel_path == "" and "." or rel_path)
-    end, top_indicators), ", "))
+    end, top_indicators) --[[@as vector ]], ", "))
   )
 end
 
@@ -353,9 +353,9 @@ function M.parse_revs(git_toplevel, rev_arg, opt)
   if not rev_arg then
     if opt.cached then
       left = head or Rev.new_null_tree()
-      right = Rev(RevType.STAGE)
+      right = Rev(RevType.STAGE, 0)
     else
-      left = Rev(RevType.STAGE)
+      left = Rev(RevType.STAGE, 0)
       right = Rev(RevType.LOCAL)
     end
   elseif rev_arg:match("%.%.%.") then
@@ -402,7 +402,7 @@ function M.parse_revs(git_toplevel, rev_arg, opt)
       local hash = rev_strings[1]:gsub("^%^", "")
       left = Rev(RevType.COMMIT, hash)
       if opt.cached then
-        right = Rev(RevType.STAGE)
+        right = Rev(RevType.STAGE, 0)
       else
         right = Rev(RevType.LOCAL)
       end

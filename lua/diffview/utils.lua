@@ -16,7 +16,7 @@ local async = lazy.require("plenary.async")
 local api = vim.api
 local M = {}
 
----@alias vector any[]
+---@class vector<T> : { [integer]: T }
 
 local mapping_callbacks = {}
 local path_sep = package.config:sub(1, 1)
@@ -100,6 +100,7 @@ end
 ---@return any result Return value
 function M.no_win_event_call(f)
   local last = vim.o.eventignore
+  ---@diagnostic disable-next-line: undefined-field
   vim.opt.eventignore:prepend(
     "WinEnter,WinLeave,WinNew,WinClosed,BufWinEnter,BufWinLeave,BufEnter,BufLeave"
   )
@@ -247,21 +248,21 @@ function M.str_match(str, patterns)
   end
 end
 
----@class StrQuoteSpec
+---@class utils.str_quote.Opt
 ---@field esc_fmt string Format string for escaping quotes. Passed to `string.format()`.
 ---@field prefer_single boolean Prefer single quotes.
 ---@field only_if_whitespace boolean Only quote the string if it contains whitespace.
 
 ---@param s string
----@param opt? StrQuoteSpec
+---@param opt? utils.str_quote.Opt
 function M.str_quote(s, opt)
-  ---@cast opt StrQuoteSpec
+  ---@cast opt utils.str_quote.Opt
   s = tostring(s)
   opt = vim.tbl_extend("keep", opt or {}, {
     esc_fmt = [[\%s]],
     prefer_single = false,
     only_if_whitespace = false,
-  })
+  }) --[[@as utils.str_quote.Opt ]]
 
   if opt.only_if_whitespace and not s:find("%s") then
     return s
@@ -286,7 +287,7 @@ function M.str_quote(s, opt)
   end
 end
 
----@class HandleJobSpec
+---@class utils.handle_job.Opt
 ---@field fail_on_empty boolean Consider the job as failed if the code is 0 and stdout is empty.
 ---@field log_func function|string
 ---@field context string Context for the logger.
@@ -294,7 +295,7 @@ end
 
 ---Handles logging of failed jobs. If the given job hasn't failed, this does nothing.
 ---@param job Job
----@param opt? HandleJobSpec
+---@param opt? utils.handle_job.Opt
 function M.handle_job(job, opt)
   ---@cast job Job|{ [string]: any }
 
@@ -324,7 +325,7 @@ function M.handle_job(job, opt)
 
   local args = vim.tbl_map(function(arg)
     return ("'%s'"):format(arg:gsub("'", [['"'"']]))
-  end, job.args)
+  end, job.args) --[[@as string[] ]]
 
   local msg
   local context = opt.context and ("[%s] "):format(opt.context) or ""
@@ -347,7 +348,7 @@ function M.handle_job(job, opt)
   end
 end
 
----@class SystemListSpec
+---@class utils.system_list.Opt
 ---@field cwd string Working directory of the job.
 ---@field silent boolean Supress log output.
 ---@field fail_on_empty boolean Return code 1 if stdout is empty and code is 0.
@@ -357,18 +358,18 @@ end
 
 ---Get the output of a system command.
 ---@param cmd string[]
----@param cwd_or_opt? string|SystemListSpec
+---@param cwd_or_opt? string|utils.system_list.Opt
 ---@return string[] stdout
 ---@return integer code
 ---@return string[] stderr
 ---@overload fun(cmd: string[], cwd: string?)
----@overload fun(cmd: string[], opt: SystemListSpec?)
+---@overload fun(cmd: string[], opt: utils.system_list.Opt?)
 function M.system_list(cmd, cwd_or_opt)
   if vim.in_fast_event() then
     async.util.scheduler()
   end
 
-  ---@type SystemListSpec
+  ---@type utils.system_list.Opt
   local opt
   if type(cwd_or_opt) == "string" then
     opt = { cwd = cwd_or_opt }
@@ -458,8 +459,7 @@ function M.set_local(winids, option_map, opt)
     winids = { winids }
   end
 
-  ---@cast opt -?
-  opt = vim.tbl_extend("keep", opt or {}, { method = "set" })
+  opt = vim.tbl_extend("keep", opt or {}, { method = "set" }) --[[@as table ]]
 
   for _, id in ipairs(winids) do
     api.nvim_win_call(id, function()
@@ -471,7 +471,7 @@ function M.set_local(winids, option_map, opt)
 
         if type(value) == "table" then
           if value.opt then
-            o = vim.tbl_extend("force", opt, value.opt)
+            o = vim.tbl_extend("force", opt, value.opt) --[[@as table ]]
           end
 
           if is_list_like then
@@ -582,10 +582,13 @@ end
 
 ---Try property access.
 ---@param t table
----@param table_path string A `.` separated string of table keys.
+---@param table_path string|string[] Either a `.` separated string of table keys, or a list.
 ---@return any?
 function M.tbl_access(t, table_path)
-  local keys = vim.split(table_path, ".", { plain = true })
+  local keys = type(table_path) == "table"
+      and table_path
+      or vim.split(table_path, ".", { plain = true })
+
   local cur = t
 
   for _, k in ipairs(keys) do
@@ -738,7 +741,7 @@ function M.list_bufs(opt)
       return false
     end
     return true
-  end, bufs)
+  end, bufs) --[[@as integer[] ]]
 end
 
 ---@param name string
@@ -899,7 +902,7 @@ function M.input_char(prompt, opt)
     clear_prompt = true,
     allow_non_ascii = false,
     prompt_hl = nil,
-  })
+  }) --[[@as InputCharSpec ]]
 
   if prompt then
     vim.api.nvim_echo({ { prompt, opt.prompt_hl } }, false, {})
@@ -999,6 +1002,8 @@ end
 function M.temp_win(bufnr, enter)
   return api.nvim_open_win(bufnr or 0, not not enter, {
     relative = "editor",
+    row = 1,
+    col = 1,
     width = 1,
     height = 1,
     noautocmd = true,
