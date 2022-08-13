@@ -303,7 +303,7 @@ function M.handle_job(job, opt)
   local empty = false
   if opt.fail_on_empty then
     local out = job:result()
-    empty = not (out[1] and out[1] ~= "")
+    empty = not (out[2] ~= nil or out[1] and out[1] ~= "")
   end
 
   if job.code == 0 and not empty then
@@ -319,8 +319,7 @@ function M.handle_job(job, opt)
   if type(opt.log_func) == "string" then
     log_func = logger[opt.log_func]
   elseif type(opt.log_func) == "function" then
-    ---@diagnostic disable-next-line: cast-local-type
-    log_func = opt.log_func
+    log_func = opt.log_func --[[@as function ]]
   end
 
   local args = vim.tbl_map(function(arg)
@@ -409,7 +408,7 @@ function M.system_list(cmd, cwd_or_opt)
     stderr = {}
     job = Job:new(job_spec)
     stdout, code = job:sync()
-    empty = not (stdout[1] and stdout[1] ~= "")
+    empty = not (stdout[2] ~= nil or stdout[1] and stdout[1] ~= "")
 
     if (code ~= 0 or not empty) then
       break
@@ -622,13 +621,23 @@ function M.tbl_fmap(t, func)
   return ret
 end
 
----Create a shallow copy of a portion of a vector.
+---Create a shallow copy of a portion of a vector. Negative numbers indexes
+---from the end.
 ---@param t vector
 ---@param first? integer First index, inclusive. (default: 1)
 ---@param last? integer Last index, inclusive. (default: `#t`)
 ---@return vector
 function M.vec_slice(t, first, last)
   local slice = {}
+
+  if first and first < 0 then
+    first = #t - first + 1
+  end
+
+  if last and last < 0 then
+    last = #t - last + 1
+  end
+
   for i = first or 1, last or #t do
     table.insert(slice, t[i])
   end
@@ -636,12 +645,22 @@ function M.vec_slice(t, first, last)
   return slice
 end
 
+---Return all elements in `t` between `first` and `last`. Negative numbers
+---indexes from the end.
+---@param t vector
+---@param first integer First index, inclusive
+---@param last? integer Last index, inclusive
+---@return any ...
+function M.vec_select(t, first, last)
+  return unpack(M.vec_slice(t, first, last))
+end
+
 ---Join multiple vectors into one.
 ---@param ... any
 ---@return vector
 function M.vec_join(...)
   local result = {}
-  local args = {...}
+  local args = { ... }
   local n = 0
 
   for i = 1, select("#", ...) do
@@ -655,6 +674,92 @@ function M.vec_join(...)
         end
         n = n + #args[i]
       end
+    end
+  end
+
+  return result
+end
+
+---Get the result of the union of the given vectors.
+---@param ... vector
+---@return vector
+function M.vec_union(...)
+  local result = {}
+  local args = {...}
+  local seen = {}
+
+  for i = 1, select("#", ...) do
+    if type(args[i]) ~= "nil" then
+      if type(args[i]) ~= "table" and not seen[args[i]] then
+        seen[args[i]] = true
+        result[#result+1] = args[i]
+      else
+        for _, v in ipairs(args[i]) do
+          if not seen[v] then
+            seen[v] = true
+            result[#result+1] = v
+          end
+        end
+      end
+    end
+  end
+
+  return result
+end
+
+---Get the result of the difference of the given vectors.
+---@param ... vector
+---@return vector
+function M.vec_diff(...)
+  local args = {...}
+  local seen = {}
+
+  for i = 1, select("#", ...) do
+    if type(args[i]) ~= "nil" then
+      if type(args[i]) ~= "table" then
+        if i == 1  then
+          seen[args[i]] = true
+        elseif seen[args[i]] then
+          seen[args[i]] = nil
+        end
+      else
+        for _, v in ipairs(args[i]) do
+          if i == 1 then
+            seen[v] = true
+          elseif seen[v] then
+            seen[v] = nil
+          end
+        end
+      end
+    end
+  end
+
+  return vim.tbl_keys(seen)
+end
+
+---Get the result of the symmetric difference of the given vectors.
+---@param ... vector
+---@return vector
+function M.vec_symdiff(...)
+  local result = {}
+  local args = {...}
+  local seen = {}
+
+  for i = 1, select("#", ...) do
+    if type(args[i]) ~= "nil" then
+      if type(args[i]) ~= "table" then
+        seen[args[i]] = seen[args[i]] == 1 and 0 or 1
+      else
+        for _, v in ipairs(args[i]) do
+          seen[v] = seen[v] == 1 and 0 or 1
+        end
+      end
+    end
+  end
+
+  for v, state in pairs(seen) do
+    if state == 1 then
+      result[#result+1] = v
     end
   end
 
@@ -688,6 +793,22 @@ function M.vec_push(t, ...)
   end
 
   return t
+end
+
+---Remove an object from a vector.
+---@param t vector
+---@param v any
+---@return boolean success True if the object was removed.
+function M.vec_remove(t, v)
+  local idx = M.vec_indexof(t, v)
+
+  if idx > -1 then
+    table.remove(t, idx)
+
+    return true
+  end
+
+  return false
 end
 
 ---Check if a given object is callable.
@@ -846,6 +967,21 @@ function M.win_find_buf(bufid, tabpage)
   end
 
   return result
+end
+
+---Set the (1,0)-indexed cursor position without having to worry about
+---out-of-bounds coordinates. The line number is clamped to the number of lines
+---in the target buffer.
+---@param winid integer
+---@param line? integer
+---@param column? integer
+function M.set_cursor(winid, line, column)
+  local bufnr = api.nvim_win_get_buf(winid)
+
+  pcall(api.nvim_win_set_cursor, winid, {
+    M.clamp(line or 1, 1, api.nvim_buf_line_count(bufnr)),
+    math.max(0, column or 0)
+  })
 end
 
 ---Create a new table with only keys that are valid when passed to

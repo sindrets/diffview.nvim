@@ -132,7 +132,7 @@ function Rev:is_head(git_toplevel)
 
   local out, code = git.exec_sync({ "rev-parse", "HEAD", "--" }, git_toplevel)
 
-  if code ~= 0 or not (out[1] and out[1] ~= "") then
+  if code ~= 0 or not (out[2] ~= nil or out[1] and out[1] ~= "") then
     return
   end
 

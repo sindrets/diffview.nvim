@@ -61,9 +61,11 @@ function Window:open_file()
   if self:is_valid() then
     if self.file.active and self.file:is_valid() then
       api.nvim_win_set_buf(self.id, self.file.bufnr)
+
       if self.file.rev.type == RevType.LOCAL then
         self:_save_winopts()
       end
+
       self:apply_file_winopts()
       self.file:attach_buffer()
     else

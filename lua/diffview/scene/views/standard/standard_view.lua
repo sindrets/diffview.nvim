@@ -1,10 +1,10 @@
 local lazy = require("diffview.lazy")
 
----@type Diff2
+---@type Diff2|LazyModule
 local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2")
----@type Panel
+---@type Panel|LazyModule
 local Panel = lazy.access("diffview.ui.panel", "Panel")
----@type View
+---@type View|LazyModule
 local View = lazy.access("diffview.scene.view", "View")
 ---@module "diffview.config"
 local config = lazy.require("diffview.config")
@@ -21,7 +21,7 @@ local M = {}
 ---@field winopts table
 ---@field nulled boolean
 ---@field cur_layout Layout
-local StandardView = oop.create_class("StandardView", View)
+local StandardView = oop.create_class("StandardView", View.__get())
 
 ---StandardView constructor
 function StandardView:init(opt)
@@ -51,7 +51,6 @@ end
 function StandardView:init_layout()
   local first_init = not vim.t[self.tabpage].diffview_view_initialized
   local curwin = api.nvim_get_current_win()
-  print(self.tabpage)
 
   self:use_layout(StandardView.get_temp_layout())
   self.cur_layout:create()
@@ -75,16 +74,6 @@ function StandardView:post_layout()
       "DiffDelete:DiffviewDiffDelete",
     }
   end
-end
-
-function StandardView:update_windows()
-  -- FIXME: Window local options should be added to the git.File instances, and
-  -- then later set by the Layout through the Window class.
-
-  -- if self.cur_layout and self.cur_layout:is_valid() then
-  --   utils.set_local(self.cur_layout.a.id, self.winopts.a)
-  --   utils.set_local(self.cur_layout.b.id, self.winopts.b)
-  -- end
 end
 
 ---@override
@@ -118,7 +107,7 @@ end
 
 ---@param entry FileEntry
 function StandardView:use_entry(entry)
-  if entry.layout:instanceof(Diff2) then
+  if entry.layout:instanceof(Diff2.__get()) then
     local layout = entry.layout --[[@as Diff2 ]]
     layout.a.file.winopts = vim.tbl_extend("force", layout.a.file.winopts, self.winopts.a or {})
     layout.b.file.winopts = vim.tbl_extend("force", layout.b.file.winopts, self.winopts.b or {})

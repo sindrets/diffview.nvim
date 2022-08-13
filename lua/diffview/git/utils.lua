@@ -1403,7 +1403,7 @@ end
 ---@return boolean ok, string[] output
 function M.verify_rev_arg(toplevel, rev_arg)
   local out, code = M.exec_sync({ "rev-parse", "--revs-only", rev_arg }, toplevel)
-  return code == 0 and out[1] and out[1] ~= "", out
+  return code == 0 and (out[2] ~= nil or out[1] and out[1] ~= ""), out
 end
 
 ---Restore a file to the state it was in, in a given commit / rev. If no commit

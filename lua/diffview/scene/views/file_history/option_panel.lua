@@ -71,8 +71,8 @@ FHOptionPanel.flags = {
           local view = panel.parent.parent
           return diffview.rev_completion(arg_lead, {
             accept_range = true,
-            git_toplevel = view.git_toplevel,
-            git_dir = view.git_dir,
+            git_toplevel = view.git_ctx.toplevel,
+            git_dir = view.git_ctx.dir,
           })
         end
       end,
@@ -159,7 +159,17 @@ for _, list in pairs(FHOptionPanel.flags) do
       ---@param self FlagOption
       ---@param value string|string[]
       render_value = function(self, value)
-        return value == "", self[2] .. utils.str_quote(value, { only_if_whitespace = true })
+        local quoted
+
+        if type(value) == "table" then
+          quoted = table.concat(vim.tbl_map(function(v)
+            return self[2] .. utils.str_quote(v, { only_if_whitespace = true })
+          end, value), " ")
+        else
+          quoted = self[2] .. utils.str_quote(value, { only_if_whitespace = true })
+        end
+
+        return value == "", quoted
       end,
 
       ---@param value string|string[]
@@ -301,6 +311,10 @@ end
 function FHOptionPanel:open()
   FHOptionPanel:super().open(self)
   self.option_state = utils.tbl_deep_clone(self.parent:get_log_options())
+
+  api.nvim_win_call(self.winid, function()
+    vim.cmd("norm! zb")
+  end)
 end
 
 function FHOptionPanel:setup_buffer()
