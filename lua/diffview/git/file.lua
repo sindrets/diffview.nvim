@@ -80,10 +80,14 @@ function File:init(opt)
   }
 end
 
-function File:destroy()
+---@param force? boolean Also delete buffers for LOCAL files.
+function File:destroy(force)
   self.active = false
   self:detach_buffer()
-  File.safe_delete_buf(self.bufnr)
+
+  if force or self.rev.type ~= RevType.LOCAL then
+    File.safe_delete_buf(self.bufnr)
+  end
 end
 
 function File:post_buf_created()
