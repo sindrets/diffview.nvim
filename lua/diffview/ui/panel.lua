@@ -61,9 +61,9 @@ Panel.bufopts = {
 Panel.default_type = "split"
 
 ---@class PanelSplitSpec
----@field type '"split"'
----@field position '"left"'|'"top"'|'"right"'|'"bottom"'
----@field relative '"editor"'|'"win"'
+---@field type "split"
+---@field position "left"|"top"|"right"|"bottom"
+---@field relative "editor"|"win"
 ---@field win integer
 ---@field width integer
 ---@field height integer
@@ -77,17 +77,17 @@ Panel.default_config_split = {
 }
 
 ---@class PanelFloatSpec
----@field type '"float"'
----@field relative '"editor"'|'"win"'|'"cursor"'
+---@field type "float"
+---@field relative "editor"|"win"|"cursor"
 ---@field win integer
----@field anchor '"NW"'|'"NE"'|'"SW"'|'"SE"'
+---@field anchor "NW"|"NE"|"SW"|"SE"
 ---@field width integer
 ---@field height integer
 ---@field row number
 ---@field col number
 ---@field zindex integer
----@field style '"minimal"'
----@field border '"none"'|'"single"'|'"double"'|'"rounded"'|'"solid"'|'"shadow"'|string[]
+---@field style "minimal"
+---@field border "none"|"single"|"double"|"rounded"|"solid"|"shadow"|string[]
 
 ---@type PanelFloatSpec
 Panel.default_config_float = {
@@ -131,43 +131,74 @@ function Panel:init(opt)
   self.au_event_map = {}
 end
 
+---Produce and validate config.
 ---@return PanelConfig
 function Panel:get_config()
-  local subject = "Panel:get_config() -"
   local config
 
-  if utils.is_callable(self.config_producer) then
+  if vim.is_callable(self.config_producer) then
     config = self.config_producer()
   elseif type(self.config_producer) == "table" then
     config = utils.tbl_deep_clone(self.config_producer)
   end
 
   ---@cast config table
+
   local default_config = self:get_default_config(config.type)
   config = vim.tbl_extend("force", default_config, config or {}) --[[@as table ]]
+
+  local function valid_enum(arg, values, optional)
+    return {
+      arg,
+      function(v) return (optional and v == nil) or vim.tbl_contains(values, v) end,
+      table.concat(vim.tbl_map(function(v) return ([['%s']]):format(v) end, values), "|"),
+    }
+  end
+
+  vim.validate({ type = valid_enum(config.type, { "split", "float" }) })
 
   if config.type == "split" then
     ---@cast config PanelSplitSpec
     self.state.form = vim.tbl_contains({ "top", "bottom" }, config.position) and "row" or "column"
-    local pos = { "left", "top", "right", "bottom" }
-    local rel = { "editor", "win" }
-    local dim = { "number", "nil" }
-    assert(
-      vim.tbl_contains(pos, config.position),
-      ("%s 'position' must be one of: %s"):format(subject, table.concat(pos, ", "))
-    )
-    assert(
-      vim.tbl_contains(rel, config.relative),
-      ("%s 'relative' must be one of: %s"):format(subject, table.concat(rel, ", "))
-    )
-    assert(
-      vim.tbl_contains(dim, type(config.width)),
-      ("%s 'width' must be one of: %s"):format(subject, table.concat(dim, ", "))
-    )
-    assert(
-      vim.tbl_contains(dim, type(config.height)),
-      ("%s 'height' must be one of: %s"):format(subject, table.concat(dim, ", "))
-    )
+
+    vim.validate({
+      position = valid_enum(config.position, { "left", "top", "right", "bottom" }),
+      relative = valid_enum(config.relative, { "editor", "win" }),
+      width = { config.width, "number", true },
+      height = { config.height, "number", true },
+    })
+  else
+    ---@cast config PanelFloatSpec
+    local border = { "none", "single", "double", "rounded", "solid", "shadow" }
+
+    vim.validate({
+      relative = valid_enum(config.relative, { "editor", "win", "cursor" }),
+      win = { config.win, "n", true },
+      anchor = valid_enum(config.anchor, { "NW", "NE", "SW", "SE" }, true),
+      width = { config.width, "n", false },
+      height = { config.height, "n", false },
+      row = { config.row, "n", false },
+      col = { config.col, "n", false },
+      zindex = { config.zindex, "n", true },
+      style = valid_enum(config.style, { "minimal" }, true),
+      border = {
+        config.border,
+        function(v)
+          if v == nil then return true end
+
+          if type(v) == "table" then
+            return #v >= 2
+          end
+
+          return vim.tbl_contains(border, v)
+        end,
+        ("%s or a list of length >=2"):format(
+          table.concat(vim.tbl_map(function(v)
+            return ([['%s']]):format(v)
+          end, border), "|")
+        )
+      },
+    })
   end
 
   return config
@@ -427,7 +458,7 @@ function Panel:get_default_config(panel_type)
   local producer = self:class()["default_config_" .. (panel_type or self:class().default_type)]
 
   local config
-  if utils.is_callable(producer) then
+  if vim.is_callable(producer) then
     config = producer()
   elseif type(producer) == "table" then
     config = producer
