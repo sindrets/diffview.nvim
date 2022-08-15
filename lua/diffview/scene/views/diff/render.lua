@@ -1,6 +1,6 @@
-local utils = require("diffview.utils")
 local config = require("diffview.config")
-local renderer = require("diffview.renderer")
+local hl = require("diffview.hl")
+local utils = require("diffview.utils")
 
 ---@param comp  RenderComponent
 ---@param show_path boolean
@@ -10,14 +10,14 @@ local function render_file(comp, show_path, depth)
   local file = comp.context
   local offset = 0
 
-  comp:add_hl(renderer.get_git_hl(file.status), 0, 0, 1)
+  comp:add_hl(hl.get_git_hl(file.status), 0, 0, 1)
   local s = file.status .. " "
   if depth then
     s = s .. string.rep(" ", depth * 2 + 2)
   end
 
   offset = #s
-  local icon = renderer.get_file_icon(file.basename, file.extension, comp, 0, offset)
+  local icon = hl.get_file_icon(file.basename, file.extension, comp, 0, offset)
 
   offset = offset + #icon
   comp:add_hl("DiffviewFilePanelFileName", 0, offset, offset + #file.basename)
@@ -76,7 +76,7 @@ local function render_file_tree_recurse(depth, comp)
   ---@type table
   local ctx = dir.context
 
-  dir:add_hl(renderer.get_git_hl(ctx.status), 0, 0, 1)
+  dir:add_hl(hl.get_git_hl(ctx.status), 0, 0, 1)
   s = get_dir_status_text(ctx, conf.file_panel.tree_options) .. " "
 
   s = s .. string.rep(" ", depth * 2)

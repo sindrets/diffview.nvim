@@ -1,22 +1,20 @@
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
-local config = require("diffview.config")
 local api = vim.api
 
 local M = {}
-local web_devicons
 local uid_counter = 0
 
 ---Duration of the last redraw in ms.
 M.last_draw_time = 0
 
----@class HlData
+---@class renderer.HlData
 ---@field group string
 ---@field line_idx integer
 ---@field first integer 0 indexed, inclusive
 ---@field last integer Exclusive
 
----@class HlList : { [integer]: HlData }
+---@class renderer.HlList : { [integer]: renderer.HlData }
 ---@field offset integer
 
 ---@class CompStruct : { [integer|string]: CompStruct }
@@ -32,7 +30,7 @@ M.last_draw_time = 0
 ---@field context? table
 ---@field parent RenderComponent
 ---@field lines string[]
----@field hl HlList
+---@field hl renderer.HlList
 ---@field components RenderComponent[]
 ---@field lstart integer 0 indexed, Inclusive
 ---@field lend integer Exclusive
@@ -259,7 +257,7 @@ end
 
 ---@class RenderData : diffview.Object
 ---@field lines string[]
----@field hl HlList
+---@field hl renderer.HlList
 ---@field components RenderComponent[]
 ---@field namespace integer
 local RenderData = oop.create_class("RenderData")
@@ -427,7 +425,7 @@ end
 
 ---@param line_idx integer
 ---@param lines string[]
----@param hl_data HlData[]
+---@param hl_data renderer.HlData[]
 ---@param component RenderComponent
 ---@return integer
 local function process_component(line_idx, lines, hl_data, component)
@@ -503,62 +501,6 @@ function M.render(bufid, data)
 
   api.nvim_buf_set_option(bufid, "modifiable", was_modifiable)
   M.last_draw_time = (vim.loop.hrtime() - last) / 1000000
-end
-
-local git_status_hl_map = {
-  ["A"] = "DiffviewStatusAdded",
-  ["?"] = "DiffviewStatusAdded",
-  ["M"] = "DiffviewStatusModified",
-  ["R"] = "DiffviewStatusRenamed",
-  ["C"] = "DiffviewStatusCopied",
-  ["T"] = "DiffviewStatusTypeChanged",
-  ["U"] = "DiffviewStatusUnmerged",
-  ["X"] = "DiffviewStatusUnknown",
-  ["D"] = "DiffviewStatusDeleted",
-  ["B"] = "DiffviewStatusBroken",
-  ["!"] = "DiffviewStatusIgnored",
-}
-
-function M.get_git_hl(status)
-  return git_status_hl_map[status]
-end
-
-local icon_cache = {}
-
-function M.get_file_icon(name, ext, render_data, line_idx, offset)
-  if not config.get_config().use_icons then
-    return " "
-  end
-  if not web_devicons then
-    local ok
-    ok, web_devicons = pcall(require, "nvim-web-devicons")
-    if not ok then
-      config.get_config().use_icons = false
-      utils.warn(
-        "nvim-web-devicons is required to use file icons! "
-          .. "Set `use_icons = false` in your config to stop seeing this message."
-      )
-      return " "
-    end
-  end
-
-  local icon, hl
-  local icon_key = (name or "") .. "|&|" .. (ext or "")
-  if icon_cache[icon_key] then
-    icon, hl = unpack(icon_cache[icon_key])
-  else
-    icon, hl = web_devicons.get_icon(name, ext, { default = true })
-    icon_cache[icon_key] = { icon, hl }
-  end
-
-  if icon then
-    if hl then
-      render_data:add_hl(hl, line_idx, offset, offset + string.len(icon) + 1)
-    end
-    return icon .. " "
-  end
-
-  return ""
 end
 
 M.RenderComponent = RenderComponent

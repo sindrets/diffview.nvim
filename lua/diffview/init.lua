@@ -2,7 +2,7 @@ if not require("diffview.bootstrap") then
   return
 end
 
-local colors = require("diffview.colors")
+local hl = require("diffview.hl")
 local lazy = require("diffview.lazy")
 
 ---@module "diffview.arg_parser"
@@ -75,7 +75,7 @@ end
 
 function M.init()
   local au = api.nvim_create_autocmd
-  colors.setup()
+  hl.setup()
 
   -- Set up autocommands
   M.augroup = api.nvim_create_augroup("diffview_nvim", {})
@@ -376,7 +376,7 @@ M.completers = {
 }
 
 function M.update_colors()
-  colors.setup()
+  hl.setup()
   lib.update_colors()
 end
 

@@ -1,8 +1,8 @@
-local utils = require("diffview.utils")
-local config = require("diffview.config")
-local renderer = require("diffview.renderer")
-local logger = require("diffview.logger")
 local PerfTimer = require("diffview.perf").PerfTimer
+local config = require("diffview.config")
+local hl = require("diffview.hl")
+local logger = require("diffview.logger")
+local utils = require("diffview.utils")
 
 ---@type PerfTimer
 local perf = PerfTimer("[FileHistoryPanel] Render internal")
@@ -26,12 +26,12 @@ local function render_files(comp, files)
 
     if file.status then
       offset = #s
-      comp:add_hl(renderer.get_git_hl(file.status), line_idx, offset, offset + 1)
+      comp:add_hl(hl.get_git_hl(file.status), line_idx, offset, offset + 1)
       s = s .. file.status .. " "
     end
 
     offset = #s
-    local icon = renderer.get_file_icon(file.basename, file.extension, comp, line_idx, offset)
+    local icon = hl.get_file_icon(file.basename, file.extension, comp, line_idx, offset)
     offset = offset + #icon
     if #file.parent_path > 0 then
       comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #file.parent_path + 1)
@@ -50,14 +50,14 @@ local function render_files(comp, files)
         "DiffviewFilePanelInsertions",
         line_idx,
         offset,
-        offset + string.len(file.stats.additions)
+        offset + string.len(file.stats.additions --[[@as string ]])
       )
-      offset = offset + string.len(file.stats.additions) + 2
+      offset = offset + string.len(file.stats.additions --[[@as string ]]) + 2
       comp:add_hl(
         "DiffviewFilePanelDeletions",
         line_idx,
         offset,
-        offset + string.len(file.stats.deletions)
+        offset + string.len(file.stats.deletions --[[@as string ]])
       )
       s = s .. " " .. file.stats.additions .. ", " .. file.stats.deletions
     end
@@ -112,7 +112,7 @@ local function render_entries(parent, entries, updating)
 
     if entry.status then
       offset = #s
-      comp:add_hl(renderer.get_git_hl(entry.status), line_idx, offset, offset + 1)
+      comp:add_hl(hl.get_git_hl(entry.status), line_idx, offset, offset + 1)
       s = s .. entry.status
     end
 
@@ -189,10 +189,10 @@ local function prepare_panel_cache(panel)
   cache[panel] = c
   c.root_path = panel.state.form == "column"
       and utils.path:shorten(
-        utils.path:vim_fnamemodify(panel.git_toplevel, ":~"),
+        utils.path:vim_fnamemodify(panel.git_ctx.toplevel, ":~"),
         panel:get_config().width - 6
       )
-    or utils.path:vim_fnamemodify(panel.git_toplevel, ":~")
+    or utils.path:vim_fnamemodify(panel.git_ctx.toplevel, ":~")
   c.args = table.concat(panel.raw_args, " ")
 end
 
@@ -226,7 +226,7 @@ return {
         local file = panel.entries[1].files[1]
 
         -- file path
-        local icon = renderer.get_file_icon(file.basename, file.extension, comp, line_idx, 0)
+        local icon = hl.get_file_icon(file.basename, file.extension, comp, line_idx, 0)
         offset = #icon
         if #file.parent_path > 0 then
           comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #file.parent_path + 1)
