@@ -659,11 +659,20 @@ view_windo({cmd}, [targets])                    *diffview-actions-view_windo*
         are given, all windows are targeted.
 
         Parameters:~
-            {cmd} (string)
-                Vim command.
+            {cmd} (string|function)
+                The vim cmd to execute, or a lua function.
 
-            [targets] (`{ left: boolean, right: boolean }`)
-                The windows to target.
+            [targets] (`{ a: boolean, b: boolean, c: boolean, d: boolean }`)
+                The windows to target. The letters generally correspond to the
+                topological order of the diff windows (assuming the order is:
+                top to bottom, left to right).
+
+                For example in a 2-way vertical diff split the left window
+                would be `a` and the right window would be `b`. In a 2-way
+                horizontal diff split the top window would be `a` and the
+                bottom window would be `b`.
+
+                The letters `c` and `d` are reserved for future use.
 
                                                 *diffview-unused-actions*
 Unused actions~

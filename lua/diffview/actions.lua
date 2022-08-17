@@ -128,24 +128,32 @@ function M.goto_file_tab()
   end
 end
 
----FIXME
 ---Execute `cmd` for each target window in the current view. If no targets
 ---are given, all windows are targeted.
----@param cmd string The vim cmd to execute.
----@param targets? { left: boolean, right: boolean } The windows to target.
+---@param cmd string|function The vim cmd to execute, or a function.
+---@param targets? { a: boolean, b: boolean, c: boolean, d: boolean } The windows to target.
 ---@return function action
 function M.view_windo(cmd, targets)
+  local fun
+
+  if type(cmd) == "string" then
+    fun = function() vim.cmd(cmd) end
+  else
+    fun = cmd
+  end
+
   return function()
     local view = lib.get_current_view()
 
-    if view then
-      targets = targets or { left = true, right = true }
+    if view and view:instanceof(StandardView.__get()) then
+      ---@cast view StandardView
+      targets = targets or { a = true, b = true, c = true }
 
-      for _, side in ipairs({ "left", "right" }) do
-        if targets[side] then
-          api.nvim_win_call(view[side .. "_winid"], function()
-            vim.cmd(cmd)
-          end)
+      for _, symbol in ipairs({ "a", "b", "c", "d" }) do
+        local win = view.cur_layout[symbol] --[[@as Window? ]]
+
+        if targets[symbol] and win then
+          api.nvim_win_call(win.id, fun)
         end
       end
     end
