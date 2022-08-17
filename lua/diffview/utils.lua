@@ -146,6 +146,11 @@ function M.sate(...)
   return ({ ... })[1]
 end
 
+---Clamp a given value between a min and a max value.
+---@param value number
+---@param min number
+---@param max number
+---@return number
 function M.clamp(value, min, max)
   if value < min then
     return min
@@ -156,14 +161,16 @@ function M.clamp(value, min, max)
   return value
 end
 
+---Get the sign of a given number.
+---@param n number
+---@return -1|0|1
 function M.sign(n)
   return (n > 0 and 1 or 0) - (n < 0 and 1 or 0)
 end
 
-function M.shell_error()
-  return vim.v.shell_error ~= 0
-end
-
+---@param s string
+---@param min_size integer
+---@param fill string? (default: `" "`)
 function M.str_right_pad(s, min_size, fill)
   s = tostring(s)
   if #s >= min_size then
@@ -175,6 +182,9 @@ function M.str_right_pad(s, min_size, fill)
   return s .. string.rep(fill, math.ceil((min_size - #s) / #fill))
 end
 
+---@param s string
+---@param min_size integer
+---@param fill string? (default: `" "`)
 function M.str_left_pad(s, min_size, fill)
   s = tostring(s)
   if #s >= min_size then
@@ -186,6 +196,9 @@ function M.str_left_pad(s, min_size, fill)
   return string.rep(fill, math.ceil((min_size - #s) / #fill)) .. s
 end
 
+---@param s string
+---@param min_size integer
+---@param fill string? (default: ` `)
 function M.str_center_pad(s, min_size, fill)
   s = tostring(s)
   if #s >= min_size then
@@ -199,6 +212,12 @@ function M.str_center_pad(s, min_size, fill)
   return string.rep(fill, left_len) .. s .. string.rep(fill, right_len)
 end
 
+---Truncate the tail of a given string with ellipsis if it exceeds the max
+---length.
+---@param s string
+---@param max_length integer
+---@param head boolean Truncate the head rather than the tail.
+---@return string
 function M.str_shorten(s, max_length, head)
   if string.len(s) > max_length then
     if head then
@@ -209,6 +228,8 @@ function M.str_shorten(s, max_length, head)
   return s
 end
 
+---@param s string
+---@param sep? string (default: `%s+`)
 function M.str_split(s, sep)
   sep = sep or "%s+"
   local iter = s:gmatch("()" .. sep .. "()")
@@ -525,6 +546,15 @@ function M.unset_local(winids, option)
       vim.opt_local[option] = nil
     end)
   end
+end
+
+---Get a list of all non-floating windows in a given tabpage.
+---@param tabid integer
+---@return integer[]
+function M.tabpage_list_normal_wins(tabid)
+  return vim.tbl_filter(function(v)
+    return api.nvim_win_get_config(v).relative == ""
+  end, api.nvim_tabpage_list_wins(tabid))
 end
 
 function M.tabnr_to_id(tabnr)
@@ -1085,38 +1115,7 @@ function M.pause(msg)
   )
 end
 
-local function prepare_mapping(t)
-  local default_options = { noremap = true, silent = true }
-  if type(t[4]) ~= "table" then
-    t[4] = {}
-  end
-  local opts = vim.tbl_extend("force", default_options, t.opt or t[4])
-  local rhs
-  if type(t[3]) == "function" then
-    mapping_callbacks[#mapping_callbacks + 1] = t[3]
-    rhs = string.format(
-      "<Cmd>lua require('diffview.utils')._mapping_callbacks[%d]()<CR>",
-      #mapping_callbacks
-    )
-  else
-    assert(type(t[3]) == "string", "The rhs of the mapping must be either a string or a function!")
-    rhs = t[3]
-  end
-
-  return { t[1], t[2], rhs, opts }
-end
-
-function M.key_map(t)
-  local prepared = prepare_mapping(t)
-  vim.api.nvim_set_keymap(prepared[1], prepared[2], prepared[3], prepared[4])
-end
-
-function M.buf_map(bufid, t)
-  local prepared = prepare_mapping(t)
-  vim.api.nvim_buf_set_keymap(bufid, prepared[1], prepared[2], prepared[3], prepared[4])
-end
-
----Open a temporary window.
+---Open a temporary 1x1 floating window.
 ---@param bufnr? integer Buffer to display.
 ---@param enter? boolean Enter the window.
 ---@return integer winid The window handle, or 0 on error.
@@ -1129,6 +1128,17 @@ function M.temp_win(bufnr, enter)
     height = 1,
     noautocmd = true,
   })
+end
+
+---@param func function
+---@param ... any
+---@return function
+function M.wrap_call(func, ...)
+  local args = M.tbl_pack(...)
+
+  return function()
+    func(M.tbl_unpack(args))
+  end
 end
 
 local function merge(t, first, mid, last, comparator)

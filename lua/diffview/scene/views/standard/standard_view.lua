@@ -30,6 +30,8 @@ function StandardView:init(opt)
   self.nulled = utils.sate(opt.nulled, false)
   self.panel = opt.panel or Panel()
   self.winopts = opt.winopts or { a = {}, b = {} }
+
+  self.emitter:on("post_layout", utils.wrap_call(self.post_layout, self))
 end
 
 ---@override
@@ -61,7 +63,7 @@ function StandardView:init_layout()
   end
 
   self.panel:focus()
-  self:post_layout()
+  self.emitter:emit("post_layout")
 end
 
 function StandardView:post_layout()
@@ -92,9 +94,15 @@ function StandardView:use_layout(layout)
 
   layout.pivot_producer = function()
     local was_open = self.panel:is_open()
+    local was_only_win = was_open and #utils.tabpage_list_normal_wins(self.tabpage) == 1
     self.panel:close()
 
-    vim.cmd("1windo aboveleft vsp")
+    -- If the panel was the only window before closing, then a temp window was
+    -- already created by `Panel:close()`.
+    if not was_only_win then
+      vim.cmd("1windo aboveleft vsp")
+    end
+
     local pivot = api.nvim_get_current_win()
 
     if was_open then

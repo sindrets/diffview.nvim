@@ -211,8 +211,16 @@ end
 ---@return string[] err
 ---@return FileDict
 DiffView.get_updated_files = async.wrap(function(self, callback)
-  ---@diagnostic disable-next-line: missing-return
-  git.diff_file_list(self.git_ctx, self.left, self.right, self.path_args, self.options, callback)
+  git.diff_file_list(
+      self.git_ctx,
+      self.left,
+      self.right,
+      self.path_args,
+      self.options,
+      { diff2 = DiffView.get_default_diff2() },
+      callback
+      ---@diagnostic disable-next-line: missing-return
+  )
 end, 2)
 
 ---Update the file list, including stats and status for all files.

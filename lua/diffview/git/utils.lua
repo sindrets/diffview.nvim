@@ -229,13 +229,18 @@ local function handle_co(thread, ok, result)
   return ok, result
 end
 
+---@class git.utils.LayoutOpt
+---@field diff2 Diff2
+---@field diff3 any
+
 ---@param ctx GitContext
 ---@param left Rev
 ---@param right Rev
 ---@param args string[]
 ---@param kind git.FileKind
+---@param opt git.utils.LayoutOpt
 ---@param callback function
-local tracked_files = async.wrap(function(ctx, left, right, args, kind, callback)
+local tracked_files = async.wrap(function(ctx, left, right, args, kind, opt, callback)
   ---@type FileEntry[]
   local files = {}
   ---@type CountDownLatch
@@ -299,7 +304,7 @@ local tracked_files = async.wrap(function(ctx, left, right, args, kind, callback
       stats = nil
     end
 
-    table.insert(files, FileEntry.for_d2(Diff2Hor, {
+    table.insert(files, FileEntry.for_d2(opt.diff2, {
       git_ctx = ctx,
       path = name,
       oldpath = oldname,
@@ -312,13 +317,14 @@ local tracked_files = async.wrap(function(ctx, left, right, args, kind, callback
   end
 
   callback(nil, files)
-end, 6)
+end, 7)
 
 ---@param ctx GitContext
 ---@param left Rev
 ---@param right Rev
+---@param opt git.utils.LayoutOpt
 ---@param callback function
-local untracked_files = async.wrap(function(ctx, left, right, callback)
+local untracked_files = async.wrap(function(ctx, left, right, opt, callback)
   Job:new({
     command = git_bin(),
     args = utils.vec_join(git_args(), "ls-files", "--others", "--exclude-standard" ),
@@ -341,7 +347,7 @@ local untracked_files = async.wrap(function(ctx, left, right, callback)
 
       local files = {}
       for _, s in ipairs(j:result()) do
-        table.insert(files, FileEntry.for_d2(Diff2Hor, {
+        table.insert(files, FileEntry.for_d2(opt.diff2, {
           git_ctx = ctx,
           path = s,
           status = "?",
@@ -353,18 +359,19 @@ local untracked_files = async.wrap(function(ctx, left, right, callback)
       callback(nil, files)
     end
   }):start()
-end, 4)
+end, 5)
 
 ---Get a list of files modified between two revs.
 ---@param ctx GitContext
 ---@param left Rev
 ---@param right Rev
 ---@param path_args string[]|nil
----@param opt DiffViewOptions
+---@param dv_opt DiffViewOptions
+---@param opt git.utils.LayoutOpt
 ---@param callback function
 ---@return string[]? err
 ---@return FileDict?
-M.diff_file_list = async.wrap(function(ctx, left, right, path_args, opt, callback)
+M.diff_file_list = async.wrap(function(ctx, left, right, path_args, dv_opt, opt, callback)
   ---@type FileDict
   local files = FileDict()
   ---@type CountDownLatch
@@ -382,6 +389,7 @@ M.diff_file_list = async.wrap(function(ctx, left, right, path_args, opt, callbac
       path_args
     ),
     "working",
+    opt,
     function (err, tfiles)
       if err then
         errors[#errors+1] = err
@@ -391,7 +399,7 @@ M.diff_file_list = async.wrap(function(ctx, left, right, path_args, opt, callbac
       end
 
       files:set_working(tfiles)
-      local show_untracked = opt.show_untracked
+      local show_untracked = dv_opt.show_untracked
       if show_untracked == nil then
         show_untracked = M.show_untracked(ctx.toplevel)
       end
@@ -402,7 +410,7 @@ M.diff_file_list = async.wrap(function(ctx, left, right, path_args, opt, callbac
       end
 
       ---@diagnostic disable-next-line: redefined-local
-      local err, ufiles = untracked_files(ctx, left, right)
+      local err, ufiles = untracked_files(ctx, left, right, opt)
       if err then
         errors[#errors+1] = err
         utils.err("Failed to get git status for untracked files!", true)
@@ -434,6 +442,7 @@ M.diff_file_list = async.wrap(function(ctx, left, right, path_args, opt, callbac
         path_args
       ),
       "staged",
+      opt,
       function(err, tfiles)
         if err then
           errors[#errors+1] = err
@@ -455,7 +464,7 @@ M.diff_file_list = async.wrap(function(ctx, left, right, path_args, opt, callbac
 
   files:update_file_trees()
   callback(nil, files)
-end, 6)
+end, 7)
 
 ---@param log_options LogOptions
 ---@param single_file boolean
@@ -861,7 +870,7 @@ local function parse_fh_data(state)
       stats = nil
     end
 
-    table.insert(files, FileEntry.for_d2(Diff2Hor, {
+    table.insert(files, FileEntry.for_d2(state.opt.diff2 or Diff2Hor, {
       git_ctx = ctx,
       path = name,
       oldpath = oldname,
@@ -939,7 +948,7 @@ local function parse_fh_line_trace_data(state)
   return true
 end
 
----@class git.utils.FileHistoryWorkerSpec
+---@class git.utils.FileHistoryWorkerSpec : git.utils.LayoutOpt
 ---@field base Rev
 
 ---@param thread thread

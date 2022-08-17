@@ -284,7 +284,10 @@ function FileHistoryPanel:update_entries(callback)
     self.git_ctx,
     self.path_args,
     self.log_options,
-    { base = self.base, },
+    {
+      base = self.base,
+      diff2 = self.parent.get_default_diff2(),
+    },
     update
   )
 

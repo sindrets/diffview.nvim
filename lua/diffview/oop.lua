@@ -193,6 +193,7 @@ local function subclass(base_class, name)
   ---@field name method
   ---@field super method
   ---@field isa method
+  ---@field static_extend fun(self, field: string, t: table)
   local class_internals = {
     static = inst_internals,
     new = new_instance,
@@ -209,6 +210,12 @@ local function subclass(base_class, name)
     end,
     isa = function(_, other)
       return the_class == other or base_class:isa(other)
+    end,
+    static_extend = function(_, field, t)
+      return vim.tbl_extend("force", base_class[field] or {}, t)
+    end,
+    static_deep_extend = function(_, field, t)
+      return vim.tbl_deep_extend("force", base_class[field], t)
     end,
   }
   meta_obj[the_class] = { virtuals = duplicate(meta_obj[base_class].virtuals) }
@@ -242,6 +249,8 @@ end
 ---@field virtual method
 ---@field super diffview.Object
 ---@field subclass method
+---@field static_extend fun(self, field: string, t: table): table
+---@field static_deep_extend fun(self, field: string, t: table): table
 local Object = {}
 
 local function obj_newitem()
