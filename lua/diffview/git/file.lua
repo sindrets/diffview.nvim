@@ -1,6 +1,8 @@
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
+---@module "plenary.async"
+local async = lazy.require("plenary.async")
 ---@type Rev
 local Rev = lazy.access("diffview.git.rev", "Rev")
 ---@type ERevType
@@ -18,6 +20,8 @@ local pl = lazy.access(utils, "path")
 local api = vim.api
 local M = {}
 
+---@alias git.FileDataProducer fun(kind: git.FileKind, path: string, pos: "left"|"right"): string[]
+
 ---@class git.File : diffview.Object
 ---@field git_ctx GitContext
 ---@filed path string
@@ -25,10 +29,12 @@ local M = {}
 ---@field parent_path string
 ---@field basename string
 ---@field extension string
----@field kind '"working"'|'"staged"'
+---@field kind "working"|"staged"
 ---@field nulled boolean
 ---@field rev Rev
----@field commit Commit|nil
+---@field commit Commit?
+---@field symbol string?
+---@field get_data git.FileDataProducer?
 ---@field bufnr integer
 ---@field binary boolean
 ---@field active boolean
@@ -65,6 +71,8 @@ function File:init(opt)
   self.nulled = not not opt.nulled
   self.rev = opt.rev
   self.commit = opt.commit
+  self.symbol = opt.symbol
+  self.get_data = opt.get_data
   self.active = false
   self.ready = false
 
@@ -137,6 +145,8 @@ function File:create_buffer(callback)
     context = self.rev:abbrev(11)
   elseif self.rev.type == RevType.STAGE then
     context = (":%d:"):format(self.rev.stage)
+  elseif self.rev.type == RevType.CUSTOM then
+    context = "[custom]"
   end
 
   for option, value in pairs(File.bufopts) do
@@ -149,36 +159,49 @@ function File:create_buffer(callback)
     -- Resolve name conflict
     local i = 1
     repeat
-      -- stylua: ignore
       fullname = pl:join("diffview://", self.git_ctx.dir, context, i, self.path)
       ok = pcall(api.nvim_buf_set_name, self.bufnr, fullname)
       i = i + 1
     until ok
   end
 
-  git.show(
-    self.git_ctx.toplevel,
-    { ("%s:%s"):format(self.rev:object_name() or "", self.path) },
-    function(err, result)
-      if err then
-        utils.err(string.format("Failed to create diff buffer: '%s'", fullname), true)
-        return
+  local function data_callback(lines)
+    vim.schedule(function()
+      if api.nvim_buf_is_valid(self.bufnr) then
+        vim.bo[self.bufnr].modifiable = true
+        api.nvim_buf_set_lines(self.bufnr, 0, -1, false, lines)
+        api.nvim_buf_call(self.bufnr, function()
+          vim.cmd("filetype detect")
+        end)
+        vim.bo[self.bufnr].modifiable = false
+        self:post_buf_created()
+        callback()
       end
+    end)
+  end
 
-      vim.schedule(function()
-        if api.nvim_buf_is_valid(self.bufnr) then
-          vim.bo[self.bufnr].modifiable = true
-          api.nvim_buf_set_lines(self.bufnr, 0, -1, false, result)
-          api.nvim_buf_call(self.bufnr, function()
-            vim.cmd("filetype detect")
-          end)
-          vim.bo[self.bufnr].modifiable = false
-          self:post_buf_created()
-          callback()
+  if self.get_data and vim.is_callable(self.get_data) then
+    async.run(function()
+      local pos = self.symbol == "a" and "left" or "right"
+      local data = self.get_data(self.kind, self.path, pos)
+      data_callback(data)
+      ---@diagnostic disable-next-line: param-type-mismatch
+    end, nil)
+
+  else
+    git.show(
+      self.git_ctx.toplevel,
+      { ("%s:%s"):format(self.rev:object_name() or "", self.path) },
+      function(err, result)
+        if err then
+          utils.err(string.format("Failed to create diff buffer: '%s'", fullname), true)
+          return
         end
-      end)
-    end
-  )
+
+        data_callback(result)
+      end
+    )
+  end
 
   return self.bufnr
 end

@@ -118,6 +118,7 @@ end
 ---@field rev_a Rev
 ---@field rev_b Rev
 ---@field nulled boolean
+---@field get_data git.FileDataProducer?
 
 ---Create a file entry for a 2-way split diff layout.
 ---@param layout_class Layout (class)
@@ -138,6 +139,7 @@ function FileEntry.for_d2(layout_class, opt)
         path = opt.oldpath or opt.path,
         kind = opt.kind,
         commit = opt.commit,
+        get_data = opt.get_data,
         rev = opt.rev_a,
         nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_a, opt.status, "a")),
       }),
@@ -146,6 +148,7 @@ function FileEntry.for_d2(layout_class, opt)
         path = opt.path,
         kind = opt.kind,
         commit = opt.commit,
+        get_data = opt.get_data,
         rev = opt.rev_b,
         nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_b, opt.status, "b")),
       }),

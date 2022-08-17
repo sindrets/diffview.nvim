@@ -126,7 +126,7 @@ return function(panel)
 
   panel.render_data:clear()
   local width = panel:get_width()
-  if not width then
+  if width == -1 then
     local panel_config = panel:get_config()
     width = panel_config.width
   end

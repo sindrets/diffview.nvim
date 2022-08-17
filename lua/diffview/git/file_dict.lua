@@ -2,7 +2,7 @@ local oop = require("diffview.oop")
 local FileTree = require("diffview.ui.models.file_tree.file_tree").FileTree
 local M = {}
 
----@alias git.FileKind '"conflicting"'|'"working"'|'"staged"'
+---@alias git.FileKind "conflicting"|"working"|"staged"
 
 ---@class FileDict : diffview.Object, { [integer]: FileEntry }
 ---@field sets FileEntry[][]

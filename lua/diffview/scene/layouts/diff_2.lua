@@ -27,12 +27,16 @@ function Diff2:init(opt)
   utils.vec_push(self.windows, self.a, self.b)
 end
 
+---@param file git.File
 function Diff2:set_file_a(file)
   self.a:set_file(file)
+  file.symbol = "a"
 end
 
+---@param file git.File
 function Diff2:set_file_b(file)
   self.b:set_file(file)
+  file.symbol = "b"
 end
 
 ---@param entry FileEntry
