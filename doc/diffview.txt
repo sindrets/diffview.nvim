@@ -664,8 +664,8 @@ view_windo({cmd}, [targets])                    *diffview-actions-view_windo*
 
             [targets] (`{ a: boolean, b: boolean, c: boolean, d: boolean }`)
                 The windows to target. The letters generally correspond to the
-                topological order of the diff windows (assuming the order is:
-                top to bottom, left to right).
+                order of the windows when counted from left to right, top to
+                bottom.
 
                 For example in a 2-way vertical diff split the left window
                 would be `a` and the right window would be `b`. In a 2-way

@@ -3,6 +3,19 @@
 
 CHANGELOG
 
+NOTE: This changelog only encompasses breaking changes.
+
+                                                *diffview.changelog-190*
+
+PR: https://github.com/sindrets/diffview.nvim/pull/190
+
+This PR involves a major refactor of the layout system. The changes are made
+in preparation of the planned merge-tool, which is going to involve 3-way
+diffs, and possibly also 4-way diffs. Different entries in the same view may
+now use completely different window layouts. Thus the action `view_windo` has
+changed to reflect these changes. See |diffview-actions-view_windo| for more
+details on the new usage.
+
                                                 *diffview.changelog-169*
 
 PR: https://github.com/sindrets/diffview.nvim/pull/169

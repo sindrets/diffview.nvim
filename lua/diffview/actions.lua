@@ -147,7 +147,7 @@ function M.view_windo(cmd, targets)
 
     if view and view:instanceof(StandardView.__get()) then
       ---@cast view StandardView
-      targets = targets or { a = true, b = true, c = true }
+      targets = targets or { a = true, b = true, c = true, d = true }
 
       for _, symbol in ipairs({ "a", "b", "c", "d" }) do
         local win = view.cur_layout[symbol] --[[@as Window? ]]
