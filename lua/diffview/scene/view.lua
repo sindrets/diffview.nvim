@@ -45,6 +45,23 @@ function View:init(opt)
   self.default_layout = opt.default_layout or View.get_default_layout()
   self.ready = utils.sate(opt.ready, false)
   self.closing = utils.sate(opt.closing, false)
+
+  local function wrap_event(event)
+    DiffviewGlobal.emitter:on(event, function(...)
+      local view = require("diffview.lib").get_current_view()
+
+      if view == self then
+        self.emitter:emit(event, ...)
+      end
+    end)
+  end
+
+  wrap_event("view_opened")
+  wrap_event("view_closed")
+  wrap_event("view_enter")
+  wrap_event("view_leave")
+  wrap_event("diff_buf_read")
+  wrap_event("diff_buf_win_enter")
 end
 
 function View:open()

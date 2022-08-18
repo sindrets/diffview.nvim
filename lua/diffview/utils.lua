@@ -133,7 +133,7 @@ function M.pick(index, ...)
   local args = { ... }
 
   if index < 0 then
-    index = #args - index + 1
+    index = #args + index + 1
   end
 
   return args[index]
@@ -141,9 +141,15 @@ end
 
 ---Get the first non-nil value among the given arguments.
 ---@param ... unknown
----@return unknown
+---@return unknown?
 function M.sate(...)
-  return ({ ... })[1]
+  local args = { ... }
+
+  for i = 1, select("#", ...) do
+    if args[i] ~= nil then
+      return args[i]
+    end
+  end
 end
 
 ---Clamp a given value between a min and a max value.
@@ -661,11 +667,11 @@ function M.vec_slice(t, first, last)
   local slice = {}
 
   if first and first < 0 then
-    first = #t - first + 1
+    first = #t + first + 1
   end
 
   if last and last < 0 then
-    last = #t - last + 1
+    last = #t + last + 1
   end
 
   for i = first or 1, last or #t do

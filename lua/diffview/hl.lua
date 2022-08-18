@@ -22,7 +22,6 @@ local M = {}
 ---@field blend      hl.HiValue<integer>
 ---@field default    hl.HiValue<boolean> Only set values if the hl group is cleared.
 ---@field unlink     boolean Remove links.
----@field clear      boolean Clear the hl group first.
 ---@field explicit   boolean All undefined fields will be cleared from the hl group.
 
 ---@class hl.HiLinkSpec
@@ -230,10 +229,6 @@ function M.hi(groups, opt)
 
     if opt.unlink then
       def_spec.link = -1
-    end
-
-    if opt.clear then
-      api.nvim_set_hl(0, group, {})
     end
 
     for k, v in pairs(def_spec) do

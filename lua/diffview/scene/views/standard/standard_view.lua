@@ -29,7 +29,10 @@ function StandardView:init(opt)
   StandardView:super().init(self, opt)
   self.nulled = utils.sate(opt.nulled, false)
   self.panel = opt.panel or Panel()
-  self.winopts = opt.winopts or { a = {}, b = {} }
+  self.winopts = opt.winopts or {
+    diff2 = { a = {}, b = {} },
+    diff3 = { a = {}, b = {}, c = {} },
+  }
 
   self.emitter:on("post_layout", utils.wrap_call(self.post_layout, self))
 end
@@ -68,11 +71,11 @@ end
 
 function StandardView:post_layout()
   if config.get_config().enhanced_diff_hl then
-    self.winopts.a.winhl = {
+    self.winopts.diff2.a.winhl = {
       "DiffAdd:DiffviewDiffAddAsDelete",
       "DiffDelete:DiffviewDiffDelete",
     }
-    self.winopts.b.winhl = {
+    self.winopts.diff2.b.winhl = {
       "DiffDelete:DiffviewDiffDelete",
     }
   end
@@ -117,8 +120,16 @@ end
 function StandardView:use_entry(entry)
   if entry.layout:instanceof(Diff2.__get()) then
     local layout = entry.layout --[[@as Diff2 ]]
-    layout.a.file.winopts = vim.tbl_extend("force", layout.a.file.winopts, self.winopts.a or {})
-    layout.b.file.winopts = vim.tbl_extend("force", layout.b.file.winopts, self.winopts.b or {})
+    layout.a.file.winopts = vim.tbl_extend(
+      "force",
+      layout.a.file.winopts,
+      self.winopts.diff2.a or {}
+    )
+    layout.b.file.winopts = vim.tbl_extend(
+      "force",
+      layout.b.file.winopts,
+      self.winopts.diff2.b or {}
+    )
   end
 
   if entry.layout:class():path() == self.cur_layout:class():path() then
