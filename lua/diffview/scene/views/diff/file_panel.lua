@@ -11,7 +11,7 @@ local M = {}
 ---@field folder_statuses "never"|"only_folded"|"always"
 
 ---@class FilePanel : Panel
----@field git_root string
+---@field git_ctx GitContext
 ---@field files FileDict
 ---@field path_args string[]
 ---@field rev_pretty_name string|nil
@@ -42,17 +42,16 @@ FilePanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 })
 
 ---FilePanel constructor.
----@param git_root string
+---@param git_ctx GitContext
 ---@param files FileEntry[]
 ---@param path_args string[]
----@return FilePanel
-function FilePanel:init(git_root, files, path_args, rev_pretty_name)
+function FilePanel:init(git_ctx, files, path_args, rev_pretty_name)
   local conf = config.get_config()
   FilePanel:super().init(self, {
     config = conf.file_panel.win_config,
     bufname = "DiffviewFilePanel",
   })
-  self.git_root = git_root
+  self.git_ctx = git_ctx
   self.files = files
   self.path_args = path_args
   self.rev_pretty_name = rev_pretty_name
@@ -66,7 +65,7 @@ function FilePanel:init(git_root, files, path_args, rev_pretty_name)
   })
 end
 
----@Override
+---@override
 function FilePanel:open()
   FilePanel:super().open(self)
   vim.cmd("wincmd =")
@@ -149,6 +148,7 @@ function FilePanel:update_components()
   })
 end
 
+---@return FileEntry[]
 function FilePanel:ordered_file_list()
   if self.listing_style == "list" then
     local list = {}
@@ -163,19 +163,19 @@ function FilePanel:ordered_file_list()
     )
     return vim.tbl_map(function(node)
       return node.data
-    end, nodes)
+    end, nodes) --[[@as vector ]]
   end
 end
 
 function FilePanel:set_cur_file(file)
   if self.cur_file then
-    self.cur_file:detach_buffers()
-    self.cur_file.active = false
+    self.cur_file.layout:detach_files()
+    self.cur_file:set_active(false)
   end
 
   self.cur_file = file
   if self.cur_file then
-    self.cur_file.active = true
+    self.cur_file:set_active(true)
   end
 end
 
@@ -327,7 +327,7 @@ function FilePanel:toggle_item_fold(item)
 end
 
 function FilePanel:render()
-  require("diffview.views.diff.render")(self)
+  require("diffview.scene.views.diff.render")(self)
 end
 
 M.FilePanel = FilePanel

@@ -2,7 +2,7 @@ local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local M = {}
 
----@class Node : Object
+---@class Node : diffview.Object
 ---@field parent Node
 ---@field name string
 ---@field data any
@@ -13,11 +13,11 @@ local Node = oop.create_class("Node")
 ---Node constructor
 ---@param name string
 ---@param data any|nil
----@return Node
 function Node:init(name, data)
   self.name = name
   self.data = data
   self.children = {}
+
   if self.data then
     self.data._node = self
   end
@@ -32,6 +32,7 @@ function Node:add_child(child)
     self.children[#self.children + 1] = child
     child.parent = self
   end
+
   return self.children[child.name]
 end
 
@@ -40,6 +41,7 @@ function Node:has_children()
   for _ in pairs(self.children) do
     return true
   end
+
   return false
 end
 
@@ -60,6 +62,7 @@ function Node:sort()
   for _, child in ipairs(self.children) do
     child:sort()
   end
+
   utils.merge_sort(self.children, Node.comparator)
 end
 
@@ -86,12 +89,14 @@ function Node:deep_some(callback)
       return node:some(wrap)
     end
   end
+
   self:some(wrap)
 end
 
 ---@return Node[]
 function Node:leaves()
   local leaves = {}
+
   self:deep_some(function(node)
     if #node.children == 0 then
       leaves[#leaves + 1] = node
@@ -109,6 +114,7 @@ function Node:first_leaf()
   end
 
   local cur = self
+
   while cur:has_children() do
     cur = cur.children[1]
   end
@@ -123,6 +129,7 @@ function Node:last_leaf()
   end
 
   local cur = self
+
   while cur:has_children() do
     cur = cur.children[#cur.children]
   end
@@ -138,6 +145,7 @@ function Node:next_leaf()
 
   local cur = self:has_children() and self:group_parent() or self
   local sibling = cur:next_sibling()
+
   if sibling then
     if not sibling:has_children() then
       return sibling
@@ -155,6 +163,7 @@ function Node:prev_leaf()
 
   local cur = self:has_children() and self:group_parent() or self
   local sibling = cur:prev_sibling()
+
   if sibling then
     if not sibling:has_children() then
       return sibling
@@ -171,6 +180,7 @@ function Node:next_sibling()
   end
 
   local i = utils.vec_indexof(self.parent.children, self)
+
   if i > -1 and  i < #self.parent.children then
     return self.parent.children[i + 1]
   end
@@ -183,6 +193,7 @@ function Node:prev_sibling()
   end
 
   local i = utils.vec_indexof(self.parent.children, self)
+
   if i > 1 and #self.parent.children > 1 then
     return self.parent.children[i - 1]
   end
@@ -197,6 +208,7 @@ function Node:group_parent()
   end
 
   local cur = self:has_children() and self or self.parent
+
   while not cur.parent:is_root() and #cur.parent.children == 1 do
     cur = cur.parent
   end

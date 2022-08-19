@@ -37,8 +37,10 @@ for _, kind in ipairs({ "trace", "debug", "info", "warn", "error", "fatal" }) do
       if type(v) == "table" and type(v.__tostring) == "function" then
         return tostring(v)
       end
+
       return v
     end, utils.tbl_pack(...))
+
     logger[kind](utils.tbl_unpack(args))
   end)
 end
@@ -51,6 +53,7 @@ function logger.lvl(min_level)
   if DiffviewGlobal.debug_level >= min_level then
     return logger
   end
+
   return logger.mock
 end
 
@@ -76,7 +79,7 @@ function logger.log_job(job, opt)
   local args = vim.tbl_map(function(arg)
     -- Simple shell escape. NOTE: not valid for windows shell.
     return ("'%s'"):format(arg:gsub("'", [['"'"']]))
-  end, job.args)
+  end, job.args) --[[@as vector ]]
 
   local log_func = logger.s_debug
   local context = opt.context and ("[%s] "):format(opt.context) or ""
@@ -84,6 +87,7 @@ function logger.log_job(job, opt)
   if type(opt.func) == "string" then
     log_func = logger[opt.func]
   elseif type(opt.func) == "function" then
+    ---@diagnostic disable-next-line: cast-local-type
     log_func = opt.func
   end
 

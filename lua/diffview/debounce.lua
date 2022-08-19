@@ -1,7 +1,7 @@
 local utils = require "diffview.utils"
 local M = {}
 
----@class ManagedFn
+---@class ManagedFn : function
 ---@field close fun() Release timer handle.
 
 ---@return ManagedFn

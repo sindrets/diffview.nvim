@@ -71,8 +71,8 @@ FHOptionPanel.flags = {
           local view = panel.parent.parent
           return diffview.rev_completion(arg_lead, {
             accept_range = true,
-            git_root = view.git_root,
-            git_dir = view.git_dir,
+            git_toplevel = view.git_ctx.toplevel,
+            git_dir = view.git_ctx.dir,
           })
         end
       end,
@@ -159,7 +159,17 @@ for _, list in pairs(FHOptionPanel.flags) do
       ---@param self FlagOption
       ---@param value string|string[]
       render_value = function(self, value)
-        return value == "", self[2] .. utils.str_quote(value, { only_if_whitespace = true })
+        local quoted
+
+        if type(value) == "table" then
+          quoted = table.concat(vim.tbl_map(function(v)
+            return self[2] .. utils.str_quote(v, { only_if_whitespace = true })
+          end, value), " ")
+        else
+          quoted = self[2] .. utils.str_quote(value, { only_if_whitespace = true })
+        end
+
+        return value == "", quoted
       end,
 
       ---@param value string|string[]
@@ -183,7 +193,6 @@ end
 
 ---FHOptionPanel constructor.
 ---@param parent FileHistoryPanel
----@return FHOptionPanel
 function FHOptionPanel:init(parent)
   FHOptionPanel:super().init(self, {
     ---@type PanelSplitSpec
@@ -298,10 +307,14 @@ function FHOptionPanel:_set_option(name, value)
   self.parent.log_options.multi_file[name] = value
 end
 
----@Override
+---@override
 function FHOptionPanel:open()
   FHOptionPanel:super().open(self)
   self.option_state = utils.tbl_deep_clone(self.parent:get_log_options())
+
+  api.nvim_win_call(self.winid, function()
+    vim.cmd("norm! zb")
+  end)
 end
 
 function FHOptionPanel:setup_buffer()
@@ -372,7 +385,7 @@ function FHOptionPanel:get_item_at_cursor()
 end
 
 function FHOptionPanel:render()
-  require("diffview.views.file_history.render").fh_option_panel(self)
+  require("diffview.scene.views.file_history.render").fh_option_panel(self)
 end
 
 M.FHOptionPanel = FHOptionPanel

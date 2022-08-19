@@ -9,7 +9,7 @@ local git = lazy.require("diffview.git.utils")
 
 local M = {}
 
----@class Commit : Object
+---@class Commit : diffview.Object
 ---@field hash string
 ---@field author string
 ---@field time number
@@ -39,9 +39,9 @@ function Commit:init(opt)
 end
 
 ---@param rev_arg string
----@param git_root string
----@return Commit
-function Commit.from_rev_arg(rev_arg, git_root)
+---@param git_toplevel string
+---@return Commit?
+function Commit.from_rev_arg(rev_arg, git_toplevel)
   local out, code = git.exec_sync({
     "show",
     "--pretty=format:%H %P%n%an%n%ad%n%ar%n  %s",
@@ -49,7 +49,7 @@ function Commit.from_rev_arg(rev_arg, git_root)
     "--name-status",
     rev_arg,
     "--",
-  }, git_root)
+  }, git_toplevel)
 
   if code ~= 0 then
     return
@@ -69,19 +69,22 @@ function Commit.from_rev_arg(rev_arg, git_root)
 end
 
 ---@param rev Rev
----@param git_root string
----@return Commit
-function Commit.from_rev(rev, git_root)
+---@param git_toplevel string
+---@return Commit?
+function Commit.from_rev(rev, git_toplevel)
   assert(rev.type == RevType.COMMIT, "Rev must be of type COMMIT!")
-  return Commit.from_rev_arg(rev.commit, git_root)
+
+  return Commit.from_rev_arg(rev.commit, git_toplevel)
 end
 
 function Commit.parse_time_offset(iso_date)
   local sign, h, m = vim.trim(iso_date):match("([+-])(%d%d):?(%d%d)$")
   local offset = tonumber(h) * 60 * 60 + tonumber(m) * 60
+
   if sign == "-" then
     offset = -offset
   end
+
   return offset
 end
 

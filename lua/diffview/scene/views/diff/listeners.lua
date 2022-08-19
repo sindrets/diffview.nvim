@@ -1,10 +1,16 @@
-local Event = require("diffview.events").Event
-local FileEntry = require("diffview.views.file_entry").FileEntry
-local RevType = require("diffview.git.rev").RevType
 local api = vim.api
-local async = require("plenary.async")
-local git = require("diffview.git.utils")
-local utils = require("diffview.utils")
+local lazy = require("diffview.lazy")
+
+---@type EEvent
+local Event = lazy.access("diffview.events", "Event")
+---@type ERevType
+local RevType = lazy.access("diffview.git.rev", "RevType")
+---@module "plenary.async"
+local async = lazy.require("plenary.async")
+---@module "diffview.git.utils"
+local git = lazy.require("diffview.git.utils")
+---@module "diffview.utils"
+local utils = lazy.require("diffview.utils")
 
 ---@param view DiffView
 return function(view)
@@ -13,7 +19,6 @@ return function(view)
       local file = view.panel.cur_file
       if file then
         view:set_file(file, false, true)
-        file:attach_buffers()
       end
 
       if view.ready then
@@ -22,17 +27,13 @@ return function(view)
     end,
     tab_leave = function()
       local file = view.panel.cur_file
+
       if file then
-        file:detach_buffers()
+        file.layout:detach_files()
       end
-      local cur_winid = api.nvim_get_current_win()
-      if cur_winid == view.left_winid or cur_winid == view.right_winid then
-        -- Change the current buffer such that 'restore_winopts()' will work
-        -- correctly.
-        FileEntry.load_null_buffer(cur_winid)
-      end
+
       for _, f in view.panel.files:ipairs() do
-        f:restore_winopts()
+        f.layout:restore_winopts()
       end
     end,
     buf_write_post = function()
@@ -89,11 +90,11 @@ return function(view)
       end
     end,
     open_commit_log = function()
-      if (view.left.type == RevType.INDEX and view.right.type == RevType.LOCAL)
+      if (view.left.type == RevType.STAGE and view.right.type == RevType.LOCAL)
         or (
           view.left.type == RevType.COMMIT
-          and vim.tbl_contains({ RevType.INDEX, RevType.LOCAL }, view.right.type)
-          and view.left:is_head(view.git_root)
+          and vim.tbl_contains({ RevType.STAGE, RevType.LOCAL }, view.right.type)
+          and view.left:is_head(view.git_ctx.toplevel)
         ) then
         utils.info("Changes not commited yet. No log available for these changes.")
         return
@@ -103,7 +104,7 @@ return function(view)
       view.commit_log_panel:update(rev_arg)
     end,
     toggle_stage_entry = function()
-      if not (view.left.type == RevType.INDEX and view.right.type == RevType.LOCAL) then
+      if not (view.left.type == RevType.STAGE and view.right.type == RevType.LOCAL) then
         return
       end
 
@@ -111,9 +112,9 @@ return function(view)
       if item then
         local code
         if item.kind == "working" then
-          _, code = git.exec_sync({ "add", item.path }, view.git_root)
+          _, code = git.exec_sync({ "add", item.path }, view.git_ctx.toplevel)
         elseif item.kind == "staged" then
-          _, code = git.exec_sync({ "reset", "--", item.path }, view.git_root)
+          _, code = git.exec_sync({ "reset", "--", item.path }, view.git_ctx.toplevel)
         end
 
         if code ~= 0 then
@@ -162,7 +163,7 @@ return function(view)
       end, view.files.working)
 
       if #args > 0 then
-        local _, code = git.exec_sync({ "add", args }, view.git_root)
+        local _, code = git.exec_sync({ "add", args }, view.git_ctx.toplevel)
 
         if code ~= 0 then
           utils.err("Failed to stage files!")
@@ -174,7 +175,7 @@ return function(view)
       end
     end,
     unstage_all = function()
-      local _, code = git.exec_sync({ "reset" }, view.git_root)
+      local _, code = git.exec_sync({ "reset" }, view.git_ctx.toplevel)
 
       if code ~= 0 then
         utils.err("Failed to unstage files!")
@@ -190,7 +191,7 @@ return function(view)
         utils.err("The right side of the diff is not local! Aborting file restoration.")
         return
       end
-      if not (view.left.type == RevType.INDEX) then
+      if not (view.left.type == RevType.STAGE) then
         commit = view.left.commit
       end
       local file = view:infer_cur_file()
@@ -200,7 +201,7 @@ return function(view)
           utils.err("The file is open with unsaved changes! Aborting file restoration.")
           return
         end
-        git.restore_file(view.git_root, file.path, file.kind, commit, function()
+        git.restore_file(view.git_ctx.toplevel, file.path, file.kind, commit, function()
           async.util.scheduler()
           view:update_files()
         end)

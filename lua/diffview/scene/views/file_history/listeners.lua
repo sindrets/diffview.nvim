@@ -1,9 +1,13 @@
-local DiffView = require("diffview.views.diff.diff_view").DiffView
-local FileEntry = require("diffview.views.file_entry").FileEntry
-local api = vim.api
-local git = require("diffview.git.utils")
-local lib = require("diffview.lib")
-local utils = require("diffview.utils")
+local lazy = require("diffview.lazy")
+
+---@type DiffView|LazyModule
+local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView")
+---@module "diffview.git.utils"
+local git = lazy.require("diffview.git.utils")
+---@module "diffview.lib"
+local lib = lazy.require("diffview.lib")
+---@module "diffview.utils"
+local utils = lazy.require("diffview.utils")
 
 ---@param view FileHistoryView
 return function(view)
@@ -12,46 +16,40 @@ return function(view)
       local file = view.panel.cur_item[2]
       if file then
         view:set_file(file)
-        file:attach_buffers()
       end
     end,
     tab_leave = function()
       local file = view.panel.cur_item[2]
+
       if file then
-        file:detach_buffers()
+        file.layout:detach_files()
       end
-      local cur_winid = api.nvim_get_current_win()
-      if cur_winid == view.left_winid or cur_winid == view.right_winid then
-        -- Change the current buffer such that 'restore_winopts()' will work
-        -- correctly.
-        FileEntry.load_null_buffer(cur_winid)
-      end
+
       for _, entry in ipairs(view.panel.entries) do
         for _, f in ipairs(entry.files) do
-          f:restore_winopts()
+          f.layout:restore_winopts()
         end
       end
     end,
-    diff_buf_read = function(bufid)
+    diff_buf_read = function(bufnr)
       -- Set the cursor at the beginning of the -L range if possible.
 
       local log_options = view.panel:get_log_options()
       local cur = view.panel:cur_file()
 
-      if log_options.L[1] and bufid == cur.right_bufid then
+      if log_options.L[1] and bufnr == cur.layout:get_main_win().file.bufnr then
         for _, value in ipairs(log_options.L) do
           local l1, lpath = value:match("^(%d+),.*:(.*)")
 
           if l1 then
             l1 = tonumber(l1)
             lpath = utils.path:chain(lpath)
-                :normalize({ cwd = view.git_root, absolute = true })
-                :relative(view.git_root)
+                :normalize({ cwd = view.git_ctx.toplevel, absolute = true })
+                :relative(view.git_ctx.toplevel)
                 :get()
 
-            print(l1, lpath)
             if lpath == cur.path then
-              vim.fn.cursor(l1, 1)
+              utils.set_cursor(0, l1, 0)
               vim.cmd("norm! zt")
               break
             end
@@ -63,23 +61,24 @@ return function(view)
       if view.panel:is_focused() then
         local item = view.panel:get_item_at_cursor()
         if item then
-          ---@type FileEntry
           local file
+
           if item.files then
             file = item.files[1]
           else
-            file = item
+            file = item --[[@as FileEntry ]]
           end
 
           if file then
-            ---@type DiffView
+            local layout = file.layout --[[@as Diff2 ]]
+
             local new_view = DiffView({
-              git_root = view.git_root,
-              rev_arg = git.rev_to_pretty_string(file.left, file.right),
-              left = file.left,
-              right = file.right,
+              git_ctx = view.git_ctx,
+              rev_arg = git.rev_to_pretty_string(layout.a.file.rev, layout.b.file.rev),
+              left = layout.a.file.rev,
+              right = layout.b.file.rev,
               options = {},
-            })
+            }) --[[@as DiffView ]]
 
             lib.add_view(new_view)
             new_view:open()

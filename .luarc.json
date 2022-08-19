@@ -1,0 +1,7 @@
+{
+    "$schema": "https://raw.githubusercontent.com/sumneko/vscode-lua/master/setting/schema.json",
+    "Lua.diagnostics.disable": [
+        "assign-type-mismatch",
+        "cast-type-mismatch"
+    ]
+}

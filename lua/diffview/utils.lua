@@ -16,16 +16,10 @@ local async = lazy.require("plenary.async")
 local api = vim.api
 local M = {}
 
----@alias vector any[]
+---@class vector<T> : { [integer]: T }
 
 local mapping_callbacks = {}
 local path_sep = package.config:sub(1, 1)
-local setlocal_opr_templates = {
-  set = [[setl ${option}=${value}]],
-  remove = [[exe 'setl ${option}-=${value}']],
-  append = [[exe 'setl ${option}=' . (&${option} == "" ? "" : &${option} . ",") . '${value}']],
-  prepend = [[exe 'setl ${option}=${value}' . (&${option} == "" ? "" : "," . &${option})]],
-}
 
 ---@type PathLib
 M.path = lazy.require("diffview.path", function(module)
@@ -106,6 +100,7 @@ end
 ---@return any result Return value
 function M.no_win_event_call(f)
   local last = vim.o.eventignore
+  ---@diagnostic disable-next-line: undefined-field
   vim.opt.eventignore:prepend(
     "WinEnter,WinLeave,WinNew,WinClosed,BufWinEnter,BufWinLeave,BufEnter,BufLeave"
   )
@@ -129,6 +124,39 @@ function M.update_win(winid)
   end
 end
 
+---Pick the argument at the given index. A negative number is indexed from the
+---end (`-1` is the last argument).
+---@param index integer
+---@param ... unknown
+---@return unknown
+function M.pick(index, ...)
+  local args = { ... }
+
+  if index < 0 then
+    index = #args + index + 1
+  end
+
+  return args[index]
+end
+
+---Get the first non-nil value among the given arguments.
+---@param ... unknown
+---@return unknown?
+function M.sate(...)
+  local args = { ... }
+
+  for i = 1, select("#", ...) do
+    if args[i] ~= nil then
+      return args[i]
+    end
+  end
+end
+
+---Clamp a given value between a min and a max value.
+---@param value number
+---@param min number
+---@param max number
+---@return number
 function M.clamp(value, min, max)
   if value < min then
     return min
@@ -139,14 +167,16 @@ function M.clamp(value, min, max)
   return value
 end
 
+---Get the sign of a given number.
+---@param n number
+---@return -1|0|1
 function M.sign(n)
   return (n > 0 and 1 or 0) - (n < 0 and 1 or 0)
 end
 
-function M.shell_error()
-  return vim.v.shell_error ~= 0
-end
-
+---@param s string
+---@param min_size integer
+---@param fill string? (default: `" "`)
 function M.str_right_pad(s, min_size, fill)
   s = tostring(s)
   if #s >= min_size then
@@ -158,6 +188,9 @@ function M.str_right_pad(s, min_size, fill)
   return s .. string.rep(fill, math.ceil((min_size - #s) / #fill))
 end
 
+---@param s string
+---@param min_size integer
+---@param fill string? (default: `" "`)
 function M.str_left_pad(s, min_size, fill)
   s = tostring(s)
   if #s >= min_size then
@@ -169,6 +202,9 @@ function M.str_left_pad(s, min_size, fill)
   return string.rep(fill, math.ceil((min_size - #s) / #fill)) .. s
 end
 
+---@param s string
+---@param min_size integer
+---@param fill string? (default: ` `)
 function M.str_center_pad(s, min_size, fill)
   s = tostring(s)
   if #s >= min_size then
@@ -182,6 +218,12 @@ function M.str_center_pad(s, min_size, fill)
   return string.rep(fill, left_len) .. s .. string.rep(fill, right_len)
 end
 
+---Truncate the tail of a given string with ellipsis if it exceeds the max
+---length.
+---@param s string
+---@param max_length integer
+---@param head boolean Truncate the head rather than the tail.
+---@return string
 function M.str_shorten(s, max_length, head)
   if string.len(s) > max_length then
     if head then
@@ -192,6 +234,8 @@ function M.str_shorten(s, max_length, head)
   return s
 end
 
+---@param s string
+---@param sep? string (default: `%s+`)
 function M.str_split(s, sep)
   sep = sep or "%s+"
   local iter = s:gmatch("()" .. sep .. "()")
@@ -231,21 +275,21 @@ function M.str_match(str, patterns)
   end
 end
 
----@class StrQuoteSpec
+---@class utils.str_quote.Opt
 ---@field esc_fmt string Format string for escaping quotes. Passed to `string.format()`.
 ---@field prefer_single boolean Prefer single quotes.
 ---@field only_if_whitespace boolean Only quote the string if it contains whitespace.
 
 ---@param s string
----@param opt? StrQuoteSpec
+---@param opt? utils.str_quote.Opt
 function M.str_quote(s, opt)
-  ---@cast opt StrQuoteSpec
+  ---@cast opt utils.str_quote.Opt
   s = tostring(s)
   opt = vim.tbl_extend("keep", opt or {}, {
     esc_fmt = [[\%s]],
     prefer_single = false,
     only_if_whitespace = false,
-  })
+  }) --[[@as utils.str_quote.Opt ]]
 
   if opt.only_if_whitespace and not s:find("%s") then
     return s
@@ -270,7 +314,7 @@ function M.str_quote(s, opt)
   end
 end
 
----@class HandleJobSpec
+---@class utils.handle_job.Opt
 ---@field fail_on_empty boolean Consider the job as failed if the code is 0 and stdout is empty.
 ---@field log_func function|string
 ---@field context string Context for the logger.
@@ -278,7 +322,7 @@ end
 
 ---Handles logging of failed jobs. If the given job hasn't failed, this does nothing.
 ---@param job Job
----@param opt? HandleJobSpec
+---@param opt? utils.handle_job.Opt
 function M.handle_job(job, opt)
   ---@cast job Job|{ [string]: any }
 
@@ -286,7 +330,7 @@ function M.handle_job(job, opt)
   local empty = false
   if opt.fail_on_empty then
     local out = job:result()
-    empty = not (out[1] and out[1] ~= "")
+    empty = not (out[2] ~= nil or out[1] and out[1] ~= "")
   end
 
   if job.code == 0 and not empty then
@@ -302,12 +346,12 @@ function M.handle_job(job, opt)
   if type(opt.log_func) == "string" then
     log_func = logger[opt.log_func]
   elseif type(opt.log_func) == "function" then
-    log_func = opt.log_func
+    log_func = opt.log_func --[[@as function ]]
   end
 
   local args = vim.tbl_map(function(arg)
     return ("'%s'"):format(arg:gsub("'", [['"'"']]))
-  end, job.args)
+  end, job.args) --[[@as string[] ]]
 
   local msg
   local context = opt.context and ("[%s] "):format(opt.context) or ""
@@ -330,7 +374,7 @@ function M.handle_job(job, opt)
   end
 end
 
----@class SystemListSpec
+---@class utils.system_list.Opt
 ---@field cwd string Working directory of the job.
 ---@field silent boolean Supress log output.
 ---@field fail_on_empty boolean Return code 1 if stdout is empty and code is 0.
@@ -340,18 +384,18 @@ end
 
 ---Get the output of a system command.
 ---@param cmd string[]
----@param cwd_or_opt? string|SystemListSpec
+---@param cwd_or_opt? string|utils.system_list.Opt
 ---@return string[] stdout
 ---@return integer code
 ---@return string[] stderr
 ---@overload fun(cmd: string[], cwd: string?)
----@overload fun(cmd: string[], opt: SystemListSpec?)
+---@overload fun(cmd: string[], opt: utils.system_list.Opt?)
 function M.system_list(cmd, cwd_or_opt)
   if vim.in_fast_event() then
     async.util.scheduler()
   end
 
-  ---@type SystemListSpec
+  ---@type utils.system_list.Opt
   local opt
   if type(cwd_or_opt) == "string" then
     opt = { cwd = cwd_or_opt }
@@ -391,7 +435,7 @@ function M.system_list(cmd, cwd_or_opt)
     stderr = {}
     job = Job:new(job_spec)
     stdout, code = job:sync()
-    empty = not (stdout[1] and stdout[1] ~= "")
+    empty = not (stdout[2] ~= nil or stdout[1] and stdout[1] ~= "")
 
     if (code ~= 0 or not empty) then
       break
@@ -415,45 +459,82 @@ function M.system_list(cmd, cwd_or_opt)
   return stdout, code, stderr
 end
 
----@class SetLocalSpec
+---Map of options that accept comma separated, list-like values, but don't work
+---correctly with Option:set(), Option:append(), Option:prepend(), and
+---Option:remove() (seemingly for legacy reasons).
+---WARN: This map is incomplete!
+local list_like_options = {
+  winhighlight = true,
+  listchars = true,
+  fillchars = true,
+}
+
+---@class utils.set_local.Opt
 ---@field method '"set"'|'"remove"'|'"append"'|'"prepend"' Assignment method. (default: "set")
 
----@class SetLocalListSpec : string[]
----@field opt SetLocalSpec
+---@class utils.set_local.ListSpec : string[]
+---@field opt utils.set_local.Opt
 
----HACK: workaround for inconsistent behavior from `vim.opt_local`.
----@see [Neovim issue](https://github.com/neovim/neovim/issues/14670)
+---@alias WindowOptions table<string, boolean|integer|string|utils.set_local.ListSpec>
+
 ---@param winids number[]|number Either a list of winids, or a single winid (0 for current window).
----@param option_map table<string, SetLocalListSpec|string|boolean>
----@param opt? SetLocalSpec
+---@param option_map WindowOptions
+---@param opt? utils.set_local.Opt
 function M.set_local(winids, option_map, opt)
   if type(winids) ~= "table" then
     winids = { winids }
   end
 
-  opt = vim.tbl_extend("keep", opt or {}, { method = "set" })
+  opt = vim.tbl_extend("keep", opt or {}, { method = "set" }) --[[@as table ]]
 
-  local cmd
   for _, id in ipairs(winids) do
     api.nvim_win_call(id, function()
       for option, value in pairs(option_map) do
-        if type(value) == "boolean" then
-          cmd = string.format("setl %s%s", value and "" or "no", option)
-        else
-          ---@type SetLocalSpec
-          local o = opt
-          if type(value) == "table" then
-            o = vim.tbl_extend("force", opt, value.opt or {})
-            value = table.concat(value, ",")
+        local o = opt
+        local fullname = api.nvim_get_option_info(option).name
+        local is_list_like = list_like_options[fullname]
+        local cur_value = vim.o[fullname]
+
+        if type(value) == "table" then
+          if value.opt then
+            o = vim.tbl_extend("force", opt, value.opt) --[[@as table ]]
           end
 
-          cmd = M.str_template(
-            setlocal_opr_templates[o.method],
-            { option = option, value = tostring(value):gsub("'", "''") }
-          )
+          if is_list_like then
+            value = table.concat(value, ",")
+          end
         end
 
-        vim.cmd(cmd)
+        if o.method == "set" then
+          vim.opt_local[option] = value
+
+        else
+          if o.method == "remove" then
+            if is_list_like then
+              vim.opt_local[fullname] = cur_value:gsub(",?" .. vim.pesc(value), "")
+            else
+              vim.opt_local[fullname]:remove(value)
+            end
+
+          elseif o.method == "append" then
+            if is_list_like then
+              vim.opt_local[fullname] = ("%s%s"):format(cur_value ~= "" and cur_value .. ",", value)
+            else
+              vim.opt_local[fullname]:append(value)
+            end
+
+          elseif o.method == "prepend" then
+            if is_list_like then
+              vim.opt_local[fullname] = ("%s%s%s"):format(
+                value,
+                cur_value ~= "" and "," or "",
+                cur_value
+              )
+            else
+              vim.opt_local[fullname]:prepend(value)
+            end
+          end
+        end
       end
     end)
   end
@@ -468,9 +549,18 @@ function M.unset_local(winids, option)
 
   for _, id in ipairs(winids) do
     api.nvim_win_call(id, function()
-      vim.cmd(string.format("set %s<", option))
+      vim.opt_local[option] = nil
     end)
   end
+end
+
+---Get a list of all non-floating windows in a given tabpage.
+---@param tabid integer
+---@return integer[]
+function M.tabpage_list_normal_wins(tabid)
+  return vim.tbl_filter(function(v)
+    return api.nvim_win_get_config(v).relative == ""
+  end, api.nvim_tabpage_list_wins(tabid))
 end
 
 function M.tabnr_to_id(tabnr)
@@ -485,9 +575,6 @@ end
 ---@param t `T`
 ---@return T
 function M.tbl_clone(t)
-  if not t then
-    return
-  end
   local clone = {}
 
   for k, v in pairs(t) do
@@ -530,10 +617,13 @@ end
 
 ---Try property access.
 ---@param t table
----@param table_path string A `.` separated string of table keys.
+---@param table_path string|string[] Either a `.` separated string of table keys, or a list.
 ---@return any?
 function M.tbl_access(t, table_path)
-  local keys = vim.split(table_path, ".", { plain = true })
+  local keys = type(table_path) == "table"
+      and table_path
+      or vim.split(table_path, ".", { plain = true })
+
   local cur = t
 
   for _, k in ipairs(keys) do
@@ -567,13 +657,23 @@ function M.tbl_fmap(t, func)
   return ret
 end
 
----Create a shallow copy of a portion of a vector.
+---Create a shallow copy of a portion of a vector. Negative numbers indexes
+---from the end.
 ---@param t vector
 ---@param first? integer First index, inclusive. (default: 1)
 ---@param last? integer Last index, inclusive. (default: `#t`)
 ---@return vector
 function M.vec_slice(t, first, last)
   local slice = {}
+
+  if first and first < 0 then
+    first = #t + first + 1
+  end
+
+  if last and last < 0 then
+    last = #t + last + 1
+  end
+
   for i = first or 1, last or #t do
     table.insert(slice, t[i])
   end
@@ -581,12 +681,22 @@ function M.vec_slice(t, first, last)
   return slice
 end
 
+---Return all elements in `t` between `first` and `last`. Negative numbers
+---indexes from the end.
+---@param t vector
+---@param first integer First index, inclusive
+---@param last? integer Last index, inclusive
+---@return any ...
+function M.vec_select(t, first, last)
+  return unpack(M.vec_slice(t, first, last))
+end
+
 ---Join multiple vectors into one.
----@vararg vector
+---@param ... any
 ---@return vector
 function M.vec_join(...)
   local result = {}
-  local args = {...}
+  local args = { ... }
   local n = 0
 
   for i = 1, select("#", ...) do
@@ -600,6 +710,92 @@ function M.vec_join(...)
         end
         n = n + #args[i]
       end
+    end
+  end
+
+  return result
+end
+
+---Get the result of the union of the given vectors.
+---@param ... vector
+---@return vector
+function M.vec_union(...)
+  local result = {}
+  local args = {...}
+  local seen = {}
+
+  for i = 1, select("#", ...) do
+    if type(args[i]) ~= "nil" then
+      if type(args[i]) ~= "table" and not seen[args[i]] then
+        seen[args[i]] = true
+        result[#result+1] = args[i]
+      else
+        for _, v in ipairs(args[i]) do
+          if not seen[v] then
+            seen[v] = true
+            result[#result+1] = v
+          end
+        end
+      end
+    end
+  end
+
+  return result
+end
+
+---Get the result of the difference of the given vectors.
+---@param ... vector
+---@return vector
+function M.vec_diff(...)
+  local args = {...}
+  local seen = {}
+
+  for i = 1, select("#", ...) do
+    if type(args[i]) ~= "nil" then
+      if type(args[i]) ~= "table" then
+        if i == 1  then
+          seen[args[i]] = true
+        elseif seen[args[i]] then
+          seen[args[i]] = nil
+        end
+      else
+        for _, v in ipairs(args[i]) do
+          if i == 1 then
+            seen[v] = true
+          elseif seen[v] then
+            seen[v] = nil
+          end
+        end
+      end
+    end
+  end
+
+  return vim.tbl_keys(seen)
+end
+
+---Get the result of the symmetric difference of the given vectors.
+---@param ... vector
+---@return vector
+function M.vec_symdiff(...)
+  local result = {}
+  local args = {...}
+  local seen = {}
+
+  for i = 1, select("#", ...) do
+    if type(args[i]) ~= "nil" then
+      if type(args[i]) ~= "table" then
+        seen[args[i]] = seen[args[i]] == 1 and 0 or 1
+      else
+        for _, v in ipairs(args[i]) do
+          seen[v] = seen[v] == 1 and 0 or 1
+        end
+      end
+    end
+  end
+
+  for v, state in pairs(seen) do
+    if state == 1 then
+      result[#result+1] = v
     end
   end
 
@@ -623,6 +819,7 @@ end
 ---Append any number of objects to the end of a vector. Pushing `nil`
 ---effectively does nothing.
 ---@param t vector
+---@param ... any
 ---@return vector t
 function M.vec_push(t, ...)
   local args = {...}
@@ -634,18 +831,19 @@ function M.vec_push(t, ...)
   return t
 end
 
----Check if a given object is callable.
----@param obj any
----@return boolean
-function M.is_callable(obj)
-  if type(obj) == "function" then
+---Remove an object from a vector.
+---@param t vector
+---@param v any
+---@return boolean success True if the object was removed.
+function M.vec_remove(t, v)
+  local idx = M.vec_indexof(t, v)
+
+  if idx > -1 then
+    table.remove(t, idx)
+
     return true
-  elseif type(obj) == "table" then
-    local mt = getmetatable(obj)
-    if mt then
-      return type(mt.__call) == "function"
-    end
   end
+
   return false
 end
 
@@ -685,7 +883,7 @@ function M.list_bufs(opt)
       return false
     end
     return true
-  end, bufs)
+  end, bufs) --[[@as integer[] ]]
 end
 
 ---@param name string
@@ -722,7 +920,7 @@ end
 ---buffer to the alt buffer if available, and then deletes it.
 ---@param force boolean Ignore unsaved changes.
 ---@param bn? integer
----@return boolean ok, string err
+---@return boolean ok, string? err
 function M.remove_buffer(force, bn)
   bn = bn or api.nvim_get_current_buf()
   if not force then
@@ -792,6 +990,21 @@ function M.win_find_buf(bufid, tabpage)
   return result
 end
 
+---Set the (1,0)-indexed cursor position without having to worry about
+---out-of-bounds coordinates. The line number is clamped to the number of lines
+---in the target buffer.
+---@param winid integer
+---@param line? integer
+---@param column? integer
+function M.set_cursor(winid, line, column)
+  local bufnr = api.nvim_win_get_buf(winid)
+
+  pcall(api.nvim_win_set_cursor, winid, {
+    M.clamp(line or 1, 1, api.nvim_buf_line_count(bufnr)),
+    math.max(0, column or 0)
+  })
+end
+
 ---Create a new table with only keys that are valid when passed to
 ---`nvim_open_win()`.
 ---@param config table
@@ -839,14 +1052,14 @@ end
 
 ---@param prompt string
 ---@param opt InputCharSpec
----@return string Char
+---@return string? Char
 ---@return string Raw
 function M.input_char(prompt, opt)
   opt = vim.tbl_extend("keep", opt or {}, {
     clear_prompt = true,
     allow_non_ascii = false,
     prompt_hl = nil,
-  })
+  }) --[[@as InputCharSpec ]]
 
   if prompt then
     vim.api.nvim_echo({ { prompt, opt.prompt_hl } }, false, {})
@@ -866,7 +1079,9 @@ function M.input_char(prompt, opt)
   end
 
   local s = type(c) == "number" and vim.fn.nr2char(c) or nil
+  ---@type string
   local raw = type(c) == "number" and s or c
+
   return s, raw
 end
 
@@ -906,35 +1121,30 @@ function M.pause(msg)
   )
 end
 
-local function prepare_mapping(t)
-  local default_options = { noremap = true, silent = true }
-  if type(t[4]) ~= "table" then
-    t[4] = {}
-  end
-  local opts = vim.tbl_extend("force", default_options, t.opt or t[4])
-  local rhs
-  if type(t[3]) == "function" then
-    mapping_callbacks[#mapping_callbacks + 1] = t[3]
-    rhs = string.format(
-      "<Cmd>lua require('diffview.utils')._mapping_callbacks[%d]()<CR>",
-      #mapping_callbacks
-    )
-  else
-    assert(type(t[3]) == "string", "The rhs of the mapping must be either a string or a function!")
-    rhs = t[3]
-  end
-
-  return { t[1], t[2], rhs, opts }
+---Open a temporary 1x1 floating window.
+---@param bufnr? integer Buffer to display.
+---@param enter? boolean Enter the window.
+---@return integer winid The window handle, or 0 on error.
+function M.temp_win(bufnr, enter)
+  return api.nvim_open_win(bufnr or 0, not not enter, {
+    relative = "editor",
+    row = 1,
+    col = 1,
+    width = 1,
+    height = 1,
+    noautocmd = true,
+  })
 end
 
-function M.key_map(t)
-  local prepared = prepare_mapping(t)
-  vim.api.nvim_set_keymap(prepared[1], prepared[2], prepared[3], prepared[4])
-end
+---@param func function
+---@param ... any
+---@return function
+function M.wrap_call(func, ...)
+  local args = M.tbl_pack(...)
 
-function M.buf_map(bufid, t)
-  local prepared = prepare_mapping(t)
-  vim.api.nvim_buf_set_keymap(bufid, prepared[1], prepared[2], prepared[3], prepared[4])
+  return function()
+    func(M.tbl_unpack(args))
+  end
 end
 
 local function merge(t, first, mid, last, comparator)

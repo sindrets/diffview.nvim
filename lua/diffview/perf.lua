@@ -4,7 +4,7 @@ local utils = require("diffview.utils")
 local luv = vim.loop
 local M = {}
 
----@class PerfTimer : Object
+---@class PerfTimer : diffview.Object
 ---@field subject string|nil
 ---@field first integer Start time (ns)
 ---@field last integer Stop time (ns)
@@ -14,7 +14,6 @@ local PerfTimer = oop.create_class("PerfTimer")
 
 ---PerfTimer constructor.
 ---@param subject string|nil
----@return PerfTimer
 function PerfTimer:init(subject)
   self.subject = subject
   self.laps = {}
@@ -41,6 +40,7 @@ end
 function PerfTimer:time()
   self.last = luv.hrtime() - self.first
   self.final_time = self.last / 1000000
+
   return self.final_time
 end
 
@@ -58,6 +58,7 @@ function PerfTimer:__tostring()
   else
     local s = (self.subject or "LAPS") .. ":\n"
     local last = 0
+
     for _, lap in ipairs(self.laps) do
       s = s
         .. string.format(
@@ -68,6 +69,7 @@ function PerfTimer:__tostring()
         )
       last = lap[2]
     end
+
     return s .. string.format("== %s %.3f ms", utils.str_right_pad("FINAL TIME", 36), self.final_time)
   end
 end
@@ -80,6 +82,7 @@ end
 function PerfTimer.difference(a, b)
   local delta = (b.final_time - a.final_time) / a.final_time
   local negative = delta < 0
+
   return string.format("%s%.2f%%", not negative and "+" or "", delta * 100)
 end
 

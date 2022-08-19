@@ -1,6 +1,6 @@
-local utils = require("diffview.utils")
 local config = require("diffview.config")
-local renderer = require("diffview.renderer")
+local hl = require("diffview.hl")
+local utils = require("diffview.utils")
 
 ---@param comp  RenderComponent
 ---@param show_path boolean
@@ -10,14 +10,14 @@ local function render_file(comp, show_path, depth)
   local file = comp.context
   local offset = 0
 
-  comp:add_hl(renderer.get_git_hl(file.status), 0, 0, 1)
+  comp:add_hl(hl.get_git_hl(file.status), 0, 0, 1)
   local s = file.status .. " "
   if depth then
     s = s .. string.rep(" ", depth * 2 + 2)
   end
 
   offset = #s
-  local icon = renderer.get_file_icon(file.basename, file.extension, comp, 0, offset)
+  local icon = hl.get_file_icon(file.basename, file.extension, comp, 0, offset)
 
   offset = offset + #icon
   comp:add_hl("DiffviewFilePanelFileName", 0, offset, offset + #file.basename)
@@ -76,7 +76,7 @@ local function render_file_tree_recurse(depth, comp)
   ---@type table
   local ctx = dir.context
 
-  dir:add_hl(renderer.get_git_hl(ctx.status), 0, 0, 1)
+  dir:add_hl(hl.get_git_hl(ctx.status), 0, 0, 1)
   s = get_dir_status_text(ctx, conf.file_panel.tree_options) .. " "
 
   s = s .. string.rep(" ", depth * 2)
@@ -126,7 +126,7 @@ return function(panel)
 
   panel.render_data:clear()
   local width = panel:get_width()
-  if not width then
+  if width == -1 then
     local panel_config = panel:get_config()
     width = panel_config.width
   end
@@ -134,7 +134,7 @@ return function(panel)
   ---@type RenderComponent
   local comp = panel.components.path.comp
   local line_idx = 0
-  local s = utils.path:shorten(utils.path:vim_fnamemodify(panel.git_root, ":~"), width - 6)
+  local s = utils.path:shorten(utils.path:vim_fnamemodify(panel.git_ctx.toplevel, ":~"), width - 6)
   comp:add_hl("DiffviewFilePanelRootPath", line_idx, 0, #s)
   comp:add_line(s)
 
@@ -179,7 +179,7 @@ return function(panel)
     comp = panel.components.info.entries.comp
     line_idx = 0
     for _, arg in ipairs(extra_info) do
-      local relpath = utils.path:relative(arg, panel.git_root)
+      local relpath = utils.path:relative(arg, panel.git_ctx.toplevel)
       if relpath == "" then
         relpath = "."
       end

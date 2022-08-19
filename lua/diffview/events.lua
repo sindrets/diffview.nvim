@@ -21,14 +21,13 @@ local Event = oop.enum({
 ---@field callback function The original callback
 ---@field call function
 
----@class EventEmitter : Object
+---@class EventEmitter : diffview.Object
 ---@field event_map table<Event, Listener[]> # Registered events mapped to subscribed listeners.
 ---@field any_listeners Listener[] # Listeners subscribed to all events.
 ---@field emit_lock table<Event, boolean>
 local EventEmitter = oop.create_class("EventEmitter")
 
 ---EventEmitter constructor.
----@return EventEmitter
 function EventEmitter:init()
   self.event_map = {}
   self.any_listeners = {}
@@ -42,6 +41,7 @@ function EventEmitter:on(event, callback)
   if not self.event_map[event] then
     self.event_map[event] = {}
   end
+
   table.insert(self.event_map[event], {
     type = "normal",
     callback = callback,
@@ -58,7 +58,9 @@ function EventEmitter:once(event, callback)
   if not self.event_map[event] then
     self.event_map[event] = {}
   end
+
   local emitted = false
+
   table.insert(self.event_map[event], {
     type = "once",
     callback = callback,
@@ -88,6 +90,7 @@ end
 ---@param callback function
 function EventEmitter:once_any(callback)
   local emitted = false
+
   table.insert(self.any_listeners, {
     type = "any_once",
     callback = callback,
@@ -107,6 +110,7 @@ end
 function EventEmitter:off(callback, event)
   ---@type Listener[][]
   local all
+
   if event then
     all = { self.event_map[event] }
   else
@@ -147,11 +151,13 @@ end
 function EventEmitter:emit(event, ...)
   if not self.emit_lock[event] then
     local args = utils.tbl_pack(...)
+
     if type(self.event_map[event]) == "table" then
       for _, listener in ipairs(self.event_map[event]) do
         listener.call(args)
       end
     end
+
     for _, listener in ipairs(self.any_listeners) do
       listener.call(event, args)
     end

@@ -2,7 +2,7 @@ if not require("diffview.bootstrap") then
   return
 end
 
-local colors = require("diffview.colors")
+local hl = require("diffview.hl")
 local lazy = require("diffview.lazy")
 
 ---@module "diffview.arg_parser"
@@ -75,7 +75,7 @@ end
 
 function M.init()
   local au = api.nvim_create_autocmd
-  colors.setup()
+  hl.setup()
 
   -- Set up autocommands
   M.augroup = api.nvim_create_augroup("diffview_nvim", {})
@@ -211,10 +211,10 @@ function M.completion(arg_lead, cmd_line, cur_pos)
   end
 end
 
-function M.rev_candidates(git_root, git_dir)
+function M.rev_candidates(git_toplevel, git_dir)
   logger.lvl(1).debug("[completion] Revision candidates requested.")
   local top_indicators
-  if not (git_root and git_dir) then
+  if not (git_toplevel and git_dir) then
     local cfile = utils.path:vim_expand("%")
     top_indicators = utils.vec_join(
       vim.bo.buftype == ""
@@ -224,18 +224,19 @@ function M.rev_candidates(git_root, git_dir)
     )
   end
 
-  if not (git_root and git_dir) then
+  if not (git_toplevel and git_dir) then
     local err
-    err, git_root = lib.find_git_toplevel(top_indicators)
+    err, git_toplevel = lib.find_git_toplevel(top_indicators)
 
     if err then
       return {}
     end
 
-    git_dir = git.git_dir(git_root)
+    ---@cast git_toplevel string
+    git_dir = git.git_dir(git_toplevel)
   end
 
-  if not (git_root and git_dir) then
+  if not (git_toplevel and git_dir) then
     return {}
   end
 
@@ -255,11 +256,11 @@ function M.rev_candidates(git_root, git_dir)
   )
   local revs = git.exec_sync(
     { "rev-parse", "--symbolic", "--branches", "--tags", "--remotes" },
-    { cwd = git_root, silent = true }
+    { cwd = git_toplevel, silent = true }
   )
   local stashes = git.exec_sync(
     { "stash", "list", "--pretty=format:%gd" },
-    { cwd = git_root, silent = true }
+    { cwd = git_toplevel, silent = true }
   )
 
   return utils.vec_join(heads, revs, stashes)
@@ -267,7 +268,7 @@ end
 
 ---@class RevCompletionSpec
 ---@field accept_range boolean
----@field git_root string
+---@field git_toplevel string
 ---@field git_dir string
 
 ---Completion for git revisions.
@@ -277,7 +278,7 @@ end
 function M.rev_completion(arg_lead, opt)
   ---@type RevCompletionSpec
   opt = vim.tbl_extend("keep", opt or {}, { accept_range = false })
-  local candidates = M.rev_candidates(opt.git_root, opt.git_dir)
+  local candidates = M.rev_candidates(opt.git_toplevel, opt.git_dir)
   local _, range_end = utils.str_match(arg_lead, {
     "^(%.%.%.?)()$",
     "^(%.%.%.?)()[^.]",
@@ -297,7 +298,7 @@ end
 
 ---Completion for the git-log `-L` flag.
 ---@param arg_lead string
----@return string[]
+---@return string[]?
 function M.line_trace_completion(arg_lead)
   local range_end = arg_lead:match(".*:()")
 
@@ -325,10 +326,11 @@ M.completers = {
 
     local has_rev_arg = false
     local git_dir
-    local err, git_root = lib.find_git_toplevel(top_indicators)
+    local err, git_toplevel = lib.find_git_toplevel(top_indicators)
 
     if not err then
-      git_dir = git.git_dir(git_root)
+      ---@cast git_toplevel string
+      git_dir = git.git_dir(git_toplevel)
     end
 
     for i = 2, math.min(#args, divideridx) do
@@ -342,11 +344,11 @@ M.completers = {
 
     if argidx > divideridx then
       utils.vec_push(candidates, unpack(vim.fn.getcompletion(arg_lead, "file", 0)))
-    elseif not has_rev_arg and arg_lead:sub(1, 1) ~= "-" and git_dir and git_root then
+    elseif not has_rev_arg and arg_lead:sub(1, 1) ~= "-" and git_dir and git_toplevel then
       utils.vec_push(candidates, unpack(comp_open:get_all_names()))
       utils.vec_push(candidates, unpack(M.rev_completion(arg_lead, {
         accept_range= true,
-        git_root = git_root,
+        git_toplevel = git_toplevel,
         git_dir = git_dir,
       })))
     else
@@ -374,7 +376,7 @@ M.completers = {
 }
 
 function M.update_colors()
-  colors.setup()
+  hl.setup()
   lib.update_colors()
 end
 
