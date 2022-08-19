@@ -92,6 +92,8 @@ function Window:detach_file()
 end
 
 function Window:_save_winopts()
+  if Window.winopt_store[self.file.bufnr] then return end
+
   Window.winopt_store[self.file.bufnr] = {}
   api.nvim_win_call(self.id, function()
     for option, _ in pairs(self.file.winopts) do
