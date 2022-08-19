@@ -72,9 +72,6 @@ M.HlAttribute = {
   blend = 17,
 }
 
-vim.tbl_add_reverse_lookup(M.HlAttribute)
-local hlattr = M.HlAttribute
-
 local style_attrs = {
   "bold",
   "italic",
@@ -88,7 +85,34 @@ local style_attrs = {
   "reverse",
 }
 
+-- NOTE: Some atrtibutes have been renamed in v0.8.0
+if vim.fn.has("nvim-0.8") == 1 then
+  M.HlAttribute.underdashed = M.HlAttribute.underdash
+  M.HlAttribute.underdash = nil
+
+  M.HlAttribute.underdotted = M.HlAttribute.underdot
+  M.HlAttribute.underdot = nil
+
+  M.HlAttribute.underdouble = M.HlAttribute.underlineline
+  M.HlAttribute.underlineline = nil
+
+  style_attrs = {
+    "bold",
+    "italic",
+    "underline",
+    "underdouble",
+    "undercurl",
+    "underdashed",
+    "underdotted",
+    "strikethrough",
+    "standout",
+    "reverse",
+  }
+end
+
+vim.tbl_add_reverse_lookup(M.HlAttribute)
 vim.tbl_add_reverse_lookup(style_attrs)
+local hlattr = M.HlAttribute
 
 ---@param name string Syntax group name.
 ---@param no_trans? boolean Don't translate the syntax group (follow links).
