@@ -44,6 +44,11 @@ return function(view)
         end
       end
     end,
+    diff_buf_read = function(_)
+      view.emitter:once("diff_buf_win_enter", function()
+        utils.set_cursor(0, 1, 0)
+      end)
+    end,
     ---@diagnostic disable-next-line: unused-local
     files_updated = function(files)
       view.initialized = true
