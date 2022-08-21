@@ -1131,7 +1131,7 @@ function M.temp_win(bufnr, enter)
     row = 1,
     col = 1,
     width = 1,
-    height = 1,
+    height = 2, -- Note: Needs to be >=2 in case of winbar (See #193).
     noautocmd = true,
   })
 end
