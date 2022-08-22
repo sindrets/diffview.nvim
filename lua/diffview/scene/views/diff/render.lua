@@ -138,11 +138,30 @@ return function(panel)
   comp:add_hl("DiffviewFilePanelRootPath", line_idx, 0, #s)
   comp:add_line(s)
 
+  local change_count
+
+  if #panel.files.conflicting > 0 then
+    comp = panel.components.conflicting.title.comp
+    line_idx = 0
+    s = "Conflicts"
+    comp:add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
+    change_count = "(" .. #panel.files.conflicting .. ")"
+    comp:add_hl("DiffviewFilePanelCounter", line_idx, #s + 1, #s + 1 + string.len(change_count))
+    s = s .. " " .. change_count
+    comp:add_line(s)
+
+    render_files(panel.listing_style, panel.components.conflicting.files.comp)
+  end
+
   comp = panel.components.working.title.comp
   line_idx = 0
+  if #panel.files.conflicting > 0 then
+    comp:add_line("")
+    line_idx = 1
+  end
   s = "Changes"
   comp:add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
-  local change_count = "(" .. #panel.files.working .. ")"
+  change_count = "(" .. #panel.files.working .. ")"
   comp:add_hl("DiffviewFilePanelCounter", line_idx, #s + 1, #s + 1 + string.len(change_count))
   s = s .. " " .. change_count
   comp:add_line(s)
@@ -151,9 +170,8 @@ return function(panel)
 
   if #panel.files.staged > 0 then
     comp = panel.components.staged.title.comp
-    line_idx = 0
     comp:add_line("")
-    line_idx = line_idx + 1
+    line_idx = 1
     s = "Staged changes"
     comp:add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
     change_count = "(" .. #panel.files.staged .. ")"

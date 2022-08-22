@@ -217,7 +217,7 @@ DiffView.get_updated_files = async.wrap(function(self, callback)
       self.right,
       self.path_args,
       self.options,
-      { diff2 = DiffView.get_default_diff2() },
+      { diff2 = DiffView.get_default_diff2(), diff3 = DiffView.get_default_diff3() },
       callback
       ---@diagnostic disable-next-line: missing-return
   )
@@ -257,6 +257,7 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
       else
         perf:lap("received new file list")
         local files = {
+          { cur_files = self.files.conflicting, new_files = new_files.conflicting },
           { cur_files = self.files.working, new_files = new_files.working },
           { cur_files = self.files.staged, new_files = new_files.staged },
         }

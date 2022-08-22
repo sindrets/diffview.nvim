@@ -2,6 +2,7 @@ local lazy = require("diffview.lazy")
 
 local Diff2Hor = lazy.access("diffview.scene.layouts.diff_2_hor", "Diff2Hor") --[[@as Diff2Hor|LazyModule ]]
 local Diff2Ver = lazy.access("diffview.scene.layouts.diff_2_ver", "Diff2Ver") --[[@as Diff2Ver|LazyModule ]]
+local Diff3Hor = lazy.access("diffview.scene.layouts.diff_3_hor", "Diff3Hor") --[[@as Diff3Hor|LazyModule ]]
 local EventEmitter = lazy.access("diffview.events", "EventEmitter") --[[@as EventEmitter|LazyModule ]]
 local File = lazy.access("diffview.git.file", "File") --[[@as git.File|LazyModule ]]
 local oop = lazy.require("diffview.oop") ---@module "diffview.oop"
@@ -95,8 +96,10 @@ function View.get_default_diff2()
   end
 end
 
+---@return Diff3
 function View.get_default_diff3()
-  error("Not implemented!")
+  -- FIXME
+  return Diff3Hor.__get()
 end
 
 ---@return Diff2 # (class) The default layout class.

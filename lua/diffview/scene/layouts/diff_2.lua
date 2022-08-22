@@ -19,7 +19,7 @@ local Diff2 = oop.create_class("Diff2", Layout)
 ---@field winid_a integer
 ---@field winid_b integer
 
----@param opt Diff2Hor.init.Opt
+---@param opt Diff2.init.Opt
 function Diff2:init(opt)
   Diff2:super().init(self)
   self.a = Window({ file = opt.a, id = opt.winid_a })
@@ -46,7 +46,10 @@ function Diff2:use_entry(entry)
 
   self:set_file_a(layout.a.file)
   self:set_file_b(layout.b.file)
-  self:open_files()
+
+  if self:is_valid() then
+    self:open_files()
+  end
 end
 
 function Diff2:get_main_win()

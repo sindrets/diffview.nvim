@@ -243,6 +243,8 @@ end
 local tracked_files = async.wrap(function(ctx, left, right, args, kind, opt, callback)
   ---@type FileEntry[]
   local files = {}
+  ---@type FileEntry[]
+  local conflicts = {}
   ---@type CountDownLatch
   local latch = CountDownLatch(2)
   local debug_opt = {
@@ -285,6 +287,9 @@ local tracked_files = async.wrap(function(ctx, left, right, args, kind, opt, cal
   end
 
   local numstat_out = numstat_job:result()
+  local data = {}
+  local conflict_map = {}
+
   for i, s in ipairs(namestat_job:result()) do
     local status = s:sub(1, 1):gsub("%s", " ")
     local name = s:match("[%a%s][^%s]*\t(.*)")
@@ -304,19 +309,53 @@ local tracked_files = async.wrap(function(ctx, left, right, args, kind, opt, cal
       stats = nil
     end
 
+    if not (status == "U" and kind == "staged") then
+      table.insert(data, {
+        status = status,
+        name = name,
+        oldname = oldname,
+        stats = stats,
+      })
+    end
+
+    if status == "U" then
+      conflict_map[name] = data[#data]
+    end
+  end
+
+  if kind == "working" and next(conflict_map) then
+    data = vim.tbl_filter(function(v)
+      return not conflict_map[v.name]
+    end, data)
+
+    for _, v in pairs(conflict_map) do
+      table.insert(conflicts, FileEntry.for_d3(opt.diff3, {
+        git_ctx = ctx,
+        path = v.name,
+        oldpath = v.oldname,
+        status = "U",
+        kind = "conflicting",
+        rev_a = Rev(RevType.STAGE, 2),  -- Theirs
+        rev_b = Rev(RevType.STAGE, 1),  -- Common ancestor
+        rev_c = Rev(RevType.STAGE, 3),  -- Ours
+      }))
+    end
+  end
+
+  for _, v in ipairs(data) do
     table.insert(files, FileEntry.for_d2(opt.diff2, {
       git_ctx = ctx,
-      path = name,
-      oldpath = oldname,
-      status = status,
-      stats = stats,
+      path = v.name,
+      oldpath = v.oldname,
+      status = v.status,
+      stats = v.stats,
       kind = kind,
       rev_a = left,
       rev_b = right,
     }))
   end
 
-  callback(nil, files)
+  callback(nil, files, conflicts)
 end, 7)
 
 ---@param ctx GitContext
@@ -390,7 +429,7 @@ M.diff_file_list = async.wrap(function(ctx, left, right, path_args, dv_opt, opt,
     ),
     "working",
     opt,
-    function (err, tfiles)
+    function (err, tfiles, tconflicts)
       if err then
         errors[#errors+1] = err
         utils.err("Failed to get git status for tracked files!", true)
@@ -399,7 +438,9 @@ M.diff_file_list = async.wrap(function(ctx, left, right, path_args, dv_opt, opt,
       end
 
       files:set_working(tfiles)
+      files:set_conflicting(tconflicts)
       local show_untracked = dv_opt.show_untracked
+
       if show_untracked == nil then
         show_untracked = M.show_untracked(ctx.toplevel)
       end
@@ -1281,7 +1322,11 @@ M.show = async.wrap(function(toplevel, args, callback)
     ---@type Job
     on_exit = async.void(function(j)
       local context = "git.utils.show()"
-      utils.handle_job(j, { fail_on_empty = true, context = context })
+      utils.handle_job(j, {
+        fail_on_empty = true,
+        context = context,
+        debug_opt = { no_stdout = true, context = context },
+      })
 
       if j.code ~= 0 then
         callback(j:stderr_result() or {}, nil)
@@ -1343,6 +1388,10 @@ end
 ---@param rev Rev
 ---@return boolean -- True if the file was binary for the given rev, or it didn't exist.
 function M.is_binary(toplevel, path, rev)
+  if rev.type == RevType.STAGE and rev.stage > 0 then
+    return false
+  end
+
   local cmd = { "-c", "submodule.recurse=false", "grep", "-I", "--name-only", "-e", "." }
   if rev.type == RevType.LOCAL then
     cmd[#cmd+1] = "--untracked"

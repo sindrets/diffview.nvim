@@ -45,21 +45,25 @@ function Window:close(force)
   end
 end
 
+---@param callback fun(file: git.File)
 function Window:load_file(callback)
   assert(self.file)
 
   if self.file.bufnr and api.nvim_buf_is_valid(self.file.bufnr) then
-    return callback()
+    return callback(self.file)
   end
 
-  self.file:create_buffer(callback)
+  self.file:create_buffer(function()
+    callback(self.file)
+  end)
 end
 
-function Window:open_file()
+---@param callback? fun(file: git.File)
+function Window:open_file(callback)
   assert(self.file)
 
-  if self:is_valid() then
-    if self.file.active and self.file:is_valid() then
+  if self:is_valid() and self.file.active then
+    local function on_load()
       api.nvim_win_set_buf(self.id, self.file.bufnr)
 
       if self.file.rev.type == RevType.LOCAL then
@@ -68,14 +72,22 @@ function Window:open_file()
 
       self:apply_file_winopts()
       self.file:attach_buffer()
-    else
-      File.load_null_buffer(self.id)
-      self:apply_null_winopts()
+
+      api.nvim_win_call(self.id, function()
+        DiffviewGlobal.emitter:emit("diff_buf_win_enter")
+      end)
+
+      if vim.is_callable(callback) then
+        ---@cast callback -?
+        callback(self.file)
+      end
     end
 
-    api.nvim_win_call(self.id, function()
-      DiffviewGlobal.emitter:emit("diff_buf_win_enter")
-    end)
+    if self.file:is_valid() then
+      on_load()
+    else
+      self:load_file(on_load)
+    end
   end
 end
 

@@ -42,10 +42,23 @@ function Layout:destroy()
   end
 end
 
+function Layout:clone()
+  local clone = self:class()({}) --[[@as Layout ]]
+
+  for i, win in ipairs(self.windows) do
+    clone.windows[i]:set_id(win.id)
+    clone.windows[i]:set_file(win.file)
+  end
+
+  return clone
+end
+
 ---Find or create a window that can be used as a pivot during layout
 ---creation.
 ---@return integer winid
 function Layout:find_pivot()
+  local last_win = api.nvim_get_current_win()
+
   for _, win in ipairs(self.windows) do
     if win:is_valid() then
       local ret
@@ -69,7 +82,13 @@ function Layout:find_pivot()
 
   vim.cmd("1windo belowright vsp")
 
-  return api.nvim_get_current_win()
+  local pivot = api.nvim_get_current_win()
+
+  if api.nvim_win_is_valid(last_win) then
+    api.nvim_set_current_win(last_win)
+  end
+
+  return pivot
 end
 
 ---@return git.File[]
@@ -93,6 +112,17 @@ end
 
 ---@param callback? fun()
 function Layout:open_files(callback)
+  if #self:files() < #self.windows then
+    self:open_null()
+
+    if vim.is_callable(callback) then
+      ---@cast callback -?
+      callback()
+    end
+
+    return
+  end
+
   local load_count = 0
   local all_loaded = self:is_files_loaded()
 

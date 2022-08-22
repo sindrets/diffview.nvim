@@ -121,7 +121,7 @@ end
 ---@field get_data git.FileDataProducer?
 
 ---Create a file entry for a 2-way split diff layout.
----@param layout_class Layout (class)
+---@param layout_class Diff2 (class)
 ---@param opt FileEntry.from_d2.Opt
 ---@return FileEntry
 function FileEntry.for_d2(layout_class, opt)
@@ -151,6 +151,58 @@ function FileEntry.for_d2(layout_class, opt)
         get_data = opt.get_data,
         rev = opt.rev_b,
         nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_b, opt.status, "b")),
+      }),
+    }),
+  })
+end
+
+---@class FileEntry.from_d3.Opt : FileEntry.init.Opt
+---@field rev_a Rev
+---@field rev_b Rev
+---@field rev_c Rev
+---@field nulled boolean
+---@field get_data git.FileDataProducer?
+
+---Create a file entry for a 2-way split diff layout.
+---@param layout_class Diff3 (class)
+---@param opt FileEntry.from_d3.Opt
+---@return FileEntry
+function FileEntry.for_d3(layout_class, opt)
+  return FileEntry({
+    git_ctx = opt.git_ctx,
+    path = opt.path,
+    oldpath = opt.oldpath,
+    status = opt.status,
+    stats = opt.stats,
+    kind = opt.kind,
+    commit = opt.commit,
+    layout = layout_class({
+      a = File({
+        git_ctx = opt.git_ctx,
+        path = opt.oldpath or opt.path,
+        kind = opt.kind,
+        commit = opt.commit,
+        get_data = opt.get_data,
+        rev = opt.rev_a,
+        nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_a, opt.status, "a")),
+      }),
+      b = File({
+        git_ctx = opt.git_ctx,
+        path = opt.path,
+        kind = opt.kind,
+        commit = opt.commit,
+        get_data = opt.get_data,
+        rev = opt.rev_b,
+        nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_b, opt.status, "b")),
+      }),
+      c = File({
+        git_ctx = opt.git_ctx,
+        path = opt.path,
+        kind = opt.kind,
+        commit = opt.commit,
+        get_data = opt.get_data,
+        rev = opt.rev_c,
+        nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_c, opt.status, "c")),
       }),
     }),
   })
