@@ -335,9 +335,9 @@ local tracked_files = async.wrap(function(ctx, left, right, args, kind, opt, cal
         oldpath = v.oldname,
         status = "U",
         kind = "conflicting",
-        rev_a = Rev(RevType.STAGE, 2),  -- Theirs
-        rev_b = Rev(RevType.STAGE, 1),  -- Common ancestor
-        rev_c = Rev(RevType.STAGE, 3),  -- Ours
+        rev_a = Rev(RevType.STAGE, 2),  -- Ours
+        rev_b = Rev(RevType.LOCAL),
+        rev_c = Rev(RevType.STAGE, 3),  -- Theirs
       }))
     end
   end

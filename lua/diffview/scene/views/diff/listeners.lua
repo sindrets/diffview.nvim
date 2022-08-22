@@ -116,7 +116,7 @@ return function(view)
       local item = view:infer_cur_file(true)
       if item then
         local code
-        if item.kind == "working" then
+        if item.kind == "working" or item.kind == "conflicting" then
           _, code = git.exec_sync({ "add", item.path }, view.git_ctx.toplevel)
         elseif item.kind == "staged" then
           _, code = git.exec_sync({ "reset", "--", item.path }, view.git_ctx.toplevel)
@@ -130,9 +130,15 @@ return function(view)
         if type(item.collapsed) == "boolean" then
           ---@cast item DirData
           ---@type FileTree
-          local tree = item.kind == "working"
-            and view.panel.files.working_tree
-            or view.panel.files.staged_tree
+          local tree
+
+          if item.kind == "conflicting" then
+            tree = view.panel.files.conflicting_tree
+          elseif item.kind == "working" then
+            tree = view.panel.files.working_tree
+          else
+            tree = view.panel.files.staged_tree
+          end
 
           ---@type Node
           local item_node
