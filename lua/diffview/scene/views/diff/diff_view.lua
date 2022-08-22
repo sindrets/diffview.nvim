@@ -113,6 +113,11 @@ function DiffView:close()
   end
 end
 
+---@return FileEntry?
+function DiffView:cur_file()
+  return self.panel.cur_file
+end
+
 ---Open the next file.
 ---@param highlight? boolean Bring the cursor to the file entry in the panel.
 ---@return FileEntry?

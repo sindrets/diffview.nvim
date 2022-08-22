@@ -1,5 +1,6 @@
 local File = require("diffview.git.file").File
 local RevType = require("diffview.git.rev").RevType
+local config = require("diffview.config")
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 
@@ -9,6 +10,7 @@ local M = {}
 ---@class Window : diffview.Object
 ---@field id integer
 ---@field file git.File
+---@field parent Layout
 local Window = oop.create_class("Window")
 
 Window.winopt_store = {}
@@ -16,11 +18,13 @@ Window.winopt_store = {}
 ---@class Window.init.opt
 ---@field id integer
 ---@field file git.File
+---@field parent Layout
 
 ---@param opt Window.init.opt
 function Window:init(opt)
   self.id = opt.id
   self.file = opt.file
+  self.parent = opt.parent
 end
 
 function Window:destroy()
@@ -71,7 +75,7 @@ function Window:open_file(callback)
       end
 
       self:apply_file_winopts()
-      self.file:attach_buffer()
+      self.file:attach_buffer(false, config.get_layout_keymaps(self.parent))
 
       api.nvim_win_call(self.id, function()
         DiffviewGlobal.emitter:emit("diff_buf_win_enter")

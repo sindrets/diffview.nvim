@@ -2,6 +2,8 @@ local lazy = require("diffview.lazy")
 
 ---@type DiffView|LazyModule
 local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView")
+---@type Diff3|LazyModule
+local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3")
 ---@type FileHistoryView|LazyModule
 local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView")
 ---@type StandardView|LazyModule
@@ -48,7 +50,7 @@ local function prepare_goto_file()
     end
 
     local cursor
-    local cur_file = (view.panel.cur_item and view.panel.cur_item[2]) or view.panel.cur_file
+    local cur_file = view:cur_file()
     if file == cur_file then
       local win = view.cur_layout:get_main_win()
       cursor = api.nvim_win_get_cursor(win.id)
@@ -216,6 +218,53 @@ function M.scroll_view(distance)
           vim.cmd(scroll_cmd)
         end)
       end
+    end
+  end
+end
+
+---@param kind "ours"|"theirs"|"base"|"local"
+local function diff_copy_target(kind)
+  local view = lib.get_current_view() --[[@as DiffView|FileHistoryView ]]
+  local file = view:cur_file()
+
+  if file then
+    local layout = file.layout
+
+    if layout:instanceof(Diff3.__get()) then
+      ---@cast layout Diff3
+      local bufnr
+
+      if kind == "ours" then
+        bufnr = layout.a.file.bufnr
+      elseif kind == "theirs" then
+        bufnr = layout.c.file.bufnr
+      elseif kind == "local" then
+        bufnr = layout.b.file.bufnr
+      end
+
+      return bufnr
+    end
+  end
+end
+
+---@param target "ours"|"theirs"|"base"|"local"
+function M.diffget(target)
+  return function()
+    local bufnr = diff_copy_target(target)
+
+    if bufnr and api.nvim_buf_is_valid(bufnr) then
+      vim.cmd("diffget " .. bufnr)
+    end
+  end
+end
+
+---@param target "ours"|"theirs"|"base"|"local"
+function M.diffput(target)
+  return function()
+    local bufnr = diff_copy_target(target)
+
+    if bufnr and api.nvim_buf_is_valid(bufnr) then
+      vim.cmd("diffput " .. bufnr)
     end
   end
 end

@@ -85,6 +85,11 @@ function FileHistoryView:close()
   end
 end
 
+---@return FileEntry?
+function FileHistoryView:cur_file()
+  return self.panel.cur_item[2]
+end
+
 function FileHistoryView:next_item()
   self:ensure_layout()
 

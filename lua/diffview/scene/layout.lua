@@ -53,6 +53,20 @@ function Layout:clone()
   return clone
 end
 
+---@param ... Window
+function Layout:use_windows(...)
+  local wins = { ... }
+
+  for i = 1, select("#", ...) do
+    local win = wins[i]
+    win.parent = self
+
+    if utils.vec_indexof(self.windows, win) == -1 then
+      table.insert(self.windows, win)
+    end
+  end
+end
+
 ---Find or create a window that can be used as a pivot during layout
 ---creation.
 ---@return integer winid

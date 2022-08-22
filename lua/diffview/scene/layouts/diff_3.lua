@@ -27,7 +27,7 @@ function Diff3:init(opt)
   self.a = Window({ file = opt.a, id = opt.winid_a })
   self.b = Window({ file = opt.b, id = opt.winid_b })
   self.c = Window({ file = opt.c, id = opt.winid_c })
-  utils.vec_push(self.windows, self.a, self.b, self.c)
+  self:use_windows(self.a, self.b, self.c)
 end
 
 ---@param file git.File

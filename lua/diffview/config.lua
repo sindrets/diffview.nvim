@@ -5,6 +5,10 @@ local lazy = require("diffview.lazy")
 
 ---@module "diffview.utils"
 local utils = lazy.require("diffview.utils")
+---@type Diff2|LazyModule
+local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2")
+---@type Diff3|LazyModule
+local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3")
 
 local M = {}
 
@@ -79,6 +83,12 @@ M.defaults = {
       ["<C-w>gf"]    = actions.goto_file_tab,
       ["<leader>e"]  = actions.focus_files,
       ["<leader>b"]  = actions.toggle_files,
+    },
+    diff2 = {},
+    diff3 = {
+      ["2do"] = actions.diffget("ours"),
+      ["3do"] = actions.diffget("theirs"),
+      ["dp"]  = actions.diffput("local"),
     },
     file_panel = {
       ["j"]             = actions.next_entry,
@@ -205,6 +215,16 @@ function M.get_log_options(single_file, t)
   end
 
   return log_options
+end
+
+---@param layout Layout
+---@return table?
+function M.get_layout_keymaps(layout)
+  if layout:instanceof(Diff2.__get()) then
+    return M._config.keymaps.diff2
+  elseif layout:instanceof(Diff3.__get()) then
+    return M._config.keymaps.diff3
+  end
 end
 
 function M.setup(user_config)

@@ -211,9 +211,10 @@ function File:is_valid()
 end
 
 ---@param force? boolean
-function File:attach_buffer(force)
+---@param keymaps? table
+function File:attach_buffer(force, keymaps)
   if self.bufnr then
-    File._attach_buffer(self.bufnr, force)
+    File._attach_buffer(self.bufnr, force, keymaps)
   end
 end
 
@@ -235,12 +236,13 @@ end
 ---@static
 ---@param bufnr integer
 ---@param force? boolean
-function File._attach_buffer(bufnr, force)
-  if force or not File.attached[bufnr] then
+---@param keymaps? table
+function File._attach_buffer(bufnr, force, keymaps)
+  if force or keymaps or not File.attached[bufnr] then
     local conf = config.get_config()
     local default_opt = { silent = true, nowait = true, buffer = bufnr }
 
-    for lhs, mapping in pairs(conf.keymaps.view) do
+    for lhs, mapping in pairs(vim.tbl_extend("force", conf.keymaps.view, keymaps or {})) do
       if type(lhs) == "number" then
         local opt = vim.tbl_extend("force", mapping[4] or {}, { buffer = bufnr })
         vim.keymap.set(mapping[1], mapping[2], mapping[3], opt)

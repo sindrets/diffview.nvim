@@ -2,7 +2,6 @@ local RevType = require("diffview.git.rev").RevType
 local Window = require("diffview.scene.window").Window
 local Layout = require("diffview.scene.layout").Layout
 local oop = require("diffview.oop")
-local utils = require("diffview.utils")
 
 local M = {}
 
@@ -24,7 +23,7 @@ function Diff2:init(opt)
   Diff2:super().init(self)
   self.a = Window({ file = opt.a, id = opt.winid_a })
   self.b = Window({ file = opt.b, id = opt.winid_b })
-  utils.vec_push(self.windows, self.a, self.b)
+  self:use_windows(self.a, self.b)
 end
 
 ---@param file git.File
