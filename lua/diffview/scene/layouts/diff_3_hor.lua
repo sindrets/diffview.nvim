@@ -64,6 +64,7 @@ function Diff3Hor:create(pivot)
 
   api.nvim_win_close(pivot, true)
   self.windows = { self.a, self.b, self.c }
+  self:open_null()
   self:open_files()
 end
 

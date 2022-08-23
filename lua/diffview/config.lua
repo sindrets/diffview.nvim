@@ -50,6 +50,9 @@ M.defaults = {
       width = 35,
     },
   },
+  merge_tool = {
+    disable_diagnostics = true,
+  },
   file_history_panel = {
     ---@type ConfigLogOptions
     log_options = {

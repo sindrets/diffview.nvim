@@ -68,6 +68,7 @@ function Window:open_file(callback)
 
   if self:is_valid() and self.file.active then
     local function on_load()
+      vim.cmd("diffoff!")
       api.nvim_win_set_buf(self.id, self.file.bufnr)
 
       if self.file.rev.type == RevType.LOCAL then
@@ -75,7 +76,11 @@ function Window:open_file(callback)
       end
 
       self:apply_file_winopts()
-      self.file:attach_buffer(false, config.get_layout_keymaps(self.parent))
+      self.file:attach_buffer(false, {
+        keymaps = config.get_layout_keymaps(self.parent),
+        disable_diagnostics = self.file.kind == "conflicting"
+            and config.get_config().merge_tool.disable_diagnostics,
+      })
 
       api.nvim_win_call(self.id, function()
         DiffviewGlobal.emitter:emit("diff_buf_win_enter")
@@ -97,6 +102,7 @@ end
 
 function Window:open_null()
   if self:is_valid() then
+    vim.cmd("diffoff!")
     File.load_null_buffer(self.id)
   end
 end
@@ -137,7 +143,7 @@ end
 
 function Window:apply_null_winopts()
   if File.NULL_FILE.winopts then
-    utils.set_local(self.id, self.file.winopts)
+    utils.set_local(self.id, File.NULL_FILE.winopts)
   end
 end
 

@@ -96,7 +96,6 @@ function FileHistoryView:next_item()
   if self:file_safeguard() then return end
 
   if self.panel:num_items() > 1 or self.nulled then
-    vim.cmd("diffoff!")
     local cur = self.panel:next_file()
 
     if cur then
@@ -115,7 +114,6 @@ function FileHistoryView:prev_item()
   if self:file_safeguard() then return end
 
   if self.panel:num_items() > 1 or self.nulled then
-    vim.cmd("diffoff!")
     local cur = self.panel:prev_file()
 
     if cur then
@@ -136,7 +134,6 @@ function FileHistoryView:set_file(file, focus)
   local entry = self.panel:find_entry(file)
 
   if entry then
-    vim.cmd("diffoff!")
     self.panel:set_cur_item({ entry, file })
     self.panel:highlight_item(file)
     self.nulled = false

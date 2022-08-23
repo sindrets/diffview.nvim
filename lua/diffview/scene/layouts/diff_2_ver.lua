@@ -59,8 +59,8 @@ function Diff2Ver:create(pivot)
 
   api.nvim_win_close(pivot, true)
   self.windows = { self.a, self.b }
-  self.a:open_file()
-  self.b:open_file()
+  self:open_null()
+  self:open_files()
 end
 
 M.Diff2Ver = Diff2Ver

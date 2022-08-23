@@ -127,7 +127,6 @@ function DiffView:next_file(highlight)
   if self:file_safeguard() then return end
 
   if self.files:len() > 1 or self.nulled then
-    vim.cmd("diffoff!")
     local cur = self.panel:next_file()
 
     if cur then
@@ -152,7 +151,6 @@ function DiffView:prev_file(highlight)
   if self:file_safeguard() then return end
 
   if self.files:len() > 1 or self.nulled then
-    vim.cmd("diffoff!")
     local cur = self.panel:prev_file()
 
     if cur then
@@ -179,7 +177,6 @@ function DiffView:set_file(file, focus, highlight)
 
   for _, f in self.files:ipairs() do
     if f == file then
-      vim.cmd("diffoff!")
       self.panel:set_cur_file(file)
 
       if highlight or not self.panel:is_focused() then
