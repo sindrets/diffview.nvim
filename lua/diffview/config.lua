@@ -86,6 +86,7 @@ M.defaults = {
       ["<C-w>gf"]    = actions.goto_file_tab,
       ["<leader>e"]  = actions.focus_files,
       ["<leader>b"]  = actions.toggle_files,
+      ["g<C-x>"]     = actions.cycle_layout,
     },
     diff2 = {},
     diff3 = {
@@ -118,6 +119,7 @@ M.defaults = {
       ["f"]             = actions.toggle_flatten_dirs,
       ["<leader>e"]     = actions.focus_files,
       ["<leader>b"]     = actions.toggle_files,
+      ["g<C-x>"]        = actions.cycle_layout,
     },
     file_history_panel = {
       ["g!"]            = actions.options,
@@ -142,6 +144,7 @@ M.defaults = {
       ["<C-w>gf"]       = actions.goto_file_tab,
       ["<leader>e"]     = actions.focus_files,
       ["<leader>b"]     = actions.toggle_files,
+      ["g<C-x>"]        = actions.cycle_layout,
     },
     option_panel = {
       ["<tab>"] = actions.select_entry,

@@ -53,6 +53,16 @@ function Layout:clone()
   return clone
 end
 
+---Check if any of the windows in the lauout are focused.
+---@return boolean
+function Layout:is_focused()
+  for _, win in ipairs(self.windows) do
+    if win:is_focused() then return true end
+  end
+
+  return false
+end
+
 ---@param ... Window
 function Layout:use_windows(...)
   local wins = { ... }

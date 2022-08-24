@@ -1,7 +1,16 @@
+local lazy = require("diffview.lazy")
 local Window = require("diffview.scene.window").Window
 local Layout = require("diffview.scene.layout").Layout
 local oop = require("diffview.oop")
-local utils = require("diffview.utils")
+
+---@type Diff4|LazyModule
+local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4")
+---@type git.File|LazyModule
+local File = lazy.access("diffview.git.file", "File")
+---@type Rev|LazyModule
+local Rev = lazy.access("diffview.git.rev", "Rev")
+---@type ERevType|LazyModule
+local RevType = lazy.access("diffview.git.rev", "RevType")
 
 local M = {}
 
@@ -64,6 +73,28 @@ end
 
 function Diff3:get_main_win()
   return self.b
+end
+
+---@param layout Diff4
+---@return Diff4
+function Diff3:to_diff4(layout)
+  assert(layout:instanceof(Diff4.__get()))
+  local main = self:get_main_win().file
+
+  return layout({
+    a = self.a.file,
+    b = self.b.file,
+    c = self.c.file,
+    d = File({
+      git_ctx = main.git_ctx,
+      path = main.path,
+      kind = main.kind,
+      commit = main.commit,
+      get_data = main.get_data,
+      rev = Rev(RevType.STAGE, 1),
+      nulled = false, -- FIXME
+    })
+  })
 end
 
 ---FIXME

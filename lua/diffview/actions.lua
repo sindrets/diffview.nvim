@@ -2,8 +2,6 @@ local lazy = require("diffview.lazy")
 
 ---@type DiffView|LazyModule
 local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView")
----@type Diff3|LazyModule
-local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3")
 ---@type FileHistoryView|LazyModule
 local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView")
 ---@type StandardView|LazyModule
@@ -12,6 +10,19 @@ local StandardView = lazy.access("diffview.scene.views.standard.standard_view", 
 local lib = lazy.require("diffview.lib")
 ---@module "diffview.utils"
 local utils = lazy.require("diffview.utils")
+
+---@type Diff2Hor|LazyModule
+local Diff2Hor = lazy.access("diffview.scene.layouts.diff_2_hor", "Diff2Hor")
+---@type Diff2Ver|LazyModule
+local Diff2Ver = lazy.access("diffview.scene.layouts.diff_2_ver", "Diff2Ver")
+---@type Diff3|LazyModule
+local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3")
+---@type Diff3Hor|LazyModule
+local Diff3Hor = lazy.access("diffview.scene.layouts.diff_3_hor", "Diff3Hor")
+---@type Diff3Mixed|LazyModule
+local Diff3Mixed = lazy.access("diffview.scene.layouts.diff_3_mixed", "Diff3Mixed")
+---@type Diff4Mixed|LazyModule
+local Diff4Mixed = lazy.access("diffview.scene.layouts.diff_4_mixed", "Diff4Mixed")
 
 local api = vim.api
 
@@ -265,6 +276,62 @@ function M.diffput(target)
 
     if bufnr and api.nvim_buf_is_valid(bufnr) then
       vim.cmd("diffput " .. bufnr)
+    end
+  end
+end
+
+function M.cycle_layout()
+  local layout_cycles = {
+    standard = {
+      Diff2Hor.__get(),
+      Diff2Ver.__get(),
+    },
+    merge_tool = {
+      Diff3Hor.__get(),
+      Diff3Mixed.__get(),
+      Diff4Mixed.__get(),
+    }
+  }
+
+  local view = lib.get_current_view()
+
+  if not view then return end
+
+  local layouts, files, cur_file
+
+  if view:instanceof(FileHistoryView.__get()) then
+    ---@cast view FileHistoryView
+    layouts = layout_cycles.standard
+    files = view.panel:list_files()
+    cur_file = view:cur_file()
+  elseif view:instanceof(DiffView.__get()) then
+    ---@cast view DiffView
+    cur_file = view:cur_file()
+
+    if cur_file then
+      layouts = cur_file.kind == "conflicting"
+          and layout_cycles.merge_tool
+          or layout_cycles.standard
+      files = cur_file.kind == "conflicting"
+          and view.files.conflicting
+          or utils.vec_join(view.panel.files.working, view.panel.files.staged)
+    end
+  else
+    return
+  end
+
+  for _, entry in ipairs(files) do
+    local cur_layout = entry.layout
+    local next_layout = layouts[utils.vec_indexof(layouts, cur_layout:class()) % #layouts + 1]
+    entry:convert_layout(next_layout)
+  end
+
+  if cur_file then
+    local was_focused = view.cur_layout:is_focused()
+    view:set_file(cur_file, false)
+
+    if was_focused then
+      view.cur_layout:get_main_win():focus()
     end
   end
 end

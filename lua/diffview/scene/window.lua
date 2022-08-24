@@ -49,6 +49,16 @@ function Window:close(force)
   end
 end
 
+function Window:focus()
+  if self:is_valid() then
+    api.nvim_set_current_win(self.id)
+  end
+end
+
+function Window:is_focused()
+  return self:is_valid() and api.nvim_get_current_win() == self.id
+end
+
 ---@param callback fun(file: git.File)
 function Window:load_file(callback)
   assert(self.file)

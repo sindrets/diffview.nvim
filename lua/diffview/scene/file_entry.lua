@@ -1,7 +1,18 @@
-local File = require("diffview.git.file").File
-local RevType = require("diffview.git.rev").RevType
+local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
-local utils = require("diffview.utils")
+
+---@type git.File|LazyModule
+local File = lazy.access("diffview.git.file", "File")
+---@type RevType|LazyModule
+local RevType = lazy.access("diffview.git.rev", "RevType")
+---@type Diff2|LazyModule
+local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2")
+---@type Diff3|LazyModule
+local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3")
+---@type Diff4|LazyModule
+local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4")
+---@module "diffview.utils"
+local utils = lazy.require("diffview.utils")
 
 local M = {}
 
@@ -79,6 +90,58 @@ function FileEntry:set_active(flag)
   for _, f in ipairs(self.layout:files()) do
     f.active = flag
   end
+end
+
+---@param target_layout Layout
+function FileEntry:convert_layout(target_layout)
+    local cur_layout = self.layout
+
+    if cur_layout:class() == target_layout:class() then return end
+
+    if cur_layout:instanceof(Diff2.__get()) then
+      ---@cast cur_layout Diff2
+      if target_layout:instanceof(Diff2.__get()) then
+        self.layout = target_layout({
+          a = cur_layout.a.file,
+          b = cur_layout.b.file,
+        })
+        return
+      end
+    elseif cur_layout:instanceof(Diff3.__get()) then
+      ---@cast cur_layout Diff3
+      if target_layout:instanceof(Diff3.__get()) then
+        self.layout = target_layout({
+          a = cur_layout.a.file,
+          b = cur_layout.b.file,
+          c = cur_layout.c.file,
+        })
+        return
+      elseif target_layout:instanceof(Diff4.__get()) then
+        ---@cast target_layout Diff4
+        self.layout = cur_layout:to_diff4(target_layout)
+        return
+      end
+    elseif cur_layout:instanceof(Diff4.__get()) then
+      ---@cast cur_layout Diff4
+      if target_layout:instanceof(Diff4.__get()) then
+        self.layout = target_layout({
+          a = cur_layout.a.file,
+          b = cur_layout.b.file,
+          c = cur_layout.c.file,
+          d = cur_layout.d.file,
+        })
+        return
+      elseif target_layout:instanceof(Diff3.__get()) then
+        ---@cast target_layout Diff3
+        self.layout = cur_layout:to_diff3(target_layout)
+        return
+      end
+    end
+
+    error(("Unimplemented layout conversion: %s to %s"):format(
+      cur_layout:class(),
+      target_layout:class()
+    ))
 end
 
 ---@param git_ctx GitContext

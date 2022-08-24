@@ -308,6 +308,19 @@ function FileHistoryPanel:num_items()
   end
 end
 
+---@return FileEntry[]
+function FileHistoryPanel:list_files()
+  local files = {}
+
+  for _, entry in ipairs(self.entries) do
+    for _, file in ipairs(entry.files) do
+      table.insert(files, file)
+    end
+  end
+
+  return files
+end
+
 function FileHistoryPanel:find_entry(file)
   for _, entry in ipairs(self.entries) do
     for _, f in ipairs(entry.files) do
