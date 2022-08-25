@@ -78,7 +78,6 @@ function Window:open_file(callback)
 
   if self:is_valid() and self.file.active then
     local function on_load()
-      vim.cmd("diffoff!")
       api.nvim_win_set_buf(self.id, self.file.bufnr)
 
       if self.file.rev.type == RevType.LOCAL then
@@ -112,7 +111,6 @@ end
 
 function Window:open_null()
   if self:is_valid() then
-    vim.cmd("diffoff!")
     File.load_null_buffer(self.id)
   end
 end

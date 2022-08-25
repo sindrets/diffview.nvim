@@ -5,10 +5,14 @@ local lazy = require("diffview.lazy")
 
 ---@module "diffview.utils"
 local utils = lazy.require("diffview.utils")
+---@type Diff1|LazyModule
+local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1")
 ---@type Diff2|LazyModule
 local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2")
 ---@type Diff3|LazyModule
 local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3")
+---@type Diff4|LazyModule
+local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4")
 
 local M = {}
 
@@ -88,8 +92,15 @@ M.defaults = {
       ["<leader>b"]  = actions.toggle_files,
       ["g<C-x>"]     = actions.cycle_layout,
     },
+    diff1 = {},
     diff2 = {},
     diff3 = {
+      ["2do"] = actions.diffget("ours"),
+      ["3do"] = actions.diffget("theirs"),
+      ["dp"]  = actions.diffput("local"),
+    },
+    diff4 = {
+      ["1do"] = actions.diffget("base"),
       ["2do"] = actions.diffget("ours"),
       ["3do"] = actions.diffget("theirs"),
       ["dp"]  = actions.diffput("local"),
@@ -226,10 +237,14 @@ end
 ---@param layout Layout
 ---@return table?
 function M.get_layout_keymaps(layout)
-  if layout:instanceof(Diff2.__get()) then
+  if layout:instanceof(Diff1.__get()) then
+    return M._config.keymaps.diff1
+  elseif layout:instanceof(Diff2.__get()) then
     return M._config.keymaps.diff2
   elseif layout:instanceof(Diff3.__get()) then
     return M._config.keymaps.diff3
+  elseif layout:instanceof(Diff4.__get()) then
+    return M._config.keymaps.diff4
   end
 end
 

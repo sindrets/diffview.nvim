@@ -150,6 +150,8 @@ function Layout:open_files(callback)
   local load_count = 0
   local all_loaded = self:is_files_loaded()
 
+  vim.cmd("diffoff!")
+
   for _, win in ipairs(self.windows) do
     if not all_loaded then
       win:open_null()

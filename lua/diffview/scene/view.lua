@@ -1,8 +1,10 @@
 local lazy = require("diffview.lazy")
 
+local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1") --[[@as Diff1|LazyModule ]]
 local Diff2Hor = lazy.access("diffview.scene.layouts.diff_2_hor", "Diff2Hor") --[[@as Diff2Hor|LazyModule ]]
 local Diff2Ver = lazy.access("diffview.scene.layouts.diff_2_ver", "Diff2Ver") --[[@as Diff2Ver|LazyModule ]]
 local Diff3Hor = lazy.access("diffview.scene.layouts.diff_3_hor", "Diff3Hor") --[[@as Diff3Hor|LazyModule ]]
+local Diff4Mixed = lazy.access("diffview.scene.layouts.diff_4_mixed", "Diff4Mixed") --[[@as Diff4Mixed|LazyModule ]]
 local EventEmitter = lazy.access("diffview.events", "EventEmitter") --[[@as EventEmitter|LazyModule ]]
 local File = lazy.access("diffview.git.file", "File") --[[@as git.File|LazyModule ]]
 local oop = lazy.require("diffview.oop") ---@module "diffview.oop"
@@ -86,6 +88,11 @@ function View:is_cur_tabpage()
   return self.tabpage == api.nvim_get_current_tabpage()
 end
 
+---@return Diff1
+function View.get_default_diff1()
+  return Diff1.__get()
+end
+
 ---@return Diff2
 function View.get_default_diff2()
   local diffopts = utils.str_split(vim.o.diffopt, ",")
@@ -100,6 +107,12 @@ end
 function View.get_default_diff3()
   -- FIXME
   return Diff3Hor.__get()
+end
+
+---@return Diff4
+function View.get_default_diff4()
+  -- FIXME
+  return Diff4Mixed.__get()
 end
 
 ---@return Diff2 # (class) The default layout class.

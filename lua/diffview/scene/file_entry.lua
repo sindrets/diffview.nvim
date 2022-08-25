@@ -5,6 +5,8 @@ local oop = require("diffview.oop")
 local File = lazy.access("diffview.git.file", "File")
 ---@type RevType|LazyModule
 local RevType = lazy.access("diffview.git.rev", "RevType")
+---@type Diff1|LazyModule
+local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1")
 ---@type Diff2|LazyModule
 local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2")
 ---@type Diff3|LazyModule
@@ -98,7 +100,18 @@ function FileEntry:convert_layout(target_layout)
 
     if cur_layout:class() == target_layout:class() then return end
 
-    if cur_layout:instanceof(Diff2.__get()) then
+    if cur_layout:instanceof(Diff1.__get()) then
+      ---@cast cur_layout Diff1
+      if target_layout:instanceof(Diff3.__get()) then
+        ---@cast target_layout Diff3
+        self.layout = cur_layout:to_diff3(target_layout)
+        return
+      elseif target_layout:instanceof(Diff4.__get()) then
+        ---@cast target_layout Diff4
+        self.layout = cur_layout:to_diff4(target_layout)
+        return
+      end
+    elseif cur_layout:instanceof(Diff2.__get()) then
       ---@cast cur_layout Diff2
       if target_layout:instanceof(Diff2.__get()) then
         self.layout = target_layout({
@@ -109,7 +122,11 @@ function FileEntry:convert_layout(target_layout)
       end
     elseif cur_layout:instanceof(Diff3.__get()) then
       ---@cast cur_layout Diff3
-      if target_layout:instanceof(Diff3.__get()) then
+      if target_layout:instanceof(Diff1.__get()) then
+        ---@cast target_layout Diff1
+        self.layout = cur_layout:to_diff1(target_layout)
+        return
+      elseif target_layout:instanceof(Diff3.__get()) then
         self.layout = target_layout({
           a = cur_layout.a.file,
           b = cur_layout.b.file,
@@ -123,7 +140,11 @@ function FileEntry:convert_layout(target_layout)
       end
     elseif cur_layout:instanceof(Diff4.__get()) then
       ---@cast cur_layout Diff4
-      if target_layout:instanceof(Diff4.__get()) then
+      if target_layout:instanceof(Diff1.__get()) then
+        ---@cast target_layout Diff1
+        self.layout = cur_layout:to_diff1(target_layout)
+        return
+      elseif target_layout:instanceof(Diff4.__get()) then
         self.layout = target_layout({
           a = cur_layout.a.file,
           b = cur_layout.b.file,

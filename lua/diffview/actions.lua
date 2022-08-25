@@ -11,6 +11,8 @@ local lib = lazy.require("diffview.lib")
 ---@module "diffview.utils"
 local utils = lazy.require("diffview.utils")
 
+---@type Diff1|LazyModule
+local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1")
 ---@type Diff2Hor|LazyModule
 local Diff2Hor = lazy.access("diffview.scene.layouts.diff_2_hor", "Diff2Hor")
 ---@type Diff2Ver|LazyModule
@@ -19,8 +21,12 @@ local Diff2Ver = lazy.access("diffview.scene.layouts.diff_2_ver", "Diff2Ver")
 local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3")
 ---@type Diff3Hor|LazyModule
 local Diff3Hor = lazy.access("diffview.scene.layouts.diff_3_hor", "Diff3Hor")
+---@type Diff3Hor|LazyModule
+local Diff3Ver = lazy.access("diffview.scene.layouts.diff_3_ver", "Diff3Ver")
 ---@type Diff3Mixed|LazyModule
 local Diff3Mixed = lazy.access("diffview.scene.layouts.diff_3_mixed", "Diff3Mixed")
+---@type Diff4|LazyModule
+local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4")
 ---@type Diff4Mixed|LazyModule
 local Diff4Mixed = lazy.access("diffview.scene.layouts.diff_4_mixed", "Diff4Mixed")
 
@@ -240,11 +246,10 @@ local function diff_copy_target(kind)
 
   if file then
     local layout = file.layout
+    local bufnr
 
     if layout:instanceof(Diff3.__get()) then
       ---@cast layout Diff3
-      local bufnr
-
       if kind == "ours" then
         bufnr = layout.a.file.bufnr
       elseif kind == "theirs" then
@@ -252,9 +257,20 @@ local function diff_copy_target(kind)
       elseif kind == "local" then
         bufnr = layout.b.file.bufnr
       end
-
-      return bufnr
+    elseif layout:instanceof(Diff4.__get()) then
+      ---@cast layout Diff4
+      if kind == "ours" then
+        bufnr = layout.a.file.bufnr
+      elseif kind == "theirs" then
+        bufnr = layout.c.file.bufnr
+      elseif kind == "base" then
+        bufnr = layout.d.file.bufnr
+      elseif kind == "local" then
+        bufnr = layout.b.file.bufnr
+      end
     end
+
+    if bufnr then return bufnr end
   end
 end
 
@@ -288,8 +304,10 @@ function M.cycle_layout()
     },
     merge_tool = {
       Diff3Hor.__get(),
+      Diff3Ver.__get(),
       Diff3Mixed.__get(),
       Diff4Mixed.__get(),
+      Diff1.__get(),
     }
   }
 

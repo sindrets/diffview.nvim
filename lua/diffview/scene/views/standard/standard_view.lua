@@ -1,9 +1,13 @@
 local lazy = require("diffview.lazy")
 
+---@type Diff1|LazyModule
+local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1")
 ---@type Diff2|LazyModule
 local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2")
 ---@type Diff3|LazyModule
 local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3")
+---@type Diff4|LazyModule
+local Diff4 = lazy.access("diffview.scene.layouts.diff_3", "Diff4")
 ---@type Panel|LazyModule
 local Panel = lazy.access("diffview.ui.panel", "Panel")
 ---@type View|LazyModule
@@ -34,8 +38,10 @@ function StandardView:init(opt)
   self.panel = opt.panel or Panel()
   self.layouts = opt.layouts or {}
   self.winopts = opt.winopts or {
+    diff1 = { a = {} },
     diff2 = { a = {}, b = {} },
     diff3 = { a = {}, b = {}, c = {} },
+    diff4 = { a = {}, b = {}, c = {}, d = {} },
   }
 
   self.emitter:on("post_layout", utils.wrap_call(self.post_layout, self))
@@ -123,7 +129,15 @@ end
 
 ---@param entry FileEntry
 function StandardView:use_entry(entry)
-  if entry.layout:instanceof(Diff2.__get()) then
+  if entry.layout:instanceof(Diff1.__get()) then
+    local layout = entry.layout --[[@as Diff1 ]]
+    layout.a.file.winopts = vim.tbl_extend(
+      "force",
+      layout.a.file.winopts,
+      self.winopts.diff1.a or {}
+    )
+
+  elseif entry.layout:instanceof(Diff2.__get()) then
     local layout = entry.layout --[[@as Diff2 ]]
     layout.a.file.winopts = vim.tbl_extend(
       "force",
@@ -152,6 +166,24 @@ function StandardView:use_entry(entry)
       "force",
       layout.c.file.winopts,
       self.winopts.diff3.c or {}
+    )
+
+  elseif entry.layout:instanceof(Diff4.__get()) then
+    local layout = entry.layout --[[@as Diff4 ]]
+    layout.a.file.winopts = vim.tbl_extend(
+      "force",
+      layout.a.file.winopts,
+      self.winopts.diff4.a or {}
+    )
+    layout.b.file.winopts = vim.tbl_extend(
+      "force",
+      layout.b.file.winopts,
+      self.winopts.diff4.b or {}
+    )
+    layout.c.file.winopts = vim.tbl_extend(
+      "force",
+      layout.c.file.winopts,
+      self.winopts.diff4.c or {}
     )
   end
 

@@ -3,6 +3,8 @@ local Window = require("diffview.scene.window").Window
 local Layout = require("diffview.scene.layout").Layout
 local oop = require("diffview.oop")
 
+---@type Diff1|LazyModule
+local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1")
 ---@type Diff4|LazyModule
 local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4")
 ---@type git.File|LazyModule
@@ -73,6 +75,14 @@ end
 
 function Diff3:get_main_win()
   return self.b
+end
+
+---@param layout Diff1
+---@return Diff1
+function Diff3:to_diff1(layout)
+  assert(layout:instanceof(Diff1.__get()))
+
+  return layout({ a = self:get_main_win().file })
 end
 
 ---@param layout Diff4
