@@ -113,6 +113,8 @@ M.defaults = {
       ["<leader>e"]  = actions.focus_files,
       ["<leader>b"]  = actions.toggle_files,
       ["g<C-x>"]     = actions.cycle_layout,
+      ["[x"]         = actions.prev_conflict,
+      ["]x"]         = actions.next_conflict,
     },
     diff1 = {},
     diff2 = {},
@@ -153,6 +155,8 @@ M.defaults = {
       ["<leader>e"]     = actions.focus_files,
       ["<leader>b"]     = actions.toggle_files,
       ["g<C-x>"]        = actions.cycle_layout,
+      ["[x"]            = actions.prev_conflict,
+      ["]x"]            = actions.next_conflict,
     },
     file_history_panel = {
       ["g!"]            = actions.options,

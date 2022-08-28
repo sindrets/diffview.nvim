@@ -1,34 +1,20 @@
 local lazy = require("diffview.lazy")
 
----@type DiffView|LazyModule
-local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView")
----@type FileHistoryView|LazyModule
-local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView")
----@type StandardView|LazyModule
-local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView")
----@module "diffview.lib"
-local lib = lazy.require("diffview.lib")
----@module "diffview.utils"
-local utils = lazy.require("diffview.utils")
+local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
+local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView") ---@type FileHistoryView|LazyModule
+local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
+local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
----@type Diff1|LazyModule
-local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1")
----@type Diff2Hor|LazyModule
-local Diff2Hor = lazy.access("diffview.scene.layouts.diff_2_hor", "Diff2Hor")
----@type Diff2Ver|LazyModule
-local Diff2Ver = lazy.access("diffview.scene.layouts.diff_2_ver", "Diff2Ver")
----@type Diff3|LazyModule
-local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3")
----@type Diff3Hor|LazyModule
-local Diff3Hor = lazy.access("diffview.scene.layouts.diff_3_hor", "Diff3Hor")
----@type Diff3Hor|LazyModule
-local Diff3Ver = lazy.access("diffview.scene.layouts.diff_3_ver", "Diff3Ver")
----@type Diff3Mixed|LazyModule
-local Diff3Mixed = lazy.access("diffview.scene.layouts.diff_3_mixed", "Diff3Mixed")
----@type Diff4|LazyModule
-local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4")
----@type Diff4Mixed|LazyModule
-local Diff4Mixed = lazy.access("diffview.scene.layouts.diff_4_mixed", "Diff4Mixed")
+local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1") ---@type Diff1|LazyModule
+local Diff2Hor = lazy.access("diffview.scene.layouts.diff_2_hor", "Diff2Hor") ---@type Diff2Hor|LazyModule
+local Diff2Ver = lazy.access("diffview.scene.layouts.diff_2_ver", "Diff2Ver") ---@type Diff2Ver|LazyModule
+local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3") ---@type Diff3|LazyModule
+local Diff3Hor = lazy.access("diffview.scene.layouts.diff_3_hor", "Diff3Hor") ---@type Diff3Hor|LazyModule
+local Diff3Ver = lazy.access("diffview.scene.layouts.diff_3_ver", "Diff3Ver") ---@type Diff3Hor|LazyModule
+local Diff3Mixed = lazy.access("diffview.scene.layouts.diff_3_mixed", "Diff3Mixed") ---@type Diff3Mixed|LazyModule
+local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4") ---@type Diff4|LazyModule
+local Diff4Mixed = lazy.access("diffview.scene.layouts.diff_4_mixed", "Diff4Mixed") ---@type Diff4Mixed|LazyModule
 
 local api = vim.api
 
@@ -165,6 +151,113 @@ function M.goto_file_tab()
 
     if cursor then
       utils.set_cursor(0, unpack(cursor))
+    end
+  end
+end
+
+---@class actions.buf_search.Opt
+---@field reverse boolean
+
+---@param bufnr integer
+---@param pattern string
+---@param opt? actions.buf_search.Opt
+local function buf_search(bufnr, pattern, opt)
+  opt = opt or {}
+  local ret = {}
+
+  api.nvim_buf_call(bufnr, function()
+    local flags = ("n%s"):format(
+      opt.reverse and "b" or ""
+    )
+    local pos = vim.fn.searchpos(pattern, flags)
+
+    if not (pos[1] == 0 and pos[2] == 0) then
+      ret.pos = pos --[[@as integer[] ]]
+      local ok, count = pcall(vim.fn.searchcount, {
+        pattern = pattern,
+        maxcount = 10000,
+        pos = { pos[1], pos[2], 0 },
+      })
+
+      if not ok or vim.tbl_isempty(count) then
+        return
+      end
+
+      local total = count.total
+      local current = count.current
+
+      if count.incomplete == 2 then
+        total = ">" .. count.maxcount
+        if current > count.maxcount then current = total end
+      end
+
+      ret.count = ("[%s/%s]"):format(current, total)
+    end
+  end)
+
+  return ret
+end
+
+---Jump to the next merge conflict marker.
+function M.next_conflict()
+  local view = lib.get_current_view()
+
+  if view and view:instanceof(StandardView.__get()) then
+    ---@cast view StandardView
+    local main = view.cur_layout:get_main_win()
+    local curfile = main.file
+
+    if main:is_valid() and curfile:is_valid() then
+      local ctx = buf_search(curfile.bufnr, [=[\V\^<<<<<<< ]=])
+
+      if ctx.pos then
+        local curwin = api.nvim_get_current_win()
+
+        api.nvim_win_call(main.id, function()
+          api.nvim_win_set_cursor(main.id, { ctx.pos[1], ctx.pos[2] - 1 })
+
+          if curwin ~= main.id then
+            -- HACK: Trigger sync for the scrollbind + cursorbind
+            vim.cmd([[exe "norm! \<c-e>\<c-y>"]])
+          end
+        end)
+      end
+
+      if ctx.count then
+        api.nvim_echo({{ "Conflict " .. ctx.count }}, false, {})
+      end
+    end
+  end
+end
+
+---Jump to the previous merge conflict marker.
+function M.prev_conflict()
+  local view = lib.get_current_view()
+
+  if view and view:instanceof(StandardView.__get()) then
+    ---@cast view StandardView
+    local main = view.cur_layout:get_main_win()
+    local curfile = main.file
+
+    if main:is_valid() and curfile:is_valid() then
+      local ctx = buf_search(curfile.bufnr, [=[\V\^<<<<<<< ]=], { reverse = true })
+
+      if ctx.pos then
+        local curwin = api.nvim_get_current_win()
+
+        api.nvim_win_call(main.id, function()
+          api.nvim_win_set_cursor(main.id, { ctx.pos[1], ctx.pos[2] - 1 })
+
+          if curwin ~= main.id then
+            -- HACK: Trigger sync for the scrollbind + cursorbind
+            vim.cmd([[exe "norm! \<c-e>\<c-y>"]])
+          end
+        end)
+      end
+
+      if ctx.count then
+        api.nvim_echo({{ "Conflict " .. ctx.count }}, false, {})
+      end
     end
   end
 end
