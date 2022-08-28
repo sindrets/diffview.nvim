@@ -9,6 +9,7 @@ local PerfTimer = require("diffview.perf").PerfTimer
 local Panel = require("diffview.ui.panel").Panel
 local LogEntry = require("diffview.git.log_entry").LogEntry
 local FHOptionPanel = require("diffview.scene.views.file_history.option_panel").FHOptionPanel
+
 local JobStatus = git.JobStatus
 local api = vim.api
 local M = {}
@@ -286,7 +287,7 @@ function FileHistoryPanel:update_entries(callback)
     self.log_options,
     {
       base = self.base,
-      diff2 = self.parent.get_default_diff2(),
+      default_layout = self.parent.get_default_diff2(),
     },
     update
   )

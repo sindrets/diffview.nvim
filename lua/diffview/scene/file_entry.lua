@@ -292,5 +292,78 @@ function FileEntry.for_d3(layout_class, opt)
   })
 end
 
+---@class FileEntry.with_layout.Opt : FileEntry.init.Opt
+---@field rev_main Rev
+---@field rev_ours Rev
+---@field rev_theirs Rev
+---@field rev_base Rev
+---@field nulled boolean
+---@field get_data git.FileDataProducer?
+
+---@param layout_class Layout (class)
+---@param opt FileEntry.with_layout.Opt
+---@return FileEntry
+function FileEntry.with_layout(layout_class, opt)
+  local new_layout
+  local main_file = File({
+    git_ctx = opt.git_ctx,
+    path = opt.path,
+    kind = opt.kind,
+    commit = opt.commit,
+    get_data = opt.get_data,
+    rev = opt.rev_main,
+  }) --[[@as git.File ]]
+
+  if layout_class:instanceof(Diff1.__get()) then
+    main_file.nulled = layout_class.should_null(main_file.rev, opt.status, "a")
+    new_layout = layout_class({
+      a = main_file,
+    })
+  else
+    main_file.nulled = layout_class.should_null(main_file.rev, opt.status, "b")
+    new_layout = layout_class({
+      a = File({
+        git_ctx = opt.git_ctx,
+        path = opt.oldpath or opt.path,
+        kind = opt.kind,
+        commit = opt.commit,
+        get_data = opt.get_data,
+        rev = opt.rev_ours,
+        nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_ours, opt.status, "a")),
+      }),
+      b = main_file,
+      c = File({
+        git_ctx = opt.git_ctx,
+        path = opt.path,
+        kind = opt.kind,
+        commit = opt.commit,
+        get_data = opt.get_data,
+        rev = opt.rev_theirs,
+        nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_theirs, opt.status, "c")),
+      }),
+      d = File({
+        git_ctx = opt.git_ctx,
+        path = opt.path,
+        kind = opt.kind,
+        commit = opt.commit,
+        get_data = opt.get_data,
+        rev = opt.rev_base,
+        nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_base, opt.status, "d")),
+      }),
+    })
+  end
+
+  return FileEntry({
+    git_ctx = opt.git_ctx,
+    path = opt.path,
+    oldpath = opt.oldpath,
+    status = opt.status,
+    stats = opt.stats,
+    kind = opt.kind,
+    commit = opt.commit,
+    layout = new_layout,
+  })
+end
+
 M.FileEntry = FileEntry
 return M

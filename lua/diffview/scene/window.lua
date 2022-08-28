@@ -88,7 +88,7 @@ function Window:open_file(callback)
       self.file:attach_buffer(false, {
         keymaps = config.get_layout_keymaps(self.parent),
         disable_diagnostics = self.file.kind == "conflicting"
-            and config.get_config().merge_tool.disable_diagnostics,
+            and config.get_config().view.merge_tool.disable_diagnostics,
       })
 
       api.nvim_win_call(self.id, function()

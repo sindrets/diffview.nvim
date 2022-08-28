@@ -7,6 +7,7 @@ local Diff3Hor = lazy.access("diffview.scene.layouts.diff_3_hor", "Diff3Hor") --
 local Diff4Mixed = lazy.access("diffview.scene.layouts.diff_4_mixed", "Diff4Mixed") --[[@as Diff4Mixed|LazyModule ]]
 local EventEmitter = lazy.access("diffview.events", "EventEmitter") --[[@as EventEmitter|LazyModule ]]
 local File = lazy.access("diffview.git.file", "File") --[[@as git.File|LazyModule ]]
+local config = lazy.require("diffview.config") ---@module "diffview.config"
 local oop = lazy.require("diffview.oop") ---@module "diffview.oop"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
@@ -95,29 +96,42 @@ end
 
 ---@return Diff2
 function View.get_default_diff2()
-  local diffopts = utils.str_split(vim.o.diffopt, ",")
-  if vim.tbl_contains(diffopts, "horizontal") then
-    return Diff2Ver.__get()
-  else
-    return Diff2Hor.__get()
+  local name = View.get_default_layout_name()
+
+  if name == -1 then
+    if vim.tbl_contains(vim.opt.diffopt:get(), "vertical") then
+      return Diff2Hor.__get()
+    else
+      return Diff2Ver.__get()
+    end
   end
+
+  return config.name_to_layout(name) --[[@as Diff2 ]]
 end
 
 ---@return Diff3
 function View.get_default_diff3()
-  -- FIXME
   return Diff3Hor.__get()
 end
 
 ---@return Diff4
 function View.get_default_diff4()
-  -- FIXME
   return Diff4Mixed.__get()
 end
 
----@return Diff2 # (class) The default layout class.
+---@return LayoutName|-1
+function View.get_default_layout_name()
+  return config.get_config().view.default.layout
+end
+
+---@return Layout # (class) The default layout class.
 function View.get_default_layout()
   return View.get_default_diff2()
+end
+
+---@return Layout
+function View.get_default_merge_layout()
+  return config.name_to_layout(config.get_config().view.merge_tool.layout)
 end
 
 ---@return Diff2

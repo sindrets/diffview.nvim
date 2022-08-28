@@ -9,10 +9,22 @@ local utils = lazy.require("diffview.utils")
 local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1")
 ---@type Diff2|LazyModule
 local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2")
+---@type Diff2Hor|LazyModule
+local Diff2Hor = lazy.access("diffview.scene.layouts.diff_2_hor", "Diff2Hor")
+---@type Diff2Ver|LazyModule
+local Diff2Ver = lazy.access("diffview.scene.layouts.diff_2_ver", "Diff2Ver")
 ---@type Diff3|LazyModule
 local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3")
+---@type Diff3Hor|LazyModule
+local Diff3Hor = lazy.access("diffview.scene.layouts.diff_3_hor", "Diff3Hor")
+---@type Diff3Hor|LazyModule
+local Diff3Ver = lazy.access("diffview.scene.layouts.diff_3_ver", "Diff3Ver")
+---@type Diff3Mixed|LazyModule
+local Diff3Mixed = lazy.access("diffview.scene.layouts.diff_3_mixed", "Diff3Mixed")
 ---@type Diff4|LazyModule
 local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4")
+---@type Diff4Mixed|LazyModule
+local Diff4Mixed = lazy.access("diffview.scene.layouts.diff_4_mixed", "Diff4Mixed")
 
 local M = {}
 
@@ -30,6 +42,7 @@ end
 ---@field multi_file LogOptions
 
 -- stylua: ignore start
+---@class DiffviewConfig
 M.defaults = {
   diff_binaries = false,
   enhanced_diff_hl = false,
@@ -43,6 +56,18 @@ M.defaults = {
     fold_closed = "",
     fold_open = "",
   },
+  view = {
+    default = {
+      layout = "diff_2_horizontal",
+    },
+    merge_tool = {
+      layout = "diff_3_horizontal",
+      disable_diagnostics = true,
+    },
+    file_history = {
+      layout = "diff_2_horizontal",
+    },
+  },
   file_panel = {
     listing_style = "tree",
     tree_options = {
@@ -53,9 +78,6 @@ M.defaults = {
       position = "left",
       width = 35,
     },
-  },
-  merge_tool = {
-    disable_diagnostics = true,
   },
   file_history_panel = {
     ---@type ConfigLogOptions
@@ -203,10 +225,9 @@ M.log_option_defaults = {
   grep = nil,
 }
 
+---@return DiffviewConfig
 function M.get_config()
-  local conf = M._config
-  ---@cast conf -nil
-  return conf
+  return M._config
 end
 
 ---@param single_file boolean
@@ -232,6 +253,32 @@ function M.get_log_options(single_file, t)
   end
 
   return log_options
+end
+
+---@alias LayoutName "diff_1_plain"
+---       | "diff_2_horizontal"
+---       | "diff_2_vertical"
+---       | "diff_3_horizontal"
+---       | "diff_3_vertical"
+---       | "diff_3_mixed"
+---       | "diff_4_mixed"
+
+local layout_map = {
+  diff_1_plain = Diff1,
+  diff_2_horizontal = Diff2Hor,
+  diff_2_vertical = Diff2Ver,
+  diff_3_horizontal = Diff3Hor,
+  diff_3_vertical = Diff3Ver,
+  diff_3_mixed = Diff3Mixed,
+  diff_4_mixed = Diff4Mixed,
+}
+
+---@param layout_name LayoutName
+---@return Layout
+function M.name_to_layout(layout_name)
+  assert(layout_map[layout_name], "Invalid layout name: " .. layout_name)
+
+  return layout_map[layout_name].__get()
 end
 
 ---@param layout Layout

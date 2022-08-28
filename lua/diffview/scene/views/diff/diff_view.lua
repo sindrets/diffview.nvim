@@ -1,19 +1,21 @@
-local CommitLogPanel = require("diffview.ui.panels.commit_log_panel").CommitLogPanel
-local Diff = require("diffview.diff").Diff
-local EditToken = require("diffview.diff").EditToken
-local Event = require("diffview.events").Event
-local FileDict = require("diffview.git.file_dict").FileDict
-local FileEntry = require("diffview.scene.file_entry").FileEntry
-local FilePanel = require("diffview.scene.views.diff.file_panel").FilePanel
-local PerfTimer = require("diffview.perf").PerfTimer
-local RevType = require("diffview.git.rev").RevType
-local StandardView = require("diffview.scene.views.standard.standard_view").StandardView
-local async = require("plenary.async")
-local debounce = require("diffview.debounce")
-local git = require("diffview.git.utils")
-local logger = require("diffview.logger")
+local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
-local utils = require("diffview.utils")
+
+local CommitLogPanel = lazy.access("diffview.ui.panels.commit_log_panel", "CommitLogPanel") ---@type CommitLogPanel|LazyModule
+local Diff = lazy.access("diffview.diff", "Diff") ---@type Diff|LazyModule
+local EditToken = lazy.access("diffview.diff", "EditToken") ---@type EditToken|LazyModule
+local Event = lazy.access("diffview.events", "Event") ---@type Event|LazyModule
+local FileDict = lazy.access("diffview.git.file_dict", "FileDict") ---@type FileDict|LazyModule
+local FileEntry = lazy.access("diffview.scene.file_entry", "FileEntry") ---@type FileEntry|LazyModule
+local FilePanel = lazy.access("diffview.scene.views.diff.file_panel", "FilePanel") ---@type FilePanel|LazyModule
+local PerfTimer = lazy.access("diffview.perf", "PerfTimer") ---@type PerfTimer|LazyModule
+local RevType = lazy.access("diffview.git.rev", "RevType") ---@type RevType|LazyModule
+local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
+local async = lazy.require("plenary.async") ---@module "plenary.async"
+local debounce = lazy.require("diffview.debounce") ---@module "diffview.debounce"
+local git = lazy.require("diffview.git.utils") ---@module "diffview.git.utils"
+local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
 local M = {}
@@ -36,7 +38,7 @@ local M = {}
 ---@field initialized boolean
 ---@field valid boolean
 ---@field watcher any UV fs poll handle.
-local DiffView = oop.create_class("DiffView", StandardView)
+local DiffView = oop.create_class("DiffView", StandardView.__get())
 
 ---DiffView constructor
 function DiffView:init(opt)
@@ -219,7 +221,10 @@ DiffView.get_updated_files = async.wrap(function(self, callback)
       self.right,
       self.path_args,
       self.options,
-      { diff2 = DiffView.get_default_diff2(), diff3 = DiffView.get_default_diff3() },
+      {
+        default_layout = DiffView.get_default_diff2(),
+        merge_layout = DiffView.get_default_merge_layout(),
+      },
       callback
       ---@diagnostic disable-next-line: missing-return
   )
@@ -412,7 +417,7 @@ function DiffView:infer_cur_file(allow_dir)
     ---@type any
     local item = self.panel:get_item_at_cursor()
     if item and (
-        (item.class and item:instanceof(FileEntry))
+        (item.class and item:instanceof(FileEntry.__get()))
         or (allow_dir and type(item.collapsed) == "boolean")) then
       return item
     end

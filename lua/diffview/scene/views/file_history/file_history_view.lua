@@ -1,13 +1,15 @@
-local CommitLogPanel = require("diffview.ui.panels.commit_log_panel").CommitLogPanel
-local Event = require("diffview.events").Event
-local EventEmitter = require("diffview.events").EventEmitter
-local FileEntry = require("diffview.scene.file_entry").FileEntry
-local FileHistoryPanel = require("diffview.scene.views.file_history.file_history_panel").FileHistoryPanel
-local StandardView = require("diffview.scene.views.standard.standard_view").StandardView
-local git = require("diffview.git.utils")
+local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
-local JobStatus = git.JobStatus
+local CommitLogPanel = lazy.access("diffview.ui.panels.commit_log_panel", "CommitLogPanel") ---@type CommitLogPanel|LazyModule
+local Event = lazy.access("diffview.events", "Event") ---@type Event|LazyModule
+local FileEntry = lazy.access("diffview.scene.file_entry", "FileEntry") ---@type FileEntry|LazyModule
+local FileHistoryPanel = lazy.access("diffview.scene.views.file_history.file_history_panel", "FileHistoryPanel") ---@type FileHistoryPanel|LazyModule
+local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
+local config = lazy.require("diffview.config") ---@module "diffview.config"
+local git = lazy.require("diffview.git.utils") ---@module "diffview.git.utils"
+
+local JobStatus = lazy.access(git, "JobStatus") ---@type JobStatus|LazyModule
 local api = vim.api
 
 local M = {}
@@ -19,16 +21,11 @@ local M = {}
 ---@field path_args string[]
 ---@field raw_args string[]
 ---@field valid boolean
-local FileHistoryView = oop.create_class("FileHistoryView", StandardView)
+local FileHistoryView = oop.create_class("FileHistoryView", StandardView.__get())
 
 function FileHistoryView:init(opt)
   self.valid = false
   self.git_ctx = opt.git_ctx
-  self.emitter = EventEmitter()
-  self.ready = false
-  self.closing = false
-  self.nulled = false
-  self.winopts = { a = {}, b = {} }
   self.path_args = opt.path_args
   self.raw_args = opt.raw_args
 
@@ -185,7 +182,7 @@ function FileHistoryView:infer_cur_file()
   if self.panel:is_focused() then
     local item = self.panel:get_item_at_cursor()
 
-    if item and not item:instanceof(FileEntry) then
+    if item and not item:instanceof(FileEntry.__get()) then
       return item.files[1]
     end
 
@@ -200,6 +197,11 @@ end
 ---@return boolean
 function FileHistoryView:is_valid()
   return self.valid
+end
+
+---@override
+function FileHistoryView.get_default_layout_name()
+  return config.get_config().view.file_history.layout
 end
 
 M.FileHistoryView = FileHistoryView

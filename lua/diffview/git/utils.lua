@@ -230,8 +230,8 @@ local function handle_co(thread, ok, result)
 end
 
 ---@class git.utils.LayoutOpt
----@field diff2 Diff2
----@field diff3 any
+---@field default_layout Diff2
+---@field merge_layout Layout
 
 ---@param ctx GitContext
 ---@param left Rev
@@ -329,21 +329,22 @@ local tracked_files = async.wrap(function(ctx, left, right, args, kind, opt, cal
     end, data)
 
     for _, v in pairs(conflict_map) do
-      table.insert(conflicts, FileEntry.for_d3(opt.diff3, {
+      table.insert(conflicts, FileEntry.with_layout(opt.merge_layout, {
         git_ctx = ctx,
         path = v.name,
         oldpath = v.oldname,
         status = "U",
         kind = "conflicting",
-        rev_a = Rev(RevType.STAGE, 2),  -- Ours
-        rev_b = Rev(RevType.LOCAL),
-        rev_c = Rev(RevType.STAGE, 3),  -- Theirs
+        rev_ours = Rev(RevType.STAGE, 2),
+        rev_main = Rev(RevType.LOCAL),
+        rev_theirs = Rev(RevType.STAGE, 3),
+        rev_base = Rev(RevType.STAGE, 1),
       }))
     end
   end
 
   for _, v in ipairs(data) do
-    table.insert(files, FileEntry.for_d2(opt.diff2, {
+    table.insert(files, FileEntry.for_d2(opt.default_layout, {
       git_ctx = ctx,
       path = v.name,
       oldpath = v.oldname,
@@ -386,7 +387,7 @@ local untracked_files = async.wrap(function(ctx, left, right, opt, callback)
 
       local files = {}
       for _, s in ipairs(j:result()) do
-        table.insert(files, FileEntry.for_d2(opt.diff2, {
+        table.insert(files, FileEntry.for_d2(opt.default_layout, {
           git_ctx = ctx,
           path = s,
           status = "?",
@@ -911,7 +912,7 @@ local function parse_fh_data(state)
       stats = nil
     end
 
-    table.insert(files, FileEntry.for_d2(state.opt.diff2 or Diff2Hor, {
+    table.insert(files, FileEntry.for_d2(state.opt.default_layout or Diff2Hor, {
       git_ctx = ctx,
       path = name,
       oldpath = oldname,
