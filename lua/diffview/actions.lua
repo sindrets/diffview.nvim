@@ -66,17 +66,18 @@ function M.goto_file()
 
     if target_tab then
       api.nvim_set_current_tabpage(target_tab)
+      file.layout:restore_winopts()
       vim.cmd("sp " .. vim.fn.fnameescape(file.absolute_path))
     else
-      vim.cmd("tabe " .. vim.fn.fnameescape(file.absolute_path))
+      vim.cmd("tabnew")
+      local temp_bufnr = api.nvim_get_current_buf()
+      file.layout:restore_winopts()
+      vim.cmd("keepalt edit " .. vim.fn.fnameescape(file.absolute_path))
+      api.nvim_buf_delete(temp_bufnr, { force = true })
     end
 
-    vim.cmd("diffoff")
-
     if cursor then
-      -- NOTE: using normal command rather than `nvim_win_set_cursor` to avoid
-      -- dealing with out-of-bounds coordinates.
-      vim.cmd(("norm! %dG"):format(cursor[1]))
+      utils.set_cursor(0, unpack(cursor))
     end
   end
 end
@@ -89,15 +90,18 @@ function M.goto_file_edit()
 
     if target_tab then
       api.nvim_set_current_tabpage(target_tab)
-      vim.cmd("e " .. vim.fn.fnameescape(file.absolute_path))
+      file.layout:restore_winopts()
+      vim.cmd("edit " .. vim.fn.fnameescape(file.absolute_path))
     else
-      vim.cmd("tabe " .. vim.fn.fnameescape(file.absolute_path))
+      vim.cmd("tabnew")
+      local temp_bufnr = api.nvim_get_current_buf()
+      file.layout:restore_winopts()
+      vim.cmd("keepalt edit " .. vim.fn.fnameescape(file.absolute_path))
+      api.nvim_buf_delete(temp_bufnr, { force = true })
     end
 
-    vim.cmd("diffoff")
-
     if cursor then
-      vim.cmd(("norm! %dG"):format(cursor[1]))
+      utils.set_cursor(0, unpack(cursor))
     end
   end
 end
@@ -106,11 +110,14 @@ function M.goto_file_split()
   local file, cursor = prepare_goto_file()
 
   if file then
-    vim.cmd("sp " .. vim.fn.fnameescape(file.absolute_path))
-    vim.cmd("diffoff")
+    vim.cmd("new")
+    local temp_bufnr = api.nvim_get_current_buf()
+    file.layout:restore_winopts()
+    vim.cmd("keepalt edit " .. vim.fn.fnameescape(file.absolute_path))
+    api.nvim_buf_delete(temp_bufnr, { force = true })
 
     if cursor then
-      vim.cmd(("norm! %dG"):format(cursor[1]))
+      utils.set_cursor(0, unpack(cursor))
     end
   end
 end
@@ -119,11 +126,14 @@ function M.goto_file_tab()
   local file, cursor = prepare_goto_file()
 
   if file then
-    vim.cmd("tabe " .. vim.fn.fnameescape(file.absolute_path))
-    vim.cmd("diffoff")
+    vim.cmd("tabnew")
+    local temp_bufnr = api.nvim_get_current_buf()
+    file.layout:restore_winopts()
+    vim.cmd("keepalt edit " .. vim.fn.fnameescape(file.absolute_path))
+    api.nvim_buf_delete(temp_bufnr, { force = true })
 
     if cursor then
-      vim.cmd(("norm! %dG"):format(cursor[1]))
+      utils.set_cursor(0, unpack(cursor))
     end
   end
 end
