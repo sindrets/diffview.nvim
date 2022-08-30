@@ -281,7 +281,7 @@ function Layout:update_windows()
       end
 
       if win.id ~= curwin then
-        vim.cmd("do <nomodeline> WinLeave")
+        api.nvim_exec_autocmds("WinLeave", { modeline = false })
       end
     end)
   end
