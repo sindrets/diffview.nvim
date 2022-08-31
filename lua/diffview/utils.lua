@@ -884,6 +884,51 @@ function M.vec_remove(t, v)
   return false
 end
 
+---@class utils.buf_search.Opt
+---@field reverse boolean
+
+---@param bufnr integer
+---@param pattern string
+---@param opt? utils.buf_search.Opt
+function M.buf_search(bufnr, pattern, opt)
+  opt = opt or {}
+  local ret = {}
+
+  api.nvim_buf_call(bufnr, function()
+    local flags = ("n%s"):format(
+      opt.reverse and "b" or ""
+    )
+    local pos = vim.fn.searchpos(pattern, flags)
+
+    if not (pos[1] == 0 and pos[2] == 0) then
+      ret.pos = pos --[[@as integer[] ]]
+      local ok, count = pcall(vim.fn.searchcount, {
+        pattern = pattern,
+        maxcount = 10000,
+        pos = { pos[1], pos[2], 0 },
+      })
+
+      if not ok or vim.tbl_isempty(count) then
+        return
+      end
+
+      ret.count = count
+
+      local total = count.total
+      local current = count.current
+
+      if count.incomplete == 2 then
+        total = ">" .. count.maxcount
+        if current > count.maxcount then current = total end
+      end
+
+      ret.s_count = ("[%s/%s]"):format(current, total)
+    end
+  end)
+
+  return ret
+end
+
 ---@class ListBufsSpec
 ---@field loaded boolean Filter out buffers that aren't loaded.
 ---@field listed boolean Filter out buffers that aren't listed.

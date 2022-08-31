@@ -55,6 +55,7 @@ M.defaults = {
   signs = {
     fold_closed = "",
     fold_open = "",
+    done = "✓",
   },
   view = {
     default = {

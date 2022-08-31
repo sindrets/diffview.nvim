@@ -25,10 +25,31 @@ local function render_file(comp, show_path, depth)
 
   if file.stats then
     offset = #s + 1
-    comp:add_hl("DiffviewFilePanelInsertions", 0, offset, offset + string.len(file.stats.additions))
-    offset = offset + string.len(file.stats.additions) + 2
-    comp:add_hl("DiffviewFilePanelDeletions", 0, offset, offset + string.len(file.stats.deletions))
-    s = s .. " " .. file.stats.additions .. ", " .. file.stats.deletions
+
+    if file.stats.additions then
+      comp:add_hl("DiffviewFilePanelInsertions", 0, offset, offset + string.len(file.stats.additions))
+      offset = offset + string.len(file.stats.additions) + 2
+      comp:add_hl("DiffviewFilePanelDeletions", 0, offset, offset + string.len(file.stats.deletions))
+      s = s .. " " .. file.stats.additions .. ", " .. file.stats.deletions
+    elseif file.stats.conflicts then
+      local conflicts
+
+      if file.stats.conflicts == 0 then
+        conflicts = config.get_config().signs.done
+        comp:add_hl("DiffviewFilePanelInsertions", 0, offset, offset + string.len(conflicts))
+      else
+        conflicts = tostring(file.stats.conflicts)
+        comp:add_hl("DiffviewFilePanelConflicts", 0, offset, offset + string.len(conflicts))
+      end
+
+      s = s .. " " .. conflicts
+    end
+  end
+
+  if file.kind == "conflicting" and not (file.stats and file.stats.conflicts) then
+    offset = #s + 1
+    comp:add_hl("DiffviewFilePanelConflicts", 0, offset, offset + 1)
+    s = s .. " !"
   end
 
   if show_path then

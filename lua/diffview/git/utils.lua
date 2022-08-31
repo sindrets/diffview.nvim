@@ -1355,6 +1355,103 @@ M.show = async.wrap(function(toplevel, args, callback)
   queue_sync_job(job)
 end, 3)
 
+local CONFLICT_START = [[^<<<<<<< ]]
+local CONFLICT_BASE = [[^||||||| ]]
+local CONFLICT_SEP = [[^=======$]]
+local CONFLICT_END = [[^>>>>>>> ]]
+
+---@class ConflictRegion
+---@field first integer
+---@field last integer
+---@field ours { first: integer, last: integer }
+---@field base { first: integer, last: integer }
+---@field theirs { first: integer, last: integer }
+
+---@param lines string[]
+---@return ConflictRegion[]
+function M.parse_conflicts(lines)
+  local ret = {}
+  local has_start, has_base, has_sep = false, false, false
+  local cur
+
+  local function process(data)
+    local first = math.huge
+    local last = -1
+
+    first = math.min(data.ours.first or math.huge, first)
+    first = math.min(data.base.first or math.huge, first)
+    first = math.min(data.theirs.first or math.huge, first)
+
+    if first == math.huge then return end
+
+    last = math.max(data.ours.last or -1, -1)
+    last = math.max(data.base.last or -1, -1)
+    last = math.max(data.theirs.last or -1, -1)
+
+    if last == -1 then return end
+
+    data.first = first
+    data.last = last
+    ret[#ret + 1] = data
+  end
+
+  local function new_cur()
+    return {
+      ours = {},
+      base = {},
+      theirs = {},
+    }
+  end
+
+  cur = new_cur()
+
+  for i, line in ipairs(lines) do
+    if line:match(CONFLICT_START) then
+      if has_start then
+        process(cur)
+        cur, has_start, has_base, has_sep = new_cur(), false, false, false
+      end
+
+      has_start = true
+      cur.ours.first = i
+      cur.ours.last = i
+    elseif line:match(CONFLICT_BASE) then
+      if has_base then
+        process(cur)
+        cur, has_start, has_base, has_sep = new_cur(), false, false, false
+      end
+
+      has_base = true
+      cur.base.first = i
+      cur.ours.last = i - 1
+    elseif line:match(CONFLICT_SEP) then
+      if has_sep then
+        process(cur)
+        cur, has_start, has_base, has_sep = new_cur(), false, false, false
+      end
+
+      has_sep = true
+      cur.theirs.first = i
+      cur.theirs.last = i
+
+      if has_base then
+        cur.base.last = i - 1
+      else
+        cur.ours.last = i - 1
+      end
+    elseif line:match(CONFLICT_END) then
+      cur.theirs.first = cur.theirs.first or i
+      cur.theirs.last = i
+      process(cur)
+      cur, has_start, has_base, has_sep = new_cur(), false, false, false
+    end
+  end
+
+  process(cur)
+
+  return ret
+end
+
 ---@return string, string
 function M.pathspec_split(pathspec)
   local magic = pathspec:match("^:[/!^]*:?") or pathspec:match("^:%b()") or ""

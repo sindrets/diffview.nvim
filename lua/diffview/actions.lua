@@ -3,6 +3,7 @@ local lazy = require("diffview.lazy")
 local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
 local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView") ---@type FileHistoryView|LazyModule
 local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
+local git = lazy.require("diffview.git.utils") ---@module "diffview.git.utils"
 local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
@@ -53,7 +54,7 @@ local function prepare_goto_file()
     end
 
     local cursor
-    local cur_file = view:cur_file()
+    local cur_file = view.cur_entry
     if file == cur_file then
       local win = view.cur_layout:get_main_win()
       cursor = api.nvim_win_get_cursor(win.id)
@@ -155,47 +156,23 @@ function M.goto_file_tab()
   end
 end
 
----@class actions.buf_search.Opt
----@field reverse boolean
+---@param winid integer
+---@param conflicts ConflictRegion[]
+local function cur_conflict_idx(winid, conflicts)
+  local cursor = api.nvim_win_get_cursor(winid)
 
----@param bufnr integer
----@param pattern string
----@param opt? actions.buf_search.Opt
-local function buf_search(bufnr, pattern, opt)
-  opt = opt or {}
-  local ret = {}
+  local cur = 0
 
-  api.nvim_buf_call(bufnr, function()
-    local flags = ("n%s"):format(
-      opt.reverse and "b" or ""
-    )
-    local pos = vim.fn.searchpos(pattern, flags)
-
-    if not (pos[1] == 0 and pos[2] == 0) then
-      ret.pos = pos --[[@as integer[] ]]
-      local ok, count = pcall(vim.fn.searchcount, {
-        pattern = pattern,
-        maxcount = 10000,
-        pos = { pos[1], pos[2], 0 },
-      })
-
-      if not ok or vim.tbl_isempty(count) then
-        return
-      end
-
-      local total = count.total
-      local current = count.current
-
-      if count.incomplete == 2 then
-        total = ">" .. count.maxcount
-        if current > count.maxcount then current = total end
-      end
-
-      ret.count = ("[%s/%s]"):format(current, total)
+  for i, conflict in ipairs(conflicts) do
+    if conflict.first == cursor[1] then
+      cur = i
+    elseif conflict.first > cursor[1] then
+      cur = i - 1
+      break
     end
-  end)
+  end
 
-  return ret
+  return cur
 end
 
 ---Jump to the next merge conflict marker.
@@ -208,23 +185,24 @@ function M.next_conflict()
     local curfile = main.file
 
     if main:is_valid() and curfile:is_valid() then
-      local ctx = buf_search(curfile.bufnr, [=[\V\^<<<<<<< ]=])
+      local conflicts = git.parse_conflicts(api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false))
 
-      if ctx.pos then
+      if #conflicts > 0 then
+        local cur_idx = cur_conflict_idx(main.id, conflicts)
+        local next_idx = cur_idx % #conflicts + 1
+        local next_conflict = conflicts[next_idx]
         local curwin = api.nvim_get_current_win()
 
         api.nvim_win_call(main.id, function()
-          api.nvim_win_set_cursor(main.id, { ctx.pos[1], ctx.pos[2] - 1 })
+          api.nvim_win_set_cursor(main.id, { next_conflict.first, 0 })
 
           if curwin ~= main.id then
             -- HACK: Trigger sync for the scrollbind + cursorbind
             vim.cmd([[exe "norm! \<c-e>\<c-y>"]])
           end
         end)
-      end
 
-      if ctx.count then
-        api.nvim_echo({{ "Conflict " .. ctx.count }}, false, {})
+        api.nvim_echo({{ ("Conflict [%d/%d]"):format(next_idx, #conflicts) }}, false, {})
       end
     end
   end
@@ -240,23 +218,24 @@ function M.prev_conflict()
     local curfile = main.file
 
     if main:is_valid() and curfile:is_valid() then
-      local ctx = buf_search(curfile.bufnr, [=[\V\^<<<<<<< ]=], { reverse = true })
+      local conflicts = git.parse_conflicts(api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false))
 
-      if ctx.pos then
+      if #conflicts > 0 then
+        local cur_idx = cur_conflict_idx(main.id, conflicts)
+        local prev_idx = (cur_idx - 2) % #conflicts + 1
+        local prev_conflict = conflicts[prev_idx]
         local curwin = api.nvim_get_current_win()
 
         api.nvim_win_call(main.id, function()
-          api.nvim_win_set_cursor(main.id, { ctx.pos[1], ctx.pos[2] - 1 })
+          api.nvim_win_set_cursor(main.id, { prev_conflict.first, 0 })
 
           if curwin ~= main.id then
             -- HACK: Trigger sync for the scrollbind + cursorbind
             vim.cmd([[exe "norm! \<c-e>\<c-y>"]])
           end
         end)
-      end
 
-      if ctx.count then
-        api.nvim_echo({{ "Conflict " .. ctx.count }}, false, {})
+        api.nvim_echo({{ ("Conflict [%d/%d]"):format(prev_idx, #conflicts) }}, false, {})
       end
     end
   end
@@ -335,7 +314,7 @@ end
 ---@param kind "ours"|"theirs"|"base"|"local"
 local function diff_copy_target(kind)
   local view = lib.get_current_view() --[[@as DiffView|FileHistoryView ]]
-  local file = view:cur_file()
+  local file = view.cur_entry
 
   if file then
     local layout = file.layout
@@ -417,7 +396,7 @@ function M.cycle_layout()
     cur_file = view:cur_file()
   elseif view:instanceof(DiffView.__get()) then
     ---@cast view DiffView
-    cur_file = view:cur_file()
+    cur_file = view.cur_entry
 
     if cur_file then
       layouts = cur_file.kind == "conflicting"

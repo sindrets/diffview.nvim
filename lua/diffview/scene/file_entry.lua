@@ -23,6 +23,7 @@ local fstat_cache = {}
 ---@class GitStats
 ---@field additions integer
 ---@field deletions integer
+---@field conflicts integer
 
 ---@class FileEntry : diffview.Object
 ---@field git_ctx GitContext

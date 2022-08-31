@@ -66,6 +66,52 @@ function DiffView:init(opt)
     ),
   })
 
+  self.attached_bufs = {}
+
+  ---@param entry FileEntry
+  self.emitter:on("file_open_post", function(entry)
+    if entry.kind == "conflicting" then
+      local file = entry.layout:get_main_win().file
+
+      local count_conflicts = vim.schedule_wrap(function()
+        local conflicts = git.parse_conflicts(api.nvim_buf_get_lines(file.bufnr, 0, -1, false))
+
+        entry.stats = entry.stats or {}
+        entry.stats.conflicts = #conflicts
+
+        self.panel:render()
+        self.panel:redraw()
+      end)
+
+      count_conflicts()
+
+      if file.bufnr and not self.attached_bufs[file.bufnr] then
+        self.attached_bufs[file.bufnr] = true
+
+        local work = debounce.throttle_trailing(1000, true, vim.schedule_wrap(function()
+          if not self:is_cur_tabpage() or self.cur_entry ~= entry then
+            self.attached_bufs[file.bufnr] = false
+            return
+          else
+            count_conflicts()
+          end
+        end))
+
+        api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
+          buffer = file.bufnr,
+          callback = function()
+            if not self.attached_bufs[file.bufnr] then
+              work:close()
+              return true
+            else
+              work()
+            end
+          end,
+        })
+      end
+    end
+  end)
+
   self.valid = true
 end
 
@@ -87,6 +133,7 @@ function DiffView:post_open()
   end)
 
   self:init_event_listeners()
+
   vim.schedule(function()
     self:file_safeguard()
     if self.files:len() == 0 then
@@ -115,9 +162,17 @@ function DiffView:close()
   end
 end
 
----@return FileEntry?
-function DiffView:cur_file()
-  return self.panel.cur_file
+---@param file FileEntry
+function DiffView:_set_file(file)
+  local cur_entry = self.cur_entry
+  self.emitter:emit("file_open_pre", file, cur_entry)
+  self.nulled = false
+
+  file.layout.emitter:once("files_opened", function()
+    self.emitter:emit("file_open_post", file, cur_entry)
+  end)
+
+  self:use_entry(file)
 end
 
 ---Open the next file.
@@ -136,8 +191,7 @@ function DiffView:next_file(highlight)
         self.panel:highlight_file(cur)
       end
 
-      self.nulled = false
-      self:use_entry(cur)
+      self:_set_file(cur)
 
       return cur
     end
@@ -160,8 +214,7 @@ function DiffView:prev_file(highlight)
         self.panel:highlight_file(cur)
       end
 
-      self.nulled = false
-      self:use_entry(cur)
+      self:_set_file(cur)
 
       return cur
     end
@@ -185,8 +238,7 @@ function DiffView:set_file(file, focus, highlight)
         self.panel:highlight_file(file)
       end
 
-      self.nulled = false
-      self:use_entry(file)
+      self:_set_file(file)
 
       if focus then
         api.nvim_set_current_win(self.cur_layout:get_main_win().id)
@@ -285,8 +337,16 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
           for _, opr in ipairs(script) do
             if opr == EditToken.NOOP then
               -- Update status and stats
+              local a_stats = v.cur_files[ai].stats
+              local b_stats = v.new_files[bi].stats
+
+              if a_stats then
+                v.cur_files[ai].stats = vim.tbl_extend("force", a_stats, b_stats or {})
+              else
+                v.cur_files[ai].stats = v.new_files[bi].stats
+              end
+
               v.cur_files[ai].status = v.new_files[bi].status
-              v.cur_files[ai].stats = v.new_files[bi].stats
               v.cur_files[ai]:validate_stage_buffers(self.git_ctx, index_stat)
 
               if new_head then

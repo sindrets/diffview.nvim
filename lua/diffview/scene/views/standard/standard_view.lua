@@ -27,6 +27,7 @@ local M = {}
 ---@field winopts table
 ---@field nulled boolean
 ---@field cur_layout Layout
+---@field cur_entry FileEntry
 ---@field layouts table<Layout, Layout>
 local StandardView = oop.create_class("StandardView", View.__get())
 
@@ -190,17 +191,22 @@ function StandardView:use_entry(entry)
   local old_layout = self.cur_layout
 
   if entry.layout:class() == self.cur_layout:class() then
+    self.cur_layout.emitter = entry.layout.emitter
     self.cur_layout:use_entry(entry)
   elseif self.layouts[entry.layout:class()] then
     self.cur_layout = self.layouts[entry.layout:class()]
+    self.cur_layout.emitter = entry.layout.emitter
     self.cur_layout:use_entry(entry)
     self.cur_layout:create()
     old_layout:destroy()
   else
     self:use_layout(entry.layout)
+    self.cur_layout.emitter = entry.layout.emitter
     self.cur_layout:create()
     old_layout:destroy()
   end
+
+  self.cur_entry = entry
 end
 
 M.StandardView = StandardView

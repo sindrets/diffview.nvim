@@ -1,16 +1,22 @@
+local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
-local utils = require("diffview.utils")
+
+local EventEmitter = lazy.access("diffview.events", "EventEmitter") ---@type EventEmitter|LazyModule
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
 local M = {}
 
 ---@class Layout : diffview.Object
 ---@field windows Window[]
+---@field emitter EventEmitter
 ---@field pivot_producer fun(): integer?
 local Layout = oop.create_class("Layout")
 
-function Layout:init()
-  self.windows = {}
+function Layout:init(opt)
+  opt = opt or {}
+  self.windows = opt.windows or {}
+  self.emitter = opt.emitter or EventEmitter()
 end
 
 ---@diagnostic disable: unused-local, missing-return
@@ -43,7 +49,7 @@ function Layout:destroy()
 end
 
 function Layout:clone()
-  local clone = self:class()({}) --[[@as Layout ]]
+  local clone = self:class()({ emitter = self.emitter }) --[[@as Layout ]]
 
   for i, win in ipairs(self.windows) do
     clone.windows[i]:set_id(win.id)
@@ -144,6 +150,8 @@ function Layout:open_files(callback)
       callback()
     end
 
+    self.emitter:emit("files_opened")
+
     return
   end
 
@@ -176,6 +184,8 @@ function Layout:open_files(callback)
               ---@cast callback -?
               callback()
             end
+
+            self.emitter:emit("files_opened")
           end
         end)
       end
@@ -189,6 +199,8 @@ function Layout:open_files(callback)
       ---@cast callback -?
       callback()
     end
+
+    self.emitter:emit("files_opened")
   end
 end
 
