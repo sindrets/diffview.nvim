@@ -73,7 +73,10 @@ function M.goto_file()
       local temp_bufnr = api.nvim_get_current_buf()
       file.layout:restore_winopts()
       vim.cmd("keepalt edit " .. vim.fn.fnameescape(file.absolute_path))
-      api.nvim_buf_delete(temp_bufnr, { force = true })
+
+      if temp_bufnr ~= api.nvim_get_current_buf() then
+        api.nvim_buf_delete(temp_bufnr, { force = true })
+      end
     end
 
     if cursor then
@@ -97,7 +100,10 @@ function M.goto_file_edit()
       local temp_bufnr = api.nvim_get_current_buf()
       file.layout:restore_winopts()
       vim.cmd("keepalt edit " .. vim.fn.fnameescape(file.absolute_path))
-      api.nvim_buf_delete(temp_bufnr, { force = true })
+
+      if temp_bufnr ~= api.nvim_get_current_buf() then
+        api.nvim_buf_delete(temp_bufnr, { force = true })
+      end
     end
 
     if cursor then
@@ -114,7 +120,10 @@ function M.goto_file_split()
     local temp_bufnr = api.nvim_get_current_buf()
     file.layout:restore_winopts()
     vim.cmd("keepalt edit " .. vim.fn.fnameescape(file.absolute_path))
-    api.nvim_buf_delete(temp_bufnr, { force = true })
+
+    if temp_bufnr ~= api.nvim_get_current_buf() then
+      api.nvim_buf_delete(temp_bufnr, { force = true })
+    end
 
     if cursor then
       utils.set_cursor(0, unpack(cursor))
@@ -130,7 +139,10 @@ function M.goto_file_tab()
     local temp_bufnr = api.nvim_get_current_buf()
     file.layout:restore_winopts()
     vim.cmd("keepalt edit " .. vim.fn.fnameescape(file.absolute_path))
-    api.nvim_buf_delete(temp_bufnr, { force = true })
+
+    if temp_bufnr ~= api.nvim_get_current_buf() then
+      api.nvim_buf_delete(temp_bufnr, { force = true })
+    end
 
     if cursor then
       utils.set_cursor(0, unpack(cursor))
