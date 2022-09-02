@@ -88,6 +88,7 @@ require("diffview").setup({
   commit_log_panel = {
     win_config = {
       win_opts = {},
+    }
   },
   default_args = {    -- Default args prepended to the arg-list for the listed commands
     DiffviewOpen = {},
