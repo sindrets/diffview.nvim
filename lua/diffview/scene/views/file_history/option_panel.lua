@@ -18,6 +18,19 @@ local M = {}
 ---@field components CompStruct
 local FHOptionPanel = oop.create_class("FHOptionPanel", Panel)
 
+FHOptionPanel.winopts = vim.tbl_extend("force", Panel.winopts, {
+  cursorline = true,
+  winhl = {
+    "EndOfBuffer:DiffviewEndOfBuffer",
+    "Normal:DiffviewNormal",
+    "CursorLine:DiffviewCursorLine",
+    "WinSeparator:DiffviewWinSeparator",
+    "SignColumn:DiffviewNormal",
+    "StatusLine:DiffviewStatusLine",
+    "StatusLineNC:DiffviewStatuslineNC",
+  },
+})
+
 FHOptionPanel.bufopts = {
   swapfile = false,
   buftype = "nofile",
@@ -272,7 +285,7 @@ function FHOptionPanel:init(parent)
   self:on_autocmd("WinClosed", {
     callback = function()
       if not vim.deep_equal(self.option_state, self.parent:get_log_options()) then
-        vim.schedule(function()
+        vim.schedule(function ()
           self.option_state = nil
           self.winid = nil
           self.parent:update_entries(function(_, status)

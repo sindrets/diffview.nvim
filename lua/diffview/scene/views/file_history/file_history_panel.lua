@@ -38,6 +38,19 @@ local perf_update = PerfTimer("[FileHistoryPanel] update")
 ---@field constrain_cursor function
 local FileHistoryPanel = oop.create_class("FileHistoryPanel", Panel)
 
+FileHistoryPanel.winopts = vim.tbl_extend("force", Panel.winopts, {
+  cursorline = true,
+  winhl = {
+    "EndOfBuffer:DiffviewEndOfBuffer",
+    "Normal:DiffviewNormal",
+    "CursorLine:DiffviewCursorLine",
+    "WinSeparator:DiffviewWinSeparator",
+    "SignColumn:DiffviewNormal",
+    "StatusLine:DiffviewStatusLine",
+    "StatusLineNC:DiffviewStatuslineNC",
+  },
+})
+
 FileHistoryPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
   filetype = "DiffviewFileHistory",
 })

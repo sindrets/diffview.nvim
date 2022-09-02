@@ -5,7 +5,6 @@ local logger = require("diffview.logger")
 local oop = require("diffview.oop")
 local renderer = require("diffview.renderer")
 local utils = require("diffview.utils")
-local config = require("diffview.config")
 
 local M = {}
 local api = vim.api
@@ -32,6 +31,24 @@ local perf = PerfTimer("[Panel] redraw")
 ---@field render function Abstract
 local Panel = oop.create_class("Panel")
 
+Panel.winopts = {
+  relativenumber = false,
+  number = false,
+  list = false,
+  winfixwidth = true,
+  winfixheight = true,
+  foldenable = false,
+  spell = false,
+  wrap = false,
+  signcolumn = "yes",
+  colorcolumn = "",
+  foldmethod = "manual",
+  foldcolumn = "0",
+  scrollbind = false,
+  cursorbind = false,
+  diff = false,
+}
+
 Panel.bufopts = {
   swapfile = false,
   buftype = "nofile",
@@ -50,7 +67,7 @@ Panel.default_type = "split"
 ---@field win integer
 ---@field width integer
 ---@field height integer
----@field winopts WindowOptions
+---@field win_opts WindowOptions
 
 ---@type PanelSplitSpec
 Panel.default_config_split = {
@@ -58,7 +75,7 @@ Panel.default_config_split = {
   position = "left",
   relative = "editor",
   win = 0,
-  winopts = config.default_winopts
+  win_opts = {}
 }
 
 ---@class PanelFloatSpec
@@ -73,7 +90,7 @@ Panel.default_config_split = {
 ---@field zindex integer
 ---@field style "minimal"
 ---@field border "none"|"single"|"double"|"rounded"|"solid"|"shadow"|string[]
----@field winopts WindowOptions
+---@field win_opts WindowOptions
 
 ---@type PanelFloatSpec
 Panel.default_config_float = {
@@ -84,7 +101,7 @@ Panel.default_config_float = {
   zindex = 50,
   style = "minimal",
   border = "single",
-  winopts = config.default_winopts
+  win_opts = {}
 }
 
 Panel.au = {
@@ -153,6 +170,7 @@ function Panel:get_config()
       relative = valid_enum(config.relative, { "editor", "win" }),
       width = { config.width, "number", true },
       height = { config.height, "number", true },
+      win_opts = { config.win_opts, "table" }
     })
   else
     ---@cast config PanelFloatSpec
@@ -168,6 +186,7 @@ function Panel:get_config()
       col = { config.col, "n", false },
       zindex = { config.zindex, "n", true },
       style = valid_enum(config.style, { "minimal" }, true),
+      win_opts = { config.win_opts, "table" },
       border = {
         config.border,
         function(v)
@@ -250,9 +269,9 @@ function Panel:open()
     local split_dir = vim.tbl_contains({ "top", "left" }, config.position) and "aboveleft" or "belowright"
     local split_cmd = self.state.form == "row" and "sp" or "vsp"
     local rel_winid = config.relative == "win"
-        and api.nvim_win_is_valid(config.win or -1)
-        and config.win
-        or 0
+      and api.nvim_win_is_valid(config.win or -1)
+      and config.win
+      or 0
 
     api.nvim_win_call(rel_winid, function()
       vim.cmd(split_dir .. " " .. split_cmd)
@@ -275,7 +294,8 @@ function Panel:open()
   end
 
   self:resize()
-  utils.set_local(self.winid, config.winopts)
+  utils.set_local(self.winid, self:class().winopts)
+  utils.set_local(self.winid, config.win_opts)
 end
 
 function Panel:close()
@@ -400,8 +420,8 @@ function Panel:on_autocmd(event, opts)
     end
 
     if (win_match and win_match == self.winid)
-        or (buf_match and buf_match == self.bufid) then
-      opts.callback(state)
+      or (buf_match and buf_match == self.bufid) then
+        opts.callback(state)
     end
   end
 

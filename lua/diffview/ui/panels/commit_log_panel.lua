@@ -13,6 +13,11 @@ local M = {}
 ---@field job_out string[]
 local CommitLogPanel = oop.create_class("CommitLogPanel", Panel)
 
+CommitLogPanel.winopts = vim.tbl_extend("force", Panel.winopts, {
+  wrap = true,
+  breakindent = true,
+})
+
 CommitLogPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
   buftype = "nowrite",
   filetype = "git",
@@ -53,7 +58,7 @@ function CommitLogPanel:init(git_toplevel, opt)
   self.git_toplevel = git_toplevel
   self.args = opt.args or { "-n256" }
 
-  self:on_autocmd("BufWinEnter", {
+  self:on_autocmd("BufWinEnter" , {
     callback = function()
       vim.bo[self.bufid].bufhidden = "wipe"
     end,
