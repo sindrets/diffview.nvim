@@ -49,6 +49,32 @@ Example configuration with default settings:
       signs = {
         fold_closed = "",
         fold_open = "",
+        done = "✓",
+      },
+      view = {
+        -- Configure the layout and behavior of different types of views.
+        -- Available layouts: 
+        --  'diff1_plain'
+        --    |'diff2_horizontal'
+        --    |'diff2_vertical'
+        --    |'diff3_horizontal'
+        --    |'diff3_vertical'
+        --    |'diff3_mixed'
+        --    |'diff4_mixed'
+        -- For more info, see ':h diffview-config-view.x.layout'.
+        default = {
+          -- Config for changed files, and staged files in diff views.
+          layout = "diff2_horizontal",
+        },
+        merge_tool = {
+          -- Config for conflicted files in diff views during a merge or rebase.
+          layout = "diff3_horizontal",
+          disable_diagnostics = true,   -- Temporarily disable diagnostics for conflict buffers while in the view.
+        },
+        file_history = {
+          -- Config for changed files in file history views.
+          layout = "diff2_horizontal",
+        },
       },
       file_panel = {
         listing_style = "tree",             -- One of 'list' or 'tree'
@@ -167,6 +193,128 @@ git_cmd                                         *diffview-config-git_cmd*
         This table forms the first part of all git commands used internally in
         the plugin. The first element should be the git binary. The subsequent
         elements are passed as arguments.
+
+view.x.layout                                   *diffview-config-view.x.layout*
+        Type: >
+            "diff1_plain"
+                | "diff2_horizontal"
+                | "diff2_vertical"
+                | "diff3_horizontal"
+                | "diff3_vertical"
+                | "diff3_mixed"
+                | "diff4_mixed"
+<
+        Default: (see example config above)
+
+        This determines the layout used for diffs in the various different
+        views. Some of the layouts are only applicable to certain types of
+        views.
+
+        Layouts: ~
+            Unless otherwise stated, the window symbols (A, B, C, D) represent
+            the following versions of a file:
+
+            In the diff_view and file_history_view:
+              • A: Old state
+              • B: New state
+
+            In the merge_tool:
+              • A: OURS (current branch)
+              • B: LOCAL (the file as it currently exists on disk)
+              • C: THEIRS (incoming branch)
+              • D: BASE (common ancestor)
+
+            {diff1_plain}
+                Available for: merge_tool
+
+                This is a plain, singular window. This is available in case
+                you prefer to edit conflict markers manually without the
+                visual noise from diffs.
+
+                Window symbols:
+                  • A: LOCAL
+
+                ┌──────────────┐
+                │              │
+                │              │
+                │      A       │
+                │              │
+                │              │
+                └──────────────┘
+
+            {diff2_horizontal}
+                Available for: diff_view, file_history_view
+
+                ┌──────┬───────┐
+                │      │       │
+                │      │       │
+                │  A   │   B   │
+                │      │       │
+                │      │       │
+                └──────┴───────┘
+
+            {diff2_vertical}
+                Available for: diff_view, file_history_view
+
+                ┌──────────────┐
+                │      A       │
+                │              │
+                ├──────────────┤
+                │      B       │
+                │              │
+                └──────────────┘
+
+            {diff3_horizontal}
+                Available for: merge_tool
+
+                ┌────┬────┬────┐
+                │    │    │    │
+                │    │    │    │
+                │ A  │ B  │ C  │
+                │    │    │    │
+                │    │    │    │
+                └────┴────┴────┘
+
+            {diff3_vertical}
+                Available for: merge_tool
+
+                ┌──────────────┐
+                │      A       │
+                ├──────────────┤
+                │      B       │
+                ├──────────────┤
+                │      C       │
+                └──────────────┘
+
+            {diff3_mixed}
+                Available for: merge_tool
+
+                ┌──────┬───────┐
+                │  A   │   C   │
+                │      │       │
+                ├──────┴───────┤
+                │      B       │
+                │              │
+                └──────────────┘
+
+            {diff4_mixed}
+                Available for: merge_tool
+
+                ┌────┬────┬────┐
+                │ A  │ D  │ C  │
+                │    │    │    │
+                ├────┴────┴────┤
+                │      B       │
+                │              │
+                └──────────────┘
+
+                                                *diffview-config-view.merge_tool.disable_diagnostics*
+view.merge_tool.disable_diagnostics
+        Type: `boolean`, Default: `true`
+
+        Temporarily disable diagnostics for conflict buffers while in a
+        diff_view. The diagnostics are enabled again when leaving or closing
+        the view's tab page.
 
 win_config                                      *diffview-config-win_config*
         Type: `table | fun(): table`, Default: `{}`
@@ -546,6 +694,11 @@ listing_style                                   *diffview-actions-listing_style*
         Cycle through the available listing styles. The currently available
         styles are: file tree and flat list.
 
+next_conflict                                   *diffview-actions-next_conflict*
+        Contexts: `diff_view`, `file_panel`
+
+        Moves the cursor to the next conflict marker in the current file.
+
 next_entry                                      *diffview-actions-next_entry*
         Contexts: `view`, `panel`
 
@@ -572,6 +725,11 @@ options                                         *diffview-actions-options*
         Contexts: `file_history_view`, `file_history_panel`
 
         Open the option panel for the subject.
+
+prev_conflict                                   *diffview-actions-prev_conflict*
+        Contexts: `diff_view`, `file_panel`
+
+        Moves the cursor to the previous conflict marker in the current file.
 
 prev_entry                                      *diffview-actions-prev_entry*
         Contexts: `view`, `panel`
@@ -714,13 +872,39 @@ COMMANDS                                        *diffview-commands*
         :DiffviewOpen HEAD~2 -- lua/diffview plugin
         :DiffviewOpen d4a7b0d -uno
 <
+                                                *diffview-merge-tool*
+                        If you call `:DiffviewOpen` during a merge or a
+                        rebase, the view will list the conflicted files in
+                        their own section. When opening a conflicted file, it
+                        will open in a 3-way diff allowing you to resolve the
+                        conflict with the context of the target branch's
+                        version (OURS, left), and the version from the branch
+                        which is being merged (THEIRS, right). The conflicted
+                        file's entry in the file panel will list the remaining
+                        number of conflict markers.
+
+                        You can jump between conflict markers with `]x` and
+                        `[x`. This works from the file panel as well. Further,
+                        in addition to the normal |copy-diffs| mappings you can
+                        use `2do` to obtain the hunk from the OURS side of the
+                        diff, `3do` to obtain the hunk from the THEIRS side of
+                        the diff, and - in a 4-way diff - `1do` to obtain the
+                        hunk from the BASE (common ancestor).
+
+                        NOTE: The horizontal 3-way diff is only the default
+                        layout for the merge-tool, but there are multiple
+                        variations on the 3-way diff layout as well as a 4-way
+                        diff, and a single window layout available. The
+                        default mapping `g<C-x>` allows you to cycle through
+                        the available layouts.
+
     Options:~
         -u[value], --untracked-files[={value}]
                         Specify whether or not to show untracked files. If
                         flag is given without value; defaults to `true`.
                         {value} can be one of:
-                          - `true`, `normal`, `all` Show untracked.
-                          - `false`, `no` Don't show untracked.
+                          • `true`, `normal`, `all` Show untracked.
+                          • `false`, `no` Don't show untracked.
         --cached, --staged
                         Diff staged changes against [git-rev]. If no [git-rev]
                         is given, defaults to `HEAD`.

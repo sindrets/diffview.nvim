@@ -59,14 +59,14 @@ M.defaults = {
   },
   view = {
     default = {
-      layout = "diff_2_horizontal",
+      layout = "diff2_horizontal",
     },
     merge_tool = {
-      layout = "diff_3_horizontal",
+      layout = "diff3_horizontal",
       disable_diagnostics = true,
     },
     file_history = {
-      layout = "diff_2_horizontal",
+      layout = "diff2_horizontal",
     },
   },
   file_panel = {
@@ -260,22 +260,22 @@ function M.get_log_options(single_file, t)
   return log_options
 end
 
----@alias LayoutName "diff_1_plain"
----       | "diff_2_horizontal"
----       | "diff_2_vertical"
----       | "diff_3_horizontal"
----       | "diff_3_vertical"
----       | "diff_3_mixed"
----       | "diff_4_mixed"
+---@alias LayoutName "diff1_plain"
+---       | "diff2_horizontal"
+---       | "diff2_vertical"
+---       | "diff3_horizontal"
+---       | "diff3_vertical"
+---       | "diff3_mixed"
+---       | "diff4_mixed"
 
 local layout_map = {
-  diff_1_plain = Diff1,
-  diff_2_horizontal = Diff2Hor,
-  diff_2_vertical = Diff2Ver,
-  diff_3_horizontal = Diff3Hor,
-  diff_3_vertical = Diff3Ver,
-  diff_3_mixed = Diff3Mixed,
-  diff_4_mixed = Diff4Mixed,
+  diff1_plain = Diff1,
+  diff2_horizontal = Diff2Hor,
+  diff2_vertical = Diff2Ver,
+  diff3_horizontal = Diff3Hor,
+  diff3_vertical = Diff3Ver,
+  diff3_mixed = Diff3Mixed,
+  diff4_mixed = Diff4Mixed,
 }
 
 ---@param layout_name LayoutName
