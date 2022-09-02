@@ -21,6 +21,24 @@ end
 ---@field single_file LogOptions
 ---@field multi_file LogOptions
 
+M.default_winopts = {
+  relativenumber = false,
+  number = false,
+  list = false,
+  winfixwidth = true,
+  winfixheight = true,
+  foldenable = false,
+  spell = false,
+  wrap = false,
+  signcolumn = "yes",
+  colorcolumn = "",
+  foldmethod = "manual",
+  foldcolumn = "0",
+  scrollbind = false,
+  cursorbind = false,
+  diff = false,
+}
+
 -- stylua: ignore start
 M.defaults = {
   diff_binaries = false,
@@ -44,6 +62,19 @@ M.defaults = {
     win_config = {
       position = "left",
       width = 35,
+      winopts = vim.tbl_extend("force", M.default_winopts, {
+        cursorline = true,
+        winhl = {
+          "EndOfBuffer:DiffviewEndOfBuffer",
+          "Normal:DiffviewNormal",
+          "CursorLine:DiffviewCursorLine",
+          "WinSeparator:DiffviewWinSeparator",
+          "SignColumn:DiffviewNormal",
+          "StatusLine:DiffviewStatusLine",
+          "StatusLineNC:DiffviewStatuslineNC",
+          opt = { method = "prepend" },
+        },
+      })
     },
   },
   file_history_panel = {
@@ -59,10 +90,27 @@ M.defaults = {
     win_config = {
       position = "bottom",
       height = 16,
+      winopts = vim.tbl_extend("force", M.default_winopts, {
+        cursorline = true,
+        winhl = {
+          "EndOfBuffer:DiffviewEndOfBuffer",
+          "Normal:DiffviewNormal",
+          "CursorLine:DiffviewCursorLine",
+          "WinSeparator:DiffviewWinSeparator",
+          "SignColumn:DiffviewNormal",
+          "StatusLine:DiffviewStatusLine",
+          "StatusLineNC:DiffviewStatuslineNC",
+        },
+      })
     },
   },
   commit_log_panel = {
-    win_config = {},
+    win_config = {
+      winopts = vim.tbl_extend("force", M.default_winopts, {
+        wrap = true,
+        breakindent = true,
+      })
+    },
   },
   default_args = {
     DiffviewOpen = {},
@@ -189,7 +237,7 @@ function M.get_log_options(single_file, t)
   local log_options
 
   if single_file then
-    log_options =  M._config.file_history_panel.log_options.single_file
+    log_options = M._config.file_history_panel.log_options.single_file
   else
     log_options = M._config.file_history_panel.log_options.multi_file
   end
@@ -225,7 +273,7 @@ function M.setup(user_config)
   local old_win_config_spec = { "position", "width", "height" }
   for _, panel_name in ipairs({ "file_panel", "file_history_panel" }) do
     local panel_config = M._config[panel_name]
-      ---@cast panel_config table
+    ---@cast panel_config table
     local notified = false
 
     for _, option in ipairs(old_win_config_spec) do

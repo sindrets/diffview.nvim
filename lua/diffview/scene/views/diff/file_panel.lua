@@ -23,20 +23,6 @@ local M = {}
 ---@field constrain_cursor function
 local FilePanel = oop.create_class("FilePanel", Panel)
 
-FilePanel.winopts = vim.tbl_extend("force", Panel.winopts, {
-  cursorline = true,
-  winhl = {
-    "EndOfBuffer:DiffviewEndOfBuffer",
-    "Normal:DiffviewNormal",
-    "CursorLine:DiffviewCursorLine",
-    "WinSeparator:DiffviewWinSeparator",
-    "SignColumn:DiffviewNormal",
-    "StatusLine:DiffviewStatusLine",
-    "StatusLineNC:DiffviewStatuslineNC",
-    opt = { method = "prepend" },
-  },
-})
-
 FilePanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
   filetype = "DiffviewFiles",
 })

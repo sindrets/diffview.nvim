@@ -59,6 +59,34 @@ Example configuration with default settings:
         win_config = {                      -- See |diffview-config-win_config|
           position = "left",
           width = 35,
+          winopts = {
+            relativenumber = false,
+            number = false,
+            list = false,
+            winfixwidth = true,
+            winfixheight = true,
+            foldenable = false,
+            spell = false,
+            wrap = false,
+            signcolumn = "yes",
+            colorcolumn = "",
+            foldmethod = "manual",
+            foldcolumn = "0",
+            scrollbind = false,
+            cursorbind = false,
+            diff = false,
+            cursorline = true,
+            winhl = {
+              "EndOfBuffer:DiffviewEndOfBuffer",
+              "Normal:DiffviewNormal",
+              "CursorLine:DiffviewCursorLine",
+              "WinSeparator:DiffviewWinSeparator",
+              "SignColumn:DiffviewNormal",
+              "StatusLine:DiffviewStatusLine",
+              "StatusLineNC:DiffviewStatuslineNC",
+              opt = { method = "prepend" },
+            },
+          }
         },
       },
       file_history_panel = {
@@ -73,10 +101,56 @@ Example configuration with default settings:
         win_config = {    -- See |diffview-config-win_config|
           position = "bottom",
           height = 16,
+          winopts = {
+            relativenumber = false,
+            number = false,
+            list = false,
+            winfixwidth = true,
+            winfixheight = true,
+            foldenable = false,
+            spell = false,
+            wrap = false,
+            signcolumn = "yes",
+            colorcolumn = "",
+            foldmethod = "manual",
+            foldcolumn = "0",
+            scrollbind = false,
+            cursorbind = false,
+            diff = false,
+            cursorline = true,
+            winhl = {
+              "EndOfBuffer:DiffviewEndOfBuffer",
+              "Normal:DiffviewNormal",
+              "CursorLine:DiffviewCursorLine",
+              "WinSeparator:DiffviewWinSeparator",
+              "SignColumn:DiffviewNormal",
+              "StatusLine:DiffviewStatusLine",
+              "StatusLineNC:DiffviewStatuslineNC",
+            },
+          }
         },
       },
       commit_log_panel = {
-        win_config = {},  -- See |diffview-config-win_config|
+          win_config = {    -- See ':h diffview-config-win_config'
+            winopts = {
+              relativenumber = false,
+              number = false,
+              list = false,
+              winfixwidth = true,
+              winfixheight = true,
+              foldenable = false,
+              spell = false,
+              wrap = true,
+              signcolumn = "yes",
+              colorcolumn = "",
+              foldmethod = "manual",
+              foldcolumn = "0",
+              scrollbind = false,
+              cursorbind = false,
+              diff = false,
+              breakindent = true,
+          },
+        },
       },
       default_args = {    -- Default args prepended to the arg-list for the listed commands
         DiffviewOpen = {},
@@ -212,6 +286,11 @@ win_config                                      *diffview-config-win_config*
                 `type="split"`. Only when `relative="win"`). Use `0` for
                 current window.
                 Default: `0`
+
+            {winopts} (table)
+                Any vim options to set for the local window (see |vim.opt_local|).
+                You don't have to copy all the defaults, just specify any
+                values you want to set/override.
 
             NOTE: Fields that are only applicable when `type="float"` are not
             listed here because they are already documented under
