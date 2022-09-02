@@ -394,7 +394,7 @@ local function _emit(no_recursion, event_name, ...)
     if event_name == "tab_enter" then
       fn(that, "view_enter", view)
     elseif event_name == "tab_leave" then
-      fn(that, "view_enter", view)
+      fn(that, "view_leave", view)
     end
   end
 end
