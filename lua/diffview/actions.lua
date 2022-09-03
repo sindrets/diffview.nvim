@@ -156,25 +156,6 @@ function M.goto_file_tab()
   end
 end
 
----@param winid integer
----@param conflicts ConflictRegion[]
-local function cur_conflict_idx(winid, conflicts)
-  local cursor = api.nvim_win_get_cursor(winid)
-
-  local cur = 0
-
-  for i, conflict in ipairs(conflicts) do
-    if conflict.first == cursor[1] then
-      cur = i
-    elseif conflict.first > cursor[1] then
-      cur = i - 1
-      break
-    end
-  end
-
-  return cur
-end
-
 ---Jump to the next merge conflict marker.
 function M.next_conflict()
   local view = lib.get_current_view()
@@ -185,11 +166,14 @@ function M.next_conflict()
     local curfile = main.file
 
     if main:is_valid() and curfile:is_valid() then
-      local conflicts = git.parse_conflicts(api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false))
+      local conflicts, cur = git.parse_conflicts(
+        api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false),
+        main.id
+      )
 
       if #conflicts > 0 then
-        local cur_idx = cur_conflict_idx(main.id, conflicts)
-        local next_idx = cur_idx % #conflicts + 1
+        local cur_idx = utils.vec_indexof(conflicts, cur)
+        local next_idx = (cur_idx == -1) and 1 or cur_idx % #conflicts + 1
         local next_conflict = conflicts[next_idx]
         local curwin = api.nvim_get_current_win()
 
@@ -218,11 +202,14 @@ function M.prev_conflict()
     local curfile = main.file
 
     if main:is_valid() and curfile:is_valid() then
-      local conflicts = git.parse_conflicts(api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false))
+      local conflicts, cur = git.parse_conflicts(
+        api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false),
+        main.id
+      )
 
       if #conflicts > 0 then
-        local cur_idx = cur_conflict_idx(main.id, conflicts)
-        local prev_idx = (cur_idx - 2) % #conflicts + 1
+        local cur_idx = utils.vec_indexof(conflicts, cur)
+        local prev_idx = (cur_idx == -1) and 1 or (cur_idx - 2) % #conflicts + 1
         local prev_conflict = conflicts[prev_idx]
         local curwin = api.nvim_get_current_win()
 
@@ -343,6 +330,43 @@ local function diff_copy_target(kind)
     end
 
     if bufnr then return bufnr end
+  end
+end
+
+---@param target "ours"|"theirs"|"base"|"all"|"none"
+function M.conflict_choose(target)
+  return function()
+    local view = lib.get_current_view()
+
+    if view and view:instanceof(StandardView.__get()) then
+      ---@cast view StandardView
+      local main = view.cur_layout:get_main_win()
+      local curfile = main.file
+
+      if main:is_valid() and curfile:is_valid() then
+        local _, cur = git.parse_conflicts(
+          api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false),
+          main.id
+        )
+
+        if cur then
+          local content
+
+          if target == "ours" then content = cur.ours.content
+          elseif target == "theirs" then content = cur.theirs.content
+          elseif target == "base" then content = cur.base.content
+          elseif target == "all" then
+            content = utils.vec_join(
+              cur.ours.content,
+              cur.base.content,
+              cur.theirs.content
+            )
+          end
+
+          api.nvim_buf_set_lines(curfile.bufnr, cur.first - 1, cur.last, false, content or {})
+        end
+      end
+    end
   end
 end
 
