@@ -231,37 +231,37 @@ win_config                                      *diffview-config-win_config*
             |nvim_open_win()|.
 
         Examples: >
-                -- Split window, aligned to the right side of the editor:
-                win_config = {
-                  type = "split",
-                  position = "right",
-                  width = 40,
-                }
+            -- Split window, aligned to the right side of the editor:
+            win_config = {
+              type = "split",
+              position = "right",
+              width = 40,
+            }
 
-                -- Split window, aligned to the bottom of the first window in
-                -- the current tabpage:
-                win_config = function()
-                  local c = {
-                    type = "split",
-                    position = "bottom",
-                    relative = "win",
-                    height = 14,
-                  }
-                  c.win = vim.api.nvim_tabpage_list_wins(0)[1]
-                  return c
-                end
+            -- Split window, aligned to the bottom of the first window in
+            -- the current tabpage:
+            win_config = function()
+              local c = {
+                type = "split",
+                position = "bottom",
+                relative = "win",
+                height = 14,
+              }
+              c.win = vim.api.nvim_tabpage_list_wins(0)[1]
+              return c
+            end
 
-                -- Floating window, centered in the editor:
-                win_config = function()
-                  local c = { type = "float" }
-                  local editor_width = vim.o.columns
-                  local editor_height = vim.o.lines
-                  c.width = math.min(100, editor_width)
-                  c.height = math.min(24, editor_height)
-                  c.col = math.floor(editor_width * 0.5 - c.width * 0.5)
-                  c.row = math.floor(editor_height * 0.5 - c.height * 0.5)
-                  return c
-                end,
+            -- Floating window, centered in the editor:
+            win_config = function()
+              local c = { type = "float" }
+              local editor_width = vim.o.columns
+              local editor_height = vim.o.lines
+              c.width = math.min(100, editor_width)
+              c.height = math.min(24, editor_height)
+              c.col = math.floor(editor_width * 0.5 - c.width * 0.5)
+              c.row = math.floor(editor_height * 0.5 - c.height * 0.5)
+              return c
+            end,
 <
 
 
@@ -761,74 +761,64 @@ COMMANDS                                        *diffview-commands*
 
                                                 *:DiffviewOpen*
 :DiffviewOpen [git-rev] [options] [ -- {paths...}]
-                        Opens a new Diffview that compares against [git-rev].
-                        If no [git-rev] is given, defaults to comparing
-                        against the index. Additional {paths...} can be
-                        provided to narrow down what files are shown. If the
-                        `-C` flag is not defined, the git top-level is
-                        determined from the current buffer when possible.
-                        Otherwise it's determined from the cwd.
-                        Examples:
+
+        Opens a new Diffview that compares against [git-rev]. If no [git-rev]
+        is given, defaults to comparing against the index. Additional
+        {paths...} can be provided to narrow down what files are shown. If the
+        `-C` flag is not defined, the git top-level is determined from the
+        current buffer when possible. Otherwise it's determined from the cwd.
+        Examples:
 >
-        :DiffviewOpen
-        :DiffviewOpen HEAD~2
-        :DiffviewOpen HEAD~4..HEAD~2
-        :DiffviewOpen d4a7b0d
-        :DiffviewOpen d4a7b0d..519b30e
-        :DiffviewOpen origin/main...HEAD
-        :DiffviewOpen HEAD~2 -- lua/diffview plugin
-        :DiffviewOpen d4a7b0d -uno
+            :DiffviewOpen
+            :DiffviewOpen HEAD~2
+            :DiffviewOpen HEAD~4..HEAD~2
+            :DiffviewOpen d4a7b0d
+            :DiffviewOpen d4a7b0d..519b30e
+            :DiffviewOpen origin/main...HEAD
+            :DiffviewOpen HEAD~2 -- lua/diffview plugin
+            :DiffviewOpen d4a7b0d -uno
 <
                                                 *diffview-merge-tool*
-                        If you call `:DiffviewOpen` during a merge or a
-                        rebase, the view will list the conflicted files in
-                        their own section. When opening a conflicted file, it
-                        will open in a 3-way diff allowing you to resolve the
-                        conflict with the context of the target branch's
-                        version (OURS, left), and the version from the branch
-                        which is being merged (THEIRS, right). The conflicted
-                        file's entry in the file panel will show the remaining
-                        number of conflict markers (the number following the
-                        file name). If what follows the file name is instead
-                        an exclamation mark (`!`), this indicates that the
-                        file has not yet been opened, and the number of
-                        conflicts is unknown. If the sign is a check mark,
-                        this indicates that there are no more conflicts in the
-                        file.
+        If you call `:DiffviewOpen` during a merge or a rebase, the view will
+        list the conflicted files in their own section. When opening a
+        conflicted file, it will open in a 3-way diff allowing you to resolve
+        the conflict with the context of the target branch's version (OURS,
+        left), and the version from the branch which is being merged (THEIRS,
+        right).
 
-                        You can jump between conflict markers with `]x` and
-                        `[x`. This works from the file panel as well. Further,
-                        in addition to the normal |copy-diffs| mappings you
-                        can use `2do` to obtain the hunk from the OURS side of
-                        the diff, `3do` to obtain the hunk from the THEIRS
-                        side of the diff, and - in a 4-way diff - `1do` to
-                        obtain the hunk from the BASE. See
-                        |diffview-conflict-versions| to tell what windows
-                        correspond with what version of the file.
+        The conflicted file's entry in the file panel will show the
+        remaining number of conflict markers (the number following the file
+        name). If what follows the file name is instead an exclamation mark
+        (`!`), this indicates that the file has not yet been opened, and the
+        number of conflicts is unknown. If the sign is a check mark, this
+        indicates that there are no more conflicts in the file.
 
-                        Additionally there are mappings for operating directly
-                        on the conflict markers:
-                          • `<leader>co`: Choose the OURS version of the
-                            conflict.
-                          • `<leader>ct`: Choose the THEIRS version of the
-                            conflict.
-                          • `<leader>cb`: Choose the BASE version of the
-                            conflict.
-                          • `<leader>ca`: Choose all versions of the
-                            conflict (effectively just deletes the markers,
-                            leaving all the content).
-                          • `dx`: Choose none of the versions of the conflict
-                            (delete the conflict region).
+        You can jump between conflict markers with `]x` and `[x`. This works
+        from the file panel as well. Further, in addition to the normal
+        |copy-diffs| mappings you can use `2do` to obtain the hunk from the
+        OURS side of the diff, `3do` to obtain the hunk from the THEIRS side
+        of the diff, and - in a 4-way diff - `1do` to obtain the hunk from the
+        BASE. See |diffview-conflict-versions| to tell what windows correspond
+        with what version of the file.
 
-                        For more info on these actions, see
-                        |diffview-actions-conflict_choose|.
+        Additionally there are mappings for operating directly on the conflict
+        markers:
+          • `<leader>co`: Choose the OURS version of the conflict.
+          • `<leader>ct`: Choose the THEIRS version of the conflict.
+          • `<leader>cb`: Choose the BASE version of the conflict.
+          • `<leader>ca`: Choose all versions of the conflict (effectively
+            just deletes the markers, leaving all the content).
+          • `dx`: Choose none of the versions of the conflict (delete the
+            conflict region).
 
-                        NOTE: The horizontal 3-way diff is only the default
-                        layout for the merge-tool, but there are multiple
-                        variations on the 3-way diff layout as well as a 4-way
-                        diff, and a single window layout available. The
-                        default mapping `g<C-x>` allows you to cycle through
-                        the available layouts.
+        For more info on these actions, see
+        |diffview-actions-conflict_choose|.
+
+        NOTE: The horizontal 3-way diff is only the default layout for the
+        merge-tool, but there are multiple variations on the 3-way diff layout
+        as well as a 4-way diff, and a single window layout available. The
+        default mapping `g<C-x>` allows you to cycle through the available
+        layouts.
 
     Options:~
         -u[value], --untracked-files[={value}]
@@ -859,53 +849,48 @@ COMMANDS                                        *diffview-commands*
 
                                                 *:DiffviewFileHistory*
 :[range]DiffviewFileHistory [paths] [options]
-                        Opens a new file history view that lists all commits
-                        that affected the given paths. This is a porcelain
-                        interface for git-log. Both [paths] and [options] may
-                        be specified in any order, even interchangeably.
 
-                        If no [paths] are given, defaults to the top-level of
-                        the working tree. The top-level will be inferred from
-                        the current buffer when possible, otherwise the cwd is
-                        used. Multiple [paths] may be provided and git
-                        pathspec is supported (see `:Man gitglossary(7)` for
-                        information about pathspec).
+        Opens a new file history view that lists all commits that affected the
+        given paths. This is a porcelain interface for git-log. Both [paths]
+        and [options] may be specified in any order, even interchangeably.
 
-                        If [range] is given, the file history view will trace
-                        the line evolution of the given range in the current
-                        file (see the `-L` flag below).
+        If no [paths] are given, defaults to the top-level of the working
+        tree. The top-level will be inferred from the current buffer when
+        possible, otherwise the cwd is used. Multiple [paths] may be provided
+        and git pathspec is supported (see `:Man gitglossary(7)` for
+        information about pathspec).
 
-                        From the file history panel (the panel listing the
-                        commits) you can open an option panel by pressing
-                        `g!`. The option panel will allow you to change the
-                        flags that will be passed to `git-log`. A flag can
-                        be adjusted either by moving the cursor to its line
-                        followed by pressing <Tab>, or by using the mappings
-                        that are shown directly in the panel, preceding the
-                        flags' descriptions.
+        If [range] is given, the file history view will trace the line
+        evolution of the given range in the current file (see the `-L` flag
+        below).
 
-                        NOTE: Commits are only listed if git-log is able to
-                        show its file stats given your currently configured
-                        log options. As such pay attention to the value of
-                        `--diff-merges`, as this controls how git-log treats
-                        merge commits and subsequently it's willingness to
-                        show stats for these commits. Setting
-                        `--diff-merges=off` will tell git-log to never compare
-                        merge commits, and as such they won't show up in the
-                        file history view.
+        From the file history panel (the panel listing the commits) you can
+        open an option panel by pressing `g!`. The option panel will allow you
+        to change the flags that will be passed to `git-log`. A flag can be
+        adjusted either by moving the cursor to its line followed by pressing
+        <Tab>, or by using the mappings that are shown directly in the panel,
+        preceding the flags' descriptions.
 
-                        Examples:
+        NOTE: Commits are only listed if git-log is able to show its file
+        stats given your currently configured log options. As such pay
+        attention to the value of `--diff-merges`, as this controls how
+        git-log treats merge commits and subsequently it's willingness to show
+        stats for these commits. Setting `--diff-merges=off` will tell git-log
+        to never compare merge commits, and as such they won't show up in the
+        file history view.
+
+        Examples:
 >
-        :DiffviewFileHistory
-        :DiffviewFileHistory %
-        :DiffviewFileHistory path/to/some/file.txt
-        :DiffviewFileHistory path/to/some/directory
-        :DiffviewFileHistory multiple/paths foo/bar baz/qux
-        :DiffviewFileHistory --base=HEAD~4
-        :DiffviewFileHistory --base=LOCAL
-        :DiffviewFileHistory --range=origin..HEAD
-        :DiffviewFileHistory --range=feat/some-branch
-        :'<,'>DiffviewFileHistory
+            :DiffviewFileHistory
+            :DiffviewFileHistory %
+            :DiffviewFileHistory path/to/some/file.txt
+            :DiffviewFileHistory path/to/some/directory
+            :DiffviewFileHistory multiple/paths foo/bar baz/qux
+            :DiffviewFileHistory --base=HEAD~4
+            :DiffviewFileHistory --base=LOCAL
+            :DiffviewFileHistory --range=origin..HEAD
+            :DiffviewFileHistory --range=feat/some-branch
+            :'<,'>DiffviewFileHistory
 <
 
     Options:~
