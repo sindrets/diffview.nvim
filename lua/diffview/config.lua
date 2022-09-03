@@ -314,6 +314,15 @@ function M.get_layout_keymaps(layout)
   end
 end
 
+---@param values vector
+---@param no_quote? boolean
+---@return string
+local function fmt_enum(values, no_quote)
+  return table.concat(vim.tbl_map(function(v)
+    return (not no_quote and type(v) == "string") and ("'" .. v .. "'") or v
+  end, values), "|")
+end
+
 function M.setup(user_config)
   user_config = user_config or {}
 
@@ -339,8 +348,8 @@ function M.setup(user_config)
       if panel_config[option] ~= nil then
         if not notified then
           utils.warn(
-            ("'%s.{position|width|height}' has been deprecated. See ':h diffview.changelog-136'.")
-            :format(panel_name)
+            ("'%s.{%s}' has been deprecated. See ':h diffview.changelog-136'.")
+            :format(panel_name, fmt_enum(old_win_config_spec, true))
           )
           notified = true
         end
@@ -370,8 +379,8 @@ function M.setup(user_config)
     for _, name in ipairs(option_names) do
       if user_log_options[name] ~= nil then
         utils.warn(
-          ("'file_history_panel.log_options.(%s)' has been deprecated. See ':h diffview.changelog-151'.")
-          :format(table.concat(option_names, "|"))
+          ("'file_history_panel.log_options.{%s}' has been deprecated. See ':h diffview.changelog-151'.")
+          :format(fmt_enum(option_names, true))
         )
         break
       end
@@ -382,6 +391,36 @@ function M.setup(user_config)
 
   if #M._config.git_cmd == 0 then
     M._config.git_cmd = M.defaults.git_cmd
+  end
+
+  do
+    -- Validate layouts
+    local view = M._config.view
+    local standard_layouts = { "diff2_horizontal", "diff2_vertical", -1 }
+    local merge_layuots = {
+      "diff1_plain",
+      "diff3_horizontal",
+      "diff3_vertical",
+      "diff3_mixed",
+      "diff4_mixed",
+      -1
+    }
+    local valid_layouts = {
+      default = standard_layouts,
+      merge_tool = merge_layuots,
+      file_history = standard_layouts,
+    }
+
+    for _, kind in ipairs(vim.tbl_keys(valid_layouts)) do
+      if not vim.tbl_contains(valid_layouts[kind], view[kind].layout) then
+        utils.err(("Invalid layout name '%s' for 'view.%s'! Must be one of (%s)."):format(
+          view[kind].layout,
+          kind,
+          fmt_enum(valid_layouts[kind])
+        ))
+        view[kind].layout = M.defaults.view[kind].layout
+      end
+    end
   end
 
   for _, name in ipairs({ "single_file", "multi_file" }) do
