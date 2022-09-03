@@ -136,6 +136,10 @@ function File:create_buffer(callback)
       end)
 
       api.nvim_win_close(winid, true)
+    else
+      -- NOTE: LSP servers might load buffers in the background and unlist
+      -- them. Explicitly set the buffer as listed when loading it here.
+      vim.bo[self.bufnr].buflisted = true
     end
 
     self:post_buf_created()
