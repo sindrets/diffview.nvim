@@ -116,6 +116,8 @@ function DiffView:init(opt)
 end
 
 function DiffView:post_open()
+  vim.cmd("redraw")
+
   self.commit_log_panel = CommitLogPanel(self.git_ctx.toplevel, {
     name = ("diffview://%s/log/%d/%s"):format(self.git_ctx.dir, self.tabpage, "commit_log"),
   })
@@ -164,6 +166,9 @@ end
 
 ---@param file FileEntry
 function DiffView:_set_file(file)
+  vim.cmd("redraw")
+
+  self.cur_layout:detach_files()
   local cur_entry = self.cur_entry
   self.emitter:emit("file_open_pre", file, cur_entry)
   self.nulled = false

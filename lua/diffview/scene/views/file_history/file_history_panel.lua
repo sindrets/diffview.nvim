@@ -356,7 +356,6 @@ end
 
 function FileHistoryPanel:set_cur_item(new_item)
   if self.cur_item[2] then
-    self.cur_item[2].layout:detach_files()
     self.cur_item[2]:set_active(false)
   end
 

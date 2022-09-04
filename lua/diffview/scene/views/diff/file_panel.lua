@@ -200,7 +200,6 @@ end
 
 function FilePanel:set_cur_file(file)
   if self.cur_file then
-    self.cur_file.layout:detach_files()
     self.cur_file:set_active(false)
   end
 

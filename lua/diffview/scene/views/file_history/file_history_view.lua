@@ -87,6 +87,22 @@ function FileHistoryView:cur_file()
   return self.panel.cur_item[2]
 end
 
+---@param file FileEntry
+function FileHistoryView:_set_file(file)
+  vim.cmd("redraw")
+
+  self.cur_layout:detach_files()
+  local cur_entry = self.cur_entry
+  self.emitter:emit("file_open_pre", file, cur_entry)
+  self.nulled = false
+
+  file.layout.emitter:once("files_opened", function()
+    self.emitter:emit("file_open_post", file, cur_entry)
+  end)
+
+  self:use_entry(file)
+end
+
 function FileHistoryView:next_item()
   self:ensure_layout()
 
@@ -98,7 +114,7 @@ function FileHistoryView:next_item()
     if cur then
       self.panel:highlight_item(cur)
       self.nulled = false
-      self:use_entry(cur)
+      self:_set_file(cur)
 
       return cur
     end
@@ -116,7 +132,7 @@ function FileHistoryView:prev_item()
     if cur then
       self.panel:highlight_item(cur)
       self.nulled = false
-      self:use_entry(cur)
+      self:_set_file(cur)
 
       return cur
     end
@@ -134,7 +150,7 @@ function FileHistoryView:set_file(file, focus)
     self.panel:set_cur_item({ entry, file })
     self.panel:highlight_item(file)
     self.nulled = false
-    self:use_entry(file)
+    self:_set_file(file)
 
     if focus then
       api.nvim_set_current_win(self.cur_layout:get_main_win().id)

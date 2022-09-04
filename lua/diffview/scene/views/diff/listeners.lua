@@ -1,16 +1,13 @@
-local api = vim.api
 local lazy = require("diffview.lazy")
 
----@type EEvent
-local Event = lazy.access("diffview.events", "Event")
----@type ERevType
-local RevType = lazy.access("diffview.git.rev", "RevType")
----@module "plenary.async"
-local async = lazy.require("plenary.async")
----@module "diffview.git.utils"
-local git = lazy.require("diffview.git.utils")
----@module "diffview.utils"
-local utils = lazy.require("diffview.utils")
+local actions = lazy.require("diffview.actions") ---@module "diffview.actions"
+local Event = lazy.access("diffview.events", "Event") ---@type EEvent
+local RevType = lazy.access("diffview.git.rev", "RevType") ---@type ERevType
+local async = lazy.require("plenary.async") ---@module "plenary.async"
+local git = lazy.require("diffview.git.utils") ---@module "diffview.git.utils"
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
+
+local api = vim.api
 
 ---@param view DiffView
 return function(view)
@@ -47,6 +44,13 @@ return function(view)
     diff_buf_read = function(_)
       view.emitter:once("diff_buf_win_enter", function()
         utils.set_cursor(0, 1, 0)
+
+        if view.cur_layout:get_main_win().id == api.nvim_get_current_win() then
+          if view.cur_entry and view.cur_entry.kind == "conflicting" then
+            actions.next_conflict()
+            vim.cmd("norm! zz")
+          end
+        end
       end)
     end,
     ---@diagnostic disable-next-line: unused-local
