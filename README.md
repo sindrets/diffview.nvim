@@ -35,6 +35,50 @@ Plug 'sindrets/diffview.nvim'
 use { 'sindrets/diffview.nvim', requires = 'nvim-lua/plenary.nvim' }
 ```
 
+## Merge Tool
+
+![merge tool showcase](https://user-images.githubusercontent.com/2786478/188286293-13bbf0ab-3595-425d-ba4a-12f514c17eb6.png)
+
+Opening a diff view during a merge or a rebase will list the conflicted files in
+their own section. When opening a conflicted file, it will open in a 3-way diff
+allowing you to resolve the merge conflicts with the context of the target
+branch's version, as well as the version from the branch which is being merged.
+
+The 3-way diff is only the default layout for merge conflicts. There are
+multiple variations on this layout, a 4-way diff layout, and a single window
+layout available.
+
+In addition to the normal `:h copy-diffs` mappings, there are default mappings
+provided for jumping between conflict markers, obtaining a hunk directly from
+any of the diff buffers, and accepting any one, all, or none of the versions of
+a file given by a conflict region.
+
+For more information on the merge tool, mappings, layouts and how to
+configure them, see:
+
+- `:h diffview-merge-tool`
+- `:h diffview-config-view.x.layout`
+
+## File History
+
+![file history showcase](https://user-images.githubusercontent.com/2786478/188331057-f9ec9a0d-8cda-4ff8-ac98-febcc7aa4010.png)
+
+The file history view allows you to list all the commits that affected a given
+set of paths, and view the changes made in a diff split. This is a porcelain
+interface for git-log, and supports a good number of its options. Things like:
+
+- Filtering commits by grepping commit messages and commit authors.
+- Tracing the line evolution of a given set of ranges for multiple files. 
+- Only listing changes for a specific commit range, branch, or tag.
+- Following file changes through renames.
+
+Get started by opening file history for:
+
+- The current branch: `:DiffviewFileHistory`
+- The current file: `:DiffviewFileHistory %`
+
+For more info, see `:h :DiffviewFileHistory`.
+
 ## Configuration
 
 <p>
@@ -216,12 +260,6 @@ require("diffview").setup({
 </details>
 </p>
 
-### Layout
-
-The diff windows can be aligned either with a horizontal split or a vertical
-split. To change the alignment add either `horizontal` or `vertical` to your
-`'diffopt'`.
-
 ### Hooks
 
 The `hooks` table allows you to define callbacks for various events emitted from
@@ -287,15 +325,6 @@ panel.
 **For more details on how to set mappings for other modes, actions, and more see:**
 - `:h diffview-config-keymaps`
 - `:h diffview-actions`
-
-## File History
-
-![file-history-multi](https://user-images.githubusercontent.com/2786478/131269782-f4184640-6d73-4226-b425-feccb5002dd0.png)
-
-The file history view allows you to list all the commits that affected a given
-file or directory, and view the changes made in a diff split. This is a
-porcelain interface for git-log. Open a file history view for your current file
-by calling `:DiffviewFileHistory %`.
 
 ## Usage
 
