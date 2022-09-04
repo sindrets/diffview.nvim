@@ -441,12 +441,25 @@ function M.cycle_layout()
   end
 
   if cur_file then
+    local main = view.cur_layout:get_main_win()
+    local pos = api.nvim_win_get_cursor(main.id)
     local was_focused = view.cur_layout:is_focused()
-    view:set_file(cur_file, false)
 
-    if was_focused then
-      view.cur_layout:get_main_win():focus()
-    end
+    cur_file.layout.emitter:once("files_opened", function()
+      utils.set_cursor(main.id, unpack(pos))
+
+      if not was_focused then
+        api.nvim_win_call(main.id, function()
+          -- HACK: Trigger sync for the scrollbind + cursorbind
+          vim.cmd([[exe "norm! \<c-e>\<c-y>"]])
+        end)
+      end
+    end)
+
+    view:set_file(cur_file, false)
+    main = view.cur_layout:get_main_win()
+
+    if was_focused then main:focus() end
   end
 end
 
