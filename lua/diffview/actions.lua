@@ -362,6 +362,11 @@ function M.conflict_choose(target)
           end
 
           api.nvim_buf_set_lines(curfile.bufnr, cur.first - 1, cur.last, false, content or {})
+
+          utils.set_cursor(main.id, unpack({
+            (content and #content or 0) + cur.first - 1,
+            content and content[1] and #content[#content] or 0
+          }))
         end
       end
     end
