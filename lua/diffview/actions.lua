@@ -166,14 +166,13 @@ function M.next_conflict()
     local curfile = main.file
 
     if main:is_valid() and curfile:is_valid() then
-      local conflicts, cur = git.parse_conflicts(
+      local conflicts, _, cur_idx = git.parse_conflicts(
         api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false),
         main.id
       )
 
       if #conflicts > 0 then
-        local cur_idx = utils.vec_indexof(conflicts, cur)
-        local next_idx = (cur_idx == -1) and 1 or cur_idx % #conflicts + 1
+        local next_idx = math.min(cur_idx, #conflicts) % #conflicts + 1
         local next_conflict = conflicts[next_idx]
         local curwin = api.nvim_get_current_win()
 
@@ -202,14 +201,13 @@ function M.prev_conflict()
     local curfile = main.file
 
     if main:is_valid() and curfile:is_valid() then
-      local conflicts, cur = git.parse_conflicts(
+      local conflicts, _, cur_idx = git.parse_conflicts(
         api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false),
         main.id
       )
 
       if #conflicts > 0 then
-        local cur_idx = utils.vec_indexof(conflicts, cur)
-        local prev_idx = (cur_idx == -1) and 1 or (cur_idx - 2) % #conflicts + 1
+        local prev_idx = (math.max(cur_idx, 1) - 2) % #conflicts + 1
         local prev_conflict = conflicts[prev_idx]
         local curwin = api.nvim_get_current_win()
 

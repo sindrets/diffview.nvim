@@ -1371,12 +1371,13 @@ local CONFLICT_END = [[^>>>>>>> ]]
 
 ---@param lines string[]
 ---@param winid? integer
----@return ConflictRegion[]
----@return ConflictRegion?
+---@return ConflictRegion[] conflicts
+---@return ConflictRegion? cur_conflict The conflict under the cursor in the given window.
+---@return integer cur_conflict_idx Index of the current conflict. Will be 0 if the cursor if before the first conflict, and `#conflicts + 1` if the cursor is after the last conflict.
 function M.parse_conflicts(lines, winid)
   local ret = {}
   local has_start, has_base, has_sep = false, false, false
-  local cur, cursor, cur_conflict
+  local cur, cursor, cur_conflict, cur_idx
 
   if winid and api.nvim_win_is_valid(winid) then
     cursor = api.nvim_win_get_cursor(winid)
@@ -1410,8 +1411,13 @@ function M.parse_conflicts(lines, winid)
       data.theirs.content = utils.vec_slice(lines, data.theirs.first + 1, data.theirs.last - 1)
     end
 
-    if cursor and cursor[1] >= first and cursor[1] <= last then
-      cur_conflict = data
+    if cursor then
+      if not cur_conflict and cursor[1] >= first and cursor[1] <= last then
+        cur_conflict = data
+        cur_idx = #ret + 1
+      elseif cursor[1] > last then
+        cur_idx = (cur_idx or 0) + 1
+      end
     end
 
     data.first = first
@@ -1481,7 +1487,13 @@ function M.parse_conflicts(lines, winid)
 
   handle(cur)
 
-  return ret, cur_conflict
+  if cursor and cur_idx then
+    if cursor[1] > ret[#ret].last then
+      cur_idx = #ret + 1
+    end
+  end
+
+  return ret, cur_conflict, cur_idx or 0
 end
 
 ---@return string, string
