@@ -336,14 +336,13 @@ hooks                                           *diffview-config-hooks*
 
             {diff_buf_read} (`fun(bufnr: integer)`)
                 Emitted after a new diff buffer is ready (the first time it's
-                created and loaded into a window). Diff buffers are all
-                buffers with |diff-mode| enabled. That includes buffers of
-                local files (not created from git).
+                created). Diff buffers are all buffers with |diff-mode|
+                enabled. That includes buffers of local files (not created
+                from git).
 
                 This is always called with the new buffer as the current
-                buffer and the correct diff window as the current window such
-                that |:setlocal| will apply settings to the relevant buffer /
-                window.
+                buffer such that |:setlocal| will apply settings to that
+                relevant buffer.
 
                 Callback Parameters:~
                     {bufnr} (`integer`)
@@ -751,12 +750,6 @@ actions:
         • |diffview-actions-goto_file_edit|
         • |diffview-actions-view_windo|
 
-LAYOUT                                          *diffview-layout*
-
-The diff windows can be aligned either with a horizontal split or a vertical
-split. To change the alignment add either `horizontal` or `vertical` to your
-'diffopt'.
-
 COMMANDS                                        *diffview-commands*
 
                                                 *:DiffviewOpen*
@@ -986,14 +979,13 @@ For information on how to use User autocommands, see |User|.
 `DiffviewViewLeave`     Fires just before leaving a view.
 
 `DiffviewDiffBufRead`   Fires after a new diff buffer is ready (the first
-                      time it's created and loaded into a window). Diff
-                      buffers are all buffers with |diff-mode| enabled. That
-                      includes buffers of local files (not created from git).
+                      time it's created). Diff buffers are all buffers with
+                      |diff-mode| enabled. That includes buffers of local
+                      files (not created from git).
 
                       This is always called with the new buffer as the current
-                      buffer and the correct diff window as the current window
-                      such that |:setlocal| will apply settings to the
-                      relevant buffer / window.
+                      buffer such that |:setlocal| will apply settings to that
+                      relevant buffer.
 
 `DiffviewDiffBufWinEnter`
                       Fires after a diff buffer is displayed in a window.
