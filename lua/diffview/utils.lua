@@ -174,6 +174,13 @@ function M.sign(n)
   return (n > 0 and 1 or 0) - (n < 0 and 1 or 0)
 end
 
+---Replace termcodes.
+---@param s string
+---@return string
+function M.t(s)
+  return api.nvim_replace_termcodes(s, true, true, true) --[[@as string ]]
+end
+
 ---@param s string
 ---@param min_size integer
 ---@param fill string? (default: `" "`)
@@ -882,6 +889,17 @@ function M.vec_remove(t, v)
   end
 
   return false
+end
+
+---Non-mutative vector sort.
+---@generic T
+---@param t vector<T>
+---@param comparator? fun(a: T, b: T):boolean
+function M.vec_sort(t, comparator)
+  local ret = M.tbl_clone(t)
+  table.sort(ret, comparator)
+
+  return ret
 end
 
 ---@class utils.buf_search.Opt

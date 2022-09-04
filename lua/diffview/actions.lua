@@ -376,7 +376,20 @@ function M.diffget(target)
     local bufnr = diff_copy_target(target)
 
     if bufnr and api.nvim_buf_is_valid(bufnr) then
-      vim.cmd("diffget " .. bufnr)
+      local range
+
+      if api.nvim_get_mode().mode:match("^[vV]") then
+        range = ("%d,%d"):format(unpack(utils.vec_sort({
+          vim.fn.line("."),
+          vim.fn.line("v")
+        })))
+      end
+
+      vim.cmd(("%sdiffget %d"):format(range or "", bufnr))
+
+      if range then
+        api.nvim_feedkeys(utils.t("<esc>"), "n", false)
+      end
     end
   end
 end

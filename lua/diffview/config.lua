@@ -125,13 +125,13 @@ M.defaults = {
     diff1 = {},
     diff2 = {},
     diff3 = {
-      ["2do"]        = actions.diffget("ours"),
-      ["3do"]        = actions.diffget("theirs"),
+      { { "n", "x" }, "2do", actions.diffget("ours") },
+      { { "n", "x" }, "3do", actions.diffget("theirs") },
     },
     diff4 = {
-      ["1do"]        = actions.diffget("base"),
-      ["2do"]        = actions.diffget("ours"),
-      ["3do"]        = actions.diffget("theirs"),
+      { { "n", "x" }, "1do", actions.diffget("base") },
+      { { "n", "x" }, "2do", actions.diffget("ours") },
+      { { "n", "x" }, "3do", actions.diffget("theirs") },
     },
     file_panel = {
       ["j"]             = actions.next_entry,

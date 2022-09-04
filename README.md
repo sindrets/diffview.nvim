@@ -142,14 +142,14 @@ require("diffview").setup({
     diff2 = { --[[ Mappings in 2-way diff layouts ]] },
     diff3 = {
       -- Mappings in 3-way diff layouts
-      ["2do"]        = actions.diffget("ours"),     -- Obtain the diff hunk from the OURS version of the file
-      ["3do"]        = actions.diffget("theirs"),   -- Obtain the diff hunk from the THEIRS version of the file
+      { { "n", "x" }, "2do", actions.diffget("ours") },   -- Obtain the diff hunk from the OURS version of the file
+      { { "n", "x" }, "3do", actions.diffget("theirs") }, -- Obtain the diff hunk from the THEIRS version of the file
     },
     diff4 = {
       -- Mappings in 4-way diff layouts
-      ["1do"]        = actions.diffget("base"),     -- Obtain the diff hunk from the BASE version of the file
-      ["2do"]        = actions.diffget("ours"),     -- Obtain the diff hunk from the OURS version of the file
-      ["3do"]        = actions.diffget("theirs"),   -- Obtain the diff hunk from the THEIRS version of the file
+      { { "n", "x" }, "1do", actions.diffget("base") },   -- Obtain the diff hunk from the BASE version of the file
+      { { "n", "x" }, "2do", actions.diffget("ours") },   -- Obtain the diff hunk from the OURS version of the file
+      { { "n", "x" }, "3do", actions.diffget("theirs") }, -- Obtain the diff hunk from the THEIRS version of the file
     },
     file_panel = {
       ["j"]             = actions.next_entry,         -- Bring the cursor to the next file entry
