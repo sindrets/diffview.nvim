@@ -113,10 +113,11 @@ function M.throttle_trailing(ms, rush_first, fn)
   local throttled_fn, args
 
   throttled_fn = wrap(timer, function(...)
-    if lock then
+    if lock or (not rush_first and args == nil) then
       args = utils.tbl_pack(...)
-      return
     end
+
+    if lock then return end
 
     lock = true
 

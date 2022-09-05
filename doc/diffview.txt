@@ -14,6 +14,8 @@ up all modified files in a diffsplit. This plugin aims to provide a simple,
 unified, single tabpage interface that lets you easily review all changed files
 for any git rev.
 
+==============================================================================
+
 USAGE                                           *diffview-usage*
 
 Quick-start: `:DiffviewOpen` to open a Diffview that compares against the
@@ -31,128 +33,231 @@ Diffviews are automatically updated:
 
 Updates are not run unless the current tabpage is a Diffview.
 
+COMMANDS                                        *diffview-commands*
+
+                                                *:DiffviewOpen*
+:DiffviewOpen [git-rev] [options] [ -- {paths...}]
+
+        Opens a new Diffview that compares against [git-rev]. If no [git-rev]
+        is given, defaults to comparing against the index. Additional
+        {paths...} may be provided to narrow down what files are shown. If the
+        `-C` flag is not defined, the git top-level is determined from the
+        current buffer when possible. Otherwise it's determined from the cwd.
+        Examples:
+>
+            :DiffviewOpen
+            :DiffviewOpen HEAD~2
+            :DiffviewOpen HEAD~4..HEAD~2
+            :DiffviewOpen d4a7b0d
+            :DiffviewOpen d4a7b0d^!
+            :DiffviewOpen d4a7b0d..519b30e
+            :DiffviewOpen origin/main...HEAD
+            :DiffviewOpen HEAD~2 -- lua/diffview plugin
+            :DiffviewOpen d4a7b0d -uno
+<
+                                                *diffview-merge-tool*
+        If you call `:DiffviewOpen` during a merge or a rebase, the view will
+        list the conflicted files in their own section. When opening a
+        conflicted file, it will open in a 3-way diff allowing you to resolve
+        the conflict with the context of the target branch's version (OURS,
+        left), and the version from the branch which is being merged (THEIRS,
+        right).
+
+        The conflicted file's entry in the file panel will show the
+        remaining number of conflict markers (the number following the file
+        name). If what follows the file name is instead an exclamation mark
+        (`!`), this indicates that the file has not yet been opened, and the
+        number of conflicts is unknown. If the sign is a check mark, this
+        indicates that there are no more conflicts in the file.
+
+        You can jump between conflict markers with `]x` and `[x`. This works
+        from the file panel as well. Further, in addition to the normal
+        |copy-diffs| mappings you can use `2do` to obtain the hunk from the
+        OURS side of the diff, `3do` to obtain the hunk from the THEIRS side
+        of the diff, and - in a 4-way diff - `1do` to obtain the hunk from the
+        BASE. See |diffview-conflict-versions| to tell what windows correspond
+        with what version of the file.
+
+        Additionally there are mappings for operating directly on the conflict
+        markers:
+          • `<leader>co`: Choose the OURS version of the conflict.
+          • `<leader>ct`: Choose the THEIRS version of the conflict.
+          • `<leader>cb`: Choose the BASE version of the conflict.
+          • `<leader>ca`: Choose all versions of the conflict (effectively
+            just deletes the markers, leaving all the content).
+          • `dx`: Choose none of the versions of the conflict (delete the
+            conflict region).
+
+        For more info on these actions, see
+        |diffview-actions-conflict_choose|.
+
+        NOTE: The horizontal 3-way diff is only the default layout for the
+        merge-tool, but there are multiple variations on the 3-way diff layout
+        as well as a 4-way diff, and a single window layout available. The
+        default mapping `g<C-x>` allows you to cycle through the available
+        layouts. To configure a different default layout, see
+        |diffview-config-view.x.layout|.
+
+    Options:~
+        -u[value], --untracked-files[={value}]
+                        Specify whether or not to show untracked files. If
+                        flag is given without value; defaults to `true`.
+                        {value} can be one of:
+                          • `true`, `normal`, `all` Show untracked.
+                          • `false`, `no` Don't show untracked.
+        --cached, --staged
+                        Diff staged changes against [git-rev]. If no [git-rev]
+                        is given, defaults to `HEAD`.
+
+        --imply-local   If a range rev is provided and either end of the range
+                        points to `HEAD`: point that end to local files
+                        instead (not created from git). This can be useful
+                        i.e. when using symmetric difference ranges
+                        (triple-dot), but you want to be able to utilize the
+                        LSP features that are not available while you're
+                        viewing files created from git.
+
+        -C{path}        Run as if git was started in {path} instead of the
+                        current working directory.
+
+        --selected-file={path}
+                        Specify a path to the preferred initially selected
+                        file. If the path doesn't match any of the files in
+                        the initial set of files, this option does nothing.
+
+                                                *:DiffviewFileHistory*
+:[range]DiffviewFileHistory [paths] [options]
+
+        Opens a new file history view that lists all commits that affected the
+        given paths. This is a porcelain interface for git-log. Both [paths]
+        and [options] may be specified in any order, even interchangeably.
+
+        If no [paths] are given, defaults to the top-level of the working
+        tree. The top-level will be inferred from the current buffer when
+        possible, otherwise the cwd is used. Multiple [paths] may be provided
+        and git pathspec is supported (see `:Man gitglossary(7)` for
+        information about pathspec).
+
+        If [range] is given, the file history view will trace the line
+        evolution of the given range in the current file (see the `-L` flag
+        below).
+
+        From the file history panel (the panel listing the commits) you can
+        open an option panel by pressing `g!`. The option panel will allow you
+        to change the flags that will be passed to `git-log`. A flag can be
+        adjusted either by moving the cursor to its line followed by pressing
+        <Tab>, or by using the mappings that are shown directly in the panel,
+        preceding the flags' descriptions.
+
+        NOTE: Commits are only listed if git-log is able to show its file
+        stats given your currently configured log options. As such pay
+        attention to the value of `--diff-merges`, as this controls how
+        git-log treats merge commits and subsequently it's willingness to show
+        stats for these commits. Setting `--diff-merges=off` will tell git-log
+        to never compare merge commits, and as such they won't show up in the
+        file history view.
+
+        Examples:
+>
+            :DiffviewFileHistory
+            :DiffviewFileHistory %
+            :DiffviewFileHistory path/to/some/file.txt
+            :DiffviewFileHistory path/to/some/directory
+            :DiffviewFileHistory multiple/paths foo/bar baz/qux
+            :DiffviewFileHistory --base=HEAD~4
+            :DiffviewFileHistory --base=LOCAL
+            :DiffviewFileHistory --range=origin..HEAD
+            :DiffviewFileHistory --range=feat/some-branch
+            :'<,'>DiffviewFileHistory
+<
+
+    Options:~
+        --base={git-rev}
+                        Specify a base git rev from which the right side of
+                        the diff will be created. Use the special value
+                        `LOCAL` to use the local version of the file.
+
+        --range={git-rev}
+                        Show only commits in the specified revision range.
+
+        -C{path}        Run as if git was started in {path} instead of the
+                        current working directory.
+
+        NOTE: All following options are described in far more detail in the
+        man page for git-log. See `:Man git-log(1)` for more information.
+
+        --follow        Follow renames (only for single file).
+
+        --first-parent  Follow only the first parent upon seeing a merge
+                        commit.
+
+        --show-pulls    Show merge commits that are not TREESAME to its first
+                        parent, but are to a later parent.
+
+        --reflog        Include all reachable objects mentioned by reflogs.
+
+        --all           Include all refs.
+
+        --merges        List only merge commits.
+
+        --no-merges     List no merge commits.
+
+        --reverse       List commits in reverse order.
+
+        -n{n}, --max-count={n}
+                        Limit the number of commits.
+
+        -L{start},{end}:{file}, -L:{funcname}:{file}
+                        Trace the evolution of the line range given by
+                        {start},{end}, or by the function name regex
+                        {funcname}, within the {file}. You can specify this
+                        option more than once.
+
+        --diff-merges={value}
+                        Determines how merge commits are treated. {value} can
+                        be one of:
+                            • `off`
+                            • `on`
+                            • `first-parent`
+                            • `separate`
+                            • `combined`
+                            • `dense-combined`
+                            • `remerge`
+
+        --author={pattern}
+                        Limit the commits output to ones with author/committer
+                        header lines that match the specified pattern (regular
+                        expression).
+
+        --grep={pattern}
+                        Limit the commits output to ones with log message that
+                        matches the specified pattern (regular expression).
+
+                                                *:DiffviewClose*
+:DiffviewClose          Close the active Diffview.
+
+                                                *:DiffviewToggleFiles*
+:DiffviewToggleFiles    Toggles the file panel.
+
+                                                *:DiffviewFocusFiles*
+:DiffviewFocusFiles     Brings focus to the file panel. Opens it if it's closed.
+
+                                                *:DiffviewRefresh*
+:DiffviewRefresh        Update stats and entries in the file list of the
+                        current Diffview.
+
+                                                *:DiffviewLog*
+:DiffviewLog            Open the log.
+
+==============================================================================
+
 CONFIGURATION                                   *diffview-config*
 
-Example configuration with default settings:
->
-    -- Lua
-    local actions = require("diffview.actions")
-    require("diffview").setup({
-      diff_binaries = false,    -- Show diffs for binaries
-      enhanced_diff_hl = false, -- See |diffview-config-enhanced_diff_hl|
-      git_cmd = { "git" },      -- The git executable followed by default args.
-      use_icons = true,         -- Requires nvim-web-devicons
-      icons = {                 -- Only applies when use_icons is true.
-        folder_closed = "",
-        folder_open = "",
-      },
-      signs = {
-        fold_closed = "",
-        fold_open = "",
-      },
-      file_panel = {
-        listing_style = "tree",             -- One of 'list' or 'tree'
-        tree_options = {                    -- Only applies when listing_style is 'tree'
-          flatten_dirs = true,              -- Flatten dirs that only contain one single dir
-          folder_statuses = "only_folded",  -- One of 'never', 'only_folded' or 'always'.
-        },
-        win_config = {                      -- See |diffview-config-win_config|
-          position = "left",
-          width = 35,
-        },
-      },
-      file_history_panel = {
-        log_options = {   -- See |diffview-config-log_options|
-          single_file = {
-            diff_merges = "combined",
-          },
-          multi_file = {
-            diff_merges = "first-parent",
-          },
-        },
-        win_config = {    -- See |diffview-config-win_config|
-          position = "bottom",
-          height = 16,
-        },
-      },
-      commit_log_panel = {
-        win_config = {},  -- See |diffview-config-win_config|
-      },
-      default_args = {    -- Default args prepended to the arg-list for the listed commands
-        DiffviewOpen = {},
-        DiffviewFileHistory = {},
-      },
-      hooks = {},         -- See |diffview-config-hooks|
-      keymaps = {
-        disable_defaults = false, -- Disable the default keymaps
-        view = {
-          -- The `view` bindings are active in the diff buffers, only when the current
-          -- tabpage is a Diffview.
-          ["<tab>"]      = actions.select_next_entry, -- Open the diff for the next file
-          ["<s-tab>"]    = actions.select_prev_entry, -- Open the diff for the previous file
-          ["gf"]         = actions.goto_file,         -- Open the file in a new split in previous tabpage
-          ["<C-w><C-f>"] = actions.goto_file_split,   -- Open the file in a new split
-          ["<C-w>gf"]    = actions.goto_file_tab,     -- Open the file in a new tabpage
-          ["<leader>e"]  = actions.focus_files,       -- Bring focus to the files panel
-          ["<leader>b"]  = actions.toggle_files,      -- Toggle the files panel.
-        },
-        file_panel = {
-          ["j"]             = actions.next_entry,         -- Bring the cursor to the next file entry
-          ["<down>"]        = actions.next_entry,
-          ["k"]             = actions.prev_entry,         -- Bring the cursor to the previous file entry.
-          ["<up>"]          = actions.prev_entry,
-          ["<cr>"]          = actions.select_entry,       -- Open the diff for the selected entry.
-          ["o"]             = actions.select_entry,
-          ["<2-LeftMouse>"] = actions.select_entry,
-          ["-"]             = actions.toggle_stage_entry, -- Stage / unstage the selected entry.
-          ["S"]             = actions.stage_all,          -- Stage all entries.
-          ["U"]             = actions.unstage_all,        -- Unstage all entries.
-          ["X"]             = actions.restore_entry,      -- Restore entry to the state on the left side.
-          ["R"]             = actions.refresh_files,      -- Update stats and entries in the file list.
-          ["L"]             = actions.open_commit_log,    -- Open the commit log panel.
-          ["<c-b>"]         = actions.scroll_view(-0.25), -- Scroll the view up
-          ["<c-f>"]         = actions.scroll_view(0.25),  -- Scroll the view down
-          ["<tab>"]         = actions.select_next_entry,
-          ["<s-tab>"]       = actions.select_prev_entry,
-          ["gf"]            = actions.goto_file,
-          ["<C-w><C-f>"]    = actions.goto_file_split,
-          ["<C-w>gf"]       = actions.goto_file_tab,
-          ["i"]             = actions.listing_style,        -- Toggle between 'list' and 'tree' views
-          ["f"]             = actions.toggle_flatten_dirs,  -- Flatten empty subdirectories in tree listing style.
-          ["<leader>e"]     = actions.focus_files,
-          ["<leader>b"]     = actions.toggle_files,
-        },
-        file_history_panel = {
-          ["g!"]            = actions.options,          -- Open the option panel
-          ["<C-A-d>"]       = actions.open_in_diffview, -- Open the entry under the cursor in a diffview
-          ["y"]             = actions.copy_hash,        -- Copy the commit hash of the entry under the cursor
-          ["L"]             = actions.open_commit_log,
-          ["zR"]            = actions.open_all_folds,
-          ["zM"]            = actions.close_all_folds,
-          ["j"]             = actions.next_entry,
-          ["<down>"]        = actions.next_entry,
-          ["k"]             = actions.prev_entry,
-          ["<up>"]          = actions.prev_entry,
-          ["<cr>"]          = actions.select_entry,
-          ["o"]             = actions.select_entry,
-          ["<2-LeftMouse>"] = actions.select_entry,
-          ["<c-b>"]         = actions.scroll_view(-0.25),
-          ["<c-f>"]         = actions.scroll_view(0.25),
-          ["<tab>"]         = actions.select_next_entry,
-          ["<s-tab>"]       = actions.select_prev_entry,
-          ["gf"]            = actions.goto_file,
-          ["<C-w><C-f>"]    = actions.goto_file_split,
-          ["<C-w>gf"]       = actions.goto_file_tab,
-          ["<leader>e"]     = actions.focus_files,
-          ["<leader>b"]     = actions.toggle_files,
-        },
-        option_panel = {
-          ["<tab>"] = actions.select_entry,
-          ["q"]     = actions.close,
-        },
-      },
-    })
-<
+
+
+EXAMPLE CONFIGURATION WITH DEFAULT SETTINGS: |diffview.defaults|
+
+
 
 enhanced_diff_hl                                *diffview-config-enhanced_diff_hl*
         Type: `boolean`, Default: `false`
@@ -167,6 +272,134 @@ git_cmd                                         *diffview-config-git_cmd*
         This table forms the first part of all git commands used internally in
         the plugin. The first element should be the git binary. The subsequent
         elements are passed as arguments.
+
+view.x.layout                                   *diffview-config-view.x.layout*
+        Type: >
+            "diff1_plain"
+                | "diff2_horizontal"
+                | "diff2_vertical"
+                | "diff3_horizontal"
+                | "diff3_vertical"
+                | "diff3_mixed"
+                | "diff4_mixed"
+                | -1
+<
+        Default: (see example config above)
+
+        This determines the layout used for diffs in the various different
+        views. Some of the layouts are only applicable to certain types of
+        views.
+
+        If you set the layout to `-1`, the layout type will be derived from
+        your |'diffopt'| (more specifically: whether or not you have
+        `vertical` set).
+
+        Layouts: ~
+            Unless otherwise stated, the window symbols (A, B, C, D) represent
+            the following versions of a file:
+
+            In the diff_view and file_history_view:
+              • A: Old state
+              • B: New state
+
+                                                *diffview-conflict-versions*
+            In the merge_tool:
+              • A: OURS (current branch)
+              • B: LOCAL (the file as it currently exists on disk)
+              • C: THEIRS (incoming branch)
+              • D: BASE (common ancestor)
+
+            {diff1_plain}
+                Available for: merge_tool
+
+                This is a plain, singular window. This is available in case
+                you prefer to edit conflict markers manually without the
+                visual noise from diffs.
+
+                Window symbols:
+                  • A: LOCAL
+
+                ┌──────────────┐
+                │              │
+                │              │
+                │      A       │
+                │              │
+                │              │
+                └──────────────┘
+
+            {diff2_horizontal}
+                Available for: diff_view, file_history_view
+
+                ┌──────┬───────┐
+                │      │       │
+                │      │       │
+                │  A   │   B   │
+                │      │       │
+                │      │       │
+                └──────┴───────┘
+
+            {diff2_vertical}
+                Available for: diff_view, file_history_view
+
+                ┌──────────────┐
+                │      A       │
+                │              │
+                ├──────────────┤
+                │      B       │
+                │              │
+                └──────────────┘
+
+            {diff3_horizontal}
+                Available for: merge_tool
+
+                ┌────┬────┬────┐
+                │    │    │    │
+                │    │    │    │
+                │ A  │ B  │ C  │
+                │    │    │    │
+                │    │    │    │
+                └────┴────┴────┘
+
+            {diff3_vertical}
+                Available for: merge_tool
+
+                ┌──────────────┐
+                │      A       │
+                ├──────────────┤
+                │      B       │
+                ├──────────────┤
+                │      C       │
+                └──────────────┘
+
+            {diff3_mixed}
+                Available for: merge_tool
+
+                ┌──────┬───────┐
+                │  A   │   C   │
+                │      │       │
+                ├──────┴───────┤
+                │      B       │
+                │              │
+                └──────────────┘
+
+            {diff4_mixed}
+                Available for: merge_tool
+
+                ┌────┬────┬────┐
+                │ A  │ D  │ C  │
+                │    │    │    │
+                ├────┴────┴────┤
+                │      B       │
+                │              │
+                └──────────────┘
+
+                                                *diffview-config-view.merge_tool.disable_diagnostics*
+view.merge_tool.disable_diagnostics
+        Type: `boolean`, Default: `true`
+
+        Temporarily disable diagnostics for conflict buffers while in a
+        diff_view. The diagnostics are enabled again when leaving or closing
+        the view's tab page.
 
 win_config                                      *diffview-config-win_config*
         Type: `table | fun(): table`, Default: `{}`
@@ -218,37 +451,37 @@ win_config                                      *diffview-config-win_config*
             |nvim_open_win()|.
 
         Examples: >
-                -- Split window, aligned to the right side of the editor:
-                win_config = {
-                  type = "split",
-                  position = "right",
-                  width = 40,
-                }
+            -- Split window, aligned to the right side of the editor:
+            win_config = {
+              type = "split",
+              position = "right",
+              width = 40,
+            }
 
-                -- Split window, aligned to the bottom of the first window in
-                -- the current tabpage:
-                win_config = function()
-                  local c = {
-                    type = "split",
-                    position = "bottom",
-                    relative = "win",
-                    height = 14,
-                  }
-                  c.win = vim.api.nvim_tabpage_list_wins(0)[1]
-                  return c
-                end
+            -- Split window, aligned to the bottom of the first window in
+            -- the current tabpage:
+            win_config = function()
+              local c = {
+                type = "split",
+                position = "bottom",
+                relative = "win",
+                height = 14,
+              }
+              c.win = vim.api.nvim_tabpage_list_wins(0)[1]
+              return c
+            end
 
-                -- Floating window, centered in the editor:
-                win_config = function()
-                  local c = { type = "float" }
-                  local editor_width = vim.o.columns
-                  local editor_height = vim.o.lines
-                  c.width = math.min(100, editor_width)
-                  c.height = math.min(24, editor_height)
-                  c.col = math.floor(editor_width * 0.5 - c.width * 0.5)
-                  c.row = math.floor(editor_height * 0.5 - c.height * 0.5)
-                  return c
-                end,
+            -- Floating window, centered in the editor:
+            win_config = function()
+              local c = { type = "float" }
+              local editor_width = vim.o.columns
+              local editor_height = vim.o.lines
+              c.width = math.min(100, editor_width)
+              c.height = math.min(24, editor_height)
+              c.col = math.floor(editor_width * 0.5 - c.width * 0.5)
+              c.row = math.floor(editor_height * 0.5 - c.height * 0.5)
+              return c
+            end,
 <
 
 
@@ -323,14 +556,13 @@ hooks                                           *diffview-config-hooks*
 
             {diff_buf_read} (`fun(bufnr: integer)`)
                 Emitted after a new diff buffer is ready (the first time it's
-                created and loaded into a window). Diff buffers are all
-                buffers with |diff-mode| enabled. That includes buffers of
-                local files (not created from git).
+                created). Diff buffers are all buffers with |diff-mode|
+                enabled. That includes buffers of local files (not created
+                from git).
 
                 This is always called with the new buffer as the current
-                buffer and the correct diff window as the current window such
-                that |:setlocal| will apply settings to the relevant buffer /
-                window.
+                buffer such that |:setlocal| will apply settings to that
+                relevant buffer.
 
                 Callback Parameters:~
                     {bufnr} (`integer`)
@@ -385,7 +617,7 @@ keymaps                                         *diffview-config-keymaps*
 <
 
         For more control (i.e. mappings for other modes), you can also define
-        index values as list-like tables containing the args for
+        index values as list-like tables containing the arguments for
         |vim.keymap.set()|. This way you can also change all the
         |:map-arguments| with the only exception being the `buffer` field, as
         this will be overridden with the target buffer number: >
@@ -438,6 +670,13 @@ Actions~
                     • The file being diffed
                     • The commit of either of the two files being diffed
                     • The range of git revs between the two files being diffed
+
+            {merge_tool} (View)
+                The windows containing the diff buffers for conflicted files
+                during a merge or rebase.
+
+                Subjects:
+                    • The file being diffed
 
             {file_history_view}
                 The windows containing the diff buffers in a FileHistoryView.
@@ -493,10 +732,51 @@ close_all_folds                                 *diffview-actions-close_all_fold
         If the FileHistoryView is showing history for multiple files: close
         all the folds in the panel.
 
+conflict_choose({version})                      *diffview-actions-conflict_choose*
+        Contexts: `merge_tool`
+
+        Replace the merge conflict under the cursor with one, none or all the
+        versions of the conflict. Choosing `'none'` effectively deletes the
+        entire conflict region. Choosing `'all'` effectively deletes only the
+        conflict markers and leaves all the content.
+
+        Parameters: ~
+            {version} `'ours'|'theirs'|'base'|'all'|'none'`
+                See |diffview-conflict-versions| to tell what versions of the
+                file these names correspond with.
+
+                                                *diffview-conflict-example*
+        Example conflict region annotated with the version names: >
+
+            <<<<<<< OURS (Start of conflict, typically the current branch)
+              Lorem ipsum dolor sit amet,
+              consectetur adipiscing elit,
+              sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+            ||||||| BASE (Common ancestor)
+              Consequat semper viverra nam libero justo laoreet sit amet.
+              Sed risus pretium quam vulputate dignissim.
+              Nisl condimentum id venenatis a condimentum.
+            ======= THEIRS (Incoming branch)
+              Rhoncus aenean vel elit scelerisque.
+              A pellentesque sit amet porttitor eget dolor morbi.
+              Integer eget aliquet nibh praesent tristique magna sit amet.
+            >>>>>>> (End of conflict)
+<
+
 copy_hash                                       *diffview-actions-copy_hash*
         Contexts: `file_history_panel`
 
         Copy the commit hash of the commit under the cursor.
+
+diffget({target})                               *diffview-actions-diffget*
+        Contexts: `merge_tool`
+
+        Obtain the hunk from a particular version of the current file.
+
+        Parameters: ~
+            {target} `'ours'|'theirs'|'base'|'local'`
+                See |diffview-conflict-versions| to tell what windows
+                correspond with what version of the file.
 
 focus_entry                                     *diffview-actions-focus_entry*
         Contexts: `file_panel`, `file_history_panel`
@@ -546,6 +826,11 @@ listing_style                                   *diffview-actions-listing_style*
         Cycle through the available listing styles. The currently available
         styles are: file tree and flat list.
 
+next_conflict                                   *diffview-actions-next_conflict*
+        Contexts: `diff_view`, `file_panel`
+
+        Moves the cursor to the next conflict marker in the current file.
+
 next_entry                                      *diffview-actions-next_entry*
         Contexts: `view`, `panel`
 
@@ -573,6 +858,11 @@ options                                         *diffview-actions-options*
 
         Open the option panel for the subject.
 
+prev_conflict                                   *diffview-actions-prev_conflict*
+        Contexts: `diff_view`, `file_panel`
+
+        Moves the cursor to the previous conflict marker in the current file.
+
 prev_entry                                      *diffview-actions-prev_entry*
         Contexts: `view`, `panel`
 
@@ -589,7 +879,7 @@ restore_entry                                   *diffview-actions-restore_entry*
         Revert the selected file entry to the state from the left side of the
         diff. This only works if the right side of the diff is showing the
         local state of the file. A command is echoed that shows how to undo
-        the change. Check `:messages` to see it again.
+        the change. Check |:messages| to see it again.
 
         NOTE: "Restoring" an untracked file will delete it from disk. It still
         gets backed up in the local git database, so it is reversible.
@@ -656,23 +946,17 @@ view_windo({cmd}, [targets])                    *diffview-actions-view_windo*
         Contexts: `view`, `panel`
 
         Execute {cmd} for each target window in the target view. If no targets
-        are given, all windows are targeted.
+        are given, all windows are targeted. The {cmd} will be called with
+        each target window as the temporary current window (|nvim_win_call()|).
 
         Parameters:~
             {cmd} (string|function)
                 The vim cmd to execute, or a lua function.
 
             [targets] (`{ a: boolean, b: boolean, c: boolean, d: boolean }`)
-                The windows to target. The letters generally correspond to the
-                order of the windows when counted from left to right, top to
-                bottom.
-
-                For example in a 2-way vertical diff split the left window
-                would be `a` and the right window would be `b`. In a 2-way
-                horizontal diff split the top window would be `a` and the
-                bottom window would be `b`.
-
-                The letters `c` and `d` are reserved for future use.
+                The windows to target. The letters correspond to the window
+                symbols for the current layout as they are illustrated under
+                |diffview-config-view.x.layout|.
 
                                                 *diffview-unused-actions*
 Unused actions~
@@ -685,190 +969,6 @@ actions:
         • |diffview-actions-focus_entry|
         • |diffview-actions-goto_file_edit|
         • |diffview-actions-view_windo|
-
-LAYOUT                                          *diffview-layout*
-
-The diff windows can be aligned either with a horizontal split or a vertical
-split. To change the alignment add either `horizontal` or `vertical` to your
-'diffopt'.
-
-COMMANDS                                        *diffview-commands*
-
-                                                *:DiffviewOpen*
-:DiffviewOpen [git-rev] [options] [ -- {paths...}]
-                        Opens a new Diffview that compares against [git-rev].
-                        If no [git-rev] is given, defaults to comparing
-                        against the index. Additional {paths...} can be
-                        provided to narrow down what files are shown. If the
-                        `-C` flag is not defined, the git top-level is
-                        determined from the current buffer when possible.
-                        Otherwise it's determined from the cwd.
-                        Examples:
->
-        :DiffviewOpen
-        :DiffviewOpen HEAD~2
-        :DiffviewOpen HEAD~4..HEAD~2
-        :DiffviewOpen d4a7b0d
-        :DiffviewOpen d4a7b0d..519b30e
-        :DiffviewOpen origin/main...HEAD
-        :DiffviewOpen HEAD~2 -- lua/diffview plugin
-        :DiffviewOpen d4a7b0d -uno
-<
-    Options:~
-        -u[value], --untracked-files[={value}]
-                        Specify whether or not to show untracked files. If
-                        flag is given without value; defaults to `true`.
-                        {value} can be one of:
-                          - `true`, `normal`, `all` Show untracked.
-                          - `false`, `no` Don't show untracked.
-        --cached, --staged
-                        Diff staged changes against [git-rev]. If no [git-rev]
-                        is given, defaults to `HEAD`.
-
-        --imply-local   If a range rev is provided and either end of the range
-                        points to `HEAD`: point that end to local files
-                        instead (not created from git). This can be useful
-                        i.e. when using symmetric difference ranges
-                        (triple-dot), but you want to be able to utilize the
-                        LSP features that are not available while you're
-                        viewing files created from git.
-
-        -C{path}        Run as if git was started in {path} instead of the
-                        current working directory.
-
-        --selected-file={path}
-                        Specify a path to the preferred initially selected
-                        file. If the path doesn't match any of the files in
-                        the initial set of files, this option does nothing.
-
-                                                *:DiffviewFileHistory*
-:[range]DiffviewFileHistory [paths] [options]
-                        Opens a new file history view that lists all commits
-                        that affected the given paths. This is a porcelain
-                        interface for git-log. Both [paths] and [options] may
-                        be specified in any order, even interchangeably.
-
-                        If no [paths] are given, defaults to the top-level of
-                        the working tree. The top-level will be inferred from
-                        the current buffer when possible, otherwise the cwd is
-                        used. Multiple [paths] may be provided and git
-                        pathspec is supported (see `:Man gitglossary(7)` for
-                        information about pathspec).
-
-                        If [range] is given, the file history view will trace
-                        the line evolution of the given range in the current
-                        file (see the `-L` flag below).
-
-                        From the file history panel (the panel listing the
-                        commits) you can open an option panel by pressing
-                        `g!`. The option panel will allow you to change the
-                        flags that will be passed to `git-log`. A flag can
-                        be adjusted either by moving the cursor to its line
-                        followed by pressing <Tab>, or by using the mappings
-                        that are shown directly in the panel, preceding the
-                        flags' descriptions.
-
-                        NOTE: Commits are only listed if git-log is able to
-                        show its file stats given your currently configured
-                        log options. As such pay attention to the value of
-                        `--diff-merges`, as this controls how git-log treats
-                        merge commits and subsequently it's willingness to
-                        show stats for these commits. Setting
-                        `--diff-merges=off` will tell git-log to never compare
-                        merge commits, and as such they won't show up in the
-                        file history view.
-
-                        Examples:
->
-        :DiffviewFileHistory
-        :DiffviewFileHistory %
-        :DiffviewFileHistory path/to/some/file.txt
-        :DiffviewFileHistory path/to/some/directory
-        :DiffviewFileHistory multiple/paths foo/bar baz/qux
-        :DiffviewFileHistory --base=HEAD~4
-        :DiffviewFileHistory --base=LOCAL
-        :DiffviewFileHistory --range=origin..HEAD
-        :DiffviewFileHistory --range=feat/some-branch
-        :'<,'>DiffviewFileHistory
-<
-
-    Options:~
-        --base={git-rev}
-                        Specify a base git rev from which the right side of
-                        the diff will be created. Use the special value
-                        `LOCAL` to use the local version of the file.
-
-        --range={git-rev}
-                        Show only commits in the specified revision range.
-
-        -C{path}        Run as if git was started in {path} instead of the
-                        current working directory.
-
-        NOTE: All following options are described in far more detail in the
-        man page for git-log. See `:Man git-log(1)` for more information.
-
-        --follow        Follow renames (only for single file).
-
-        --first-parent  Follow only the first parent upon seeing a merge
-                        commit.
-
-        --show-pulls    Show merge commits that are not TREESAME to its first
-                        parent, but are to a later parent.
-
-        --reflog        Include all reachable objects mentioned by reflogs.
-
-        --all           Include all refs.
-
-        --merges        List only merge commits.
-
-        --no-merges     List no merge commits.
-
-        --reverse       List commits in reverse order.
-
-        -n{n}, --max-count={n}
-                        Limit the number of commits.
-
-        -L{start},{end}:{file}, -L:{funcname}:{file}
-                        Trace the evolution of the line range given by
-                        {start},{end}, or by the function name regex
-                        {funcname}, within the {file}. You can specify this
-                        option more than once.
-
-        --diff-merges={value}
-                        Determines how merge commits are treated. {value} can
-                        be one of:
-                            • `off`
-                            • `on`
-                            • `first-parent`
-                            • `separate`
-                            • `combined`
-                            • `dense-combined`
-                            • `remerge`
-
-        --author={pattern}
-                        Limit the commits output to ones with author/committer
-                        header lines that match the specified pattern (regular
-                        expression).
-
-        --grep={pattern}
-                        Limit the commits output to ones with log message that
-                        matches the specified pattern (regular expression).
-
-                                                *:DiffviewClose*
-:DiffviewClose          Close the active Diffview.
-
-                                                *:DiffviewToggleFiles*
-:DiffviewToggleFiles    Toggles the files panel.
-
-                                                *:DiffviewFocusFiles*
-:DiffviewFocusFiles     Brings focus to the file panel. Opens it if it's closed.
-
-                                                *:DiffviewRefresh*
-:DiffviewRefresh        Update stats and entries in the file list of the
-                        current Diffview.
-
-                                                *:DiffviewLog*
-:DiffviewLog            Open the log.
 
 USER AUTOCOMMANDS                               *diffview-user-autocmds*
 
@@ -885,14 +985,13 @@ For information on how to use User autocommands, see |User|.
 `DiffviewViewLeave`     Fires just before leaving a view.
 
 `DiffviewDiffBufRead`   Fires after a new diff buffer is ready (the first
-                      time it's created and loaded into a window). Diff
-                      buffers are all buffers with |diff-mode| enabled. That
-                      includes buffers of local files (not created from git).
+                      time it's created). Diff buffers are all buffers with
+                      |diff-mode| enabled. That includes buffers of local
+                      files (not created from git).
 
                       This is always called with the new buffer as the current
-                      buffer and the correct diff window as the current window
-                      such that |:setlocal| will apply settings to the
-                      relevant buffer / window.
+                      buffer such that |:setlocal| will apply settings to that
+                      relevant buffer.
 
 `DiffviewDiffBufWinEnter`
                       Fires after a diff buffer is displayed in a window.
@@ -999,7 +1098,7 @@ X                       Revert the selected file entry to the state from the
                         left side of the diff. This only works if the right
                         side of the diff is showing the local state of the
                         file. A command is echoed that shows how to undo the
-                        change. Check `:messages` to see it again.
+                        change. Check |:messages| to see it again.
 
                                                 *diffview-maps-refresh_files*
 R                       Update the stats and entries in the file list.
@@ -1062,6 +1161,8 @@ panel will allow you to change the flags that will be passed to `git-log`. A
 flag can be adjusted either by moving the cursor to its line followed by
 pressing <Tab>, or by using the mappings that are shown directly in the
 panel, preceding the flags' descriptions.
+
+==============================================================================
 
 API                                             *diffview-api*
 

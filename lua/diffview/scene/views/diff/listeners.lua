@@ -1,16 +1,13 @@
-local api = vim.api
 local lazy = require("diffview.lazy")
 
----@type EEvent
-local Event = lazy.access("diffview.events", "Event")
----@type ERevType
-local RevType = lazy.access("diffview.git.rev", "RevType")
----@module "plenary.async"
-local async = lazy.require("plenary.async")
----@module "diffview.git.utils"
-local git = lazy.require("diffview.git.utils")
----@module "diffview.utils"
-local utils = lazy.require("diffview.utils")
+local actions = lazy.require("diffview.actions") ---@module "diffview.actions"
+local Event = lazy.access("diffview.events", "Event") ---@type EEvent
+local RevType = lazy.access("diffview.git.rev", "RevType") ---@type ERevType
+local async = lazy.require("plenary.async") ---@module "plenary.async"
+local git = lazy.require("diffview.git.utils") ---@module "diffview.git.utils"
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
+
+local api = vim.api
 
 ---@param view DiffView
 return function(view)
@@ -47,6 +44,13 @@ return function(view)
     diff_buf_read = function(_)
       view.emitter:once("diff_buf_win_enter", function()
         utils.set_cursor(0, 1, 0)
+
+        if view.cur_layout:get_main_win().id == api.nvim_get_current_win() then
+          if view.cur_entry and view.cur_entry.kind == "conflicting" then
+            actions.next_conflict()
+            vim.cmd("norm! zz")
+          end
+        end
       end)
     end,
     ---@diagnostic disable-next-line: unused-local
@@ -116,7 +120,7 @@ return function(view)
       local item = view:infer_cur_file(true)
       if item then
         local code
-        if item.kind == "working" then
+        if item.kind == "working" or item.kind == "conflicting" then
           _, code = git.exec_sync({ "add", item.path }, view.git_ctx.toplevel)
         elseif item.kind == "staged" then
           _, code = git.exec_sync({ "reset", "--", item.path }, view.git_ctx.toplevel)
@@ -130,9 +134,15 @@ return function(view)
         if type(item.collapsed) == "boolean" then
           ---@cast item DirData
           ---@type FileTree
-          local tree = item.kind == "working"
-            and view.panel.files.working_tree
-            or view.panel.files.staged_tree
+          local tree
+
+          if item.kind == "conflicting" then
+            tree = view.panel.files.conflicting_tree
+          elseif item.kind == "working" then
+            tree = view.panel.files.working_tree
+          else
+            tree = view.panel.files.staged_tree
+          end
 
           ---@type Node
           local item_node

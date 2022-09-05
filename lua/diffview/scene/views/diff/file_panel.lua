@@ -16,7 +16,7 @@ local M = {}
 ---@field path_args string[]
 ---@field rev_pretty_name string|nil
 ---@field cur_file FileEntry
----@field listing_style '"list"'|'"tree"'
+---@field listing_style "list"|"tree"
 ---@field tree_options TreeOptions
 ---@field render_data RenderData
 ---@field components CompStruct
@@ -86,27 +86,47 @@ function FilePanel:setup_buffer()
 end
 
 function FilePanel:update_components()
+  local conflicting_files
   local working_files
   local staged_files
 
   if self.listing_style == "list" then
+    conflicting_files = { name = "files" }
     working_files = { name = "files" }
     staged_files = { name = "files" }
+
+    for _, file in ipairs(self.files.conflicting) do
+      table.insert(conflicting_files, {
+        name = "file",
+        context = file,
+      })
+    end
+
     for _, file in ipairs(self.files.working) do
       table.insert(working_files, {
         name = "file",
         context = file,
       })
     end
+
     for _, file in ipairs(self.files.staged) do
       table.insert(staged_files, {
         name = "file",
         context = file,
       })
     end
+
   elseif self.listing_style == "tree" then
+    self.files.conflicting_tree:update_statuses()
     self.files.working_tree:update_statuses()
     self.files.staged_tree:update_statuses()
+
+    conflicting_files = {
+      name = "files",
+      unpack(self.files.conflicting_tree:create_comp_schema({
+        flatten_dirs = self.tree_options.flatten_dirs
+      })),
+    }
 
     working_files = {
       name = "files",
@@ -114,6 +134,7 @@ function FilePanel:update_components()
         flatten_dirs = self.tree_options.flatten_dirs
       })),
     }
+
     staged_files = {
       name = "files",
       unpack(self.files.staged_tree:create_comp_schema({
@@ -125,6 +146,11 @@ function FilePanel:update_components()
   ---@type CompStruct
   self.components = self.render_data:create_component({
     { name = "path" },
+    {
+      name = "conflicting",
+      { name = "title" },
+      conflicting_files,
+    },
     {
       name = "working",
       { name = "title" },
@@ -143,6 +169,7 @@ function FilePanel:update_components()
   })
 
   self.constrain_cursor = renderer.create_cursor_constraint({
+    self.components.conflicting.files.comp,
     self.components.working.files.comp,
     self.components.staged.files.comp,
   })
@@ -152,15 +179,19 @@ end
 function FilePanel:ordered_file_list()
   if self.listing_style == "list" then
     local list = {}
+
     for _, file in self.files:ipairs() do
       list[#list + 1] = file
     end
+
     return list
   else
     local nodes = utils.vec_join(
+      self.files.conflicting_tree.root:leaves(),
       self.files.working_tree.root:leaves(),
       self.files.staged_tree.root:leaves()
     )
+
     return vim.tbl_map(function(node)
       return node.data
     end, nodes) --[[@as vector ]]
@@ -169,7 +200,6 @@ end
 
 function FilePanel:set_cur_file(file)
   if self.cur_file then
-    self.cur_file.layout:detach_files()
     self.cur_file:set_active(false)
   end
 
@@ -229,27 +259,37 @@ function FilePanel:highlight_file(file)
   end
 
   if self.listing_style == "list" then
-    for _, file_list in ipairs({ self.components.working.files, self.components.staged.files }) do
+    for _, file_list in ipairs({
+      self.components.conflicting.files,
+      self.components.working.files,
+      self.components.staged.files,
+    }) do
       for _, comp_struct in ipairs(file_list) do
         if file == comp_struct.comp.context then
-          pcall(api.nvim_win_set_cursor, self.winid, { comp_struct.comp.lstart + 1, 0 })
+          utils.set_cursor(self.winid, comp_struct.comp.lstart + 1, 0)
         end
       end
     end
-  else
-    -- tree
-    for _, comp_struct in ipairs({ self.components.working.files, self.components.staged.files }) do
+
+  else -- tree
+    for _, comp_struct in ipairs({
+      self.components.conflicting.files,
+      self.components.working.files,
+      self.components.staged.files,
+    }) do
       comp_struct.comp:deep_some(function(cur)
         if file == cur.context then
           local was_concealed = false
           local last = cur.parent
+
           while last do
-            -- print(vim.inspect(last, {depth=2}))
             local dir = last.components[1]
+
             if dir.context and dir.context.collapsed then
               was_concealed = true
               dir.context.collapsed = false
             end
+
             last = last.parent
           end
 
@@ -258,9 +298,10 @@ function FilePanel:highlight_file(file)
             self:redraw()
           end
 
-          pcall(api.nvim_win_set_cursor, self.winid, { cur.lstart + 1, 0 })
+          utils.set_cursor(self.winid, cur.lstart + 1, 0)
           return true
         end
+
         return false
       end)
     end

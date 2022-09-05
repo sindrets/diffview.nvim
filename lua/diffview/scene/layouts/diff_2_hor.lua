@@ -6,8 +6,6 @@ local api = vim.api
 local M = {}
 
 ---@class Diff2Hor : Diff2
----@field a Window
----@field b Window
 local Diff2Hor = oop.create_class("Diff2Hor", Diff2)
 
 ---@class Diff2Hor.init.Opt
@@ -24,6 +22,8 @@ end
 ---@override
 ---@param pivot integer?
 function Diff2Hor:create(pivot)
+  local curwin
+
   pivot = pivot or self:find_pivot()
   assert(api.nvim_win_is_valid(pivot), "Layout creation requires a valid window pivot!")
 
@@ -32,8 +32,6 @@ function Diff2Hor:create(pivot)
       win:close(true)
     end
   end
-
-  local curwin
 
   api.nvim_win_call(pivot, function()
     vim.cmd("aboveleft vsp")
@@ -59,8 +57,8 @@ function Diff2Hor:create(pivot)
 
   api.nvim_win_close(pivot, true)
   self.windows = { self.a, self.b }
-  self.a:open_file()
-  self.b:open_file()
+  self:open_null()
+  self:open_files()
 end
 
 M.Diff2Hor = Diff2Hor

@@ -1,5 +1,6 @@
 local File = require("diffview.git.file").File
 local RevType = require("diffview.git.rev").RevType
+local config = require("diffview.config")
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 
@@ -9,6 +10,7 @@ local M = {}
 ---@class Window : diffview.Object
 ---@field id integer
 ---@field file git.File
+---@field parent Layout
 local Window = oop.create_class("Window")
 
 Window.winopt_store = {}
@@ -16,11 +18,13 @@ Window.winopt_store = {}
 ---@class Window.init.opt
 ---@field id integer
 ---@field file git.File
+---@field parent Layout
 
 ---@param opt Window.init.opt
 function Window:init(opt)
   self.id = opt.id
   self.file = opt.file
+  self.parent = opt.parent
 end
 
 function Window:destroy()
@@ -45,21 +49,35 @@ function Window:close(force)
   end
 end
 
+function Window:focus()
+  if self:is_valid() then
+    api.nvim_set_current_win(self.id)
+  end
+end
+
+function Window:is_focused()
+  return self:is_valid() and api.nvim_get_current_win() == self.id
+end
+
+---@param callback fun(file: git.File)
 function Window:load_file(callback)
   assert(self.file)
 
   if self.file.bufnr and api.nvim_buf_is_valid(self.file.bufnr) then
-    return callback()
+    return callback(self.file)
   end
 
-  self.file:create_buffer(callback)
+  self.file:create_buffer(function()
+    callback(self.file)
+  end)
 end
 
-function Window:open_file()
+---@param callback? fun(file: git.File)
+function Window:open_file(callback)
   assert(self.file)
 
-  if self:is_valid() then
-    if self.file.active and self.file:is_valid() then
+  if self:is_valid() and self.file.active then
+    local function on_load()
       api.nvim_win_set_buf(self.id, self.file.bufnr)
 
       if self.file.rev.type == RevType.LOCAL then
@@ -67,15 +85,27 @@ function Window:open_file()
       end
 
       self:apply_file_winopts()
-      self.file:attach_buffer()
-    else
-      File.load_null_buffer(self.id)
-      self:apply_null_winopts()
+      self.file:attach_buffer(false, {
+        keymaps = config.get_layout_keymaps(self.parent),
+        disable_diagnostics = self.file.kind == "conflicting"
+            and config.get_config().view.merge_tool.disable_diagnostics,
+      })
+
+      api.nvim_win_call(self.id, function()
+        DiffviewGlobal.emitter:emit("diff_buf_win_enter")
+      end)
+
+      if vim.is_callable(callback) then
+        ---@cast callback -?
+        callback(self.file)
+      end
     end
 
-    api.nvim_win_call(self.id, function()
-      DiffviewGlobal.emitter:emit("diff_buf_win_enter")
-    end)
+    if self.file:is_valid() then
+      on_load()
+    else
+      self:load_file(on_load)
+    end
   end
 end
 
@@ -121,7 +151,7 @@ end
 
 function Window:apply_null_winopts()
   if File.NULL_FILE.winopts then
-    utils.set_local(self.id, self.file.winopts)
+    utils.set_local(self.id, File.NULL_FILE.winopts)
   end
 end
 

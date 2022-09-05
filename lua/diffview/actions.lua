@@ -1,15 +1,21 @@
 local lazy = require("diffview.lazy")
 
----@type DiffView|LazyModule
-local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView")
----@type FileHistoryView|LazyModule
-local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView")
----@type StandardView|LazyModule
-local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView")
----@module "diffview.lib"
-local lib = lazy.require("diffview.lib")
----@module "diffview.utils"
-local utils = lazy.require("diffview.utils")
+local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
+local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView") ---@type FileHistoryView|LazyModule
+local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
+local git = lazy.require("diffview.git.utils") ---@module "diffview.git.utils"
+local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
+
+local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1") ---@type Diff1|LazyModule
+local Diff2Hor = lazy.access("diffview.scene.layouts.diff_2_hor", "Diff2Hor") ---@type Diff2Hor|LazyModule
+local Diff2Ver = lazy.access("diffview.scene.layouts.diff_2_ver", "Diff2Ver") ---@type Diff2Ver|LazyModule
+local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3") ---@type Diff3|LazyModule
+local Diff3Hor = lazy.access("diffview.scene.layouts.diff_3_hor", "Diff3Hor") ---@type Diff3Hor|LazyModule
+local Diff3Ver = lazy.access("diffview.scene.layouts.diff_3_ver", "Diff3Ver") ---@type Diff3Hor|LazyModule
+local Diff3Mixed = lazy.access("diffview.scene.layouts.diff_3_mixed", "Diff3Mixed") ---@type Diff3Mixed|LazyModule
+local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4") ---@type Diff4|LazyModule
+local Diff4Mixed = lazy.access("diffview.scene.layouts.diff_4_mixed", "Diff4Mixed") ---@type Diff4Mixed|LazyModule
 
 local api = vim.api
 
@@ -48,7 +54,7 @@ local function prepare_goto_file()
     end
 
     local cursor
-    local cur_file = (view.panel.cur_item and view.panel.cur_item[2]) or view.panel.cur_file
+    local cur_file = view.cur_entry
     if file == cur_file then
       local win = view.cur_layout:get_main_win()
       cursor = api.nvim_win_get_cursor(win.id)
@@ -150,6 +156,76 @@ function M.goto_file_tab()
   end
 end
 
+---Jump to the next merge conflict marker.
+function M.next_conflict()
+  local view = lib.get_current_view()
+
+  if view and view:instanceof(StandardView.__get()) then
+    ---@cast view StandardView
+    local main = view.cur_layout:get_main_win()
+    local curfile = main.file
+
+    if main:is_valid() and curfile:is_valid() then
+      local conflicts, _, cur_idx = git.parse_conflicts(
+        api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false),
+        main.id
+      )
+
+      if #conflicts > 0 then
+        local next_idx = math.min(cur_idx, #conflicts) % #conflicts + 1
+        local next_conflict = conflicts[next_idx]
+        local curwin = api.nvim_get_current_win()
+
+        api.nvim_win_call(main.id, function()
+          api.nvim_win_set_cursor(main.id, { next_conflict.first, 0 })
+
+          if curwin ~= main.id then
+            -- HACK: Trigger sync for the scrollbind + cursorbind
+            vim.cmd([[exe "norm! \<c-e>\<c-y>"]])
+          end
+        end)
+
+        api.nvim_echo({{ ("Conflict [%d/%d]"):format(next_idx, #conflicts) }}, false, {})
+      end
+    end
+  end
+end
+
+---Jump to the previous merge conflict marker.
+function M.prev_conflict()
+  local view = lib.get_current_view()
+
+  if view and view:instanceof(StandardView.__get()) then
+    ---@cast view StandardView
+    local main = view.cur_layout:get_main_win()
+    local curfile = main.file
+
+    if main:is_valid() and curfile:is_valid() then
+      local conflicts, _, cur_idx = git.parse_conflicts(
+        api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false),
+        main.id
+      )
+
+      if #conflicts > 0 then
+        local prev_idx = (math.max(cur_idx, 1) - 2) % #conflicts + 1
+        local prev_conflict = conflicts[prev_idx]
+        local curwin = api.nvim_get_current_win()
+
+        api.nvim_win_call(main.id, function()
+          api.nvim_win_set_cursor(main.id, { prev_conflict.first, 0 })
+
+          if curwin ~= main.id then
+            -- HACK: Trigger sync for the scrollbind + cursorbind
+            vim.cmd([[exe "norm! \<c-e>\<c-y>"]])
+          end
+        end)
+
+        api.nvim_echo({{ ("Conflict [%d/%d]"):format(prev_idx, #conflicts) }}, false, {})
+      end
+    end
+  end
+end
+
 ---Execute `cmd` for each target window in the current view. If no targets
 ---are given, all windows are targeted.
 ---@param cmd string|function The vim cmd to execute, or a function.
@@ -217,6 +293,189 @@ function M.scroll_view(distance)
         end)
       end
     end
+  end
+end
+
+---@param kind "ours"|"theirs"|"base"|"local"
+local function diff_copy_target(kind)
+  local view = lib.get_current_view() --[[@as DiffView|FileHistoryView ]]
+  local file = view.cur_entry
+
+  if file then
+    local layout = file.layout
+    local bufnr
+
+    if layout:instanceof(Diff3.__get()) then
+      ---@cast layout Diff3
+      if kind == "ours" then
+        bufnr = layout.a.file.bufnr
+      elseif kind == "theirs" then
+        bufnr = layout.c.file.bufnr
+      elseif kind == "local" then
+        bufnr = layout.b.file.bufnr
+      end
+    elseif layout:instanceof(Diff4.__get()) then
+      ---@cast layout Diff4
+      if kind == "ours" then
+        bufnr = layout.a.file.bufnr
+      elseif kind == "theirs" then
+        bufnr = layout.c.file.bufnr
+      elseif kind == "base" then
+        bufnr = layout.d.file.bufnr
+      elseif kind == "local" then
+        bufnr = layout.b.file.bufnr
+      end
+    end
+
+    if bufnr then return bufnr end
+  end
+end
+
+---@param target "ours"|"theirs"|"base"|"all"|"none"
+function M.conflict_choose(target)
+  return function()
+    local view = lib.get_current_view()
+
+    if view and view:instanceof(StandardView.__get()) then
+      ---@cast view StandardView
+      local main = view.cur_layout:get_main_win()
+      local curfile = main.file
+
+      if main:is_valid() and curfile:is_valid() then
+        local _, cur = git.parse_conflicts(
+          api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false),
+          main.id
+        )
+
+        if cur then
+          local content
+
+          if target == "ours" then content = cur.ours.content
+          elseif target == "theirs" then content = cur.theirs.content
+          elseif target == "base" then content = cur.base.content
+          elseif target == "all" then
+            content = utils.vec_join(
+              cur.ours.content,
+              cur.base.content,
+              cur.theirs.content
+            )
+          end
+
+          api.nvim_buf_set_lines(curfile.bufnr, cur.first - 1, cur.last, false, content or {})
+
+          utils.set_cursor(main.id, unpack({
+            (content and #content or 0) + cur.first - 1,
+            content and content[1] and #content[#content] or 0
+          }))
+        end
+      end
+    end
+  end
+end
+
+---@param target "ours"|"theirs"|"base"|"local"
+function M.diffget(target)
+  return function()
+    local bufnr = diff_copy_target(target)
+
+    if bufnr and api.nvim_buf_is_valid(bufnr) then
+      local range
+
+      if api.nvim_get_mode().mode:match("^[vV]") then
+        range = ("%d,%d"):format(unpack(utils.vec_sort({
+          vim.fn.line("."),
+          vim.fn.line("v")
+        })))
+      end
+
+      vim.cmd(("%sdiffget %d"):format(range or "", bufnr))
+
+      if range then
+        api.nvim_feedkeys(utils.t("<esc>"), "n", false)
+      end
+    end
+  end
+end
+
+---@param target "ours"|"theirs"|"base"|"local"
+function M.diffput(target)
+  return function()
+    local bufnr = diff_copy_target(target)
+
+    if bufnr and api.nvim_buf_is_valid(bufnr) then
+      vim.cmd("diffput " .. bufnr)
+    end
+  end
+end
+
+function M.cycle_layout()
+  local layout_cycles = {
+    standard = {
+      Diff2Hor.__get(),
+      Diff2Ver.__get(),
+    },
+    merge_tool = {
+      Diff3Hor.__get(),
+      Diff3Ver.__get(),
+      Diff3Mixed.__get(),
+      Diff4Mixed.__get(),
+      Diff1.__get(),
+    }
+  }
+
+  local view = lib.get_current_view()
+
+  if not view then return end
+
+  local layouts, files, cur_file
+
+  if view:instanceof(FileHistoryView.__get()) then
+    ---@cast view FileHistoryView
+    layouts = layout_cycles.standard
+    files = view.panel:list_files()
+    cur_file = view:cur_file()
+  elseif view:instanceof(DiffView.__get()) then
+    ---@cast view DiffView
+    cur_file = view.cur_entry
+
+    if cur_file then
+      layouts = cur_file.kind == "conflicting"
+          and layout_cycles.merge_tool
+          or layout_cycles.standard
+      files = cur_file.kind == "conflicting"
+          and view.files.conflicting
+          or utils.vec_join(view.panel.files.working, view.panel.files.staged)
+    end
+  else
+    return
+  end
+
+  for _, entry in ipairs(files) do
+    local cur_layout = entry.layout
+    local next_layout = layouts[utils.vec_indexof(layouts, cur_layout:class()) % #layouts + 1]
+    entry:convert_layout(next_layout)
+  end
+
+  if cur_file then
+    local main = view.cur_layout:get_main_win()
+    local pos = api.nvim_win_get_cursor(main.id)
+    local was_focused = view.cur_layout:is_focused()
+
+    cur_file.layout.emitter:once("files_opened", function()
+      utils.set_cursor(main.id, unpack(pos))
+
+      if not was_focused then
+        api.nvim_win_call(main.id, function()
+          -- HACK: Trigger sync for the scrollbind + cursorbind
+          vim.cmd([[exe "norm! \<c-e>\<c-y>"]])
+        end)
+      end
+    end)
+
+    view:set_file(cur_file, false)
+    main = view.cur_layout:get_main_win()
+
+    if was_focused then main:focus() end
   end
 end
 

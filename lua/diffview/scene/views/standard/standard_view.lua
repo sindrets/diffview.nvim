@@ -1,7 +1,13 @@
 local lazy = require("diffview.lazy")
 
+---@type Diff1|LazyModule
+local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1")
 ---@type Diff2|LazyModule
 local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2")
+---@type Diff3|LazyModule
+local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3")
+---@type Diff4|LazyModule
+local Diff4 = lazy.access("diffview.scene.layouts.diff_3", "Diff4")
 ---@type Panel|LazyModule
 local Panel = lazy.access("diffview.ui.panel", "Panel")
 ---@type View|LazyModule
@@ -21,6 +27,8 @@ local M = {}
 ---@field winopts table
 ---@field nulled boolean
 ---@field cur_layout Layout
+---@field cur_entry FileEntry
+---@field layouts table<Layout, Layout>
 local StandardView = oop.create_class("StandardView", View.__get())
 
 ---StandardView constructor
@@ -29,9 +37,12 @@ function StandardView:init(opt)
   StandardView:super().init(self, opt)
   self.nulled = utils.sate(opt.nulled, false)
   self.panel = opt.panel or Panel()
+  self.layouts = opt.layouts or {}
   self.winopts = opt.winopts or {
+    diff1 = { a = {} },
     diff2 = { a = {}, b = {} },
     diff3 = { a = {}, b = {}, c = {} },
+    diff4 = { a = {}, b = {}, c = {}, d = {} },
   }
 
   self.emitter:on("post_layout", utils.wrap_call(self.post_layout, self))
@@ -93,7 +104,8 @@ end
 
 ---@param layout Layout
 function StandardView:use_layout(layout)
-  self.cur_layout = layout
+  self.cur_layout = layout:clone()
+  self.layouts[layout:class()] = self.cur_layout
 
   layout.pivot_producer = function()
     local was_open = self.panel:is_open()
@@ -118,7 +130,15 @@ end
 
 ---@param entry FileEntry
 function StandardView:use_entry(entry)
-  if entry.layout:instanceof(Diff2.__get()) then
+  if entry.layout:instanceof(Diff1.__get()) then
+    local layout = entry.layout --[[@as Diff1 ]]
+    layout.a.file.winopts = vim.tbl_extend(
+      "force",
+      layout.a.file.winopts,
+      self.winopts.diff1.a or {}
+    )
+
+  elseif entry.layout:instanceof(Diff2.__get()) then
     local layout = entry.layout --[[@as Diff2 ]]
     layout.a.file.winopts = vim.tbl_extend(
       "force",
@@ -130,16 +150,63 @@ function StandardView:use_entry(entry)
       layout.b.file.winopts,
       self.winopts.diff2.b or {}
     )
+
+  elseif entry.layout:instanceof(Diff3.__get()) then
+    local layout = entry.layout --[[@as Diff3 ]]
+    layout.a.file.winopts = vim.tbl_extend(
+      "force",
+      layout.a.file.winopts,
+      self.winopts.diff3.a or {}
+    )
+    layout.b.file.winopts = vim.tbl_extend(
+      "force",
+      layout.b.file.winopts,
+      self.winopts.diff3.b or {}
+    )
+    layout.c.file.winopts = vim.tbl_extend(
+      "force",
+      layout.c.file.winopts,
+      self.winopts.diff3.c or {}
+    )
+
+  elseif entry.layout:instanceof(Diff4.__get()) then
+    local layout = entry.layout --[[@as Diff4 ]]
+    layout.a.file.winopts = vim.tbl_extend(
+      "force",
+      layout.a.file.winopts,
+      self.winopts.diff4.a or {}
+    )
+    layout.b.file.winopts = vim.tbl_extend(
+      "force",
+      layout.b.file.winopts,
+      self.winopts.diff4.b or {}
+    )
+    layout.c.file.winopts = vim.tbl_extend(
+      "force",
+      layout.c.file.winopts,
+      self.winopts.diff4.c or {}
+    )
   end
 
-  if entry.layout:class():path() == self.cur_layout:class():path() then
+  local old_layout = self.cur_layout
+
+  if entry.layout:class() == self.cur_layout:class() then
+    self.cur_layout.emitter = entry.layout.emitter
     self.cur_layout:use_entry(entry)
+  elseif self.layouts[entry.layout:class()] then
+    self.cur_layout = self.layouts[entry.layout:class()]
+    self.cur_layout.emitter = entry.layout.emitter
+    self.cur_layout:use_entry(entry)
+    self.cur_layout:create()
+    old_layout:destroy()
   else
-    local old_layout = self.cur_layout
     self:use_layout(entry.layout)
+    self.cur_layout.emitter = entry.layout.emitter
     self.cur_layout:create()
     old_layout:destroy()
   end
+
+  self.cur_entry = entry
 end
 
 M.StandardView = StandardView
