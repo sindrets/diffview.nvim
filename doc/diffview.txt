@@ -879,7 +879,7 @@ restore_entry                                   *diffview-actions-restore_entry*
         Revert the selected file entry to the state from the left side of the
         diff. This only works if the right side of the diff is showing the
         local state of the file. A command is echoed that shows how to undo
-        the change. Check `:messages` to see it again.
+        the change. Check |:messages| to see it again.
 
         NOTE: "Restoring" an untracked file will delete it from disk. It still
         gets backed up in the local git database, so it is reversible.
@@ -1098,7 +1098,7 @@ X                       Revert the selected file entry to the state from the
                         left side of the diff. This only works if the right
                         side of the diff is showing the local state of the
                         file. A command is echoed that shows how to undo the
-                        change. Check `:messages` to see it again.
+                        change. Check |:messages| to see it again.
 
                                                 *diffview-maps-refresh_files*
 R                       Update the stats and entries in the file list.

@@ -87,8 +87,8 @@ require("diffview").setup({
       ["gf"]         = actions.goto_file,                 -- Open the file in a new split in the previous tabpage
       ["<C-w><C-f>"] = actions.goto_file_split,           -- Open the file in a new split
       ["<C-w>gf"]    = actions.goto_file_tab,             -- Open the file in a new tabpage
-      ["<leader>e"]  = actions.focus_files,               -- Bring focus to the files panel
-      ["<leader>b"]  = actions.toggle_files,              -- Toggle the files panel.
+      ["<leader>e"]  = actions.focus_files,               -- Bring focus to the file panel
+      ["<leader>b"]  = actions.toggle_files,              -- Toggle the file panel.
       ["g<C-x>"]     = actions.cycle_layout,              -- Cycle through available layouts.
       ["[x"]         = actions.prev_conflict,             -- In the merge_tool: jump to the previous conflict
       ["]x"]         = actions.next_conflict,             -- In the merge_tool: jump to the next conflict
