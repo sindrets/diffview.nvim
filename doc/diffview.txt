@@ -14,6 +14,8 @@ up all modified files in a diffsplit. This plugin aims to provide a simple,
 unified, single tabpage interface that lets you easily review all changed files
 for any git rev.
 
+==============================================================================
+
 USAGE                                           *diffview-usage*
 
 Quick-start: `:DiffviewOpen` to open a Diffview that compares against the
@@ -30,6 +32,224 @@ Diffviews are automatically updated:
         • On |User_FugitiveChanged|
 
 Updates are not run unless the current tabpage is a Diffview.
+
+COMMANDS                                        *diffview-commands*
+
+                                                *:DiffviewOpen*
+:DiffviewOpen [git-rev] [options] [ -- {paths...}]
+
+        Opens a new Diffview that compares against [git-rev]. If no [git-rev]
+        is given, defaults to comparing against the index. Additional
+        {paths...} may be provided to narrow down what files are shown. If the
+        `-C` flag is not defined, the git top-level is determined from the
+        current buffer when possible. Otherwise it's determined from the cwd.
+        Examples:
+>
+            :DiffviewOpen
+            :DiffviewOpen HEAD~2
+            :DiffviewOpen HEAD~4..HEAD~2
+            :DiffviewOpen d4a7b0d
+            :DiffviewOpen d4a7b0d^!
+            :DiffviewOpen d4a7b0d..519b30e
+            :DiffviewOpen origin/main...HEAD
+            :DiffviewOpen HEAD~2 -- lua/diffview plugin
+            :DiffviewOpen d4a7b0d -uno
+<
+                                                *diffview-merge-tool*
+        If you call `:DiffviewOpen` during a merge or a rebase, the view will
+        list the conflicted files in their own section. When opening a
+        conflicted file, it will open in a 3-way diff allowing you to resolve
+        the conflict with the context of the target branch's version (OURS,
+        left), and the version from the branch which is being merged (THEIRS,
+        right).
+
+        The conflicted file's entry in the file panel will show the
+        remaining number of conflict markers (the number following the file
+        name). If what follows the file name is instead an exclamation mark
+        (`!`), this indicates that the file has not yet been opened, and the
+        number of conflicts is unknown. If the sign is a check mark, this
+        indicates that there are no more conflicts in the file.
+
+        You can jump between conflict markers with `]x` and `[x`. This works
+        from the file panel as well. Further, in addition to the normal
+        |copy-diffs| mappings you can use `2do` to obtain the hunk from the
+        OURS side of the diff, `3do` to obtain the hunk from the THEIRS side
+        of the diff, and - in a 4-way diff - `1do` to obtain the hunk from the
+        BASE. See |diffview-conflict-versions| to tell what windows correspond
+        with what version of the file.
+
+        Additionally there are mappings for operating directly on the conflict
+        markers:
+          • `<leader>co`: Choose the OURS version of the conflict.
+          • `<leader>ct`: Choose the THEIRS version of the conflict.
+          • `<leader>cb`: Choose the BASE version of the conflict.
+          • `<leader>ca`: Choose all versions of the conflict (effectively
+            just deletes the markers, leaving all the content).
+          • `dx`: Choose none of the versions of the conflict (delete the
+            conflict region).
+
+        For more info on these actions, see
+        |diffview-actions-conflict_choose|.
+
+        NOTE: The horizontal 3-way diff is only the default layout for the
+        merge-tool, but there are multiple variations on the 3-way diff layout
+        as well as a 4-way diff, and a single window layout available. The
+        default mapping `g<C-x>` allows you to cycle through the available
+        layouts. To configure a different default layout, see
+        |diffview-config-view.x.layout|.
+
+    Options:~
+        -u[value], --untracked-files[={value}]
+                        Specify whether or not to show untracked files. If
+                        flag is given without value; defaults to `true`.
+                        {value} can be one of:
+                          • `true`, `normal`, `all` Show untracked.
+                          • `false`, `no` Don't show untracked.
+        --cached, --staged
+                        Diff staged changes against [git-rev]. If no [git-rev]
+                        is given, defaults to `HEAD`.
+
+        --imply-local   If a range rev is provided and either end of the range
+                        points to `HEAD`: point that end to local files
+                        instead (not created from git). This can be useful
+                        i.e. when using symmetric difference ranges
+                        (triple-dot), but you want to be able to utilize the
+                        LSP features that are not available while you're
+                        viewing files created from git.
+
+        -C{path}        Run as if git was started in {path} instead of the
+                        current working directory.
+
+        --selected-file={path}
+                        Specify a path to the preferred initially selected
+                        file. If the path doesn't match any of the files in
+                        the initial set of files, this option does nothing.
+
+                                                *:DiffviewFileHistory*
+:[range]DiffviewFileHistory [paths] [options]
+
+        Opens a new file history view that lists all commits that affected the
+        given paths. This is a porcelain interface for git-log. Both [paths]
+        and [options] may be specified in any order, even interchangeably.
+
+        If no [paths] are given, defaults to the top-level of the working
+        tree. The top-level will be inferred from the current buffer when
+        possible, otherwise the cwd is used. Multiple [paths] may be provided
+        and git pathspec is supported (see `:Man gitglossary(7)` for
+        information about pathspec).
+
+        If [range] is given, the file history view will trace the line
+        evolution of the given range in the current file (see the `-L` flag
+        below).
+
+        From the file history panel (the panel listing the commits) you can
+        open an option panel by pressing `g!`. The option panel will allow you
+        to change the flags that will be passed to `git-log`. A flag can be
+        adjusted either by moving the cursor to its line followed by pressing
+        <Tab>, or by using the mappings that are shown directly in the panel,
+        preceding the flags' descriptions.
+
+        NOTE: Commits are only listed if git-log is able to show its file
+        stats given your currently configured log options. As such pay
+        attention to the value of `--diff-merges`, as this controls how
+        git-log treats merge commits and subsequently it's willingness to show
+        stats for these commits. Setting `--diff-merges=off` will tell git-log
+        to never compare merge commits, and as such they won't show up in the
+        file history view.
+
+        Examples:
+>
+            :DiffviewFileHistory
+            :DiffviewFileHistory %
+            :DiffviewFileHistory path/to/some/file.txt
+            :DiffviewFileHistory path/to/some/directory
+            :DiffviewFileHistory multiple/paths foo/bar baz/qux
+            :DiffviewFileHistory --base=HEAD~4
+            :DiffviewFileHistory --base=LOCAL
+            :DiffviewFileHistory --range=origin..HEAD
+            :DiffviewFileHistory --range=feat/some-branch
+            :'<,'>DiffviewFileHistory
+<
+
+    Options:~
+        --base={git-rev}
+                        Specify a base git rev from which the right side of
+                        the diff will be created. Use the special value
+                        `LOCAL` to use the local version of the file.
+
+        --range={git-rev}
+                        Show only commits in the specified revision range.
+
+        -C{path}        Run as if git was started in {path} instead of the
+                        current working directory.
+
+        NOTE: All following options are described in far more detail in the
+        man page for git-log. See `:Man git-log(1)` for more information.
+
+        --follow        Follow renames (only for single file).
+
+        --first-parent  Follow only the first parent upon seeing a merge
+                        commit.
+
+        --show-pulls    Show merge commits that are not TREESAME to its first
+                        parent, but are to a later parent.
+
+        --reflog        Include all reachable objects mentioned by reflogs.
+
+        --all           Include all refs.
+
+        --merges        List only merge commits.
+
+        --no-merges     List no merge commits.
+
+        --reverse       List commits in reverse order.
+
+        -n{n}, --max-count={n}
+                        Limit the number of commits.
+
+        -L{start},{end}:{file}, -L:{funcname}:{file}
+                        Trace the evolution of the line range given by
+                        {start},{end}, or by the function name regex
+                        {funcname}, within the {file}. You can specify this
+                        option more than once.
+
+        --diff-merges={value}
+                        Determines how merge commits are treated. {value} can
+                        be one of:
+                            • `off`
+                            • `on`
+                            • `first-parent`
+                            • `separate`
+                            • `combined`
+                            • `dense-combined`
+                            • `remerge`
+
+        --author={pattern}
+                        Limit the commits output to ones with author/committer
+                        header lines that match the specified pattern (regular
+                        expression).
+
+        --grep={pattern}
+                        Limit the commits output to ones with log message that
+                        matches the specified pattern (regular expression).
+
+                                                *:DiffviewClose*
+:DiffviewClose          Close the active Diffview.
+
+                                                *:DiffviewToggleFiles*
+:DiffviewToggleFiles    Toggles the file panel.
+
+                                                *:DiffviewFocusFiles*
+:DiffviewFocusFiles     Brings focus to the file panel. Opens it if it's closed.
+
+                                                *:DiffviewRefresh*
+:DiffviewRefresh        Update stats and entries in the file list of the
+                        current Diffview.
+
+                                                *:DiffviewLog*
+:DiffviewLog            Open the log.
+
+==============================================================================
 
 CONFIGURATION                                   *diffview-config*
 
@@ -750,220 +970,6 @@ actions:
         • |diffview-actions-goto_file_edit|
         • |diffview-actions-view_windo|
 
-COMMANDS                                        *diffview-commands*
-
-                                                *:DiffviewOpen*
-:DiffviewOpen [git-rev] [options] [ -- {paths...}]
-
-        Opens a new Diffview that compares against [git-rev]. If no [git-rev]
-        is given, defaults to comparing against the index. Additional
-        {paths...} can be provided to narrow down what files are shown. If the
-        `-C` flag is not defined, the git top-level is determined from the
-        current buffer when possible. Otherwise it's determined from the cwd.
-        Examples:
->
-            :DiffviewOpen
-            :DiffviewOpen HEAD~2
-            :DiffviewOpen HEAD~4..HEAD~2
-            :DiffviewOpen d4a7b0d
-            :DiffviewOpen d4a7b0d..519b30e
-            :DiffviewOpen origin/main...HEAD
-            :DiffviewOpen HEAD~2 -- lua/diffview plugin
-            :DiffviewOpen d4a7b0d -uno
-<
-                                                *diffview-merge-tool*
-        If you call `:DiffviewOpen` during a merge or a rebase, the view will
-        list the conflicted files in their own section. When opening a
-        conflicted file, it will open in a 3-way diff allowing you to resolve
-        the conflict with the context of the target branch's version (OURS,
-        left), and the version from the branch which is being merged (THEIRS,
-        right).
-
-        The conflicted file's entry in the file panel will show the
-        remaining number of conflict markers (the number following the file
-        name). If what follows the file name is instead an exclamation mark
-        (`!`), this indicates that the file has not yet been opened, and the
-        number of conflicts is unknown. If the sign is a check mark, this
-        indicates that there are no more conflicts in the file.
-
-        You can jump between conflict markers with `]x` and `[x`. This works
-        from the file panel as well. Further, in addition to the normal
-        |copy-diffs| mappings you can use `2do` to obtain the hunk from the
-        OURS side of the diff, `3do` to obtain the hunk from the THEIRS side
-        of the diff, and - in a 4-way diff - `1do` to obtain the hunk from the
-        BASE. See |diffview-conflict-versions| to tell what windows correspond
-        with what version of the file.
-
-        Additionally there are mappings for operating directly on the conflict
-        markers:
-          • `<leader>co`: Choose the OURS version of the conflict.
-          • `<leader>ct`: Choose the THEIRS version of the conflict.
-          • `<leader>cb`: Choose the BASE version of the conflict.
-          • `<leader>ca`: Choose all versions of the conflict (effectively
-            just deletes the markers, leaving all the content).
-          • `dx`: Choose none of the versions of the conflict (delete the
-            conflict region).
-
-        For more info on these actions, see
-        |diffview-actions-conflict_choose|.
-
-        NOTE: The horizontal 3-way diff is only the default layout for the
-        merge-tool, but there are multiple variations on the 3-way diff layout
-        as well as a 4-way diff, and a single window layout available. The
-        default mapping `g<C-x>` allows you to cycle through the available
-        layouts.
-
-    Options:~
-        -u[value], --untracked-files[={value}]
-                        Specify whether or not to show untracked files. If
-                        flag is given without value; defaults to `true`.
-                        {value} can be one of:
-                          • `true`, `normal`, `all` Show untracked.
-                          • `false`, `no` Don't show untracked.
-        --cached, --staged
-                        Diff staged changes against [git-rev]. If no [git-rev]
-                        is given, defaults to `HEAD`.
-
-        --imply-local   If a range rev is provided and either end of the range
-                        points to `HEAD`: point that end to local files
-                        instead (not created from git). This can be useful
-                        i.e. when using symmetric difference ranges
-                        (triple-dot), but you want to be able to utilize the
-                        LSP features that are not available while you're
-                        viewing files created from git.
-
-        -C{path}        Run as if git was started in {path} instead of the
-                        current working directory.
-
-        --selected-file={path}
-                        Specify a path to the preferred initially selected
-                        file. If the path doesn't match any of the files in
-                        the initial set of files, this option does nothing.
-
-                                                *:DiffviewFileHistory*
-:[range]DiffviewFileHistory [paths] [options]
-
-        Opens a new file history view that lists all commits that affected the
-        given paths. This is a porcelain interface for git-log. Both [paths]
-        and [options] may be specified in any order, even interchangeably.
-
-        If no [paths] are given, defaults to the top-level of the working
-        tree. The top-level will be inferred from the current buffer when
-        possible, otherwise the cwd is used. Multiple [paths] may be provided
-        and git pathspec is supported (see `:Man gitglossary(7)` for
-        information about pathspec).
-
-        If [range] is given, the file history view will trace the line
-        evolution of the given range in the current file (see the `-L` flag
-        below).
-
-        From the file history panel (the panel listing the commits) you can
-        open an option panel by pressing `g!`. The option panel will allow you
-        to change the flags that will be passed to `git-log`. A flag can be
-        adjusted either by moving the cursor to its line followed by pressing
-        <Tab>, or by using the mappings that are shown directly in the panel,
-        preceding the flags' descriptions.
-
-        NOTE: Commits are only listed if git-log is able to show its file
-        stats given your currently configured log options. As such pay
-        attention to the value of `--diff-merges`, as this controls how
-        git-log treats merge commits and subsequently it's willingness to show
-        stats for these commits. Setting `--diff-merges=off` will tell git-log
-        to never compare merge commits, and as such they won't show up in the
-        file history view.
-
-        Examples:
->
-            :DiffviewFileHistory
-            :DiffviewFileHistory %
-            :DiffviewFileHistory path/to/some/file.txt
-            :DiffviewFileHistory path/to/some/directory
-            :DiffviewFileHistory multiple/paths foo/bar baz/qux
-            :DiffviewFileHistory --base=HEAD~4
-            :DiffviewFileHistory --base=LOCAL
-            :DiffviewFileHistory --range=origin..HEAD
-            :DiffviewFileHistory --range=feat/some-branch
-            :'<,'>DiffviewFileHistory
-<
-
-    Options:~
-        --base={git-rev}
-                        Specify a base git rev from which the right side of
-                        the diff will be created. Use the special value
-                        `LOCAL` to use the local version of the file.
-
-        --range={git-rev}
-                        Show only commits in the specified revision range.
-
-        -C{path}        Run as if git was started in {path} instead of the
-                        current working directory.
-
-        NOTE: All following options are described in far more detail in the
-        man page for git-log. See `:Man git-log(1)` for more information.
-
-        --follow        Follow renames (only for single file).
-
-        --first-parent  Follow only the first parent upon seeing a merge
-                        commit.
-
-        --show-pulls    Show merge commits that are not TREESAME to its first
-                        parent, but are to a later parent.
-
-        --reflog        Include all reachable objects mentioned by reflogs.
-
-        --all           Include all refs.
-
-        --merges        List only merge commits.
-
-        --no-merges     List no merge commits.
-
-        --reverse       List commits in reverse order.
-
-        -n{n}, --max-count={n}
-                        Limit the number of commits.
-
-        -L{start},{end}:{file}, -L:{funcname}:{file}
-                        Trace the evolution of the line range given by
-                        {start},{end}, or by the function name regex
-                        {funcname}, within the {file}. You can specify this
-                        option more than once.
-
-        --diff-merges={value}
-                        Determines how merge commits are treated. {value} can
-                        be one of:
-                            • `off`
-                            • `on`
-                            • `first-parent`
-                            • `separate`
-                            • `combined`
-                            • `dense-combined`
-                            • `remerge`
-
-        --author={pattern}
-                        Limit the commits output to ones with author/committer
-                        header lines that match the specified pattern (regular
-                        expression).
-
-        --grep={pattern}
-                        Limit the commits output to ones with log message that
-                        matches the specified pattern (regular expression).
-
-                                                *:DiffviewClose*
-:DiffviewClose          Close the active Diffview.
-
-                                                *:DiffviewToggleFiles*
-:DiffviewToggleFiles    Toggles the files panel.
-
-                                                *:DiffviewFocusFiles*
-:DiffviewFocusFiles     Brings focus to the file panel. Opens it if it's closed.
-
-                                                *:DiffviewRefresh*
-:DiffviewRefresh        Update stats and entries in the file list of the
-                        current Diffview.
-
-                                                *:DiffviewLog*
-:DiffviewLog            Open the log.
-
 USER AUTOCOMMANDS                               *diffview-user-autocmds*
 
 For information on how to use User autocommands, see |User|.
@@ -1155,6 +1161,8 @@ panel will allow you to change the flags that will be passed to `git-log`. A
 flag can be adjusted either by moving the cursor to its line followed by
 pressing <Tab>, or by using the mappings that are shown directly in the
 panel, preceding the flags' descriptions.
+
+==============================================================================
 
 API                                             *diffview-api*
 
