@@ -525,7 +525,10 @@ function M.set_local(winids, option_map, opt)
 
           elseif o.method == "append" then
             if is_list_like then
-              vim.opt_local[fullname] = ("%s%s"):format(cur_value ~= "" and cur_value .. ",", value)
+              vim.opt_local[fullname] = ("%s%s"):format(
+                cur_value ~= "" and cur_value .. "," or "",
+                value
+              )
             else
               vim.opt_local[fullname]:append(value)
             end
