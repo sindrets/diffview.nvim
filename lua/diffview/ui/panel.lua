@@ -67,6 +67,7 @@ Panel.default_type = "split"
 ---@field win integer
 ---@field width integer
 ---@field height integer
+---@field win_opts WindowOptions
 
 ---@type PanelSplitSpec
 Panel.default_config_split = {
@@ -74,6 +75,7 @@ Panel.default_config_split = {
   position = "left",
   relative = "editor",
   win = 0,
+  win_opts = {}
 }
 
 ---@class PanelFloatSpec
@@ -88,6 +90,7 @@ Panel.default_config_split = {
 ---@field zindex integer
 ---@field style "minimal"
 ---@field border "none"|"single"|"double"|"rounded"|"solid"|"shadow"|string[]
+---@field win_opts WindowOptions
 
 ---@type PanelFloatSpec
 Panel.default_config_float = {
@@ -98,6 +101,7 @@ Panel.default_config_float = {
   zindex = 50,
   style = "minimal",
   border = "single",
+  win_opts = {}
 }
 
 Panel.au = {
@@ -145,7 +149,7 @@ function Panel:get_config()
   ---@cast config table
 
   local default_config = self:get_default_config(config.type)
-  config = vim.tbl_extend("force", default_config, config or {}) --[[@as table ]]
+  config = vim.tbl_deep_extend("force", default_config, config or {}) --[[@as table ]]
 
   local function valid_enum(arg, values, optional)
     return {
@@ -166,6 +170,7 @@ function Panel:get_config()
       relative = valid_enum(config.relative, { "editor", "win" }),
       width = { config.width, "number", true },
       height = { config.height, "number", true },
+      win_opts = { config.win_opts, "table" }
     })
   else
     ---@cast config PanelFloatSpec
@@ -181,6 +186,7 @@ function Panel:get_config()
       col = { config.col, "n", false },
       zindex = { config.zindex, "n", true },
       style = valid_enum(config.style, { "minimal" }, true),
+      win_opts = { config.win_opts, "table" },
       border = {
         config.border,
         function(v)
@@ -289,6 +295,7 @@ function Panel:open()
 
   self:resize()
   utils.set_local(self.winid, self:class().winopts)
+  utils.set_local(self.winid, config.win_opts)
 end
 
 function Panel:close()

@@ -197,6 +197,7 @@ require("diffview").setup({
     win_config = {                      -- See ':h diffview-config-win_config'
       position = "left",
       width = 35,
+      win_opts = {}
     },
   },
   file_history_panel = {
@@ -211,10 +212,13 @@ require("diffview").setup({
     win_config = {    -- See ':h diffview-config-win_config'
       position = "bottom",
       height = 16,
+      win_opts = {}
     },
   },
   commit_log_panel = {
-    win_config = {},  -- See ':h diffview-config-win_config'
+    win_config = {   -- See ':h diffview-config-win_config'
+      win_opts = {},
+    }
   },
   default_args = {    -- Default args prepended to the arg-list for the listed commands
     DiffviewOpen = {},
