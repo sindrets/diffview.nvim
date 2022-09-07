@@ -35,6 +35,110 @@ Plug 'sindrets/diffview.nvim'
 use { 'sindrets/diffview.nvim', requires = 'nvim-lua/plenary.nvim' }
 ```
 
+## Merge Tool
+
+![merge tool showcase](https://user-images.githubusercontent.com/2786478/188286293-13bbf0ab-3595-425d-ba4a-12f514c17eb6.png)
+
+Opening a diff view during a merge or a rebase will list the conflicted files in
+their own section. When opening a conflicted file, it will open in a 3-way diff
+allowing you to resolve the merge conflicts with the context of the target
+branch's version, as well as the version from the branch which is being merged.
+
+The 3-way diff is only the default layout for merge conflicts. There are
+multiple variations on this layout, a 4-way diff layout, and a single window
+layout available.
+
+In addition to the normal `:h copy-diffs` mappings, there are default mappings
+provided for jumping between conflict markers, obtaining a hunk directly from
+any of the diff buffers, and accepting any one, all, or none of the versions of
+a file given by a conflict region.
+
+For more information on the merge tool, mappings, layouts and how to
+configure them, see:
+
+- `:h diffview-merge-tool`
+- `:h diffview-config-view.x.layout`
+
+## File History
+
+![file history showcase](https://user-images.githubusercontent.com/2786478/188331057-f9ec9a0d-8cda-4ff8-ac98-febcc7aa4010.png)
+
+The file history view allows you to list all the commits that affected a given
+set of paths, and view the changes made in a diff split. This is a porcelain
+interface for git-log, and supports a good number of its options. Things like:
+
+- Filtering commits by grepping commit messages and commit authors.
+- Tracing the line evolution of a given set of line ranges for multiple files. 
+- Only listing changes for a specific commit range, branch, or tag.
+- Following file changes through renames.
+
+Get started by opening file history for:
+
+- The current branch: `:DiffviewFileHistory`
+- The current file: `:DiffviewFileHistory %`
+
+For more info, see `:h :DiffviewFileHistory`.
+
+## Usage
+
+### `:DiffviewOpen [git rev] [options] [ -- {paths...}]`
+
+Calling `:DiffviewOpen` with no args opens a new Diffview that compares against
+the current index. You can also provide any valid git rev to view only changes
+for that rev.
+
+Examples:
+
+- `:DiffviewOpen`
+- `:DiffviewOpen HEAD~2`
+- `:DiffviewOpen HEAD~4..HEAD~2`
+- `:DiffviewOpen d4a7b0d`
+- `:DiffviewOpen d4a7b0d^!`
+- `:DiffviewOpen d4a7b0d..519b30e`
+- `:DiffviewOpen origin/main...HEAD`
+
+You can also provide additional paths to narrow down what files are shown:
+
+- `:DiffviewOpen HEAD~2 -- lua/diffview plugin`
+
+For information about additional `[options]`, visit the
+[documentation](https://github.com/sindrets/diffview.nvim/blob/main/doc/diffview.txt).
+
+Additional commands for convenience:
+
+- `:DiffviewClose`: Close the current diffview. You can also use `:tabclose`.
+- `:DiffviewToggleFiles`: Toggle the file panel.
+- `:DiffviewFocusFiles`: Bring focus to the file panel.
+- `:DiffviewRefresh`: Update stats and entries in the file list of the current
+  Diffview.
+
+With a Diffview open and the default key bindings, you can cycle through changed
+files with `<tab>` and `<s-tab>` (see configuration to change the key bindings).
+
+### `:[range]DiffviewFileHistory [paths] [options]`
+
+Opens a new file history view that lists all commits that affected the given
+paths. This is a porcelain interface for git-log. Both `[paths]` and
+`[options]` may be specified in any order, even interchangeably.
+
+If no `[paths]` are given, defaults to the top-level of the working tree. The
+top-level will be inferred from the current buffer when possible, otherwise the
+cwd is used. Multiple `[paths]` may be provided and git pathspec is supported.
+
+If `[range]` is given, the file history view will trace the line evolution of the
+given range in the current file (for more info, see the `-L` flag in the docs).
+
+Examples:
+
+- `:DiffviewFileHistory`
+- `:DiffviewFileHistory %`
+- `:DiffviewFileHistory path/to/some/file.txt`
+- `:DiffviewFileHistory path/to/some/directory`
+- `:DiffviewFileHistory include/this and/this :!but/not/this`
+- `:DiffviewFileHistory --range=origin..HEAD`
+- `:DiffviewFileHistory --range=feat/example-branch`
+- `:'<,'>DiffviewFileHistory`
+
 ## Configuration
 
 <p>
@@ -57,6 +161,32 @@ require("diffview").setup({
   signs = {
     fold_closed = "",
     fold_open = "",
+    done = "✓",
+  },
+  view = {
+    -- Configure the layout and behavior of different types of views.
+    -- Available layouts: 
+    --  'diff1_plain'
+    --    |'diff2_horizontal'
+    --    |'diff2_vertical'
+    --    |'diff3_horizontal'
+    --    |'diff3_vertical'
+    --    |'diff3_mixed'
+    --    |'diff4_mixed'
+    -- For more info, see ':h diffview-config-view.x.layout'.
+    default = {
+      -- Config for changed files, and staged files in diff views.
+      layout = "diff2_horizontal",
+    },
+    merge_tool = {
+      -- Config for conflicted files in diff views during a merge or rebase.
+      layout = "diff3_horizontal",
+      disable_diagnostics = true,   -- Temporarily disable diagnostics for conflict buffers while in the view.
+    },
+    file_history = {
+      -- Config for changed files in file history views.
+      layout = "diff2_horizontal",
+    },
   },
   file_panel = {
     listing_style = "tree",             -- One of 'list' or 'tree'
@@ -100,13 +230,34 @@ require("diffview").setup({
     view = {
       -- The `view` bindings are active in the diff buffers, only when the current
       -- tabpage is a Diffview.
-      ["<tab>"]      = actions.select_next_entry, -- Open the diff for the next file
-      ["<s-tab>"]    = actions.select_prev_entry, -- Open the diff for the previous file
-      ["gf"]         = actions.goto_file,         -- Open the file in a new split in the previous tabpage
-      ["<C-w><C-f>"] = actions.goto_file_split,   -- Open the file in a new split
-      ["<C-w>gf"]    = actions.goto_file_tab,     -- Open the file in a new tabpage
-      ["<leader>e"]  = actions.focus_files,       -- Bring focus to the files panel
-      ["<leader>b"]  = actions.toggle_files,      -- Toggle the files panel.
+      ["<tab>"]      = actions.select_next_entry,         -- Open the diff for the next file
+      ["<s-tab>"]    = actions.select_prev_entry,         -- Open the diff for the previous file
+      ["gf"]         = actions.goto_file,                 -- Open the file in a new split in the previous tabpage
+      ["<C-w><C-f>"] = actions.goto_file_split,           -- Open the file in a new split
+      ["<C-w>gf"]    = actions.goto_file_tab,             -- Open the file in a new tabpage
+      ["<leader>e"]  = actions.focus_files,               -- Bring focus to the file panel
+      ["<leader>b"]  = actions.toggle_files,              -- Toggle the file panel.
+      ["g<C-x>"]     = actions.cycle_layout,              -- Cycle through available layouts.
+      ["[x"]         = actions.prev_conflict,             -- In the merge_tool: jump to the previous conflict
+      ["]x"]         = actions.next_conflict,             -- In the merge_tool: jump to the next conflict
+      ["<leader>co"] = actions.conflict_choose("ours"),   -- Choose the OURS version of a conflict
+      ["<leader>ct"] = actions.conflict_choose("theirs"), -- Choose the THEIRS version of a conflict
+      ["<leader>cb"] = actions.conflict_choose("base"),   -- Choose the BASE version of a conflict
+      ["<leader>ca"] = actions.conflict_choose("all"),    -- Choose all the versions of a conflict
+      ["dx"]         = actions.conflict_choose("none"),   -- Delete the conflict region
+    },
+    diff1 = { --[[ Mappings in single window diff layouts ]] },
+    diff2 = { --[[ Mappings in 2-way diff layouts ]] },
+    diff3 = {
+      -- Mappings in 3-way diff layouts
+      { { "n", "x" }, "2do", actions.diffget("ours") },   -- Obtain the diff hunk from the OURS version of the file
+      { { "n", "x" }, "3do", actions.diffget("theirs") }, -- Obtain the diff hunk from the THEIRS version of the file
+    },
+    diff4 = {
+      -- Mappings in 4-way diff layouts
+      { { "n", "x" }, "1do", actions.diffget("base") },   -- Obtain the diff hunk from the BASE version of the file
+      { { "n", "x" }, "2do", actions.diffget("ours") },   -- Obtain the diff hunk from the OURS version of the file
+      { { "n", "x" }, "3do", actions.diffget("theirs") }, -- Obtain the diff hunk from the THEIRS version of the file
     },
     file_panel = {
       ["j"]             = actions.next_entry,         -- Bring the cursor to the next file entry
@@ -133,6 +284,9 @@ require("diffview").setup({
       ["f"]             = actions.toggle_flatten_dirs,  -- Flatten empty subdirectories in tree listing style.
       ["<leader>e"]     = actions.focus_files,
       ["<leader>b"]     = actions.toggle_files,
+      ["g<C-x>"]        = actions.cycle_layout,
+      ["[x"]            = actions.prev_conflict,
+      ["]x"]            = actions.next_conflict,
     },
     file_history_panel = {
       ["g!"]            = actions.options,          -- Open the option panel
@@ -157,6 +311,7 @@ require("diffview").setup({
       ["<C-w>gf"]       = actions.goto_file_tab,
       ["<leader>e"]     = actions.focus_files,
       ["<leader>b"]     = actions.toggle_files,
+      ["g<C-x>"]        = actions.cycle_layout,
     },
     option_panel = {
       ["<tab>"] = actions.select_entry,
@@ -168,12 +323,6 @@ require("diffview").setup({
 
 </details>
 </p>
-
-### Layout
-
-The diff windows can be aligned either with a horizontal split or a vertical
-split. To change the alignment add either `horizontal` or `vertical` to your
-`'diffopt'`.
 
 ### Hooks
 
@@ -240,74 +389,6 @@ panel.
 **For more details on how to set mappings for other modes, actions, and more see:**
 - `:h diffview-config-keymaps`
 - `:h diffview-actions`
-
-## File History
-
-![file-history-multi](https://user-images.githubusercontent.com/2786478/131269782-f4184640-6d73-4226-b425-feccb5002dd0.png)
-
-The file history view allows you to list all the commits that affected a given
-file or directory, and view the changes made in a diff split. This is a
-porcelain interface for git-log. Open a file history view for your current file
-by calling `:DiffviewFileHistory %`.
-
-## Usage
-
-### `:DiffviewOpen [git rev] [options] [ -- {paths...}]`
-
-Calling `:DiffviewOpen` with no args opens a new Diffview that compares against
-the current index. You can also provide any valid git rev to view only changes
-for that rev.
-
-Examples:
-
-- `:DiffviewOpen`
-- `:DiffviewOpen HEAD~2`
-- `:DiffviewOpen HEAD~4..HEAD~2`
-- `:DiffviewOpen d4a7b0d`
-- `:DiffviewOpen d4a7b0d..519b30e`
-- `:DiffviewOpen origin/main...HEAD`
-
-You can also provide additional paths to narrow down what files are shown:
-
-- `:DiffviewOpen HEAD~2 -- lua/diffview plugin`
-
-For information about additional `[options]`, visit the
-[documentation](https://github.com/sindrets/diffview.nvim/blob/main/doc/diffview.txt).
-
-Additional commands for convenience:
-
-- `:DiffviewClose`: Close the current diffview. You can also use `:tabclose`.
-- `:DiffviewToggleFiles`: Toggle the files panel.
-- `:DiffviewFocusFiles`: Bring focus to the files panel.
-- `:DiffviewRefresh`: Update stats and entries in the file list of the current
-  Diffview.
-
-With a Diffview open and the default key bindings, you can cycle through changed
-files with `<tab>` and `<s-tab>` (see configuration to change the key bindings).
-
-### `:[range]DiffviewFileHistory [paths] [options]`
-
-Opens a new file history view that lists all commits that affected the given
-paths. This is a porcelain interface for git-log. Both `[paths]` and
-`[options]` may be specified in any order, even interchangeably.
-
-If no `[paths]` are given, defaults to the top-level of the working tree. The
-top-level will be inferred from the current buffer when possible, otherwise the
-cwd is used. Multiple `[paths]` may be provided and git pathspec is supported.
-
-If `[range]` is given, the file history view will trace the line evolution of the
-given range in the current file (for more info, see the `-L` flag in the docs).
-
-Examples:
-
-- `:DiffviewFileHistory`
-- `:DiffviewFileHistory %`
-- `:DiffviewFileHistory path/to/some/file.txt`
-- `:DiffviewFileHistory path/to/some/directory`
-- `:DiffviewFileHistory include/this and/this :!but/not/this`
-- `:DiffviewFileHistory --range=origin..HEAD`
-- `:DiffviewFileHistory --range=feat/example-branch`
-- `:'<,'>DiffviewFileHistory`
 
 ## Restoring Files
 

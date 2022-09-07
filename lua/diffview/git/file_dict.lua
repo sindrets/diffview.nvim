@@ -71,7 +71,7 @@ end
 
 function FileDict:ipairs()
   local i = 0
-  local n = #self.working + #self.staged
+  local n = #self.conflicting + #self.working + #self.staged
   ---@return integer, FileEntry
   return function()
     i = i + 1

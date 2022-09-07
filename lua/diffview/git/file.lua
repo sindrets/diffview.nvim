@@ -29,7 +29,7 @@ local M = {}
 ---@field parent_path string
 ---@field basename string
 ---@field extension string
----@field kind "working"|"staged"
+---@field kind git.FileKind
 ---@field nulled boolean
 ---@field rev Rev
 ---@field commit Commit?
@@ -42,11 +42,7 @@ local M = {}
 ---@field winopts WindowOptions
 local File = oop.create_class("git.File")
 
----@static
----@type integer|nil
-File._null_buffer = nil
-
----@type table<integer, boolean>
+---@type table<integer, git.File.AttachState>
 File.attached = {}
 
 ---@static
@@ -68,6 +64,7 @@ function File:init(opt)
   self.basename = pl:basename(opt.path)
   self.extension = pl:extension(opt.path)
   self.kind = opt.kind
+  self.binary = utils.sate(opt.binary)
   self.nulled = not not opt.nulled
   self.rev = opt.rev
   self.commit = opt.commit
@@ -76,7 +73,7 @@ function File:init(opt)
   self.active = false
   self.ready = false
 
-  self.winopts = {
+  self.winopts = opt.winopts or {
     diff = true,
     scrollbind = true,
     cursorbind = true,
@@ -106,6 +103,14 @@ end
 
 ---@param callback function
 function File:create_buffer(callback)
+  if self == File.NULL_FILE then
+    vim.schedule(callback)
+    return File._get_null_buffer()
+  elseif self:is_valid() then
+    vim.schedule(callback)
+    return self.bufnr
+  end
+
   if self.binary == nil and not config.get_config().diff_binaries then
     self.binary = git.is_binary(self.git_ctx.toplevel, self.path, self.rev)
   end
@@ -131,6 +136,10 @@ function File:create_buffer(callback)
       end)
 
       api.nvim_win_close(winid, true)
+    else
+      -- NOTE: LSP servers might load buffers in the background and unlist
+      -- them. Explicitly set the buffer as listed when loading it here.
+      vim.bo[self.bufnr].buflisted = true
     end
 
     self:post_buf_created()
@@ -211,16 +220,16 @@ function File:is_valid()
 end
 
 ---@param force? boolean
-function File:attach_buffer(force)
+---@param opt? git.File.AttachState
+function File:attach_buffer(force, opt)
   if self.bufnr then
-    File._attach_buffer(self.bufnr, force)
+    File._attach_buffer(self.bufnr, force, opt)
   end
 end
 
----@param force? boolean
-function File:detach_buffer(force)
+function File:detach_buffer()
   if self.bufnr then
-    File._detach_buffer(self.bufnr, force)
+    File._detach_buffer(self.bufnr)
   end
 end
 
@@ -232,35 +241,80 @@ function File:dispose_buffer()
   end
 end
 
+---@param t1 table
+---@param t2 table
+---@return git.File.AttachState
+local function prepare_attach_opt(t1, t2)
+  local res = vim.tbl_extend("keep", t1, {
+    keymaps = {},
+    disable_diagnostics = false,
+  })
+
+  for k, v in pairs(t2) do
+    local t = type(res[k])
+
+    if t == "boolean" then
+      res[k] = res[k] or v
+    elseif t == "table" and type(v) == "table" then
+      res[k] = vim.tbl_extend("force", res[k], v)
+    else
+      res[k] = v
+    end
+  end
+
+  return res
+end
+
+---@class git.File.AttachState
+---@field keymaps table
+---@field disable_diagnostics boolean
+
 ---@static
 ---@param bufnr integer
 ---@param force? boolean
-function File._attach_buffer(bufnr, force)
-  if force or not File.attached[bufnr] then
-    local conf = config.get_config()
-    local default_opt = { silent = true, nowait = true, buffer = bufnr }
+---@param opt? git.File.AttachState
+function File._attach_buffer(bufnr, force, opt)
+  local new_opt = false
+  local cur_state = File.attached[bufnr] or {}
+  local state = prepare_attach_opt(cur_state, opt or {})
 
-    for lhs, mapping in pairs(conf.keymaps.view) do
+  if opt then
+    new_opt = not vim.deep_equal(cur_state or {}, opt)
+  end
+
+  if force or new_opt or not cur_state then
+    local conf = config.get_config()
+
+    -- Keymaps
+    state.keymaps = utils.tbl_deep_union_extend(conf.keymaps.view, state.keymaps)
+    local default_map_opt = { silent = true, nowait = true, buffer = bufnr }
+
+    for lhs, mapping in pairs(state.keymaps) do
       if type(lhs) == "number" then
-        local opt = vim.tbl_extend("force", mapping[4] or {}, { buffer = bufnr })
-        vim.keymap.set(mapping[1], mapping[2], mapping[3], opt)
+        local map_opt = vim.tbl_extend("force", mapping[4] or {}, { buffer = bufnr })
+        vim.keymap.set(mapping[1], mapping[2], mapping[3], map_opt)
       else
-        vim.keymap.set("n", lhs, mapping, default_opt)
+        vim.keymap.set("n", lhs, mapping, default_map_opt)
       end
     end
 
-    File.attached[bufnr] = true
+    -- Diagnostics
+    if state.disable_diagnostics then
+      vim.diagnostic.disable(bufnr)
+    end
+
+    File.attached[bufnr] = state
   end
 end
 
 ---@static
 ---@param bufnr integer
----@param force? boolean
-function File._detach_buffer(bufnr, force)
-  if force or File.attached[bufnr] then
-    local conf = config.get_config()
+function File._detach_buffer(bufnr)
+  local state = File.attached[bufnr]
 
-    for lhs, mapping in pairs(conf.keymaps.view) do
+  if state then
+    -- Keymaps
+    for lhs, mapping in pairs(state.keymaps) do
       if type(lhs) == "number" then
         local modes = type(mapping[1]) == "table" and mapping[1] or { mapping[1] }
         for _, mode in ipairs(modes) do
@@ -271,12 +325,17 @@ function File._detach_buffer(bufnr, force)
       end
     end
 
+    -- Diagnostics
+    if state.disable_diagnostics then
+      vim.diagnostic.enable(bufnr)
+    end
+
     File.attached[bufnr] = nil
   end
 end
 
 function File.safe_delete_buf(bufnr)
-  if not bufnr or bufnr == File._null_buffer or not api.nvim_buf_is_loaded(bufnr) then
+  if not bufnr or bufnr == File.NULL_FILE.bufnr or not api.nvim_buf_is_loaded(bufnr) then
     return
   end
 
@@ -290,7 +349,7 @@ end
 ---@static Get the bufid of the null buffer. Create it if it's not loaded.
 ---@return integer
 function File._get_null_buffer()
-  if not (File._null_buffer and api.nvim_buf_is_loaded(File._null_buffer)) then
+  if not api.nvim_buf_is_loaded(File.NULL_FILE.bufnr or -1) then
     local bn = api.nvim_create_buf(false, false)
     for option, value in pairs(File.bufopts) do
       api.nvim_buf_set_option(bn, option, value)
@@ -303,10 +362,10 @@ function File._get_null_buffer()
       api.nvim_buf_set_name(bn, bufname)
     end
 
-    File._null_buffer = bn
+    File.NULL_FILE.bufnr = bn
   end
 
-  return File._null_buffer
+  return File.NULL_FILE.bufnr
 end
 
 ---@static
@@ -324,6 +383,7 @@ File.NULL_FILE = File({
   path = "null",
   kind = "working",
   status = "X",
+  binary = false,
   nulled = true,
   rev = Rev.new_null_tree(),
 })

@@ -13,6 +13,8 @@ local config = require("diffview.config")
 local logger = require("diffview.logger")
 local utils = require("diffview.utils")
 
+local api = vim.api
+
 local M = {}
 
 ---@class GitContext
@@ -230,8 +232,8 @@ local function handle_co(thread, ok, result)
 end
 
 ---@class git.utils.LayoutOpt
----@field diff2 Diff2
----@field diff3 any
+---@field default_layout Diff2
+---@field merge_layout Layout
 
 ---@param ctx GitContext
 ---@param left Rev
@@ -243,6 +245,8 @@ end
 local tracked_files = async.wrap(function(ctx, left, right, args, kind, opt, callback)
   ---@type FileEntry[]
   local files = {}
+  ---@type FileEntry[]
+  local conflicts = {}
   ---@type CountDownLatch
   local latch = CountDownLatch(2)
   local debug_opt = {
@@ -285,6 +289,9 @@ local tracked_files = async.wrap(function(ctx, left, right, args, kind, opt, cal
   end
 
   local numstat_out = numstat_job:result()
+  local data = {}
+  local conflict_map = {}
+
   for i, s in ipairs(namestat_job:result()) do
     local status = s:sub(1, 1):gsub("%s", " ")
     local name = s:match("[%a%s][^%s]*\t(.*)")
@@ -304,19 +311,54 @@ local tracked_files = async.wrap(function(ctx, left, right, args, kind, opt, cal
       stats = nil
     end
 
-    table.insert(files, FileEntry.for_d2(opt.diff2, {
+    if not (status == "U" and kind == "staged") then
+      table.insert(data, {
+        status = status,
+        name = name,
+        oldname = oldname,
+        stats = stats,
+      })
+    end
+
+    if status == "U" then
+      conflict_map[name] = data[#data]
+    end
+  end
+
+  if kind == "working" and next(conflict_map) then
+    data = vim.tbl_filter(function(v)
+      return not conflict_map[v.name]
+    end, data)
+
+    for _, v in pairs(conflict_map) do
+      table.insert(conflicts, FileEntry.with_layout(opt.merge_layout, {
+        git_ctx = ctx,
+        path = v.name,
+        oldpath = v.oldname,
+        status = "U",
+        kind = "conflicting",
+        rev_ours = Rev(RevType.STAGE, 2),
+        rev_main = Rev(RevType.LOCAL),
+        rev_theirs = Rev(RevType.STAGE, 3),
+        rev_base = Rev(RevType.STAGE, 1),
+      }))
+    end
+  end
+
+  for _, v in ipairs(data) do
+    table.insert(files, FileEntry.for_d2(opt.default_layout, {
       git_ctx = ctx,
-      path = name,
-      oldpath = oldname,
-      status = status,
-      stats = stats,
+      path = v.name,
+      oldpath = v.oldname,
+      status = v.status,
+      stats = v.stats,
       kind = kind,
       rev_a = left,
       rev_b = right,
     }))
   end
 
-  callback(nil, files)
+  callback(nil, files, conflicts)
 end, 7)
 
 ---@param ctx GitContext
@@ -347,7 +389,7 @@ local untracked_files = async.wrap(function(ctx, left, right, opt, callback)
 
       local files = {}
       for _, s in ipairs(j:result()) do
-        table.insert(files, FileEntry.for_d2(opt.diff2, {
+        table.insert(files, FileEntry.for_d2(opt.default_layout, {
           git_ctx = ctx,
           path = s,
           status = "?",
@@ -390,7 +432,7 @@ M.diff_file_list = async.wrap(function(ctx, left, right, path_args, dv_opt, opt,
     ),
     "working",
     opt,
-    function (err, tfiles)
+    function (err, tfiles, tconflicts)
       if err then
         errors[#errors+1] = err
         utils.err("Failed to get git status for tracked files!", true)
@@ -399,7 +441,9 @@ M.diff_file_list = async.wrap(function(ctx, left, right, path_args, dv_opt, opt,
       end
 
       files:set_working(tfiles)
+      files:set_conflicting(tconflicts)
       local show_untracked = dv_opt.show_untracked
+
       if show_untracked == nil then
         show_untracked = M.show_untracked(ctx.toplevel)
       end
@@ -870,7 +914,7 @@ local function parse_fh_data(state)
       stats = nil
     end
 
-    table.insert(files, FileEntry.for_d2(state.opt.diff2 or Diff2Hor, {
+    table.insert(files, FileEntry.for_d2(state.opt.default_layout or Diff2Hor, {
       git_ctx = ctx,
       path = name,
       oldpath = oldname,
@@ -1281,7 +1325,11 @@ M.show = async.wrap(function(toplevel, args, callback)
     ---@type Job
     on_exit = async.void(function(j)
       local context = "git.utils.show()"
-      utils.handle_job(j, { fail_on_empty = true, context = context })
+      utils.handle_job(j, {
+        fail_on_empty = true,
+        context = context,
+        debug_opt = { no_stdout = true, context = context },
+      })
 
       if j.code ~= 0 then
         callback(j:stderr_result() or {}, nil)
@@ -1308,6 +1356,145 @@ M.show = async.wrap(function(toplevel, args, callback)
   -- Solution: queue them and run them one after another.
   queue_sync_job(job)
 end, 3)
+
+local CONFLICT_START = [[^<<<<<<< ]]
+local CONFLICT_BASE = [[^||||||| ]]
+local CONFLICT_SEP = [[^=======$]]
+local CONFLICT_END = [[^>>>>>>> ]]
+
+---@class ConflictRegion
+---@field first integer
+---@field last integer
+---@field ours { first: integer, last: integer, content?: string[] }
+---@field base { first: integer, last: integer, content?: string[] }
+---@field theirs { first: integer, last: integer, content?: string[] }
+
+---@param lines string[]
+---@param winid? integer
+---@return ConflictRegion[] conflicts
+---@return ConflictRegion? cur_conflict The conflict under the cursor in the given window.
+---@return integer cur_conflict_idx Index of the current conflict. Will be 0 if the cursor if before the first conflict, and `#conflicts + 1` if the cursor is after the last conflict.
+function M.parse_conflicts(lines, winid)
+  local ret = {}
+  local has_start, has_base, has_sep = false, false, false
+  local cur, cursor, cur_conflict, cur_idx
+
+  if winid and api.nvim_win_is_valid(winid) then
+    cursor = api.nvim_win_get_cursor(winid)
+  end
+
+  local function handle(data)
+    local first = math.huge
+    local last = -1
+
+    first = math.min(data.ours.first or math.huge, first)
+    first = math.min(data.base.first or math.huge, first)
+    first = math.min(data.theirs.first or math.huge, first)
+
+    if first == math.huge then return end
+
+    last = math.max(data.ours.last or -1, -1)
+    last = math.max(data.base.last or -1, -1)
+    last = math.max(data.theirs.last or -1, -1)
+
+    if last == -1 then return end
+
+    if data.ours.first and data.ours.last and data.ours.first < data.ours.last then
+      data.ours.content = utils.vec_slice(lines, data.ours.first + 1, data.ours.last)
+    end
+
+    if data.base.first and data.base.last and data.base.first < data.base.last then
+      data.base.content = utils.vec_slice(lines, data.base.first + 1, data.base.last)
+    end
+
+    if data.theirs.first and data.theirs.last and data.theirs.first < data.theirs.last - 1 then
+      data.theirs.content = utils.vec_slice(lines, data.theirs.first + 1, data.theirs.last - 1)
+    end
+
+    if cursor then
+      if not cur_conflict and cursor[1] >= first and cursor[1] <= last then
+        cur_conflict = data
+        cur_idx = #ret + 1
+      elseif cursor[1] > last then
+        cur_idx = (cur_idx or 0) + 1
+      end
+    end
+
+    data.first = first
+    data.last = last
+    ret[#ret + 1] = data
+  end
+
+  local function new_cur()
+    return {
+      ours = {},
+      base = {},
+      theirs = {},
+    }
+  end
+
+  cur = new_cur()
+
+  for i, line in ipairs(lines) do
+    if line:match(CONFLICT_START) then
+      if has_start then
+        handle(cur)
+        cur, has_start, has_base, has_sep = new_cur(), false, false, false
+      end
+
+      has_start = true
+      cur.ours.first = i
+      cur.ours.last = i
+    elseif line:match(CONFLICT_BASE) then
+      if has_base then
+        handle(cur)
+        cur, has_start, has_base, has_sep = new_cur(), false, false, false
+      end
+
+      has_base = true
+      cur.base.first = i
+      cur.ours.last = i - 1
+    elseif line:match(CONFLICT_SEP) then
+      if has_sep then
+        handle(cur)
+        cur, has_start, has_base, has_sep = new_cur(), false, false, false
+      end
+
+      has_sep = true
+      cur.theirs.first = i
+      cur.theirs.last = i
+
+      if has_base then
+        cur.base.last = i - 1
+      else
+        cur.ours.last = i - 1
+      end
+    elseif line:match(CONFLICT_END) then
+      if not has_sep then
+        if has_base then
+          cur.base.last = i - 1
+        elseif has_start then
+          cur.ours.last = i - 1
+        end
+      end
+
+      cur.theirs.first = cur.theirs.first or i
+      cur.theirs.last = i
+      handle(cur)
+      cur, has_start, has_base, has_sep = new_cur(), false, false, false
+    end
+  end
+
+  handle(cur)
+
+  if cursor and cur_idx then
+    if cursor[1] > ret[#ret].last then
+      cur_idx = #ret + 1
+    end
+  end
+
+  return ret, cur_conflict, cur_idx or 0
+end
 
 ---@return string, string
 function M.pathspec_split(pathspec)
@@ -1343,6 +1530,10 @@ end
 ---@param rev Rev
 ---@return boolean -- True if the file was binary for the given rev, or it didn't exist.
 function M.is_binary(toplevel, path, rev)
+  if rev.type == RevType.STAGE and rev.stage > 0 then
+    return false
+  end
+
   local cmd = { "-c", "submodule.recurse=false", "grep", "-I", "--name-only", "-e", "." }
   if rev.type == RevType.LOCAL then
     cmd[#cmd+1] = "--untracked"

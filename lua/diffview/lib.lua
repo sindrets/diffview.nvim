@@ -1,25 +1,15 @@
 local lazy = require("diffview.lazy")
 
----@type DiffView|LazyModule
-local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView")
----@type FileHistoryView|LazyModule
-local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView")
----@type Rev|LazyModule
-local Rev = lazy.access("diffview.git.rev", "Rev")
----@type ERevType|LazyModule
-local RevType = lazy.access("diffview.git.rev", "RevType")
----@type StandardView|LazyModule
-local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView")
----@module "diffview.arg_parser"
-local arg_parser = lazy.require("diffview.arg_parser")
----@module "diffview.config"
-local config = lazy.require("diffview.config")
----@module "diffview.git.utils"
-local git = lazy.require("diffview.git.utils")
----@module "diffview.logger"
-local logger = lazy.require("diffview.logger")
----@module "diffview.utils"
-local utils = lazy.require("diffview.utils")
+local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
+local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView") ---@type FileHistoryView|LazyModule
+local Rev = lazy.access("diffview.git.rev", "Rev") ---@type Rev|LazyModule
+local RevType = lazy.access("diffview.git.rev", "RevType") ---@type ERevType|LazyModule
+local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
+local arg_parser = lazy.require("diffview.arg_parser") ---@module "diffview.arg_parser"
+local config = lazy.require("diffview.config") ---@module "diffview.config"
+local git = lazy.require("diffview.git.utils") ---@module "diffview.git.utils"
+local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
 
@@ -75,14 +65,15 @@ function M.diffview_open(args)
   ---@cast git_toplevel string
   logger.lvl(1).s_debug(("Found git top-level: %s"):format(utils.str_quote(git_toplevel)))
 
-  local left, right = M.parse_revs(
-    git_toplevel,
-    rev_arg,
-    {
-      cached = argo:get_flag({ "cached", "staged" }),
-      imply_local = argo:get_flag("imply-local"),
-    }
-  )
+  local cwd = cpath or vim.loop.cwd()
+  paths = vim.tbl_map(function(pathspec)
+    return git.pathspec_expand(git_toplevel, cwd, pathspec)
+  end, paths) --[[@as string[] ]]
+
+  local left, right = M.parse_revs(git_toplevel, rev_arg, {
+    cached = argo:get_flag({ "cached", "staged" }),
+    imply_local = argo:get_flag("imply-local"),
+  })
 
   if not (left and right) then
     return

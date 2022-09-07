@@ -5,6 +5,26 @@ local lazy = require("diffview.lazy")
 
 ---@module "diffview.utils"
 local utils = lazy.require("diffview.utils")
+---@type Diff1|LazyModule
+local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1")
+---@type Diff2|LazyModule
+local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2")
+---@type Diff2Hor|LazyModule
+local Diff2Hor = lazy.access("diffview.scene.layouts.diff_2_hor", "Diff2Hor")
+---@type Diff2Ver|LazyModule
+local Diff2Ver = lazy.access("diffview.scene.layouts.diff_2_ver", "Diff2Ver")
+---@type Diff3|LazyModule
+local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3")
+---@type Diff3Hor|LazyModule
+local Diff3Hor = lazy.access("diffview.scene.layouts.diff_3_hor", "Diff3Hor")
+---@type Diff3Hor|LazyModule
+local Diff3Ver = lazy.access("diffview.scene.layouts.diff_3_ver", "Diff3Ver")
+---@type Diff3Mixed|LazyModule
+local Diff3Mixed = lazy.access("diffview.scene.layouts.diff_3_mixed", "Diff3Mixed")
+---@type Diff4|LazyModule
+local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4")
+---@type Diff4Mixed|LazyModule
+local Diff4Mixed = lazy.access("diffview.scene.layouts.diff_4_mixed", "Diff4Mixed")
 
 local M = {}
 
@@ -22,6 +42,7 @@ end
 ---@field multi_file LogOptions
 
 -- stylua: ignore start
+---@class DiffviewConfig
 M.defaults = {
   diff_binaries = false,
   enhanced_diff_hl = false,
@@ -34,6 +55,19 @@ M.defaults = {
   signs = {
     fold_closed = "",
     fold_open = "",
+    done = "✓",
+  },
+  view = {
+    default = {
+      layout = "diff2_horizontal",
+    },
+    merge_tool = {
+      layout = "diff3_horizontal",
+      disable_diagnostics = true,
+    },
+    file_history = {
+      layout = "diff2_horizontal",
+    },
   },
   file_panel = {
     listing_style = "tree",
@@ -83,6 +117,25 @@ M.defaults = {
       ["<C-w>gf"]    = actions.goto_file_tab,
       ["<leader>e"]  = actions.focus_files,
       ["<leader>b"]  = actions.toggle_files,
+      ["g<C-x>"]     = actions.cycle_layout,
+      ["[x"]         = actions.prev_conflict,
+      ["]x"]         = actions.next_conflict,
+      ["<leader>co"] = actions.conflict_choose("ours"),
+      ["<leader>ct"] = actions.conflict_choose("theirs"),
+      ["<leader>cb"] = actions.conflict_choose("base"),
+      ["<leader>ca"] = actions.conflict_choose("all"),
+      ["dx"]         = actions.conflict_choose("none"),
+    },
+    diff1 = {},
+    diff2 = {},
+    diff3 = {
+      { { "n", "x" }, "2do", actions.diffget("ours") },
+      { { "n", "x" }, "3do", actions.diffget("theirs") },
+    },
+    diff4 = {
+      { { "n", "x" }, "1do", actions.diffget("base") },
+      { { "n", "x" }, "2do", actions.diffget("ours") },
+      { { "n", "x" }, "3do", actions.diffget("theirs") },
     },
     file_panel = {
       ["j"]             = actions.next_entry,
@@ -109,6 +162,9 @@ M.defaults = {
       ["f"]             = actions.toggle_flatten_dirs,
       ["<leader>e"]     = actions.focus_files,
       ["<leader>b"]     = actions.toggle_files,
+      ["g<C-x>"]        = actions.cycle_layout,
+      ["[x"]            = actions.prev_conflict,
+      ["]x"]            = actions.next_conflict,
     },
     file_history_panel = {
       ["g!"]            = actions.options,
@@ -133,6 +189,7 @@ M.defaults = {
       ["<C-w>gf"]       = actions.goto_file_tab,
       ["<leader>e"]     = actions.focus_files,
       ["<leader>b"]     = actions.toggle_files,
+      ["g<C-x>"]        = actions.cycle_layout,
     },
     option_panel = {
       ["<tab>"] = actions.select_entry,
@@ -180,10 +237,9 @@ M.log_option_defaults = {
   grep = nil,
 }
 
+---@return DiffviewConfig
 function M.get_config()
-  local conf = M._config
-  ---@cast conf -nil
-  return conf
+  return M._config
 end
 
 ---@param single_file boolean
@@ -211,6 +267,55 @@ function M.get_log_options(single_file, t)
   return log_options
 end
 
+---@alias LayoutName "diff1_plain"
+---       | "diff2_horizontal"
+---       | "diff2_vertical"
+---       | "diff3_horizontal"
+---       | "diff3_vertical"
+---       | "diff3_mixed"
+---       | "diff4_mixed"
+
+local layout_map = {
+  diff1_plain = Diff1,
+  diff2_horizontal = Diff2Hor,
+  diff2_vertical = Diff2Ver,
+  diff3_horizontal = Diff3Hor,
+  diff3_vertical = Diff3Ver,
+  diff3_mixed = Diff3Mixed,
+  diff4_mixed = Diff4Mixed,
+}
+
+---@param layout_name LayoutName
+---@return Layout
+function M.name_to_layout(layout_name)
+  assert(layout_map[layout_name], "Invalid layout name: " .. layout_name)
+
+  return layout_map[layout_name].__get()
+end
+
+---@param layout Layout
+---@return table?
+function M.get_layout_keymaps(layout)
+  if layout:instanceof(Diff1.__get()) then
+    return M._config.keymaps.diff1
+  elseif layout:instanceof(Diff2.__get()) then
+    return M._config.keymaps.diff2
+  elseif layout:instanceof(Diff3.__get()) then
+    return M._config.keymaps.diff3
+  elseif layout:instanceof(Diff4.__get()) then
+    return M._config.keymaps.diff4
+  end
+end
+
+---@param values vector
+---@param no_quote? boolean
+---@return string
+local function fmt_enum(values, no_quote)
+  return table.concat(vim.tbl_map(function(v)
+    return (not no_quote and type(v) == "string") and ("'" .. v .. "'") or v
+  end, values), "|")
+end
+
 function M.setup(user_config)
   user_config = user_config or {}
 
@@ -236,8 +341,8 @@ function M.setup(user_config)
       if panel_config[option] ~= nil then
         if not notified then
           utils.warn(
-            ("'%s.{position|width|height}' has been deprecated. See ':h diffview.changelog-136'.")
-            :format(panel_name)
+            ("'%s.{%s}' has been deprecated. See ':h diffview.changelog-136'.")
+            :format(panel_name, fmt_enum(old_win_config_spec, true))
           )
           notified = true
         end
@@ -267,8 +372,8 @@ function M.setup(user_config)
     for _, name in ipairs(option_names) do
       if user_log_options[name] ~= nil then
         utils.warn(
-          ("'file_history_panel.log_options.(%s)' has been deprecated. See ':h diffview.changelog-151'.")
-          :format(table.concat(option_names, "|"))
+          ("'file_history_panel.log_options.{%s}' has been deprecated. See ':h diffview.changelog-151'.")
+          :format(fmt_enum(option_names, true))
         )
         break
       end
@@ -279,6 +384,36 @@ function M.setup(user_config)
 
   if #M._config.git_cmd == 0 then
     M._config.git_cmd = M.defaults.git_cmd
+  end
+
+  do
+    -- Validate layouts
+    local view = M._config.view
+    local standard_layouts = { "diff2_horizontal", "diff2_vertical", -1 }
+    local merge_layuots = {
+      "diff1_plain",
+      "diff3_horizontal",
+      "diff3_vertical",
+      "diff3_mixed",
+      "diff4_mixed",
+      -1
+    }
+    local valid_layouts = {
+      default = standard_layouts,
+      merge_tool = merge_layuots,
+      file_history = standard_layouts,
+    }
+
+    for _, kind in ipairs(vim.tbl_keys(valid_layouts)) do
+      if not vim.tbl_contains(valid_layouts[kind], view[kind].layout) then
+        utils.err(("Invalid layout name '%s' for 'view.%s'! Must be one of (%s)."):format(
+          view[kind].layout,
+          kind,
+          fmt_enum(valid_layouts[kind])
+        ))
+        view[kind].layout = M.defaults.view[kind].layout
+      end
+    end
   end
 
   for _, name in ipairs({ "single_file", "multi_file" }) do

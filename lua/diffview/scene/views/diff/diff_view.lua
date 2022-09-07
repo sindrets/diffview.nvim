@@ -1,19 +1,21 @@
-local CommitLogPanel = require("diffview.ui.panels.commit_log_panel").CommitLogPanel
-local Diff = require("diffview.diff").Diff
-local EditToken = require("diffview.diff").EditToken
-local Event = require("diffview.events").Event
-local FileDict = require("diffview.git.file_dict").FileDict
-local FileEntry = require("diffview.scene.file_entry").FileEntry
-local FilePanel = require("diffview.scene.views.diff.file_panel").FilePanel
-local PerfTimer = require("diffview.perf").PerfTimer
-local RevType = require("diffview.git.rev").RevType
-local StandardView = require("diffview.scene.views.standard.standard_view").StandardView
-local async = require("plenary.async")
-local debounce = require("diffview.debounce")
-local git = require("diffview.git.utils")
-local logger = require("diffview.logger")
+local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
-local utils = require("diffview.utils")
+
+local CommitLogPanel = lazy.access("diffview.ui.panels.commit_log_panel", "CommitLogPanel") ---@type CommitLogPanel|LazyModule
+local Diff = lazy.access("diffview.diff", "Diff") ---@type Diff|LazyModule
+local EditToken = lazy.access("diffview.diff", "EditToken") ---@type EditToken|LazyModule
+local Event = lazy.access("diffview.events", "Event") ---@type Event|LazyModule
+local FileDict = lazy.access("diffview.git.file_dict", "FileDict") ---@type FileDict|LazyModule
+local FileEntry = lazy.access("diffview.scene.file_entry", "FileEntry") ---@type FileEntry|LazyModule
+local FilePanel = lazy.access("diffview.scene.views.diff.file_panel", "FilePanel") ---@type FilePanel|LazyModule
+local PerfTimer = lazy.access("diffview.perf", "PerfTimer") ---@type PerfTimer|LazyModule
+local RevType = lazy.access("diffview.git.rev", "RevType") ---@type RevType|LazyModule
+local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
+local async = lazy.require("plenary.async") ---@module "plenary.async"
+local debounce = lazy.require("diffview.debounce") ---@module "diffview.debounce"
+local git = lazy.require("diffview.git.utils") ---@module "diffview.git.utils"
+local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
 local M = {}
@@ -36,7 +38,7 @@ local M = {}
 ---@field initialized boolean
 ---@field valid boolean
 ---@field watcher any UV fs poll handle.
-local DiffView = oop.create_class("DiffView", StandardView)
+local DiffView = oop.create_class("DiffView", StandardView.__get())
 
 ---DiffView constructor
 function DiffView:init(opt)
@@ -64,10 +66,58 @@ function DiffView:init(opt)
     ),
   })
 
+  self.attached_bufs = {}
+
+  ---@param entry FileEntry
+  self.emitter:on("file_open_post", function(entry)
+    if entry.kind == "conflicting" then
+      local file = entry.layout:get_main_win().file
+
+      local count_conflicts = vim.schedule_wrap(function()
+        local conflicts = git.parse_conflicts(api.nvim_buf_get_lines(file.bufnr, 0, -1, false))
+
+        entry.stats = entry.stats or {}
+        entry.stats.conflicts = #conflicts
+
+        self.panel:render()
+        self.panel:redraw()
+      end)
+
+      count_conflicts()
+
+      if file.bufnr and not self.attached_bufs[file.bufnr] then
+        self.attached_bufs[file.bufnr] = true
+
+        local work = debounce.throttle_trailing(1000, true, vim.schedule_wrap(function()
+          if not self:is_cur_tabpage() or self.cur_entry ~= entry then
+            self.attached_bufs[file.bufnr] = false
+            return
+          else
+            count_conflicts()
+          end
+        end))
+
+        api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
+          buffer = file.bufnr,
+          callback = function()
+            if not self.attached_bufs[file.bufnr] then
+              work:close()
+              return true
+            else
+              work()
+            end
+          end,
+        })
+      end
+    end
+  end)
+
   self.valid = true
 end
 
 function DiffView:post_open()
+  vim.cmd("redraw")
+
   self.commit_log_panel = CommitLogPanel(self.git_ctx.toplevel, {
     name = ("diffview://%s/log/%d/%s"):format(self.git_ctx.dir, self.tabpage, "commit_log"),
   })
@@ -85,6 +135,7 @@ function DiffView:post_open()
   end)
 
   self:init_event_listeners()
+
   vim.schedule(function()
     self:file_safeguard()
     if self.files:len() == 0 then
@@ -113,6 +164,22 @@ function DiffView:close()
   end
 end
 
+---@param file FileEntry
+function DiffView:_set_file(file)
+  vim.cmd("redraw")
+
+  self.cur_layout:detach_files()
+  local cur_entry = self.cur_entry
+  self.emitter:emit("file_open_pre", file, cur_entry)
+  self.nulled = false
+
+  file.layout.emitter:once("files_opened", function()
+    self.emitter:emit("file_open_post", file, cur_entry)
+  end)
+
+  self:use_entry(file)
+end
+
 ---Open the next file.
 ---@param highlight? boolean Bring the cursor to the file entry in the panel.
 ---@return FileEntry?
@@ -122,7 +189,6 @@ function DiffView:next_file(highlight)
   if self:file_safeguard() then return end
 
   if self.files:len() > 1 or self.nulled then
-    vim.cmd("diffoff!")
     local cur = self.panel:next_file()
 
     if cur then
@@ -130,8 +196,7 @@ function DiffView:next_file(highlight)
         self.panel:highlight_file(cur)
       end
 
-      self.nulled = false
-      self:use_entry(cur)
+      self:_set_file(cur)
 
       return cur
     end
@@ -147,7 +212,6 @@ function DiffView:prev_file(highlight)
   if self:file_safeguard() then return end
 
   if self.files:len() > 1 or self.nulled then
-    vim.cmd("diffoff!")
     local cur = self.panel:prev_file()
 
     if cur then
@@ -155,8 +219,7 @@ function DiffView:prev_file(highlight)
         self.panel:highlight_file(cur)
       end
 
-      self.nulled = false
-      self:use_entry(cur)
+      self:_set_file(cur)
 
       return cur
     end
@@ -174,15 +237,13 @@ function DiffView:set_file(file, focus, highlight)
 
   for _, f in self.files:ipairs() do
     if f == file then
-      vim.cmd("diffoff!")
       self.panel:set_cur_file(file)
 
       if highlight or not self.panel:is_focused() then
         self.panel:highlight_file(file)
       end
 
-      self.nulled = false
-      self:use_entry(file)
+      self:_set_file(file)
 
       if focus then
         api.nvim_set_current_win(self.cur_layout:get_main_win().id)
@@ -217,7 +278,10 @@ DiffView.get_updated_files = async.wrap(function(self, callback)
       self.right,
       self.path_args,
       self.options,
-      { diff2 = DiffView.get_default_diff2() },
+      {
+        default_layout = DiffView.get_default_diff2(),
+        merge_layout = DiffView.get_default_merge_layout(),
+      },
       callback
       ---@diagnostic disable-next-line: missing-return
   )
@@ -257,6 +321,7 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
       else
         perf:lap("received new file list")
         local files = {
+          { cur_files = self.files.conflicting, new_files = new_files.conflicting },
           { cur_files = self.files.working, new_files = new_files.working },
           { cur_files = self.files.staged, new_files = new_files.staged },
         }
@@ -277,8 +342,16 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
           for _, opr in ipairs(script) do
             if opr == EditToken.NOOP then
               -- Update status and stats
+              local a_stats = v.cur_files[ai].stats
+              local b_stats = v.new_files[bi].stats
+
+              if a_stats then
+                v.cur_files[ai].stats = vim.tbl_extend("force", a_stats, b_stats or {})
+              else
+                v.cur_files[ai].stats = v.new_files[bi].stats
+              end
+
               v.cur_files[ai].status = v.new_files[bi].status
-              v.cur_files[ai].stats = v.new_files[bi].stats
               v.cur_files[ai]:validate_stage_buffers(self.git_ctx, index_stat)
 
               if new_head then
@@ -409,7 +482,7 @@ function DiffView:infer_cur_file(allow_dir)
     ---@type any
     local item = self.panel:get_item_at_cursor()
     if item and (
-        (item.class and item:instanceof(FileEntry))
+        (item.class and item:instanceof(FileEntry.__get()))
         or (allow_dir and type(item.collapsed) == "boolean")) then
       return item
     end

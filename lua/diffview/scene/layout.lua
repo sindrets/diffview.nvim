@@ -1,16 +1,22 @@
+local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
-local utils = require("diffview.utils")
+
+local EventEmitter = lazy.access("diffview.events", "EventEmitter") ---@type EventEmitter|LazyModule
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
 local M = {}
 
 ---@class Layout : diffview.Object
 ---@field windows Window[]
+---@field emitter EventEmitter
 ---@field pivot_producer fun(): integer?
 local Layout = oop.create_class("Layout")
 
-function Layout:init()
-  self.windows = {}
+function Layout:init(opt)
+  opt = opt or {}
+  self.windows = opt.windows or {}
+  self.emitter = opt.emitter or EventEmitter()
 end
 
 ---@diagnostic disable: unused-local, missing-return
@@ -42,10 +48,47 @@ function Layout:destroy()
   end
 end
 
+function Layout:clone()
+  local clone = self:class()({ emitter = self.emitter }) --[[@as Layout ]]
+
+  for i, win in ipairs(self.windows) do
+    clone.windows[i]:set_id(win.id)
+    clone.windows[i]:set_file(win.file)
+  end
+
+  return clone
+end
+
+---Check if any of the windows in the lauout are focused.
+---@return boolean
+function Layout:is_focused()
+  for _, win in ipairs(self.windows) do
+    if win:is_focused() then return true end
+  end
+
+  return false
+end
+
+---@param ... Window
+function Layout:use_windows(...)
+  local wins = { ... }
+
+  for i = 1, select("#", ...) do
+    local win = wins[i]
+    win.parent = self
+
+    if utils.vec_indexof(self.windows, win) == -1 then
+      table.insert(self.windows, win)
+    end
+  end
+end
+
 ---Find or create a window that can be used as a pivot during layout
 ---creation.
 ---@return integer winid
 function Layout:find_pivot()
+  local last_win = api.nvim_get_current_win()
+
   for _, win in ipairs(self.windows) do
     if win:is_valid() then
       local ret
@@ -69,7 +112,13 @@ function Layout:find_pivot()
 
   vim.cmd("1windo belowright vsp")
 
-  return api.nvim_get_current_win()
+  local pivot = api.nvim_get_current_win()
+
+  if api.nvim_win_is_valid(last_win) then
+    api.nvim_set_current_win(last_win)
+  end
+
+  return pivot
 end
 
 ---@return git.File[]
@@ -93,8 +142,23 @@ end
 
 ---@param callback? fun()
 function Layout:open_files(callback)
+  if #self:files() < #self.windows then
+    self:open_null()
+
+    if vim.is_callable(callback) then
+      ---@cast callback -?
+      callback()
+    end
+
+    self.emitter:emit("files_opened")
+
+    return
+  end
+
   local load_count = 0
   local all_loaded = self:is_files_loaded()
+
+  vim.cmd("diffoff!")
 
   for _, win in ipairs(self.windows) do
     if not all_loaded then
@@ -120,6 +184,8 @@ function Layout:open_files(callback)
               ---@cast callback -?
               callback()
             end
+
+            self.emitter:emit("files_opened")
           end
         end)
       end
@@ -133,6 +199,8 @@ function Layout:open_files(callback)
       ---@cast callback -?
       callback()
     end
+
+    self.emitter:emit("files_opened")
   end
 end
 
@@ -225,7 +293,7 @@ function Layout:update_windows()
       end
 
       if win.id ~= curwin then
-        vim.cmd("do <nomodeline> WinLeave")
+        api.nvim_exec_autocmds("WinLeave", { modeline = false })
       end
     end)
   end

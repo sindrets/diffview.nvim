@@ -1,29 +1,23 @@
 local Window = require("diffview.scene.window").Window
-local Diff2 = require("diffview.scene.layouts.diff_2").Diff2
+local Diff3 = require("diffview.scene.layouts.diff_3").Diff3
 local oop = require("diffview.oop")
 
 local api = vim.api
 local M = {}
 
----@class Diff2Ver : Diff2
+---@class Diff3Ver : Diff3
 ---@field a Window
 ---@field b Window
-local Diff2Ver = oop.create_class("Diff2Ver", Diff2)
+---@field c Window
+local Diff3Ver = oop.create_class("Diff3Ver", Diff3)
 
----@class Diff2Hor.init.Opt
----@field a git.File
----@field b git.File
----@field winid_a integer
----@field winid_b integer
-
----@param opt Diff2Hor.init.Opt
-function Diff2Ver:init(opt)
-  Diff2Ver:super().init(self, opt)
+function Diff3Ver:init(opt)
+  Diff3Ver:super().init(self, opt)
 end
 
 ---@override
 ---@param pivot integer?
-function Diff2Ver:create(pivot)
+function Diff3Ver:create(pivot)
   local curwin
 
   pivot = pivot or self:find_pivot()
@@ -57,11 +51,22 @@ function Diff2Ver:create(pivot)
     end
   end)
 
+  api.nvim_win_call(pivot, function()
+    vim.cmd("aboveleft sp")
+    curwin = api.nvim_get_current_win()
+
+    if self.c then
+      self.c:set_id(curwin)
+    else
+      self.c = Window({ id = curwin })
+    end
+  end)
+
   api.nvim_win_close(pivot, true)
-  self.windows = { self.a, self.b }
+  self.windows = { self.a, self.b, self.c }
   self:open_null()
   self:open_files()
 end
 
-M.Diff2Ver = Diff2Ver
+M.Diff3Ver = Diff3Ver
 return M

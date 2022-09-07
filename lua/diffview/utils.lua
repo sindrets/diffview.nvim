@@ -174,6 +174,13 @@ function M.sign(n)
   return (n > 0 and 1 or 0) - (n < 0 and 1 or 0)
 end
 
+---Replace termcodes.
+---@param s string
+---@return string
+function M.t(s)
+  return api.nvim_replace_termcodes(s, true, true, true) --[[@as string ]]
+end
+
 ---@param s string
 ---@param min_size integer
 ---@param fill string? (default: `" "`)
@@ -518,7 +525,10 @@ function M.set_local(winids, option_map, opt)
 
           elseif o.method == "append" then
             if is_list_like then
-              vim.opt_local[fullname] = ("%s%s"):format(cur_value ~= "" and cur_value .. ",", value)
+              vim.opt_local[fullname] = ("%s%s"):format(
+                cur_value ~= "" and cur_value .. "," or "",
+                value
+              )
             else
               vim.opt_local[fullname]:append(value)
             end
@@ -634,6 +644,43 @@ function M.tbl_access(t, table_path)
   end
 
   return cur
+end
+
+---Deep extend a table, and also perform a union on all sub-tables.
+---@param t table
+---@param ... table
+---@return table
+function M.tbl_deep_union_extend(t, ...)
+  local res = M.tbl_clone(t)
+
+  local function recurse(ours, theirs)
+    -- Get the union of the two tables
+    local sub = M.vec_union(ours, theirs)
+
+    for k, v in pairs(ours) do
+      if type(k) ~= "number" then
+        sub[k] = v
+      end
+    end
+
+    for k, v in pairs(theirs) do
+      if type(k) ~= "number" then
+        if type(v) == "table" then
+          sub[k] = recurse(sub[k] or {}, v)
+        else
+          sub[k] = v
+        end
+      end
+    end
+
+    return sub
+  end
+
+  for _, theirs in ipairs({ ... }) do
+    res = recurse(res, theirs)
+  end
+
+  return res
 end
 
 ---Perform a map and also filter out index values that would become `nil`.
@@ -845,6 +892,62 @@ function M.vec_remove(t, v)
   end
 
   return false
+end
+
+---Non-mutative vector sort.
+---@generic T
+---@param t vector<T>
+---@param comparator? fun(a: T, b: T):boolean
+function M.vec_sort(t, comparator)
+  local ret = M.tbl_clone(t)
+  table.sort(ret, comparator)
+
+  return ret
+end
+
+---@class utils.buf_search.Opt
+---@field reverse boolean
+
+---@param bufnr integer
+---@param pattern string
+---@param opt? utils.buf_search.Opt
+function M.buf_search(bufnr, pattern, opt)
+  opt = opt or {}
+  local ret = {}
+
+  api.nvim_buf_call(bufnr, function()
+    local flags = ("n%s"):format(
+      opt.reverse and "b" or ""
+    )
+    local pos = vim.fn.searchpos(pattern, flags)
+
+    if not (pos[1] == 0 and pos[2] == 0) then
+      ret.pos = pos --[[@as integer[] ]]
+      local ok, count = pcall(vim.fn.searchcount, {
+        pattern = pattern,
+        maxcount = 10000,
+        pos = { pos[1], pos[2], 0 },
+      })
+
+      if not ok or vim.tbl_isempty(count) then
+        return
+      end
+
+      ret.count = count
+
+      local total = count.total
+      local current = count.current
+
+      if count.incomplete == 2 then
+        total = ">" .. count.maxcount
+        if current > count.maxcount then current = total end
+      end
+
+      ret.s_count = ("[%s/%s]"):format(current, total)
+    end
+  end)
+
+  return ret
 end
 
 ---@class ListBufsSpec
