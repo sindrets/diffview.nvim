@@ -216,7 +216,7 @@ require("diffview").setup({
     },
   },
   commit_log_panel = {
-    win_config = {
+    win_config = {   -- See ':h diffview-config-win_config'
       win_opts = {},
     }
   },

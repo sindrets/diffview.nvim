@@ -447,9 +447,8 @@ win_config                                      *diffview-config-win_config*
                 Default: `0`
 
             {win_opts} (table)
-                Any vim options to set for the local window (see |vim.opt_local|).
-                You don't have to copy all the defaults, just specify any
-                values you want to set/override.
+                Table of window local options (see |vim.opt_local|).
+                These options are applied whenever the window is opened.
 
             NOTE: Fields that are only applicable when `type="float"` are not
             listed here because they are already documented under

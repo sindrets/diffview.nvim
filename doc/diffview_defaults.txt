@@ -53,6 +53,7 @@ require("diffview").setup({
     win_config = {                      -- See |diffview-config-win_config|
       position = "left",
       width = 35,
+      win_opts = {},
     },
   },
   file_history_panel = {
@@ -67,6 +68,7 @@ require("diffview").setup({
     win_config = {    -- See |diffview-config-win_config|
       position = "bottom",
       height = 16,
+      win_opts = {},
     },
   },
   commit_log_panel = {
