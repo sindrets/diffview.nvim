@@ -1554,10 +1554,10 @@ end
 ---@return boolean
 function M.show_untracked(toplevel)
   local out = M.exec_sync(
-    { "config", "--type=bool", "status.showUntrackedFiles" },
+    { "config", "status.showUntrackedFiles" },
     { cwd = toplevel, silent = true }
   )
-  return vim.trim(out[1] or "") ~= "false"
+  return vim.trim(out[1] or "") ~= "no"
 end
 
 ---Get the diff status letter for a file for a given rev.

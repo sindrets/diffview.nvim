@@ -86,8 +86,8 @@ function M.diffview_open(args)
     show_untracked = arg_parser.ambiguous_bool(
       argo:get_flag({ "u", "untracked-files" }, { plain = true }),
       nil,
-      { "all", "normal", "true" },
-      { "no", "false" }
+      { "all", "normal" },
+      { "no" }
     ),
     selected_file = argo:get_flag("selected-file", { no_empty = true, expand = true })
       or (vim.bo.buftype == "" and pl:vim_expand("%:p"))
