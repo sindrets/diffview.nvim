@@ -96,9 +96,19 @@ function File:destroy(force)
 end
 
 function File:post_buf_created()
-  api.nvim_buf_call(self.bufnr, function()
-    DiffviewGlobal.emitter:emit("diff_buf_read", self.bufnr)
-  end)
+  local view = require("diffview.lib").get_current_view()
+
+  if view then
+    view.emitter:on("diff_buf_win_enter", function(bufnr, winid)
+      if bufnr == self.bufnr then
+        api.nvim_win_call(winid, function()
+          DiffviewGlobal.emitter:emit("diff_buf_read", self.bufnr)
+        end)
+
+        return true
+      end
+    end)
+  end
 end
 
 ---@param callback function

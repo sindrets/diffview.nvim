@@ -32,34 +32,32 @@ return function(view)
       end
     end,
     diff_buf_read = function(bufnr)
-      view.emitter:once("diff_buf_win_enter", function()
-        -- Set the cursor at the beginning of the -L range if possible.
+      -- Set the cursor at the beginning of the -L range if possible.
 
-        local log_options = view.panel:get_log_options()
-        local cur = view.panel:cur_file()
+      local log_options = view.panel:get_log_options()
+      local cur = view.panel:cur_file()
 
-        if log_options.L[1] and bufnr == cur.layout:get_main_win().file.bufnr then
-          for _, value in ipairs(log_options.L) do
-            local l1, lpath = value:match("^(%d+),.*:(.*)")
+      if log_options.L[1] and bufnr == cur.layout:get_main_win().file.bufnr then
+        for _, value in ipairs(log_options.L) do
+          local l1, lpath = value:match("^(%d+),.*:(.*)")
 
-            if l1 then
-              l1 = tonumber(l1)
-              lpath = utils.path:chain(lpath)
-                  :normalize({ cwd = view.git_ctx.toplevel, absolute = true })
-                  :relative(view.git_ctx.toplevel)
-                  :get()
+          if l1 then
+            l1 = tonumber(l1)
+            lpath = utils.path:chain(lpath)
+                :normalize({ cwd = view.git_ctx.toplevel, absolute = true })
+                :relative(view.git_ctx.toplevel)
+                :get()
 
-              if lpath == cur.path then
-                utils.set_cursor(0, l1, 0)
-                vim.cmd("norm! zt")
-                break
-              end
+            if lpath == cur.path then
+              utils.set_cursor(0, l1, 0)
+              vim.cmd("norm! zt")
+              break
             end
           end
-        else
-          utils.set_cursor(0, 1, 0)
         end
-      end)
+      else
+        utils.set_cursor(0, 1, 0)
+      end
     end,
     open_in_diffview = function()
       if view.panel:is_focused() then

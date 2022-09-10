@@ -278,13 +278,12 @@ function Layout:detach_files()
   end
 end
 
----Reapply window local options, and sync the scrollbind.
+---Sync the scrollbind.
 function Layout:update_windows()
   local curwin = api.nvim_get_current_win()
   local main = self:get_main_win()
 
   for _, win in ipairs(self.windows) do
-    win:apply_file_winopts()
     api.nvim_win_call(win.id, function()
       if win == main then
         -- Scroll to trigger the scrollbind and sync the windows. This works more

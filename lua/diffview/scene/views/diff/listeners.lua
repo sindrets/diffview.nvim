@@ -42,16 +42,14 @@ return function(view)
       end
     end,
     diff_buf_read = function(_)
-      view.emitter:once("diff_buf_win_enter", function()
-        utils.set_cursor(0, 1, 0)
+      utils.set_cursor(0, 1, 0)
 
-        if view.cur_layout:get_main_win().id == api.nvim_get_current_win() then
-          if view.cur_entry and view.cur_entry.kind == "conflicting" then
-            actions.next_conflict()
-            vim.cmd("norm! zz")
-          end
+      if view.cur_layout:get_main_win().id == api.nvim_get_current_win() then
+        if view.cur_entry and view.cur_entry.kind == "conflicting" then
+          actions.next_conflict()
+          vim.cmd("norm! zz")
         end
-      end)
+      end
     end,
     ---@diagnostic disable-next-line: unused-local
     files_updated = function(files)

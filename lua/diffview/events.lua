@@ -46,7 +46,7 @@ function EventEmitter:on(event, callback)
     type = "normal",
     callback = callback,
     call = function(args)
-      callback(utils.tbl_unpack(args))
+      return callback(utils.tbl_unpack(args))
     end,
   })
 end
@@ -68,7 +68,7 @@ function EventEmitter:once(event, callback)
       if not emitted then
         emitted = true
         self:off(callback, event)
-        callback(utils.tbl_unpack(args))
+        return callback(utils.tbl_unpack(args))
       end
     end,
   })
@@ -81,7 +81,7 @@ function EventEmitter:on_any(callback)
     type = "any",
     callback = callback,
     call = function(event, args)
-      callback(event, args)
+      return callback(event, args)
     end,
   })
 end
@@ -97,7 +97,7 @@ function EventEmitter:once_any(callback)
     call = function(event, args)
       if not emitted then
         emitted = true
-        callback(event, utils.tbl_unpack(args))
+        return callback(event, utils.tbl_unpack(args))
       end
     end,
   })
@@ -153,14 +153,14 @@ function EventEmitter:emit(event, ...)
     local args = utils.tbl_pack(...)
 
     if type(self.event_map[event]) == "table" then
-      for _, listener in ipairs(self.event_map[event]) do
-        listener.call(args)
-      end
+      self.event_map[event] = utils.tbl_fmap(self.event_map[event], function(listeners)
+        return not listeners.call(args) and listeners or nil
+      end)
     end
 
-    for _, listener in ipairs(self.any_listeners) do
-      listener.call(event, args)
-    end
+    self.any_listeners = utils.tbl_fmap(self.any_listeners, function(listeners)
+      return not listeners.call(event, args) and listeners or nil
+    end)
   end
 end
 
@@ -173,14 +173,14 @@ function EventEmitter:nore_emit(event, ...)
     local args = utils.tbl_pack(...)
 
     if type(self.event_map[event]) == "table" then
-      for _, listener in ipairs(self.event_map[event]) do
-        listener.call(args)
-      end
+      self.event_map[event] = utils.tbl_fmap(self.event_map[event], function(listeners)
+        return not listeners.call(args) and listeners or nil
+      end)
     end
 
-    for _, listener in ipairs(self.any_listeners) do
-      listener.call(event, args)
-    end
+    self.any_listeners = utils.tbl_fmap(self.any_listeners, function(listeners)
+      return not listeners.call(event, args) and listeners or nil
+    end)
 
     self.emit_lock[event] = false
   end
