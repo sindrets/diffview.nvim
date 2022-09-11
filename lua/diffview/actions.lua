@@ -178,11 +178,7 @@ function M.next_conflict()
 
         api.nvim_win_call(main.id, function()
           api.nvim_win_set_cursor(main.id, { next_conflict.first, 0 })
-
-          if curwin ~= main.id then
-            -- HACK: Trigger sync for the scrollbind + cursorbind
-            vim.cmd([[exe "norm! \<c-e>\<c-y>"]])
-          end
+          if curwin ~= main.id then view.cur_layout:sync_scroll() end
         end)
 
         api.nvim_echo({{ ("Conflict [%d/%d]"):format(next_idx, #conflicts) }}, false, {})
@@ -213,11 +209,7 @@ function M.prev_conflict()
 
         api.nvim_win_call(main.id, function()
           api.nvim_win_set_cursor(main.id, { prev_conflict.first, 0 })
-
-          if curwin ~= main.id then
-            -- HACK: Trigger sync for the scrollbind + cursorbind
-            vim.cmd([[exe "norm! \<c-e>\<c-y>"]])
-          end
+          if curwin ~= main.id then view.cur_layout:sync_scroll() end
         end)
 
         api.nvim_echo({{ ("Conflict [%d/%d]"):format(prev_idx, #conflicts) }}, false, {})
@@ -463,13 +455,7 @@ function M.cycle_layout()
 
     cur_file.layout.emitter:once("files_opened", function()
       utils.set_cursor(main.id, unpack(pos))
-
-      if not was_focused then
-        api.nvim_win_call(main.id, function()
-          -- HACK: Trigger sync for the scrollbind + cursorbind
-          vim.cmd([[exe "norm! \<c-e>\<c-y>"]])
-        end)
-      end
+      if not was_focused then view.cur_layout:sync_scroll() end
     end)
 
     view:set_file(cur_file, false)

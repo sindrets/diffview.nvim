@@ -178,7 +178,7 @@ function Layout:open_files(callback)
               win:open_file()
             end
 
-            self:update_windows()
+            self:sync_scroll()
 
             if vim.is_callable(callback) then
               ---@cast callback -?
@@ -193,7 +193,7 @@ function Layout:open_files(callback)
   end
 
   if all_loaded then
-    self:update_windows()
+    self:sync_scroll()
 
     if vim.is_callable(callback) then
       ---@cast callback -?
@@ -279,13 +279,18 @@ function Layout:detach_files()
 end
 
 ---Sync the scrollbind.
-function Layout:update_windows()
+function Layout:sync_scroll()
   local curwin = api.nvim_get_current_win()
-  local main = self:get_main_win()
+  local target, max = nil, 0
+
+  for _, win in ipairs(self.windows) do
+    local lcount = api.nvim_buf_line_count(win.file.bufnr)
+    if lcount > max then target, max = win, lcount end
+  end
 
   for _, win in ipairs(self.windows) do
     api.nvim_win_call(win.id, function()
-      if win == main then
+      if win == target then
         -- Scroll to trigger the scrollbind and sync the windows. This works more
         -- consistently than calling `:syncbind`.
         vim.cmd([[exe "norm! \<c-e>\<c-y>"]])
