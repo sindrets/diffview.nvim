@@ -1283,6 +1283,18 @@ LogOptions                                      *diffview.git.LogOptions*
             NOTE: All these options are described in far more detail in the
             man page for git-log. See `:Man git-log(1)` for more information.
 
+            {base} (string)
+                Specify a base git rev from which the right side of the diff
+                will be created. Use the special value `LOCAL` to use the
+                local version of the file.
+
+            {rev_range} (string)
+                List only the commits in the specified revision range.
+
+            {path_args} (string[])
+                Limit the target files to only the files matching the given
+                path arguments (git pathspec is supported).
+
             {follow} (boolean)
                 Follow renames (only for single file).
 
@@ -1307,9 +1319,6 @@ LogOptions                                      *diffview.git.LogOptions*
 
             {reverse} (boolean)
                 List commits in reverse order.
-
-            {rev_range} (string)
-                List only the commits in the specified revision range.
 
             {max_count} (integer)
                 Limit the number of commits.

@@ -1,14 +1,17 @@
-local config = require("diffview.config")
-local oop = require("diffview.oop")
-local utils = require("diffview.utils")
-local debounce = require("diffview.debounce")
-local git = require("diffview.git.utils")
-local renderer = require("diffview.renderer")
-local logger = require("diffview.logger")
-local PerfTimer = require("diffview.perf").PerfTimer
-local Panel = require("diffview.ui.panel").Panel
-local LogEntry = require("diffview.git.log_entry").LogEntry
-local FHOptionPanel = require("diffview.scene.views.file_history.option_panel").FHOptionPanel
+local lazy = require("diffview.lazy")
+
+local FHOptionPanel = lazy.access("diffview.scene.views.file_history.option_panel", "FHOptionPanel") ---@type FHOptionPanel|LazyModule
+local LogEntry = lazy.access("diffview.git.log_entry", "LogEntry") ---@type LogEntry|LazyModule
+local Panel = lazy.access("diffview.ui.panel", "Panel") ---@type Panel|LazyModule
+local PerfTimer = lazy.access("diffview.perf", "PerfTimer") ---@type PerfTimer|LazyModule
+local config = lazy.require("diffview.config") ---@module "diffview.config"
+local debounce = lazy.require("diffview.debounce") ---@module "diffview.debounce"
+local git = lazy.require("diffview.git.utils") ---@module "diffview.git.utils"
+local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
+local oop = lazy.require("diffview.oop") ---@module "diffview.oop"
+local panel_renderer = lazy.require("diffview.scene.views.file_history.render") ---@module "diffview.scene.views.file_history.render"
+local renderer = lazy.require("diffview.renderer") ---@module "diffview.renderer"
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local JobStatus = git.JobStatus
 local api = vim.api
@@ -23,9 +26,6 @@ local perf_update = PerfTimer("[FileHistoryPanel] update")
 ---@field parent FileHistoryView
 ---@field git_ctx GitContext
 ---@field entries LogEntry[]
----@field path_args string[]
----@field raw_args string[]
----@field base Rev
 ---@field rev_range RevRange
 ---@field log_options ConfigLogOptions
 ---@field cur_item {[1]: LogEntry, [2]: FileEntry}
@@ -37,7 +37,7 @@ local perf_update = PerfTimer("[FileHistoryPanel] update")
 ---@field option_mapping string
 ---@field components CompStruct
 ---@field constrain_cursor function
-local FileHistoryPanel = oop.create_class("FileHistoryPanel", Panel)
+local FileHistoryPanel = oop.create_class("FileHistoryPanel", Panel.__get())
 
 FileHistoryPanel.winopts = vim.tbl_extend("force", Panel.winopts, {
   cursorline = true,
@@ -60,10 +60,7 @@ FileHistoryPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 ---@field parent FileHistoryView
 ---@field git_ctx GitContext
 ---@field entries LogEntry[]
----@field path_args string[]
----@field raw_args string[]
 ---@field log_options LogOptions
----@field base Rev
 
 ---FileHistoryPanel constructor.
 ---@param opt FileHistoryPanel.init.Opt
@@ -78,9 +75,6 @@ function FileHistoryPanel:init(opt)
   self.parent = opt.parent
   self.git_ctx = opt.git_ctx
   self.entries = opt.entries
-  self.path_args = opt.path_args
-  self.raw_args = opt.raw_args
-  self.base = opt.base
   self.cur_item = {}
   self.single_file = opt.entries[1] and opt.entries[1].single_file
   self.option_panel = FHOptionPanel(self)
@@ -205,6 +199,7 @@ function FileHistoryPanel:update_entries(callback)
 
         self:render()
         self:redraw()
+        self.option_panel:sync()
         callback(nil, JobStatus.ERROR, msg)
       end)
 
@@ -216,6 +211,7 @@ function FileHistoryPanel:update_entries(callback)
         -- The parent view has closed: shutdown git jobs and clean up.
         finalizer()
         update:close()
+        vim.schedule(function() self.option_panel:sync() end)
         callback(nil, JobStatus.KILLED)
         return
       end
@@ -266,6 +262,7 @@ function FileHistoryPanel:update_entries(callback)
 
       if (was_empty or status == JobStatus.SUCCESS) and type(callback) == "function" then
         vim.cmd("redraw")
+        self.option_panel:sync()
         callback(entries, status)
       end
 
@@ -277,18 +274,15 @@ function FileHistoryPanel:update_entries(callback)
     entry:destroy()
   end
 
+  panel_renderer.clear_cache(self)
   self.cur_item = {}
   self.entries = {}
   self.updating = true
 
   finalizer = git.file_history(
     self.git_ctx,
-    self.path_args,
     self.log_options,
-    {
-      base = self.base,
-      default_layout = self.parent.get_default_diff2(),
-    },
+    { default_layout = self.parent.get_default_diff2(), },
     update
   )
 
@@ -369,7 +363,7 @@ end
 function FileHistoryPanel:set_entry_from_file(item)
   local file = self.cur_item[2]
 
-  if item:instanceof(LogEntry) then
+  if item:instanceof(LogEntry.__get()) then
     self:set_cur_item({ item, item.files[1] })
   else
     local entry = self:find_entry(file)
@@ -449,7 +443,7 @@ end
 function FileHistoryPanel:highlight_item(item)
   if not (self:is_open() and self:buf_loaded()) then return end
 
-  if item:instanceof(LogEntry) then
+  if item:instanceof(LogEntry.__get()) then
     for _, comp_struct in ipairs(self.components.log.entries) do
       if comp_struct.comp.context == item then
         pcall(api.nvim_win_set_cursor, self.winid, { comp_struct.comp.lstart, 0 })
@@ -519,7 +513,7 @@ end
 
 function FileHistoryPanel:render()
   perf_render:reset()
-  require("diffview.scene.views.file_history.render").file_history_panel(self)
+  panel_renderer.file_history_panel(self)
   perf_render:time()
   logger.lvl(10).s_debug(perf_render)
 end

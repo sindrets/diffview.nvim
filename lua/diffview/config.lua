@@ -3,28 +3,17 @@ local EventEmitter = require("diffview.events").EventEmitter
 local actions = require("diffview.actions")
 local lazy = require("diffview.lazy")
 
----@module "diffview.utils"
-local utils = lazy.require("diffview.utils")
----@type Diff1|LazyModule
-local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1")
----@type Diff2|LazyModule
-local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2")
----@type Diff2Hor|LazyModule
-local Diff2Hor = lazy.access("diffview.scene.layouts.diff_2_hor", "Diff2Hor")
----@type Diff2Ver|LazyModule
-local Diff2Ver = lazy.access("diffview.scene.layouts.diff_2_ver", "Diff2Ver")
----@type Diff3|LazyModule
-local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3")
----@type Diff3Hor|LazyModule
-local Diff3Hor = lazy.access("diffview.scene.layouts.diff_3_hor", "Diff3Hor")
----@type Diff3Hor|LazyModule
-local Diff3Ver = lazy.access("diffview.scene.layouts.diff_3_ver", "Diff3Ver")
----@type Diff3Mixed|LazyModule
-local Diff3Mixed = lazy.access("diffview.scene.layouts.diff_3_mixed", "Diff3Mixed")
----@type Diff4|LazyModule
-local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4")
----@type Diff4Mixed|LazyModule
-local Diff4Mixed = lazy.access("diffview.scene.layouts.diff_4_mixed", "Diff4Mixed")
+local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1") ---@type Diff1|LazyModule
+local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2") ---@type Diff2|LazyModule
+local Diff2Hor = lazy.access("diffview.scene.layouts.diff_2_hor", "Diff2Hor") ---@type Diff2Hor|LazyModule
+local Diff2Ver = lazy.access("diffview.scene.layouts.diff_2_ver", "Diff2Ver") ---@type Diff2Ver|LazyModule
+local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3") ---@type Diff3|LazyModule
+local Diff3Hor = lazy.access("diffview.scene.layouts.diff_3_hor", "Diff3Hor") ---@type Diff3Hor|LazyModule
+local Diff3Mixed = lazy.access("diffview.scene.layouts.diff_3_mixed", "Diff3Mixed") ---@type Diff3Mixed|LazyModule
+local Diff3Ver = lazy.access("diffview.scene.layouts.diff_3_ver", "Diff3Ver") ---@type Diff3Hor|LazyModule
+local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4") ---@type Diff4|LazyModule
+local Diff4Mixed = lazy.access("diffview.scene.layouts.diff_4_mixed", "Diff4Mixed") ---@type Diff4Mixed|LazyModule
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local M = {}
 
@@ -218,6 +207,8 @@ M._config = M.defaults
 ---@field grep string
 ---@field diff_merges string
 ---@field rev_range string
+---@field base string
+---@field path_args string[]
 
 ---@type LogOptions
 M.log_option_defaults = {
@@ -230,11 +221,13 @@ M.log_option_defaults = {
   no_merges = false,
   reverse = false,
   rev_range = nil,
+  base = nil,
   max_count = 256,
   L = {},
   diff_merges = nil,
   author = nil,
   grep = nil,
+  path_args = {},
 }
 
 ---@return DiffviewConfig

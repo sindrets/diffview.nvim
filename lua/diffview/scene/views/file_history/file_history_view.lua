@@ -18,26 +18,19 @@ local M = {}
 ---@field git_ctx GitContext
 ---@field panel FileHistoryPanel
 ---@field commit_log_panel CommitLogPanel
----@field path_args string[]
----@field raw_args string[]
 ---@field valid boolean
 local FileHistoryView = oop.create_class("FileHistoryView", StandardView.__get())
 
 function FileHistoryView:init(opt)
   self.valid = false
   self.git_ctx = opt.git_ctx
-  self.path_args = opt.path_args
-  self.raw_args = opt.raw_args
 
   FileHistoryView:super().init(self, {
     panel = FileHistoryPanel({
       parent = self,
       git_ctx = self.git_ctx,
       entries = {},
-      path_args = self.path_args,
-      raw_args = self.raw_args,
       log_options = opt.log_options,
-      base = opt.base,
     }),
   })
 

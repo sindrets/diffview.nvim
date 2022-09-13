@@ -1,11 +1,14 @@
-local EventEmitter = require("diffview.events").EventEmitter
-local JobStatus = require("diffview.git.utils").JobStatus
-local Panel = require("diffview.ui.panel").Panel
-local arg_parser = require("diffview.arg_parser")
-local config = require("diffview.config")
-local diffview = require("diffview")
-local oop = require("diffview.oop")
-local utils = require("diffview.utils")
+local lazy = require("diffview.lazy")
+
+local EventEmitter = lazy.access("diffview.events", "EventEmitter") ---@type EventEmitter|LazyModule
+local JobStatus = lazy.access("diffview.git.utils", "JobStatus") ---@type JobStatus|LazyModule
+local Panel = lazy.access("diffview.ui.panel", "Panel") ---@type Panel|LazyModule
+local arg_parser = lazy.require("diffview.arg_parser") ---@module "diffview.arg_parser"
+local config = lazy.require("diffview.config") ---@module "diffview.config"
+local diffview = lazy.require("diffview") ---@module "diffview"
+local oop = lazy.require("diffview.oop") ---@module "diffview.oop"
+local panel_renderer = lazy.require("diffview.scene.views.file_history.render") ---@module "diffview.scene.views.file_history.render"
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
 local M = {}
@@ -16,7 +19,7 @@ local M = {}
 ---@field render_data RenderData
 ---@field option_state LogOptions
 ---@field components CompStruct
-local FHOptionPanel = oop.create_class("FHOptionPanel", Panel)
+local FHOptionPanel = oop.create_class("FHOptionPanel", Panel.__get())
 
 FHOptionPanel.winopts = vim.tbl_extend("force", Panel.winopts, {
   cursorline = true,
@@ -45,9 +48,9 @@ FHOptionPanel.bufopts = {
 ---@field prompt_fmt string
 ---@field select string[]
 ---@field completion string|fun(panel: FHOptionPanel): function
----@field transform fun(values: string[]): any
----@field render_value fun(option: FlagOption, value: string|string[]): boolean, string
----@field render_default fun(options: FlagOption, value: string|string[]): string
+---@field transform fun(values: string[]): any # Transform the values given by the user.
+---@field render_value fun(option: FlagOption, value: string|string[]): boolean, string # Render the flag value in the panel.
+---@field render_default fun(options: FlagOption, value: string|string[]): string # Render the default text for the input().
 
 FHOptionPanel.flags = {
   ---@type FlagOption[]
@@ -77,6 +80,19 @@ FHOptionPanel.flags = {
         end
       end,
     },
+    {
+      "=b", "++base=", "Set the base revision",
+      ---@param panel FHOptionPanel
+      completion = function(panel)
+        return function(arg_lead, _, _)
+          local view = panel.parent.parent
+          return utils.vec_join("LOCAL", diffview.rev_completion(arg_lead, {
+            git_toplevel = view.git_ctx.toplevel,
+            git_dir = view.git_ctx.dir,
+          }))
+        end
+      end,
+    },
     { "=n", "--max-count=", "Limit the number of commits" },
     {
       "=L", "-L", "Trace line evolution",
@@ -90,11 +106,7 @@ FHOptionPanel.flags = {
       transform = function(values)
         return utils.tbl_fmap(values, function(v)
           v = utils.str_match(v, { "^-L(.*)", ".*" })
-
-          if v == "" then
-            return nil
-          end
-
+          if v == "" then return nil end
           return v
         end)
       end,
@@ -143,6 +155,51 @@ FHOptionPanel.flags = {
     },
     { "=a", "--author=", "List only commits from a given author", prompt_label = "(Extended regular expression)" },
     { "=g", "--grep=", "Filter commit messages", prompt_label = "(Extended regular expression)" },
+    {
+      "--", "--", "Limit to files",
+      key = "path_args",
+      prompt_label = "(Path arguments)",
+      prompt_fmt = "${label}${flag_name} ",
+      transform = function(values)
+        return utils.tbl_fmap(values, function(v)
+          if v == "" then return nil end
+          return v
+        end)
+      end,
+      render_value = function(_, value)
+        if #value == 0 then
+          -- Just render the flag name
+          return true, "--"
+        end
+
+        -- Render a string of quoted args
+        return false, table.concat(utils.vec_join(
+          "--",
+          vim.tbl_map(function(v)
+            v = v:gsub("\\", "\\\\")
+            return utils.str_quote(v, { only_if_whitespace = true })
+          end, value)
+        ), " ")
+      end,
+      completion = function(_)
+        return function(_, cmd_line, cur_pos)
+          local ok, args, argidx = pcall(arg_parser.scan_sh_args, cmd_line, cur_pos)
+
+          if ok then
+            local quoted = vim.tbl_map(function(v)
+              return utils.str_quote(v, { only_if_whitespace = true })
+            end, args)
+
+            return vim.tbl_map(function(v)
+              return table.concat(utils.vec_join(
+                utils.vec_slice(quoted, 1, argidx - 1),
+                utils.str_quote(v, { only_if_whitespace = true })
+              ), " ")
+            end, vim.fn.getcompletion(args[argidx] or "", "file"))
+          end
+        end
+      end,
+    },
   },
 }
 
@@ -151,7 +208,7 @@ for _, list in pairs(FHOptionPanel.flags) do
     option = vim.tbl_extend("keep", option, {
       prompt_fmt = "${label}${flag_name}",
 
-      key = utils.str_match(option[2], {
+      key = option.key or utils.str_match(option[2], {
         "^%-%-?([^=]+)=?",
         "^%+%+?([^=]+)=?",
       }):gsub("%-", "_"),
@@ -385,7 +442,7 @@ function FHOptionPanel:get_item_at_cursor()
 end
 
 function FHOptionPanel:render()
-  require("diffview.scene.views.file_history.render").fh_option_panel(self)
+  panel_renderer.fh_option_panel(self)
 end
 
 M.FHOptionPanel = FHOptionPanel

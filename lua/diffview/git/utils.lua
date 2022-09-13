@@ -510,10 +510,17 @@ M.diff_file_list = async.wrap(function(ctx, left, right, path_args, dv_opt, opt,
   callback(nil, files)
 end, 7)
 
+---@class git.utils.PreparedLogOpts
+---@field rev_range Rev
+---@field base Rev
+---@field path_args string[]
+---@field flags string[]
+
+---@param toplevel string
 ---@param log_options LogOptions
 ---@param single_file boolean
----@return string[]
-local function prepare_fh_options(log_options, single_file)
+---@return git.utils.PreparedLogOpts
+local function prepare_fh_options(toplevel, log_options, single_file)
   local o = log_options
   local line_trace = vim.tbl_map(function(v)
     if not v:match("^-L") then
@@ -522,21 +529,52 @@ local function prepare_fh_options(log_options, single_file)
     return v
   end, o.L or {})
 
-  return utils.vec_join(
-    line_trace,
-    (o.follow and single_file) and { "--follow" } or nil,
-    o.first_parent and { "--first-parent" } or nil,
-    o.show_pulls and { "--show-pulls" } or nil,
-    o.reflog and { "--reflog" } or nil,
-    o.all and { "--all" } or nil,
-    o.merges and { "--merges" } or nil,
-    o.no_merges and { "--no-merges" } or nil,
-    o.reverse and { "--reverse" } or nil,
-    o.max_count and { "-n" .. o.max_count } or nil,
-    o.diff_merges and { "--diff-merges=" .. o.diff_merges } or nil,
-    o.author and { "-E", "--author=" .. o.author } or nil,
-    o.grep and { "-E", "--grep=" .. o.grep } or nil
-  )
+  local rev_range, base
+
+  if log_options.rev_range then
+    local ok, out = M.verify_rev_arg(toplevel, log_options.rev_range)
+
+    if not ok then
+      utils.warn(("Bad range revision, ignoring: %s"):format(utils.str_quote(log_options.rev_range)))
+    else
+      rev_range = Rev(RevType.COMMIT, out[1])
+    end
+  end
+
+  if log_options.base then
+    if log_options.base == "LOCAL" then
+      base = Rev(RevType.LOCAL)
+    else
+      local ok, out = M.verify_rev_arg(toplevel, log_options.base)
+
+      if not ok then
+        utils.warn(("Bad base revision, ignoring: %s"):format(utils.str_quote(log_options.base)))
+      else
+        base = Rev(RevType.COMMIT, out[1])
+      end
+    end
+  end
+
+  return {
+    rev_range = rev_range,
+    base = base,
+    path_args = log_options.path_args,
+    flags = utils.vec_join(
+      line_trace,
+      (o.follow and single_file) and { "--follow" } or nil,
+      o.first_parent and { "--first-parent" } or nil,
+      o.show_pulls and { "--show-pulls" } or nil,
+      o.reflog and { "--reflog" } or nil,
+      o.all and { "--all" } or nil,
+      o.merges and { "--merges" } or nil,
+      o.no_merges and { "--no-merges" } or nil,
+      o.reverse and { "--reverse" } or nil,
+      o.max_count and { "-n" .. o.max_count } or nil,
+      o.diff_merges and { "--diff-merges=" .. o.diff_merges } or nil,
+      o.author and { "-E", "--author=" .. o.author } or nil,
+      o.grep and { "-E", "--grep=" .. o.grep } or nil
+    )
+  }
 end
 
 local function structure_fh_data(namestat_data, numstat_data)
@@ -557,13 +595,9 @@ local function structure_fh_data(namestat_data, numstat_data)
   }
 end
 
----@param toplevel string
----@param path_args string[]
----@param single_file boolean
----@param log_opt LogOptions
+---@param state git.utils.FHState
 ---@param callback fun(status: JobStatus, data?: table, msg?: string[])
-local incremental_fh_data = async.void(function(toplevel, path_args, single_file, log_opt, callback)
-  local options = prepare_fh_options(log_opt, single_file)
+local incremental_fh_data = async.void(function(state, callback)
   local raw = {}
   local namestat_job, numstat_job, shutdown
 
@@ -579,20 +613,20 @@ local incremental_fh_data = async.void(function(toplevel, path_args, single_file
   }
 
   local function on_stdout(_, line, j)
-    local state = j == namestat_job and namestat_state or numstat_state
+    local handler_state = j == namestat_job and namestat_state or numstat_state
 
     if line == "\0" then
-      if state.idx > 0 then
-        if not raw[state.idx] then
-          raw[state.idx] = {}
+      if handler_state.idx > 0 then
+        if not raw[handler_state.idx] then
+          raw[handler_state.idx] = {}
         end
 
-        raw[state.idx][state.key] = state.data
+        raw[handler_state.idx][handler_state.key] = handler_state.data
 
-        if not shutdown and raw[state.idx].namestat and raw[state.idx].numstat then
+        if not shutdown and raw[handler_state.idx].namestat and raw[handler_state.idx].numstat then
           shutdown = callback(
             JobStatus.PROGRESS,
-            structure_fh_data(raw[state.idx].namestat, raw[state.idx].numstat)
+            structure_fh_data(raw[handler_state.idx].namestat, raw[handler_state.idx].numstat)
           )
 
           if shutdown then
@@ -604,10 +638,10 @@ local incremental_fh_data = async.void(function(toplevel, path_args, single_file
           end
         end
       end
-      state.idx = state.idx + 1
-      state.data = {}
+      handler_state.idx = handler_state.idx + 1
+      handler_state.data = {}
     elseif line ~= "" then
-      table.insert(state.data, line)
+      table.insert(handler_state.data, line)
     end
   end
 
@@ -621,20 +655,22 @@ local incremental_fh_data = async.void(function(toplevel, path_args, single_file
     latch:count_down()
   end
 
+  local rev_range = state.prepared_log_opts.rev_range
+
   namestat_job = Job:new({
     command = git_bin(),
     args = utils.vec_join(
       git_args(),
       "log",
-      log_opt.rev_range,
+      rev_range and rev_range:object_name() or nil,
       "--pretty=format:%x00%n%H %P%n%an%n%ad%n%ar%n  %s",
       "--date=raw",
       "--name-status",
-      options,
+      state.prepared_log_opts.flags,
       "--",
-      path_args
+      state.path_args
     ),
-    cwd = toplevel,
+    cwd = state.ctx.toplevel,
     on_stdout = on_stdout,
     on_exit = on_exit,
   })
@@ -644,15 +680,15 @@ local incremental_fh_data = async.void(function(toplevel, path_args, single_file
     args = utils.vec_join(
       git_args(),
       "log",
-      log_opt.rev_range,
+      rev_range and rev_range:object_name() or nil,
       "--pretty=format:%x00",
       "--date=raw",
       "--numstat",
-      options,
+      state.prepared_log_opts.flags,
       "--",
-      path_args
+      state.path_args
     ),
-    cwd = toplevel,
+    cwd = state.ctx.toplevel,
     on_stdout = on_stdout,
     on_exit = on_exit,
   })
@@ -683,11 +719,9 @@ local incremental_fh_data = async.void(function(toplevel, path_args, single_file
   end
 end)
 
----@param toplevel string
----@param log_opt LogOptions
+---@param state git.utils.FHState
 ---@param callback fun(status: JobStatus, data?: table, msg?: string[])
-local incremental_line_trace_data = async.void(function(toplevel, log_opt, callback)
-  local options = prepare_fh_options(log_opt, true)
+local incremental_line_trace_data = async.void(function(state, callback)
   local raw = {}
   local trace_job, shutdown
 
@@ -737,21 +771,23 @@ local incremental_line_trace_data = async.void(function(toplevel, log_opt, callb
     latch:count_down()
   end
 
+  local rev_range = state.prepared_log_opts.rev_range
+
   trace_job = Job:new({
     command = git_bin(),
     args = utils.vec_join(
       git_args(),
       "-P",
       "log",
-      log_opt.rev_range,
+      rev_range and rev_range:object_name() or nil,
       "--color=never",
       "--no-ext-diff",
       "--pretty=format:%x00%n%H %P%n%an%n%ad%n%ar%n  %s",
       "--date=raw",
-      options,
+      state.prepared_log_opts.flags,
       "--"
     ),
-    cwd = toplevel,
+    cwd = state.ctx.toplevel,
     on_stdout = on_stdout,
     on_exit = on_exit,
   })
@@ -802,11 +838,12 @@ local function is_single_file(toplevel, path_args, lflags)
   return true
 end
 
----@class git.utils.ParseFHDataSpec
+---@class git.utils.FHState
 ---@field thread thread
 ---@field ctx GitContext
 ---@field path_args string[]
 ---@field log_options LogOptions
+---@field prepared_log_opts git.utils.PreparedLogOpts
 ---@field opt git.utils.FileHistoryWorkerSpec
 ---@field single_file boolean
 ---@field resume_lock boolean
@@ -815,12 +852,10 @@ end
 ---@field entries LogEntry[]
 ---@field callback function
 
----@param state git.utils.ParseFHDataSpec
+---@param state git.utils.FHState
 ---@return boolean ok, JobStatus? status
 local function parse_fh_data(state)
-  local cur, single_file, log_options, ctx, thread, path_args, callback, opt, commit, entries
-      = state.cur, state.single_file, state.log_options, state.ctx, state.thread,
-        state.path_args, state.callback, state.opt, state.commit, state.entries
+  local cur = state.cur
 
   -- 'git log --name-status' doesn't work properly for merge commits. It
   -- lists only an incomplete list of files at best. We need to use 'git
@@ -836,17 +871,17 @@ local function parse_fh_data(state)
         "--format=",
         "--diff-merges=first-parent",
         "--name-status",
-        (single_file and log_options.follow) and "--follow" or nil,
+        (state.single_file and state.log_options.follow) and "--follow" or nil,
         cur.right_hash,
         "--",
-        state.old_path or path_args
+        state.old_path or state.path_args
       ),
-      cwd = ctx.toplevel,
+      cwd = state.ctx.toplevel,
       on_exit = function(j)
         if j.code == 0 then
           cur.namestat = j:result()
         end
-        handle_co(thread, coroutine.resume(thread))
+        handle_co(state.thread, coroutine.resume(state.thread))
       end,
     }
 
@@ -878,7 +913,7 @@ local function parse_fh_data(state)
     state.resume_lock = false
 
     if job.code ~= 0 then
-      callback({}, JobStatus.ERROR, job:stderr_result())
+      state.callback({}, JobStatus.ERROR, job:stderr_result())
       return false, JobStatus.FATAL
     end
 
@@ -900,7 +935,7 @@ local function parse_fh_data(state)
     if name:match("\t") ~= nil then
       oldname = name:match("(.*)\t")
       name = name:gsub("^.*\t", "")
-      if single_file then
+      if state.single_file then
         state.old_path = oldname
       end
     end
@@ -915,41 +950,39 @@ local function parse_fh_data(state)
     end
 
     table.insert(files, FileEntry.for_d2(state.opt.default_layout or Diff2Hor, {
-      git_ctx = ctx,
+      git_ctx = state.ctx,
       path = name,
       oldpath = oldname,
       status = status,
       stats = stats,
       kind = "working",
-      commit = commit,
+      commit = state.commit,
       rev_a = cur.left_hash and Rev(RevType.COMMIT, cur.left_hash) or Rev.new_null_tree(),
-      rev_b = opt.base or Rev(RevType.COMMIT, cur.right_hash),
+      rev_b = state.prepared_log_opts.base or Rev(RevType.COMMIT, cur.right_hash),
     }))
   end
 
   if files[1] then
     table.insert(
-      entries,
+      state.entries,
       LogEntry({
-        path_args = path_args,
-        commit = commit,
+        path_args = state.path_args,
+        commit = state.commit,
         files = files,
-        single_file = single_file,
+        single_file = state.single_file,
       })
     )
 
-    callback(entries, JobStatus.PROGRESS)
+    state.callback(state.entries, JobStatus.PROGRESS)
   end
 
   return true
 end
 
----@param state git.utils.ParseFHDataSpec
+---@param state git.utils.FHState
 ---@return boolean ok
 local function parse_fh_line_trace_data(state)
-  local cur, single_file, ctx, path_args, callback, opt, commit, entries
-      = state.cur, state.single_file, state.ctx, state.path_args, state.callback,
-        state.opt, state.commit, state.entries
+  local cur = state.cur
 
   local files = {}
 
@@ -959,50 +992,48 @@ local function parse_fh_line_trace_data(state)
       local b_path = line:match('.*"? "?b/(.-)"?$')
       local oldpath = a_path ~= b_path and a_path or nil
 
-      if single_file and oldpath then
+      if state.single_file and oldpath then
         state.old_path = oldpath
       end
 
       table.insert(files, FileEntry.for_d2(Diff2Hor, {
-        git_ctx = ctx,
+        git_ctx = state.ctx,
         path = b_path,
         oldpath = oldpath,
         kind = "working",
-        commit = commit,
+        commit = state.commit,
         rev_a = cur.left_hash and Rev(RevType.COMMIT, cur.left_hash) or Rev.new_null_tree(),
-        rev_b = opt.base or Rev(RevType.COMMIT, cur.right_hash),
+        rev_b = state.prepared_log_opts.base or Rev(RevType.COMMIT, cur.right_hash),
       }))
     end
   end
 
   if files[1] then
     table.insert(
-      entries,
+      state.entries,
       LogEntry({
-        path_args = path_args,
-        commit = commit,
+        path_args = state.path_args,
+        commit = state.commit,
         files = files,
-        single_file = single_file,
+        single_file = state.single_file,
       })
     )
 
-    callback(entries, JobStatus.PROGRESS)
+    state.callback(state.entries, JobStatus.PROGRESS)
   end
 
   return true
 end
 
 ---@class git.utils.FileHistoryWorkerSpec : git.utils.LayoutOpt
----@field base Rev
 
 ---@param thread thread
 ---@param ctx GitContext
----@param path_args string[]
 ---@param log_opt ConfigLogOptions
 ---@param opt git.utils.FileHistoryWorkerSpec
 ---@param co_state table
 ---@param callback function
-local function file_history_worker(thread, ctx, path_args, log_opt, opt, co_state, callback)
+local function file_history_worker(thread, ctx, log_opt, opt, co_state, callback)
   ---@type LogEntry[]
   local entries = {}
   local data = {}
@@ -1010,7 +1041,7 @@ local function file_history_worker(thread, ctx, path_args, log_opt, opt, co_stat
   local last_status
   local err_msg
 
-  local single_file = is_single_file(ctx.toplevel, path_args, log_opt.single_file.L)
+  local single_file = is_single_file(ctx.toplevel, log_opt.single_file.path_args, log_opt.single_file.L)
 
   ---@type LogOptions
   local log_options = config.get_log_options(
@@ -1020,12 +1051,13 @@ local function file_history_worker(thread, ctx, path_args, log_opt, opt, co_stat
 
   local is_trace = #log_options.L > 0
 
-  ---@type git.utils.ParseFHDataSpec
+  ---@type git.utils.FHState
   local state = {
     thread = thread,
     ctx = ctx,
-    path_args = path_args,
+    path_args = log_opt.single_file.path_args,
     log_options = log_options,
+    prepared_log_opts = prepare_fh_options(ctx.toplevel, log_options, single_file),
     opt = opt,
     callback = callback,
     entries = entries,
@@ -1052,9 +1084,9 @@ local function file_history_worker(thread, ctx, path_args, log_opt, opt, co_stat
   end
 
   if is_trace then
-    incremental_line_trace_data(ctx.toplevel, log_options, data_callback)
+    incremental_line_trace_data(state, data_callback)
   else
-    incremental_fh_data(ctx.toplevel, path_args, single_file, log_options, data_callback)
+    incremental_fh_data(state, data_callback)
   end
 
   while true do
@@ -1064,7 +1096,7 @@ local function file_history_worker(thread, ctx, path_args, log_opt, opt, co_stat
     end
 
     if last_status == JobStatus.KILLED then
-      logger.lvl(1).debug("File history processing was killed.")
+      logger.warn("File history processing was killed.")
       return
     elseif last_status == JobStatus.ERROR then
       callback(entries, JobStatus.ERROR, err_msg)
@@ -1105,12 +1137,11 @@ local function file_history_worker(thread, ctx, path_args, log_opt, opt, co_stat
 end
 
 ---@param ctx GitContext
----@param path_args string[]
 ---@param log_opt ConfigLogOptions
 ---@param opt git.utils.FileHistoryWorkerSpec
 ---@param callback function
 ---@return fun() finalizer
-function M.file_history(ctx, path_args, log_opt, opt, callback)
+function M.file_history(ctx, log_opt, opt, callback)
   local thread
 
   local co_state = {
@@ -1118,7 +1149,7 @@ function M.file_history(ctx, path_args, log_opt, opt, callback)
   }
 
   thread = coroutine.create(function()
-    file_history_worker(thread, ctx, path_args, log_opt, opt, co_state, callback)
+    file_history_worker(thread, ctx, log_opt, opt, co_state, callback)
   end)
 
   handle_co(thread, coroutine.resume(thread))
@@ -1129,16 +1160,15 @@ function M.file_history(ctx, path_args, log_opt, opt, callback)
 end
 
 ---@param toplevel string
----@param path_args string[]
 ---@param log_opt LogOptions
 ---@return boolean ok, string description
-function M.file_history_dry_run(toplevel, path_args, log_opt)
-  local single_file = is_single_file(toplevel, path_args, log_opt.L)
+function M.file_history_dry_run(toplevel, log_opt)
+  local single_file = is_single_file(toplevel, log_opt.path_args, log_opt.L)
   local log_options = config.get_log_options(single_file, log_opt)
 
   local options = vim.tbl_map(function(v)
     return vim.fn.shellescape(v)
-  end, prepare_fh_options(log_options, single_file)) --[[@as vector ]]
+  end, prepare_fh_options(toplevel, log_options, single_file).flags) --[[@as vector ]]
 
   local description = utils.vec_join(
     ("Top-level path: '%s'"):format(utils.path:vim_fnamemodify(toplevel, ":~")),
@@ -1146,9 +1176,9 @@ function M.file_history_dry_run(toplevel, path_args, log_opt)
     ("Flags: %s"):format(table.concat(options, " "))
   )
 
-  log_options = utils.tbl_clone(log_options)
+  log_options = utils.tbl_clone(log_options) --[[@as LogOptions ]]
   log_options.max_count = 1
-  options = prepare_fh_options(log_options, single_file)
+  options = prepare_fh_options(toplevel, log_options, single_file).flags
 
   local context = "git.utils.file_history_dry_run()"
   local cmd
@@ -1158,7 +1188,7 @@ function M.file_history_dry_run(toplevel, path_args, log_opt)
     -- NOTE: Running the dry-run for line tracing is slow. Just skip for now.
     return true, table.concat(description, ", ")
   else
-    cmd = utils.vec_join("log", "--pretty=format:%H", "--name-status", options, log_options.rev_range, "--", path_args)
+    cmd = utils.vec_join("log", "--pretty=format:%H", "--name-status", options, log_options.rev_range, "--", log_options.path_args)
   end
 
   local out, code = M.exec_sync(cmd, {
@@ -1602,7 +1632,10 @@ end
 ---@param rev_arg string
 ---@return boolean ok, string[] output
 function M.verify_rev_arg(toplevel, rev_arg)
-  local out, code = M.exec_sync({ "rev-parse", "--revs-only", rev_arg }, toplevel)
+  local out, code = M.exec_sync({ "rev-parse", "--verify", "--revs-only", rev_arg }, {
+    context = "git.utils.verify_rev_arg()",
+    cwd = toplevel,
+  })
   return code == 0 and (out[2] ~= nil or out[1] and out[1] ~= ""), out
 end
 

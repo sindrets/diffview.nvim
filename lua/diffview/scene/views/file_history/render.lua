@@ -193,7 +193,7 @@ local function prepare_panel_cache(panel)
         panel:get_config().width - 6
       )
     or utils.path:vim_fnamemodify(panel.git_ctx.toplevel, ":~")
-  c.args = table.concat(panel.raw_args, " ")
+  c.args = table.concat(panel.log_options.single_file.path_args, " ")
 end
 
 return {
@@ -377,5 +377,8 @@ return {
       s = s .. ")"
       comp:add_line(s)
     end
+  end,
+  clear_cache = function(panel)
+    cache[panel] = nil
   end,
 }

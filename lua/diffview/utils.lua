@@ -1,5 +1,8 @@
 local lazy = require("diffview.lazy")
 
+local async = lazy.require("plenary.async") ---@module "plenary.async"
+local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
+
 ---@module "plenary.job"
 local Job = lazy.require("plenary.job", function(m)
   -- Ensure plenary's `new` method will use the right metatable when this is
@@ -10,8 +13,6 @@ local Job = lazy.require("plenary.job", function(m)
   end
   return m
 end)
----@module "plenary.async"
-local async = lazy.require("plenary.async")
 
 local api = vim.api
 local M = {}
@@ -89,6 +90,10 @@ function M.err(msg, schedule)
     return
   end
   msg = M.vec_slice(msg)
+
+  local log_fn = schedule and logger.s_error or logger.error
+  log_fn(table.concat(msg, "\n"))
+
   msg[1] = "[Diffview.nvim] " .. msg[1]
   M.echo_multiln(msg, "ErrorMsg", schedule)
 end
@@ -229,7 +234,7 @@ end
 ---length.
 ---@param s string
 ---@param max_length integer
----@param head boolean Truncate the head rather than the tail.
+---@param head? boolean Truncate the head rather than the tail.
 ---@return string
 function M.str_shorten(s, max_length, head)
   if string.len(s) > max_length then
@@ -342,12 +347,11 @@ function M.handle_job(job, opt)
 
   if job.code == 0 and not empty then
     if opt.debug_opt then
-      require("diffview.logger").log_job(job, opt.debug_opt)
+      logger.log_job(job, opt.debug_opt)
     end
     return
   end
 
-  local logger = require("diffview.logger")
   local log_func = logger.s_error
 
   if type(opt.log_func) == "string" then
@@ -413,8 +417,8 @@ function M.system_list(cmd, cwd_or_opt)
   opt.fail_on_empty = vim.F.if_nil(opt.fail_on_empty, (opt.retry_on_empty or 0) > 0)
   opt.context = opt.context or "system_list()"
   local context = ("[%s] "):format(opt.context)
-  local logger = require("diffview.logger")
-  logger = opt.silent and logger.mock or logger
+  ---@diagnostic disable-next-line: redefined-local
+  local logger = opt.silent and logger.mock or logger
 
   local command = table.remove(cmd, 1)
   local num_retries = 0

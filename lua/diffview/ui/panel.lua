@@ -395,9 +395,11 @@ end
 
 ---Update components, render and redraw.
 function Panel:sync()
-  self:update_components()
-  self:render()
-  self:redraw()
+  if self:buf_loaded() then
+    self:update_components()
+    self:render()
+    self:redraw()
+  end
 end
 
 ---@class PanelAutocmdSpec

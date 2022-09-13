@@ -214,6 +214,7 @@ function M.file_history(range, args)
     { "diff-merges" },
     { "author" },
     { "grep" },
+    { "base" },
   }
 
   ---@type LogOptions
@@ -234,7 +235,9 @@ function M.file_history(range, args)
     }
   end
 
-  local ok, opt_description = git.file_history_dry_run(git_toplevel, paths, log_options)
+  log_options.path_args = paths
+
+  local ok, opt_description = git.file_history_dry_run(git_toplevel, log_options)
 
   if not ok then
     utils.info({
@@ -245,23 +248,6 @@ function M.file_history(range, args)
       ("Current options: [ %s ]"):format(opt_description)
     })
     return
-  end
-
-  local base
-  ---@type string
-  local base_arg = argo:get_flag("base", { no_empty = true })
-  if base_arg then
-    if base_arg == "LOCAL" then
-      base = Rev(RevType.LOCAL)
-    else
-      ---@diagnostic disable-next-line: redefined-local
-      local ok, out = git.verify_rev_arg(git_toplevel, base_arg)
-      if not ok then
-        utils.warn(("Bad base revision, ignoring: %s"):format(utils.str_quote(base_arg)))
-      else
-        base = Rev(RevType.COMMIT, out[1])
-      end
-    end
   end
 
   local git_ctx = {
@@ -280,10 +266,7 @@ function M.file_history(range, args)
   ---@type FileHistoryView
   local v = FileHistoryView({
     git_ctx = git_ctx,
-    path_args = paths,
-    raw_args = argo.args,
     log_options = log_options,
-    base = base,
   })
 
   if not v:is_valid() then
