@@ -183,7 +183,9 @@ return function(view)
           return
         end
 
-        view:update_files()
+        view:update_files(function()
+          view.panel:highlight_cur_file()
+        end)
         view.emitter:emit(Event.FILES_STAGED, view)
       end
     end,

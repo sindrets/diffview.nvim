@@ -1219,7 +1219,7 @@ CDiffView                                       *diffview.api.views.diff.diff_vi
                     indicated by `path` and `split`.
 
                     Parameters: ~
-                        {kind} ("working"|"staged")
+                        {kind} ("working"|"staged"|"conflicting")
                         {path} (string)             Path to the file, relative to
                                                     git root.
                         {split} ("left"|"right")
@@ -1229,6 +1229,7 @@ FileDict                                        *diffview.git.FileDict*
         Fields:~
             {working} (FileData[])
             {staged}  (FileData[])
+            {conflicting} (FileData[])
 
 FileData                                        *diffview.api.views.diff.diff_view.FileData*
 

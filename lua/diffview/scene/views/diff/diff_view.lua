@@ -430,8 +430,8 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
         perf:time()
         logger.lvl(5).s_debug(perf)
         logger.s_info(
-          ("[DiffView] Completed update for %d files successfully (%.3f ms)")
-          :format(self.files:len(), perf.final_time)
+          ("[%s] Completed update for %d files successfully (%.3f ms)")
+          :format(self:class():name(), self.files:len(), perf.final_time)
         )
         self.emitter:emit("files_updated", self.files)
         if type(callback) == "function" then

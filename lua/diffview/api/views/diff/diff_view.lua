@@ -1,13 +1,15 @@
-local FileEntry = require("diffview.scene.file_entry").FileEntry
-local DiffView = require("diffview.scene.views.diff.diff_view").DiffView
-local FilePanel = require("diffview.scene.views.diff.file_panel").FilePanel
-local Rev = require("diffview.git.rev").Rev
-local RevType = require("diffview.git.rev").RevType
-local async = require("plenary.async")
-local git = require("diffview.git.utils")
-local logger = require("diffview.logger")
-local oop = require("diffview.oop")
-local utils = require("diffview.utils")
+local lazy = require("diffview.lazy")
+
+local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
+local FileEntry = lazy.access("diffview.scene.file_entry", "FileEntry") ---@type FileEntry|LazyModule
+local FilePanel = lazy.access("diffview.scene.views.diff.file_panel", "FilePanel") ---@type FilePanel|LazyModule
+local Rev = lazy.access("diffview.git.rev", "Rev") ---@type Rev|LazyModule
+local RevType = lazy.access("diffview.git.rev", "RevType") ---@type RevType|LazyModule
+local async = lazy.require("plenary.async") ---@module "plenary.async"
+local git = lazy.require("diffview.git.utils") ---@module "diffview.git.utils"
+local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
+local oop = lazy.require("diffview.oop") ---@module "diffview.oop"
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local M = {}
 
@@ -24,11 +26,12 @@ local M = {}
 ---@field files any
 ---@field fetch_files function A function that should return an updated list of files.
 ---@field get_file_data function A function that is called with parameters `path: string` and `split: string`, and should return a list of lines that should make up the buffer.
-local CDiffView = oop.create_class("CDiffView", DiffView)
+local CDiffView = oop.create_class("CDiffView", DiffView.__get())
 
 ---CDiffView constructor.
 ---@param opt any
 function CDiffView:init(opt)
+  logger.info("[api] Creating a new Custom DiffView.")
   self.valid = false
   local git_dir = git.git_dir(opt.git_root)
 
@@ -120,10 +123,11 @@ function CDiffView:create_file_entries(files)
   local entries = {}
 
   local sections = {
-    { kind = "working", files = files.working, left = self.left, right = self.right },
+    { kind = "conflicting", files = files.conflicting or {} },
+    { kind = "working", files = files.working or {}, left = self.left, right = self.right },
     {
       kind = "staged",
-      files = files.staged,
+      files = files.staged or {},
       left = git.head_rev(self.git_ctx.toplevel),
       right = Rev(RevType.STAGE, 0),
     },
@@ -131,11 +135,23 @@ function CDiffView:create_file_entries(files)
 
   for _, v in ipairs(sections) do
     entries[v.kind] = {}
-    for _, file_data in ipairs(v.files) do
 
-      table.insert(
-        entries[v.kind],
-        FileEntry.for_d2(CDiffView.get_default_diff2(), {
+    for _, file_data in ipairs(v.files) do
+      if v.kind == "conflicting" then
+        table.insert(entries[v.kind], FileEntry.with_layout(CDiffView.get_default_merge_layout(), {
+          git_ctx = self.git_ctx,
+          path = file_data.path,
+          oldpath = file_data.oldpath,
+          status = "U",
+          kind = "conflicting",
+          rev_ours = Rev(RevType.STAGE, 2),
+          rev_main = Rev(RevType.LOCAL),
+          rev_theirs = Rev(RevType.STAGE, 3),
+          rev_base = Rev(RevType.STAGE, 1),
+          get_data = self.get_file_data,
+        }))
+      else
+        table.insert(entries[v.kind], FileEntry.for_d2(CDiffView.get_default_diff2(), {
           git_ctx = self.git_ctx,
           path = file_data.path,
           oldpath = file_data.oldpath,
@@ -146,8 +162,8 @@ function CDiffView:create_file_entries(files)
           rev_b = v.right,
           get_data = self.get_file_data,
           --FIXME: left_null, right_null
-        })
-      )
+        }))
+      end
 
       if file_data.selected then
         self.panel:set_cur_file(entries[v.kind][#entries[v.kind]])
