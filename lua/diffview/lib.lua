@@ -1,5 +1,15 @@
 local lazy = require("diffview.lazy")
 
+local Job = lazy.require("plenary.job", function(m)
+  -- Ensure plenary's `new` method will use the right metatable when this is
+  -- invoked as a method.
+  local new = m.new
+  function m.new(_, ...)
+    return new(m, ...)
+  end
+  return m
+end)
+
 local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
 local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView") ---@type FileHistoryView|LazyModule
 local Rev = lazy.access("diffview.git.rev", "Rev") ---@type Rev|LazyModule
@@ -72,6 +82,32 @@ function M.diffview_open(args)
       return
     end
   end
+
+  -- Check if the returned path is Windows-style and convert it to a WSL
+  -- path so when we use this path as the current working directory for future
+  -- jobs, it'll be a linux path and run error free.
+  local is_wsl = vim.env.WSL_DISTRO_NAME and vim.env.WSL_DISTRO_NAME ~= ''
+
+  if git_toplevel ~= nil then
+
+    local is_windows_path = git_toplevel:find("%u:/") ~= nil
+    if is_wsl and is_windows_path then
+
+      local job_spec = {
+        command = "wslpath",
+        args = { git_toplevel },
+        on_stderr = function(_, data) utils.err(data) end,
+      }
+
+      local job = Job:new(job_spec)
+      local stdout, code = job:sync()
+      if code == 0 then
+        git_toplevel = stdout[1]
+      end
+
+    end
+  end
+
 
   ---@cast git_toplevel string
   logger.lvl(1).s_debug(("Found git top-level: %s"):format(utils.str_quote(git_toplevel)))
