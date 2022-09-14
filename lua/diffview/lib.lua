@@ -58,8 +58,19 @@ function M.diffview_open(args)
   local err, git_toplevel = M.find_git_toplevel(top_indicators)
 
   if err then
-    utils.err(err)
-    return
+
+    -- Set and try the fallback git arguments. If that fails as well,
+    -- we'll exit.
+    local conf = config.get_config()
+    if conf.git_cmd_fallback ~= nil  then
+      conf["git_cmd"] = conf.git_cmd_fallback
+      err, git_toplevel = M.find_git_toplevel(top_indicators)
+    end
+
+    if err then
+      utils.err(err)
+      return
+    end
   end
 
   ---@cast git_toplevel string

@@ -48,13 +48,24 @@ local sync_jobs = {}
 ---@type Semaphore
 local job_queue_sem = Semaphore.new(1)
 
+---@return string cmd The git binary.
+local function git_bin()
+  return config.get_config().git_cmd[1]
+end
+
+---@return string[] args The default git args.
+local function git_args()
+  local args = utils.vec_slice(config.get_config().git_cmd, 2)
+  return args
+end
+
 ---Ensure that the configured git binary meets the version requirement.
 local function run_bootstrap()
   bootstrap.done = true
   local msg
 
   local out, code = utils.system_list(
-    vim.tbl_flatten({ config.get_config().git_cmd, "version" })
+    vim.tbl_flatten({ git_bin(), git_args(), "version" })
   )
 
   if code ~= 0 or not out[1] then
@@ -100,16 +111,6 @@ local function run_bootstrap()
   bootstrap.ok = true
 end
 
----@return string cmd The git binary.
-local function git_bin()
-  return config.get_config().git_cmd[1]
-end
-
----@return string[] args The default git args.
-local function git_args()
-  return utils.vec_slice(config.get_config().git_cmd, 2)
-end
-
 ---Execute a git command synchronously.
 ---@param args string[]
 ---@param cwd_or_opt? string|utils.system_list.Opt
@@ -124,7 +125,7 @@ function M.exec_sync(args, cwd_or_opt)
   end
 
   return utils.system_list(
-    vim.tbl_flatten({ config.get_config().git_cmd, args }),
+    vim.tbl_flatten({ git_bin(), git_args(), args }),
     cwd_or_opt
   )
 end

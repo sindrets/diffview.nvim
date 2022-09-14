@@ -47,6 +47,7 @@ M.defaults = {
   diff_binaries = false,
   enhanced_diff_hl = false,
   git_cmd = { "git" },
+  git_cmd_fallback = nil,
   use_icons = true,
   icons = {
     folder_closed = "",
