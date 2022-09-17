@@ -16,6 +16,7 @@ local debounce = lazy.require("diffview.debounce") ---@module "diffview.debounce
 local git = lazy.require("diffview.git.utils") ---@module "diffview.git.utils"
 local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
+local config = lazy.require("diffview.config") ---@module "diffview.config"
 
 local api = vim.api
 local M = {}
@@ -122,17 +123,19 @@ function DiffView:post_open()
     name = ("diffview://%s/log/%d/%s"):format(self.git_ctx.dir, self.tabpage, "commit_log"),
   })
 
-  self.watcher = vim.loop.new_fs_poll()
-  ---@diagnostic disable-next-line: unused-local
-  self.watcher:start(self.git_ctx.dir .. "/index", 1000, function(err, prev, cur)
-    if not err then
-      vim.schedule(function()
-        if self:is_cur_tabpage() then
-          self:update_files()
-        end
-      end)
-    end
-  end)
+  if config.get_config().watch_index then
+    self.watcher = vim.loop.new_fs_poll()
+    ---@diagnostic disable-next-line: unused-local
+    self.watcher:start(self.git_ctx.dir .. "/index", 1000, function(err, prev, cur)
+      if not err then
+        vim.schedule(function()
+          if self:is_cur_tabpage() then
+            self:update_files()
+          end
+        end)
+      end
+    end)
+  end
 
   self:init_event_listeners()
 
