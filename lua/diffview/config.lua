@@ -37,6 +37,7 @@ M.defaults = {
   enhanced_diff_hl = false,
   git_cmd = { "git" },
   use_icons = true,
+  watch_index = true,
   icons = {
     folder_closed = "",
     folder_open = "",
