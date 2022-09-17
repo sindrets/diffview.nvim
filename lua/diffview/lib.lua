@@ -33,9 +33,11 @@ function M.diffview_open(args)
   }), " "))
 
   for _, path_arg in ipairs(argo.post_args) do
-    local magic, pattern = git.pathspec_split(pl:vim_expand(path_arg))
-    pattern = pl:readlink(pattern) or pattern
-    table.insert(paths, magic .. pattern)
+    for _, path in ipairs(pl:vim_expand(path_arg, false, true)) do
+      local magic, pattern = git.pathspec_split(path)
+      pattern = pl:readlink(pattern) or pattern
+      table.insert(paths, magic .. pattern)
+    end
   end
 
   local cfile = pl:vim_expand("%")
@@ -141,9 +143,11 @@ function M.file_history(range, args)
   }), " "))
 
   for _, path_arg in ipairs(argo.args) do
-    local magic, pattern = git.pathspec_split(pl:vim_expand(path_arg))
-    pattern = pl:readlink(pattern) or pattern
-    table.insert(paths, magic .. pattern)
+    for _, path in ipairs(pl:vim_expand(path_arg, false, true)) do
+      local magic, pattern = git.pathspec_split(path)
+      pattern = pl:readlink(pattern) or pattern
+      table.insert(paths, magic .. pattern)
+    end
   end
 
   ---@type string

@@ -443,9 +443,17 @@ function PathLib:readlink(path)
 end
 
 ---@param path string
+---@param nosuf? boolean
 ---@return string
-function PathLib:vim_expand(path)
-  return self:convert(vim.fn.expand(path) --[[@as string ]])
+---@overload fun(self: PathLib, path: string, nosuf: boolean, list: boolean): string[]
+function PathLib:vim_expand(path, nosuf, list)
+  if list then
+    return vim.tbl_map(function(v)
+      return self:convert(v)
+    end, vim.fn.expand(path, nosuf, list))
+  end
+
+  return self:convert(vim.fn.expand(path, nosuf, list) --[[@as string ]])
 end
 
 ---@param path string
