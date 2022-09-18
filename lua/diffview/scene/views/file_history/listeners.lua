@@ -1,13 +1,10 @@
 local lazy = require("diffview.lazy")
 
----@type DiffView|LazyModule
-local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView")
----@module "diffview.git.utils"
-local git = lazy.require("diffview.git.utils")
----@module "diffview.lib"
-local lib = lazy.require("diffview.lib")
----@module "diffview.utils"
-local utils = lazy.require("diffview.utils")
+local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
+local JobStatus = lazy.access("diffview.git.utils", "JobStatus") ---@type JobStatus|LazyModule
+local git = lazy.require("diffview.git.utils") ---@module "diffview.git.utils"
+local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 ---@param view FileHistoryView
 return function(view)
@@ -151,6 +148,16 @@ return function(view)
     end,
     toggle_files = function()
       view.panel:toggle(true)
+    end,
+    refresh_files = function()
+      view.panel:update_entries(function(_, status)
+        if status >= JobStatus.ERROR then
+          return
+        end
+        if not view:cur_file() then
+          view:next_item()
+        end
+      end)
     end,
     open_all_folds = function()
       if view.panel:is_focused() and not view.panel.single_file then

@@ -877,7 +877,7 @@ prev_entry                                      *diffview-actions-prev_entry*
         Bring the cursor in the subject panel to the previous entry.
 
 refresh_files                                   *diffview-actions-refresh_files*
-        Contexts: `diff_view`, `file_panel`
+        Contexts: `view`, `panel`
 
         Update stats and entries in the file list.
 

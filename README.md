@@ -272,7 +272,6 @@ require("diffview").setup({
       ["S"]             = actions.stage_all,          -- Stage all entries.
       ["U"]             = actions.unstage_all,        -- Unstage all entries.
       ["X"]             = actions.restore_entry,      -- Restore entry to the state on the left side.
-      ["R"]             = actions.refresh_files,      -- Update stats and entries in the file list.
       ["L"]             = actions.open_commit_log,    -- Open the commit log panel.
       ["<c-b>"]         = actions.scroll_view(-0.25), -- Scroll the view up
       ["<c-f>"]         = actions.scroll_view(0.25),  -- Scroll the view down
@@ -283,6 +282,7 @@ require("diffview").setup({
       ["<C-w>gf"]       = actions.goto_file_tab,
       ["i"]             = actions.listing_style,        -- Toggle between 'list' and 'tree' views
       ["f"]             = actions.toggle_flatten_dirs,  -- Flatten empty subdirectories in tree listing style.
+      ["R"]             = actions.refresh_files,        -- Update stats and entries in the file list.
       ["<leader>e"]     = actions.focus_files,
       ["<leader>b"]     = actions.toggle_files,
       ["g<C-x>"]        = actions.cycle_layout,
