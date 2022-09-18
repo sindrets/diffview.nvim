@@ -511,7 +511,7 @@ M.diff_file_list = async.wrap(function(ctx, left, right, path_args, dv_opt, opt,
 end, 7)
 
 ---@class git.utils.PreparedLogOpts
----@field rev_range Rev
+---@field rev_range string
 ---@field base Rev
 ---@field path_args string[]
 ---@field flags string[]
@@ -532,12 +532,12 @@ local function prepare_fh_options(toplevel, log_options, single_file)
   local rev_range, base
 
   if log_options.rev_range then
-    local ok, out = M.verify_rev_arg(toplevel, log_options.rev_range)
+    local ok, _ = M.verify_rev_arg(toplevel, log_options.rev_range)
 
     if not ok then
       utils.warn(("Bad range revision, ignoring: %s"):format(utils.str_quote(log_options.rev_range)))
     else
-      rev_range = Rev(RevType.COMMIT, out[1])
+      rev_range = log_options.rev_range
     end
   end
 
@@ -662,7 +662,7 @@ local incremental_fh_data = async.void(function(state, callback)
     args = utils.vec_join(
       git_args(),
       "log",
-      rev_range and rev_range:object_name() or nil,
+      rev_range,
       "--pretty=format:%x00%n%H %P%n%an%n%ad%n%ar%n  %s",
       "--date=raw",
       "--name-status",
@@ -680,7 +680,7 @@ local incremental_fh_data = async.void(function(state, callback)
     args = utils.vec_join(
       git_args(),
       "log",
-      rev_range and rev_range:object_name() or nil,
+      rev_range,
       "--pretty=format:%x00",
       "--date=raw",
       "--numstat",
@@ -700,8 +700,7 @@ local incremental_fh_data = async.void(function(state, callback)
 
   local debug_opt = {
     context = "git.utils>incremental_fh_data()",
-    func = "s_debug",
-    debug_level = 1,
+    func = "s_info",
     no_stdout = true,
   }
   utils.handle_job(namestat_job, { debug_opt = debug_opt })
@@ -779,7 +778,7 @@ local incremental_line_trace_data = async.void(function(state, callback)
       git_args(),
       "-P",
       "log",
-      rev_range and rev_range:object_name() or nil,
+      rev_range,
       "--color=never",
       "--no-ext-diff",
       "--pretty=format:%x00%n%H %P%n%an%n%ad%n%ar%n  %s",
@@ -1184,11 +1183,11 @@ function M.file_history_dry_run(toplevel, log_opt)
   local cmd
 
   if #log_options.L > 0 then
-    -- cmd = utils.vec_join("-P", "log", "--no-ext-diff", "--color=never", "--pretty=format:%H", "-s", options, log_options.rev_range, "--")
+    -- cmd = utils.vec_join("-P", "log", log_options.rev_range, "--no-ext-diff", "--color=never", "--pretty=format:%H", "-s", options, "--")
     -- NOTE: Running the dry-run for line tracing is slow. Just skip for now.
     return true, table.concat(description, ", ")
   else
-    cmd = utils.vec_join("log", "--pretty=format:%H", "--name-status", options, log_options.rev_range, "--", log_options.path_args)
+    cmd = utils.vec_join("log", log_options.rev_range, "--pretty=format:%H", "--name-status", options, "--", log_options.path_args)
   end
 
   local out, code = M.exec_sync(cmd, {
@@ -1632,7 +1631,7 @@ end
 ---@param rev_arg string
 ---@return boolean ok, string[] output
 function M.verify_rev_arg(toplevel, rev_arg)
-  local out, code = M.exec_sync({ "rev-parse", "--verify", "--revs-only", rev_arg }, {
+  local out, code = M.exec_sync({ "rev-parse", "--revs-only", rev_arg }, {
     context = "git.utils.verify_rev_arg()",
     cwd = toplevel,
   })
