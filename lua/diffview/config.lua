@@ -17,6 +17,8 @@ local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local M = {}
 
+local setup_done = false
+
 ---@deprecated
 function M.diffview_callback(cb_name)
   if cb_name == "select" then
@@ -233,6 +235,10 @@ M.log_option_defaults = {
 
 ---@return DiffviewConfig
 function M.get_config()
+  if not setup_done then
+    M.setup()
+  end
+
   return M._config
 end
 
@@ -448,6 +454,8 @@ function M.setup(user_config)
       end
     end
   end
+
+  setup_done = true
 end
 
 M.actions = actions
