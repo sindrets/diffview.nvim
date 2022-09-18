@@ -198,16 +198,12 @@ function M.filter_completion(arg_lead, items)
   end, items)
 end
 
-function M.completion(arg_lead, cmd_line, cur_pos)
-  local args, argidx, divideridx = arg_parser.scan_ex_args(cmd_line, cur_pos)
-  local _, cmd = arg_parser.split_ex_range(args[1])
-
-  if cmd == "" then
-    cmd = args[2]
-  end
+function M.completion(_, cmd_line, cur_pos)
+  local ctx = arg_parser.scan_ex_args(cmd_line, cur_pos)
+  local cmd = ctx.args[1]
 
   if cmd and M.completers[cmd] then
-    return M.filter_completion(arg_lead, M.completers[cmd](args, argidx, divideridx, arg_lead))
+    return M.filter_completion(ctx.arg_lead, M.completers[cmd](ctx))
   end
 end
 
@@ -315,7 +311,8 @@ function M.line_trace_completion(arg_lead)
 end
 
 M.completers = {
-  DiffviewOpen = function(args, argidx, divideridx, arg_lead)
+  ---@param ctx CmdLineContext
+  DiffviewOpen = function(ctx)
     local cfile = utils.path:vim_expand("%")
     local top_indicators = utils.vec_join(
       vim.bo.buftype == ""
@@ -333,8 +330,8 @@ M.completers = {
       git_dir = git.git_dir(git_toplevel)
     end
 
-    for i = 2, math.min(#args, divideridx) do
-      if args[i]:sub(1, 1) ~= "-" and i ~= argidx then
+    for i = 2, math.min(#ctx.args, ctx.divideridx) do
+      if ctx.args[i]:sub(1, 1) ~= "-" and i ~= ctx.argidx then
         has_rev_arg = true
         break
       end
@@ -342,34 +339,34 @@ M.completers = {
 
     local candidates = {}
 
-    if argidx > divideridx then
-      utils.vec_push(candidates, unpack(vim.fn.getcompletion(arg_lead, "file", 0)))
-    elseif not has_rev_arg and arg_lead:sub(1, 1) ~= "-" and git_dir and git_toplevel then
+    if ctx.argidx > ctx.divideridx then
+      utils.vec_push(candidates, unpack(vim.fn.getcompletion(ctx.arg_lead, "file", 0)))
+    elseif not has_rev_arg and ctx.arg_lead:sub(1, 1) ~= "-" and git_dir and git_toplevel then
       utils.vec_push(candidates, unpack(comp_open:get_all_names()))
-      utils.vec_push(candidates, unpack(M.rev_completion(arg_lead, {
+      utils.vec_push(candidates, unpack(M.rev_completion(ctx.arg_lead, {
         accept_range= true,
         git_toplevel = git_toplevel,
         git_dir = git_dir,
       })))
     else
       utils.vec_push(candidates, unpack(
-        comp_open:get_completion(arg_lead)
+        comp_open:get_completion(ctx.arg_lead)
         or comp_open:get_all_names()
       ))
     end
 
     return candidates
   end,
-  ---@diagnostic disable-next-line: unused-local
-  DiffviewFileHistory = function(args, argidx, divideridx, arg_lead)
+  ---@param ctx CmdLineContext
+  DiffviewFileHistory = function(ctx)
     local candidates = {}
 
     utils.vec_push(candidates, unpack(
-      comp_file_history:get_completion(arg_lead)
+      comp_file_history:get_completion(ctx.arg_lead)
       or comp_file_history:get_all_names()
     ))
 
-    utils.vec_push(candidates, unpack(vim.fn.getcompletion(arg_lead, "file", 0)))
+    utils.vec_push(candidates, unpack(vim.fn.getcompletion(ctx.arg_lead, "file", 0)))
 
     return candidates
   end,

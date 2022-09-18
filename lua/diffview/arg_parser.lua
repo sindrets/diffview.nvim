@@ -1,10 +1,12 @@
+local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
-local utils = require("diffview.utils")
+
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local M = {}
 
-local short_flag_pat = "^%-(%a)=?(.*)"
-local long_flag_pat = "^%-%-(%a[%a%d-]*)=?(.*)"
+local short_flag_pat = { "^%-(%a)=?(.*)", "^%+(%a)=?(.*)" }
+local long_flag_pat = { "^%-%-(%a[%a%d-]*)=?(.*)", "^%+%+(%a[%a%d-]*)=?(.*)" }
 
 ---@class ArgObject : diffview.Object
 ---@field flags table<string, string[]>
@@ -85,7 +87,8 @@ end
 ---@param producer? string[]|fun(name_lead: string, arg_lead: string): string[]
 function FlagValueMap:put(flag_synonyms, producer)
   for _, flag in ipairs(flag_synonyms) do
-    if flag:sub(1, 1) ~= "-" then
+    local char = flag:sub(1, 1)
+    if char ~= "-" and char ~= "+" then
       if #flag > 1 then
         flag = "--" .. flag
       else
@@ -101,17 +104,20 @@ end
 ---@param flag_name string
 ---@return string[]
 function FlagValueMap:get(flag_name)
-  if flag_name:sub(1, 1) ~= "-" then
+  local char = flag_name:sub(1, 1)
+  if char ~= "-" and char ~= "+" then
     if #flag_name > 1 then
       flag_name = "--" .. flag_name
     else
       flag_name = "-" .. flag_name
     end
   end
+
   if type(self.map[flag_name]) == "function" then
-    local is_short = flag_name:match(short_flag_pat) ~= nil
+    local is_short = utils.str_match(flag_name, short_flag_pat) ~= nil
     return self.map[flag_name](flag_name .. (not is_short and "=" or ""), "")
   end
+
   return self.map[flag_name]
 end
 
@@ -124,8 +130,10 @@ end
 ---@param arg_lead string
 ---@return string[]?
 function FlagValueMap:get_completion(arg_lead)
+  arg_lead = arg_lead or ""
   local name
-  local is_short = arg_lead:match(short_flag_pat) ~= nil
+  local is_short = utils.str_match(arg_lead, short_flag_pat) ~= nil
+
   if is_short then
     name = arg_lead:sub(1, 2)
     arg_lead = arg_lead:match("..=?(.*)") or ""
@@ -171,7 +179,7 @@ function M.parse(args)
     end
 
     local flag, value
-    flag, value = arg:match(short_flag_pat)
+    flag, value = utils.str_match(arg, short_flag_pat)
     if flag then
       value = (value == "") and "true" or value
 
@@ -183,7 +191,7 @@ function M.parse(args)
       goto continue
     end
 
-    flag, value = arg:match(long_flag_pat)
+    flag, value = utils.str_match(arg, long_flag_pat)
     if flag then
       value = (value == "") and "true" or value
 
@@ -222,31 +230,44 @@ function M.split_ex_range(arg)
   return  arg, ""
 end
 
+---@class CmdLineContext
+---@field args string[] The complete list of arguments.
+---@field arg_lead string
+---@field argidx integer Index of the current argument.
+---@field divideridx integer
+---@field range string? Ex command range.
+---@field between boolean The current position is between two arguments.
+
 ---Scan an EX command string and split it into individual args.
 ---@param cmd_line string
 ---@param cur_pos number
----@return string[] args
----@return integer argidx
----@return integer divideridx
+---@return CmdLineContext
 function M.scan_ex_args(cmd_line, cur_pos)
   local args = {}
+  local arg_lead
   local divideridx = math.huge
   local argidx
+  local between = false
   local arg = ""
 
-  local i = 1
+  local h, i = -1, 1
+
   while i <= #cmd_line do
+    local char = cmd_line:sub(i, i)
+
     if not argidx and i > cur_pos then
       argidx = #args + 1
+      arg_lead = arg
+      if h < cur_pos then between = true end
     end
 
-    local char = cmd_line:sub(i, i)
     if char == "\\" then
       arg = arg .. char
       if i < #cmd_line then
         i = i + 1
         arg = arg .. cmd_line:sub(i, i)
       end
+      h = i
     elseif char:match("%s") then
       if arg ~= "" then
         table.insert(args, arg)
@@ -259,6 +280,7 @@ function M.scan_ex_args(cmd_line, cur_pos)
       i = i + cmd_line:sub(i, -1):match("^%s+()") - 2
     else
       arg = arg .. char
+      h = i
     end
 
     i = i + 1
@@ -266,6 +288,8 @@ function M.scan_ex_args(cmd_line, cur_pos)
 
   if #arg > 0 then
     table.insert(args, arg)
+    if not arg_lead then arg_lead = arg end
+
     if arg == "--" and cmd_line:sub(#cmd_line, #cmd_line) ~= "-" then
       divideridx = #args
     end
@@ -278,43 +302,68 @@ function M.scan_ex_args(cmd_line, cur_pos)
     end
   end
 
-  return args, argidx, divideridx
+  local range
+
+  if #args > 0 then
+    range, args[1] = M.split_ex_range(args[1])
+    if args[1] == "" then
+      table.remove(args, 1)
+      argidx = math.max(argidx - 1, 1)
+      divideridx = math.max(divideridx - 1, 1)
+    end
+  end
+
+  return {
+    args = args,
+    arg_lead = arg_lead or "",
+    argidx = argidx,
+    divideridx = divideridx,
+    range = range ~= "" and range or nil,
+    between = between,
+  }
 end
 
 ---Scan a shell-like string and split it into individual args. This scanner
 ---understands quoted args.
 ---@param cmd_line string
 ---@param cur_pos number
----@return string[] args
----@return integer argidx
----@return integer divideridx
+---@return CmdLineContext
 function M.scan_sh_args(cmd_line, cur_pos)
   local args = {}
+  local arg_lead
   local divideridx = math.huge
   local argidx
+  local between = false
   local cur_quote
   local arg = ""
 
-  local i = 1
+  local h, i = -1, 1
+
   while i <= #cmd_line do
+    local char = cmd_line:sub(i, i)
+
     if not argidx and i > cur_pos then
       argidx = #args + 1
+      arg_lead = arg
+      if h < cur_pos then between = true end
     end
 
-    local char = cmd_line:sub(i, i)
     if char == "\\" then
       if i < #cmd_line then
         i = i + 1
         arg = arg .. cmd_line:sub(i, i)
       end
+      h = i
     elseif cur_quote then
       if char == cur_quote then
         cur_quote = nil
       else
         arg = arg .. char
       end
+      h = i
     elseif char == [[']] or char == [["]] then
       cur_quote = char
+      h = i
     elseif char:match("%s") then
       if arg ~= "" then
         table.insert(args, arg)
@@ -327,6 +376,7 @@ function M.scan_sh_args(cmd_line, cur_pos)
       i = i + cmd_line:sub(i, -1):match("^%s+()") - 2
     else
       arg = arg .. char
+      h = i
     end
 
     i = i + 1
@@ -338,6 +388,8 @@ function M.scan_sh_args(cmd_line, cur_pos)
 
   if #arg > 0 then
     table.insert(args, arg)
+    if not arg_lead then arg_lead = arg end
+
     if arg == "--" and cmd_line:sub(#cmd_line, #cmd_line) ~= "-" then
       divideridx = #args
     end
@@ -350,7 +402,13 @@ function M.scan_sh_args(cmd_line, cur_pos)
     end
   end
 
-  return args, argidx, divideridx
+  return {
+    args = args,
+    arg_lead = arg_lead or "",
+    argidx = argidx,
+    divideridx = divideridx,
+    between = between,
+  }
 end
 
 function M.ambiguous_bool(value, default, truthy, falsy)

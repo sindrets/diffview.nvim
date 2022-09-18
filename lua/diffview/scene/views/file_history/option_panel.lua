@@ -183,19 +183,19 @@ FHOptionPanel.flags = {
       end,
       completion = function(_)
         return function(_, cmd_line, cur_pos)
-          local ok, args, argidx = pcall(arg_parser.scan_sh_args, cmd_line, cur_pos)
+          local ok, ctx = pcall(arg_parser.scan_sh_args, cmd_line, cur_pos)
 
           if ok then
             local quoted = vim.tbl_map(function(v)
               return utils.str_quote(v, { only_if_whitespace = true })
-            end, args)
+            end, ctx.args)
 
             return vim.tbl_map(function(v)
               return table.concat(utils.vec_join(
-                utils.vec_slice(quoted, 1, argidx - 1),
+                utils.vec_slice(quoted, 1, ctx.argidx - 1),
                 utils.str_quote(v, { only_if_whitespace = true })
               ), " ")
-            end, vim.fn.getcompletion(args[argidx] or "", "file"))
+            end, vim.fn.getcompletion(ctx.arg_lead, "file"))
           end
         end
       end,
@@ -308,11 +308,12 @@ function FHOptionPanel:init(parent)
               if response == nil then
                 values = { "" }
               else
-                local ok
-                ok, values = pcall(arg_parser.scan_sh_args, response, 1)
+                local ok, ctx = pcall(arg_parser.scan_sh_args, response, 1)
                 if not ok then
-                  utils.err(values, true)
+                  utils.err(ctx.args, true)
                   return
+                else
+                  values = ctx.args
                 end
               end
 
