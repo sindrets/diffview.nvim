@@ -19,6 +19,7 @@ end
 ---@override
 ---@param pivot integer?
 function Diff4Mixed:create(pivot)
+  self.emitter:emit("create_pre", self)
   local curwin
 
   pivot = pivot or self:find_pivot()
@@ -76,8 +77,7 @@ function Diff4Mixed:create(pivot)
 
   api.nvim_win_close(pivot, true)
   self.windows = { self.a, self.b, self.c, self.d }
-  self:open_null()
-  self:open_files()
+  self.emitter:emit("create_post", self)
 end
 
 M.Diff4Mixed = Diff4Mixed

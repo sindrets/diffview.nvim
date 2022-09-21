@@ -193,17 +193,23 @@ function StandardView:use_entry(entry)
   if entry.layout:class() == self.cur_layout:class() then
     self.cur_layout.emitter = entry.layout.emitter
     self.cur_layout:use_entry(entry)
-  elseif self.layouts[entry.layout:class()] then
-    self.cur_layout = self.layouts[entry.layout:class()]
-    self.cur_layout.emitter = entry.layout.emitter
-    self.cur_layout:use_entry(entry)
-    self.cur_layout:create()
-    old_layout:destroy()
   else
-    self:use_layout(entry.layout)
-    self.cur_layout.emitter = entry.layout.emitter
-    self.cur_layout:create()
-    old_layout:destroy()
+    if self.layouts[entry.layout:class()] then
+      self.cur_layout = self.layouts[entry.layout:class()]
+      self.cur_layout.emitter = entry.layout.emitter
+      self.cur_layout:use_entry(entry)
+      self.cur_layout:create()
+      old_layout:destroy()
+    else
+      self:use_layout(entry.layout)
+      self.cur_layout.emitter = entry.layout.emitter
+      self.cur_layout:create()
+      old_layout:destroy()
+    end
+
+    if not vim.o.equalalways then
+      vim.cmd("wincmd =")
+    end
   end
 
   self.cur_entry = entry

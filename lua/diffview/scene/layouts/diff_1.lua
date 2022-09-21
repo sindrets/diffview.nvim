@@ -1,18 +1,13 @@
 local lazy = require("diffview.lazy")
-local Window = require("diffview.scene.window").Window
 local Layout = require("diffview.scene.layout").Layout
 local oop = require("diffview.oop")
 
----@type Diff3|LazyModule
-local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3")
----@type Diff4|LazyModule
-local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4")
----@type git.File|LazyModule
-local File = lazy.access("diffview.git.file", "File")
----@type Rev|LazyModule
-local Rev = lazy.access("diffview.git.rev", "Rev")
----@type RevType|LazyModule
-local RevType = lazy.access("diffview.git.rev", "RevType")
+local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3") ---@type Diff3|LazyModule
+local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4") ---@type Diff4|LazyModule
+local File = lazy.access("diffview.git.file", "File") ---@type git.File|LazyModule
+local Rev = lazy.access("diffview.git.rev", "Rev") ---@type Rev|LazyModule
+local RevType = lazy.access("diffview.git.rev", "RevType") ---@type RevType|LazyModule
+local Window = lazy.access("diffview.scene.window", "Window") ---@type Window|LazyModule
 
 local api = vim.api
 local M = {}
@@ -37,6 +32,7 @@ end
 ---@override
 ---@param pivot integer?
 function Diff1:create(pivot)
+  self.emitter:emit("create_pre", self)
   local curwin
 
   pivot = pivot or self:find_pivot()
@@ -61,8 +57,7 @@ function Diff1:create(pivot)
 
   api.nvim_win_close(pivot, true)
   self.windows = { self.a }
-  self:open_null()
-  self:open_files()
+  self.emitter:emit("create_post", self)
 end
 
 ---@param file git.File

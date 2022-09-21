@@ -17,6 +17,24 @@ function Layout:init(opt)
   opt = opt or {}
   self.windows = opt.windows or {}
   self.emitter = opt.emitter or EventEmitter()
+
+  if not opt.emitter then
+    local last_equalalways
+
+    ---@param other Layout
+    ---@diagnostic disable-next-line: unused-local
+    self.emitter:on("create_pre", function(other)
+      last_equalalways = vim.o.equalalways
+      vim.opt.equalalways = true
+    end)
+
+    ---@param other Layout
+    self.emitter:on("create_post", function(other)
+      other:open_null()
+      other:open_files()
+      vim.opt.equalalways = last_equalalways
+    end)
+  end
 end
 
 ---@diagnostic disable: unused-local, missing-return
@@ -40,7 +58,7 @@ function Layout:use_entry(entry) oop.abstract_stub() end
 ---@return Window
 function Layout:get_main_win() oop.abstract_stub() end
 
----@diagnostic enable: unused-local
+---@diagnostic enable: unused-local, missing-return
 
 function Layout:destroy()
   for _, win in ipairs(self.windows) do
