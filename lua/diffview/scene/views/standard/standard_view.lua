@@ -198,14 +198,13 @@ function StandardView:use_entry(entry)
       self.cur_layout = self.layouts[entry.layout:class()]
       self.cur_layout.emitter = entry.layout.emitter
       self.cur_layout:use_entry(entry)
-      self.cur_layout:create()
-      old_layout:destroy()
     else
       self:use_layout(entry.layout)
       self.cur_layout.emitter = entry.layout.emitter
-      self.cur_layout:create()
-      old_layout:destroy()
     end
+
+    self.cur_layout:create()
+    old_layout:destroy()
 
     if not vim.o.equalalways then
       vim.cmd("wincmd =")

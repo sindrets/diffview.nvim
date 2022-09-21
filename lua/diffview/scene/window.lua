@@ -1,8 +1,11 @@
-local File = require("diffview.git.file").File
-local RevType = require("diffview.git.rev").RevType
-local config = require("diffview.config")
+local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
-local utils = require("diffview.utils")
+
+local File = lazy.access("diffview.git.file", "File") ---@type git.File|LazyModule
+local RevType = lazy.access("diffview.git.rev", "RevType") ---@type RevType|LazyModule
+local config = lazy.require("diffview.config") ---@module "diffview.config"
+local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
 local M = {}
@@ -121,6 +124,19 @@ function Window:detach_file()
   end
 end
 
+---Check if the file buffer is in use in the current view's layout.
+---@return boolean
+function Window:_is_file_in_use()
+  local view = lib.get_current_view() --[[@as StandardView? ]]
+
+  if view and view.cur_layout ~= self.parent then
+    local main = view.cur_layout:get_main_win()
+    return main.file.bufnr and main.file.bufnr == self.file.bufnr
+  end
+
+  return false
+end
+
 function Window:_save_winopts()
   if Window.winopt_store[self.file.bufnr] then return end
 
@@ -133,7 +149,11 @@ function Window:_save_winopts()
 end
 
 function Window:_restore_winopts()
-  if Window.winopt_store[self.file.bufnr] and api.nvim_buf_is_loaded(self.file.bufnr) then
+  if
+    Window.winopt_store[self.file.bufnr]
+    and api.nvim_buf_is_loaded(self.file.bufnr)
+    and not self:_is_file_in_use()
+  then
     utils.no_win_event_call(function()
       local winid = utils.temp_win(self.file.bufnr)
       utils.set_local(winid, Window.winopt_store[self.file.bufnr])
