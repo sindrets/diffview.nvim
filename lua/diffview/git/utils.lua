@@ -589,8 +589,9 @@ local function structure_fh_data(namestat_data, numstat_data)
     time = tonumber(time),
     time_offset = time_offset,
     rel_date = namestat_data[4],
-    subject = namestat_data[5]:sub(3),
-    namestat = utils.vec_slice(namestat_data, 6),
+    ref_names = namestat_data[5]:sub(3),
+    subject = namestat_data[6]:sub(3),
+    namestat = utils.vec_slice(namestat_data, 7),
     numstat = numstat_data,
   }
 end
@@ -663,7 +664,7 @@ local incremental_fh_data = async.void(function(state, callback)
       git_args(),
       "log",
       rev_range,
-      "--pretty=format:%x00%n%H %P%n%an%n%ad%n%ar%n  %s",
+      "--pretty=format:%x00%n%H %P%n%an%n%ad%n%ar%n  %D%n  %s",
       "--date=raw",
       "--name-status",
       state.prepared_log_opts.flags,
@@ -781,7 +782,7 @@ local incremental_line_trace_data = async.void(function(state, callback)
       rev_range,
       "--color=never",
       "--no-ext-diff",
-      "--pretty=format:%x00%n%H %P%n%an%n%ad%n%ar%n  %s",
+      "--pretty=format:%x00%n%H %P%n%an%n%ad%n%ar%n  %D%n  %s",
       "--date=raw",
       state.prepared_log_opts.flags,
       "--"
@@ -1112,6 +1113,7 @@ local function file_history_worker(thread, ctx, log_opt, opt, co_state, callback
       time = tonumber(state.cur.time),
       time_offset = state.cur.time_offset,
       rel_date = state.cur.rel_date,
+      ref_names = state.cur.ref_names,
       subject = state.cur.subject,
     })
 

@@ -152,6 +152,13 @@ local function render_entries(parent, entries, updating)
     end
 
     offset = #s
+    if entry.commit.ref_names then
+      local ref_names = ("(%s) "):format(entry.commit.ref_names)
+      comp:add_hl("DiffviewReference", line_idx, offset, offset + #ref_names)
+      s = s .. ref_names
+    end
+
+    offset = #s
     local subject = utils.str_shorten(entry.commit.subject, 72)
     if subject == "" then
       subject = "[empty message]"

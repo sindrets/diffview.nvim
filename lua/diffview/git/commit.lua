@@ -16,6 +16,7 @@ local M = {}
 ---@field time_offset number
 ---@field date string
 ---@field rel_date string
+---@field ref_names string
 ---@field subject string
 ---@field body string
 local Commit = oop.create_class("Commit")
@@ -25,6 +26,7 @@ function Commit:init(opt)
   self.author = opt.author
   self.time = opt.time
   self.rel_date = opt.rel_date
+  self.ref_names = opt.ref_names ~= "" and opt.ref_names or nil
   self.subject = opt.subject
   self.body = opt.body
 

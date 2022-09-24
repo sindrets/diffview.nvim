@@ -411,6 +411,7 @@ M.hl_links = {
   FilePanelConflicts = "DiagnosticSignWarn",
   FolderName = "Directory",
   FolderSign = "PreProc",
+  Reference = "Function",
   StatusAdded = "diffAdded",
   StatusUntracked = "diffAdded",
   StatusModified = "diffChanged",
