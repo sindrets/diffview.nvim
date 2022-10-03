@@ -1,8 +1,9 @@
 local config = require("diffview.config")
 local hl = require("diffview.hl")
 local utils = require("diffview.utils")
+local conf = config.get_config()
 
----@param comp  RenderComponent
+---@param comp RenderComponent
 ---@param show_path boolean
 ---@param depth integer|nil
 local function render_file(comp, show_path, depth)
@@ -17,7 +18,11 @@ local function render_file(comp, show_path, depth)
   end
 
   offset = #s
-  local icon = hl.get_file_icon(file.basename, file.extension, comp, 0, offset)
+
+  local icon = ""
+  if conf.use_icons then
+    icon = hl.get_file_icon(file.basename, file.extension, comp, 0, offset)
+  end
 
   offset = offset + #icon
   comp:add_hl("DiffviewFilePanelFileName", 0, offset, offset + #file.basename)
@@ -82,7 +87,6 @@ end
 ---@param depth integer
 ---@param comp RenderComponent
 local function render_file_tree_recurse(depth, comp)
-  local conf = config.get_config()
   local offset, s
 
   if comp.name == "file" then
