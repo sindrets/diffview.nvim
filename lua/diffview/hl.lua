@@ -324,7 +324,7 @@ function M.get_file_icon(name, ext, render_data, line_idx, offset)
           .. "Set `use_icons = false` in your config to stop seeing this message."
       )
 
-      return " "
+      return ""
     end
   end
 
