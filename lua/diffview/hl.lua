@@ -311,7 +311,7 @@ function M.hi_clear(groups)
 end
 
 function M.get_file_icon(name, ext, render_data, line_idx, offset)
-  if not config.get_config().use_icons then return " " end
+  if not config.get_config().use_icons then return "" end
 
   if not web_devicons then
     local ok
@@ -324,7 +324,7 @@ function M.get_file_icon(name, ext, render_data, line_idx, offset)
           .. "Set `use_icons = false` in your config to stop seeing this message."
       )
 
-      return " "
+      return ""
     end
   end
 
