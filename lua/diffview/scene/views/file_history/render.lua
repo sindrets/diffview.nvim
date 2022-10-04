@@ -3,7 +3,6 @@ local config = require("diffview.config")
 local hl = require("diffview.hl")
 local logger = require("diffview.logger")
 local utils = require("diffview.utils")
-local conf = config.get_config()
 
 ---@type PerfTimer
 local perf = PerfTimer("[FileHistoryPanel] Render internal")
@@ -32,10 +31,7 @@ local function render_files(comp, files)
     end
 
     offset = #s
-    local icon = ""
-    if conf.use_icons then
-      icon = hl.get_file_icon(file.basename, file.extension, comp, line_idx, offset)
-    end
+    local icon = hl.get_file_icon(file.basename, file.extension, comp, line_idx, offset)
     offset = offset + #icon
     if #file.parent_path > 0 then
       comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #file.parent_path + 1)
@@ -237,10 +233,7 @@ return {
         local file = panel.entries[1].files[1]
 
         -- file path
-        local icon = ""
-        if conf.use_icons then
-          icon = hl.get_file_icon(file.basename, file.extension, comp, line_idx, 0)
-        end
+        local icon = hl.get_file_icon(file.basename, file.extension, comp, line_idx, 0)
         offset = #icon
         if #file.parent_path > 0 then
           comp:add_hl("DiffviewFilePanelPath", line_idx, offset, offset + #file.parent_path + 1)
