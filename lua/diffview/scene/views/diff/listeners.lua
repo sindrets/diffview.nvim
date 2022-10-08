@@ -78,10 +78,12 @@ return function(view)
       if view.panel:is_open() then
         ---@type any
         local item = view.panel:get_item_at_cursor()
-        if type(item.collapsed) == "boolean" then
-          view.panel:toggle_item_fold(item)
-        else
-          view:set_file(item, false)
+        if item then
+          if type(item.collapsed) == "boolean" then
+            view.panel:toggle_item_fold(item)
+          else
+            view:set_file(item, false)
+          end
         end
       end
     end,
@@ -89,10 +91,12 @@ return function(view)
       if view.panel:is_open() then
         ---@type any
         local item = view.panel:get_item_at_cursor()
-        if type(item.collapsed) == "boolean" then
-          view.panel:toggle_item_fold(item)
-        else
-          view:set_file(item, true)
+        if item then
+          if type(item.collapsed) == "boolean" then
+            view.panel:toggle_item_fold(item)
+          else
+            view:set_file(item, true)
+          end
         end
       end
     end,
