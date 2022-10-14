@@ -2,7 +2,7 @@ local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
 ---@type vcs.File|LazyModule
-local File = lazy.access("diffview.git.file", "File")
+local File = lazy.access("diffview.vcs.file", "File")
 ---@type RevType|LazyModule
 local RevType = lazy.access("diffview.git.rev", "RevType")
 ---@type Diff1|LazyModule
