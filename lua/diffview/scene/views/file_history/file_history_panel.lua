@@ -1,7 +1,7 @@
 local lazy = require("diffview.lazy")
 
 local FHOptionPanel = lazy.access("diffview.scene.views.file_history.option_panel", "FHOptionPanel") ---@type FHOptionPanel|LazyModule
-local LogEntry = lazy.access("diffview.git.log_entry", "LogEntry") ---@type LogEntry|LazyModule
+local LogEntry = lazy.access("diffview.vcs.log_entry", "LogEntry") ---@type LogEntry|LazyModule
 local Panel = lazy.access("diffview.ui.panel", "Panel") ---@type Panel|LazyModule
 local PerfTimer = lazy.access("diffview.perf", "PerfTimer") ---@type PerfTimer|LazyModule
 local config = lazy.require("diffview.config") ---@module "diffview.config"
