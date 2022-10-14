@@ -1,7 +1,7 @@
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
----@type git.File|LazyModule
+---@type vcs.File|LazyModule
 local File = lazy.access("diffview.git.file", "File")
 ---@type RevType|LazyModule
 local RevType = lazy.access("diffview.git.rev", "RevType")
@@ -313,7 +313,7 @@ function FileEntry.with_layout(layout_class, opt)
     commit = opt.commit,
     get_data = opt.get_data,
     rev = opt.rev_main,
-  }) --[[@as git.File ]]
+  }) --[[@as vcs.File ]]
 
   if layout_class:instanceof(Diff1.__get()) then
     main_file.nulled = layout_class.should_null(main_file.rev, opt.status, "a")

@@ -13,8 +13,8 @@ local Diff2 = oop.create_class("Diff2", Layout)
 ---@alias Diff2.WindowSymbol "a"|"b"
 
 ---@class Diff2.init.Opt
----@field a git.File
----@field b git.File
+---@field a vcs.File
+---@field b vcs.File
 ---@field winid_a integer
 ---@field winid_b integer
 
@@ -26,13 +26,13 @@ function Diff2:init(opt)
   self:use_windows(self.a, self.b)
 end
 
----@param file git.File
+---@param file vcs.File
 function Diff2:set_file_a(file)
   self.a:set_file(file)
   file.symbol = "a"
 end
 
----@param file git.File
+---@param file vcs.File
 function Diff2:set_file_b(file)
   self.b:set_file(file)
   file.symbol = "b"

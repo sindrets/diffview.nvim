@@ -1,7 +1,7 @@
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
-local File = lazy.access("diffview.git.file", "File") ---@type git.File|LazyModule
+local File = lazy.access("diffview.vcs.file", "File") ---@type vcs.File|LazyModule
 local RevType = lazy.access("diffview.git.rev", "RevType") ---@type RevType|LazyModule
 local config = lazy.require("diffview.config") ---@module "diffview.config"
 local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
@@ -12,7 +12,7 @@ local M = {}
 
 ---@class Window : diffview.Object
 ---@field id integer
----@field file git.File
+---@field file vcs.File
 ---@field parent Layout
 local Window = oop.create_class("Window")
 
@@ -20,7 +20,7 @@ Window.winopt_store = {}
 
 ---@class Window.init.opt
 ---@field id integer
----@field file git.File
+---@field file vcs.File
 ---@field parent Layout
 
 ---@param opt Window.init.opt
@@ -62,7 +62,7 @@ function Window:is_focused()
   return self:is_valid() and api.nvim_get_current_win() == self.id
 end
 
----@param callback fun(file: git.File)
+---@param callback fun(file: vcs.File)
 function Window:load_file(callback)
   assert(self.file)
 
@@ -75,7 +75,7 @@ function Window:load_file(callback)
   end)
 end
 
----@param callback? fun(file: git.File)
+---@param callback? fun(file: vcs.File)
 function Window:open_file(callback)
   assert(self.file)
 

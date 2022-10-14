@@ -22,7 +22,7 @@ local M = {}
 
 ---@alias git.FileDataProducer fun(kind: git.FileKind, path: string, pos: "left"|"right"): string[]
 
----@class git.File : diffview.Object
+---@class vcs.File : diffview.Object
 ---@field git_ctx GitContext
 ---@filed path string
 ---@field absolute_path string
@@ -40,9 +40,9 @@ local M = {}
 ---@field active boolean
 ---@field ready boolean
 ---@field winopts WindowOptions
-local File = oop.create_class("git.File")
+local File = oop.create_class("vcs.File")
 
----@type table<integer, git.File.AttachState>
+---@type table<integer, vcs.File.AttachState>
 File.attached = {}
 
 ---@static
@@ -230,7 +230,7 @@ function File:is_valid()
 end
 
 ---@param force? boolean
----@param opt? git.File.AttachState
+---@param opt? vcs.File.AttachState
 function File:attach_buffer(force, opt)
   if self.bufnr then
     File._attach_buffer(self.bufnr, force, opt)
@@ -253,7 +253,7 @@ end
 
 ---@param t1 table
 ---@param t2 table
----@return git.File.AttachState
+---@return vcs.File.AttachState
 local function prepare_attach_opt(t1, t2)
   local res = vim.tbl_extend("keep", t1, {
     keymaps = {},
@@ -275,14 +275,14 @@ local function prepare_attach_opt(t1, t2)
   return res
 end
 
----@class git.File.AttachState
+---@class vcs.File.AttachState
 ---@field keymaps table
 ---@field disable_diagnostics boolean
 
 ---@static
 ---@param bufnr integer
 ---@param force? boolean
----@param opt? git.File.AttachState
+---@param opt? vcs.File.AttachState
 function File._attach_buffer(bufnr, force, opt)
   local new_opt = false
   local cur_state = File.attached[bufnr] or {}
@@ -385,7 +385,7 @@ function File.load_null_buffer(winid)
   File._attach_buffer(bn)
 end
 
----@type git.File
+---@type vcs.File
 File.NULL_FILE = File({
   git_ctx = {
     toplevel = "diffview://",
