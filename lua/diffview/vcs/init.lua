@@ -1,3 +1,7 @@
-local git = require('diffview.vcs.adapters.git.utils')
+local M = {}
 
-return git
+function M.get_adapter(path)
+  -- TODO: return adapter based on path specification
+end
+
+return M
