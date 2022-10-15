@@ -12,6 +12,7 @@ function VCSAdapter:init(path)
     done = false,
     ok = false,
   }
+  self.context = self:get_context(path)
 end
 
 function VCSAdapter:run_bootstrap()
@@ -20,6 +21,10 @@ end
 
 function VCSAdapter:get_command()
   oop.abstract_stub()
+end
+
+function VCSAdapter:get_context(path)
+  return {}
 end
 
 ---@return string cmd The VCS binary.

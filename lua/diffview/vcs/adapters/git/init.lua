@@ -11,17 +11,16 @@ local GitAdapter = oop.create_class('GitAdapter', VCSAdapter)
 function GitAdapter:init(path)
   self.super:init(path)
 
-  local bootstrap = {
-    version_string = nil,
-    version = {},
-    target_version_string = nil,
-    target_version = {
-      major = 2,
-      minor = 31,
-      patch = 0,
-    },
+  self.bootstrap.version_string = nil
+  self.bootstrap.version = {}
+  self.bootstrap.target_version_string = nil
+  self.bootstrap.target_version = {
+    major = 2,
+    minor = 31,
+    patch = 0,
   }
-  self.bootstrap = vim.tbl_extend('force', self.bootstrap, bootstrap)
+
+  self.context = self:get_context(path)
 end
 
 function GitAdapter:run_bootstrap()
@@ -74,6 +73,22 @@ end
 
 function GitAdapter:get_command()
   return config.get_config().git_cmd
+end
+
+function GitAdapter:get_context(path)
+  local context = {}
+  local out, code = self:exec_sync({ "rev-parse", "--path-format=absolute", "--show-toplevel" }, path)
+  if code ~= 0 then
+    return nil
+  end
+  context.toplevel = out[1] and vim.trim(out[1])
+
+  out, code = self:exec_sync({ "rev-parse", "--path-format=absolute", "--git-dir" }, path)
+  if code ~= 0 then
+    return nil
+  end
+  context.dir = out[1] and vim.trim(out[1])
+  return context
 end
 
 M.GitAdapter = GitAdapter
