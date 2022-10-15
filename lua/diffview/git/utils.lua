@@ -1,4 +1,4 @@
-local Commit = require("diffview.git.commit").Commit
+local Commit = require("diffview.vcs.adapters.git").GitCommit
 local CountDownLatch = require("diffview.control").CountDownLatch
 local Diff2Hor = require("diffview.scene.layouts.diff_2_hor").Diff2Hor
 local FileDict = require("diffview.vcs.file_dict").FileDict
