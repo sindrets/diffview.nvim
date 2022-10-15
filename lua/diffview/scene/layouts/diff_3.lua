@@ -10,9 +10,9 @@ local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4")
 ---@type vcs.File|LazyModule
 local File = lazy.access("diffview.vcs.file", "File")
 ---@type Rev|LazyModule
-local Rev = lazy.access("diffview.git.rev", "Rev")
+local Rev = lazy.access("diffview.vcs.rev", "Rev")
 ---@type ERevType|LazyModule
-local RevType = lazy.access("diffview.git.rev", "RevType")
+local RevType = lazy.access("diffview.vcs.rev", "RevType")
 
 local M = {}
 

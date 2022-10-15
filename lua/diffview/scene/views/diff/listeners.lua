@@ -2,7 +2,7 @@ local lazy = require("diffview.lazy")
 
 local actions = lazy.require("diffview.actions") ---@module "diffview.actions"
 local Event = lazy.access("diffview.events", "Event") ---@type EEvent
-local RevType = lazy.access("diffview.git.rev", "RevType") ---@type ERevType
+local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type ERevType
 local async = lazy.require("plenary.async") ---@module "plenary.async"
 local git = lazy.require("diffview.git.utils") ---@module "diffview.git.utils"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"

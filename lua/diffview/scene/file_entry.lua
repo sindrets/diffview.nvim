@@ -4,7 +4,7 @@ local oop = require("diffview.oop")
 ---@type vcs.File|LazyModule
 local File = lazy.access("diffview.vcs.file", "File")
 ---@type RevType|LazyModule
-local RevType = lazy.access("diffview.git.rev", "RevType")
+local RevType = lazy.access("diffview.vcs.rev", "RevType")
 ---@type Diff1|LazyModule
 local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1")
 ---@type Diff2|LazyModule

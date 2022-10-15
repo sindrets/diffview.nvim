@@ -4,9 +4,9 @@ local oop = require("diffview.oop")
 ---@module "plenary.async"
 local async = lazy.require("plenary.async")
 ---@type Rev
-local Rev = lazy.access("diffview.git.rev", "Rev")
+local Rev = lazy.access("diffview.vcs.rev", "Rev")
 ---@type ERevType
-local RevType = lazy.access("diffview.git.rev", "RevType")
+local RevType = lazy.access("diffview.vcs.rev", "RevType")
 ---@module "diffview.config"
 local config = lazy.require("diffview.config")
 ---@module "diffview.git.utils"
