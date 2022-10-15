@@ -6,14 +6,14 @@ local Panel = lazy.access("diffview.ui.panel", "Panel") ---@type Panel|LazyModul
 local PerfTimer = lazy.access("diffview.perf", "PerfTimer") ---@type PerfTimer|LazyModule
 local config = lazy.require("diffview.config") ---@module "diffview.config"
 local debounce = lazy.require("diffview.debounce") ---@module "diffview.debounce"
-local git = lazy.require("diffview.git.utils") ---@module "diffview.git.utils"
+local git = lazy.require("diffview.vcs.adapters.git.utils") ---@module "diffview.vcs.adapters.git.utils"
 local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 local oop = lazy.require("diffview.oop") ---@module "diffview.oop"
 local panel_renderer = lazy.require("diffview.scene.views.file_history.render") ---@module "diffview.scene.views.file_history.render"
 local renderer = lazy.require("diffview.renderer") ---@module "diffview.renderer"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
-local JobStatus = git.JobStatus
+local JobStatus = lazy.access('diffview.vcs.utils', 'JobStatus') ---@type JobStatus|LazyModule
 local api = vim.api
 local M = {}
 

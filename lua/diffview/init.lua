@@ -9,8 +9,8 @@ local lazy = require("diffview.lazy")
 local arg_parser = lazy.require("diffview.arg_parser")
 ---@module "diffview.config"
 local config = lazy.require("diffview.config")
----@module "diffview.git.utils"
-local git = lazy.require("diffview.git.utils")
+---@module "diffview.vcs.adapters.git.utils"
+local git = lazy.require("diffview.vcs.adapters.git.utils")
 ---@module "diffview.lib"
 local lib = lazy.require("diffview.lib")
 ---@module "diffview.logger"

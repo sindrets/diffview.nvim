@@ -4,7 +4,7 @@ local actions = lazy.require("diffview.actions") ---@module "diffview.actions"
 local Event = lazy.access("diffview.events", "Event") ---@type EEvent
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type ERevType
 local async = lazy.require("plenary.async") ---@module "plenary.async"
-local git = lazy.require("diffview.git.utils") ---@module "diffview.git.utils"
+local git = lazy.require("diffview.vcs.adapters.git.utils") ---@module "diffview.vcs.adapters.git.utils"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api

@@ -1,4 +1,4 @@
-local Commit = require("diffview.vcs.adapters.git").GitCommit
+local Commit = require("diffview.vcs.adapters.git.commit").GitCommit
 local CountDownLatch = require("diffview.control").CountDownLatch
 local Diff2Hor = require("diffview.scene.layouts.diff_2_hor").Diff2Hor
 local FileDict = require("diffview.vcs.file_dict").FileDict
@@ -12,6 +12,7 @@ local async = require("plenary.async")
 local config = require("diffview.config")
 local logger = require("diffview.logger")
 local utils = require("diffview.utils")
+local JobStatus = require("diffview.vcs.utils").JobStatus
 
 local api = vim.api
 
@@ -32,15 +33,6 @@ local bootstrap = {
     minor = 31,
     patch = 0,
   },
-}
-
----@enum JobStatus
-local JobStatus = {
-  SUCCESS = 1,
-  PROGRESS = 2,
-  ERROR = 3,
-  KILLED = 4,
-  FATAL = 5,
 }
 
 ---@type Job[]
@@ -1728,5 +1720,4 @@ M.restore_file = async.wrap(function(toplevel, path, kind, commit, callback)
   callback()
 end, 5)
 
-M.JobStatus = JobStatus
 return M
