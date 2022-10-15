@@ -4,7 +4,7 @@ local actions = lazy.require("diffview.actions") ---@module "diffview.actions"
 local Event = lazy.access("diffview.events", "Event") ---@type EEvent
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type ERevType
 local async = lazy.require("plenary.async") ---@module "plenary.async"
-local git = lazy.require("diffview.vcs") ---@module "diffview.vcs"
+local vcs = lazy.require("diffview.vcs") ---@module "diffview.vcs"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
@@ -34,7 +34,7 @@ return function(view)
       end
     end,
     buf_write_post = function()
-      if git.has_local(view.left, view.right) then
+      if vcs.has_local(view.left, view.right) then
         view.update_needed = true
         if api.nvim_get_current_tabpage() == view.tabpage then
           view:update_files()
@@ -123,9 +123,9 @@ return function(view)
       if item then
         local code
         if item.kind == "working" or item.kind == "conflicting" then
-          _, code = git.exec_sync({ "add", item.path }, view.git_ctx.toplevel)
+          _, code = vcs.exec_sync({ "add", item.path }, view.git_ctx.toplevel)
         elseif item.kind == "staged" then
-          _, code = git.exec_sync({ "reset", "--", item.path }, view.git_ctx.toplevel)
+          _, code = vcs.exec_sync({ "reset", "--", item.path }, view.git_ctx.toplevel)
         end
 
         if code ~= 0 then
@@ -180,7 +180,7 @@ return function(view)
       end, view.files.working)
 
       if #args > 0 then
-        local _, code = git.exec_sync({ "add", args }, view.git_ctx.toplevel)
+        local _, code = vcs.exec_sync({ "add", args }, view.git_ctx.toplevel)
 
         if code ~= 0 then
           utils.err("Failed to stage files!")
@@ -194,7 +194,7 @@ return function(view)
       end
     end,
     unstage_all = function()
-      local _, code = git.exec_sync({ "reset" }, view.git_ctx.toplevel)
+      local _, code = vcs.exec_sync({ "reset" }, view.git_ctx.toplevel)
 
       if code ~= 0 then
         utils.err("Failed to unstage files!")
@@ -220,7 +220,7 @@ return function(view)
           utils.err("The file is open with unsaved changes! Aborting file restoration.")
           return
         end
-        git.restore_file(view.git_ctx.toplevel, file.path, file.kind, commit, function()
+        vcs.restore_file(view.git_ctx.toplevel, file.path, file.kind, commit, function()
           async.util.scheduler()
           view:update_files()
         end)

@@ -6,7 +6,7 @@ local Panel = lazy.access("diffview.ui.panel", "Panel") ---@type Panel|LazyModul
 local PerfTimer = lazy.access("diffview.perf", "PerfTimer") ---@type PerfTimer|LazyModule
 local config = lazy.require("diffview.config") ---@module "diffview.config"
 local debounce = lazy.require("diffview.debounce") ---@module "diffview.debounce"
-local git = lazy.require("diffview.vcs") ---@module "diffview.vcs"
+local vcs = lazy.require("diffview.vcs") ---@module "diffview.vcs"
 local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 local oop = lazy.require("diffview.oop") ---@module "diffview.oop"
 local panel_renderer = lazy.require("diffview.scene.views.file_history.render") ---@module "diffview.scene.views.file_history.render"
@@ -279,7 +279,7 @@ function FileHistoryPanel:update_entries(callback)
   self.entries = {}
   self.updating = true
 
-  finalizer = git.file_history(
+  finalizer = vcs.file_history(
     self.git_ctx,
     self.log_options,
     { default_layout = self.parent.get_default_diff2(), },

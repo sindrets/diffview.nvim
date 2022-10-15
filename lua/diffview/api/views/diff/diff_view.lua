@@ -6,7 +6,7 @@ local FilePanel = lazy.access("diffview.scene.views.diff.file_panel", "FilePanel
 local Rev = lazy.access("diffview.vcs.rev", "Rev") ---@type Rev|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local async = lazy.require("plenary.async") ---@module "plenary.async"
-local git = lazy.require("diffview.vcs") ---@module "diffview.vcs"
+local vcs = lazy.require("diffview.vcs") ---@module "diffview.vcs"
 local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 local oop = lazy.require("diffview.oop") ---@module "diffview.oop"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
@@ -33,7 +33,7 @@ local CDiffView = oop.create_class("CDiffView", DiffView.__get())
 function CDiffView:init(opt)
   logger.info("[api] Creating a new Custom DiffView.")
   self.valid = false
-  local git_dir = git.git_dir(opt.git_root)
+  local git_dir = vcs.git_dir(opt.git_root)
 
   if not git_dir then
     utils.err(
@@ -65,7 +65,7 @@ function CDiffView:init(opt)
       git_ctx,
       self.files,
       self.path_args,
-      self.rev_arg or git.rev_to_pretty_string(opt.left, opt.right)
+      self.rev_arg or vcs.rev_to_pretty_string(opt.left, opt.right)
     ),
   }))
 
@@ -128,7 +128,7 @@ function CDiffView:create_file_entries(files)
     {
       kind = "staged",
       files = files.staged or {},
-      left = git.head_rev(self.git_ctx.toplevel),
+      left = vcs.head_rev(self.git_ctx.toplevel),
       right = Rev(RevType.STAGE, 0),
     },
   }

@@ -7,7 +7,7 @@ local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type ERevType|Laz
 local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
 local arg_parser = lazy.require("diffview.arg_parser") ---@module "diffview.arg_parser"
 local config = lazy.require("diffview.config") ---@module "diffview.config"
-local git = lazy.require("diffview.vcs") ---@module "diffview.vcs"
+local vcs = lazy.require("diffview.vcs") ---@module "diffview.vcs"
 local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
@@ -34,7 +34,7 @@ function M.diffview_open(args)
 
   for _, path_arg in ipairs(argo.post_args) do
     for _, path in ipairs(pl:vim_expand(path_arg, false, true)) do
-      local magic, pattern = git.pathspec_split(path)
+      local magic, pattern = vcs.pathspec_split(path)
       pattern = pl:readlink(pattern) or pattern
       table.insert(paths, magic .. pattern)
     end
@@ -69,7 +69,7 @@ function M.diffview_open(args)
 
   local cwd = cpath or vim.loop.cwd()
   paths = vim.tbl_map(function(pathspec)
-    return git.pathspec_expand(git_toplevel, cwd, pathspec)
+    return vcs.pathspec_expand(git_toplevel, cwd, pathspec)
   end, paths) --[[@as string[] ]]
 
   local left, right = M.parse_revs(git_toplevel, rev_arg, {
@@ -98,7 +98,7 @@ function M.diffview_open(args)
 
   local git_ctx = {
     toplevel = git_toplevel,
-    dir = git.git_dir(git_toplevel),
+    dir = vcs.git_dir(git_toplevel),
   }
 
   if not git_ctx.dir then
@@ -144,7 +144,7 @@ function M.file_history(range, args)
 
   for _, path_arg in ipairs(argo.args) do
     for _, path in ipairs(pl:vim_expand(path_arg, false, true)) do
-      local magic, pattern = git.pathspec_split(path)
+      local magic, pattern = vcs.pathspec_split(path)
       pattern = pl:readlink(pattern) or pattern
       table.insert(paths, magic .. pattern)
     end
@@ -157,7 +157,7 @@ function M.file_history(range, args)
 
   local top_indicators = {}
   for _, path in ipairs(paths) do
-    if git.pathspec_split(path) == "" then
+    if vcs.pathspec_split(path) == "" then
       table.insert(top_indicators, pl:absolute(path, cpath))
       break
     end
@@ -189,13 +189,13 @@ function M.file_history(range, args)
 
   local cwd = cpath or vim.loop.cwd()
   paths = vim.tbl_map(function(pathspec)
-    return git.pathspec_expand(git_toplevel, cwd, pathspec)
+    return vcs.pathspec_expand(git_toplevel, cwd, pathspec)
   end, paths) --[[@as string[] ]]
 
   ---@type string
   local range_arg = argo:get_flag("range", { no_empty = true })
   if range_arg then
-    local ok = git.verify_rev_arg(git_toplevel, range_arg)
+    local ok = vcs.verify_rev_arg(git_toplevel, range_arg)
     if not ok then
       utils.err(("Bad revision: %s"):format(utils.str_quote(range_arg)))
       return
@@ -241,7 +241,7 @@ function M.file_history(range, args)
 
   log_options.path_args = paths
 
-  local ok, opt_description = git.file_history_dry_run(git_toplevel, log_options)
+  local ok, opt_description = vcs.file_history_dry_run(git_toplevel, log_options)
 
   if not ok then
     utils.info({
@@ -256,7 +256,7 @@ function M.file_history(range, args)
 
   local git_ctx = {
     toplevel = git_toplevel,
-    dir = git.git_dir(git_toplevel),
+    dir = vcs.git_dir(git_toplevel),
   }
 
   if not git_ctx.dir then
@@ -296,7 +296,7 @@ function M.find_git_toplevel(top_indicators)
     end
 
     if p and pl:readable(p) then
-      toplevel = git.toplevel(p)
+      toplevel = vcs.toplevel(p)
 
       if toplevel then
         return nil, toplevel
@@ -325,7 +325,7 @@ function M.parse_revs(git_toplevel, rev_arg, opt)
   ---@type Rev?
   local right
 
-  local head = git.head_rev(git_toplevel)
+  local head = vcs.head_rev(git_toplevel)
   ---@cast head Rev
 
   if not rev_arg then
@@ -337,7 +337,7 @@ function M.parse_revs(git_toplevel, rev_arg, opt)
       right = Rev(RevType.LOCAL)
     end
   elseif rev_arg:match("%.%.%.") then
-    left, right = git.symmetric_diff_revs(git_toplevel, rev_arg)
+    left, right = vcs.symmetric_diff_revs(git_toplevel, rev_arg)
     if not (left or right) then
       return
     elseif opt.imply_local then
@@ -346,7 +346,7 @@ function M.parse_revs(git_toplevel, rev_arg, opt)
       left, right = M.imply_local(left, right, head)
     end
   else
-    local rev_strings, code, stderr = git.exec_sync(
+    local rev_strings, code, stderr = vcs.exec_sync(
       { "rev-parse", "--revs-only", rev_arg }, git_toplevel
     )
     if code ~= 0 then
@@ -361,7 +361,7 @@ function M.parse_revs(git_toplevel, rev_arg, opt)
       return
     end
 
-    local is_range = git.is_rev_arg_range(rev_arg)
+    local is_range = vcs.is_rev_arg_range(rev_arg)
 
     if is_range then
       local right_hash = rev_strings[1]:gsub("^%^", "")

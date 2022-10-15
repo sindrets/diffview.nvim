@@ -10,7 +10,7 @@ local RevType = lazy.access("diffview.vcs.rev", "RevType")
 ---@module "diffview.config"
 local config = lazy.require("diffview.config")
 ---@module "diffview.vcs"
-local git = lazy.require("diffview.vcs")
+local vcs = lazy.require("diffview.vcs")
 ---@module "diffview.utils"
 local utils = lazy.require("diffview.utils")
 
@@ -122,7 +122,7 @@ function File:create_buffer(callback)
   end
 
   if self.binary == nil and not config.get_config().diff_binaries then
-    self.binary = git.is_binary(self.git_ctx.toplevel, self.path, self.rev)
+    self.binary = vcs.is_binary(self.git_ctx.toplevel, self.path, self.rev)
   end
 
   if self.nulled or self.binary then
@@ -208,7 +208,7 @@ function File:create_buffer(callback)
     end, nil)
 
   else
-    git.show(
+    vcs.show(
       self.git_ctx.toplevel,
       { ("%s:%s"):format(self.rev:object_name() or "", self.path) },
       function(err, result)

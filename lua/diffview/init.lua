@@ -10,7 +10,7 @@ local arg_parser = lazy.require("diffview.arg_parser")
 ---@module "diffview.config"
 local config = lazy.require("diffview.config")
 ---@module "diffview.vcs"
-local git = lazy.require("diffview.vcs")
+local vcs = lazy.require("diffview.vcs")
 ---@module "diffview.lib"
 local lib = lazy.require("diffview.lib")
 ---@module "diffview.logger"
@@ -229,7 +229,7 @@ function M.rev_candidates(git_toplevel, git_dir)
     end
 
     ---@cast git_toplevel string
-    git_dir = git.git_dir(git_toplevel)
+    git_dir = vcs.git_dir(git_toplevel)
   end
 
   if not (git_toplevel and git_dir) then
@@ -250,11 +250,11 @@ function M.rev_candidates(git_toplevel, git_dir)
       vim.fn.glob(git_dir .. "/*", false, true)
     )
   )
-  local revs = git.exec_sync(
+  local revs = vcs.exec_sync(
     { "rev-parse", "--symbolic", "--branches", "--tags", "--remotes" },
     { cwd = git_toplevel, silent = true }
   )
-  local stashes = git.exec_sync(
+  local stashes = vcs.exec_sync(
     { "stash", "list", "--pretty=format:%gd" },
     { cwd = git_toplevel, silent = true }
   )
@@ -327,7 +327,7 @@ M.completers = {
 
     if not err then
       ---@cast git_toplevel string
-      git_dir = git.git_dir(git_toplevel)
+      git_dir = vcs.git_dir(git_toplevel)
     end
 
     for i = 2, math.min(#ctx.args, ctx.divideridx) do

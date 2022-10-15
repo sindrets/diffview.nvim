@@ -3,7 +3,7 @@ local lazy = require("diffview.lazy")
 local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
 local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView") ---@type FileHistoryView|LazyModule
 local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
-local git = lazy.require("diffview.vcs") ---@module "diffview.vcs"
+local vcs = lazy.require("diffview.vcs") ---@module "diffview.vcs"
 local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
@@ -166,7 +166,7 @@ function M.next_conflict()
     local curfile = main.file
 
     if main:is_valid() and curfile:is_valid() then
-      local conflicts, _, cur_idx = git.parse_conflicts(
+      local conflicts, _, cur_idx = vcs.parse_conflicts(
         api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false),
         main.id
       )
@@ -197,7 +197,7 @@ function M.prev_conflict()
     local curfile = main.file
 
     if main:is_valid() and curfile:is_valid() then
-      local conflicts, _, cur_idx = git.parse_conflicts(
+      local conflicts, _, cur_idx = vcs.parse_conflicts(
         api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false),
         main.id
       )
@@ -334,7 +334,7 @@ function M.conflict_choose(target)
       local curfile = main.file
 
       if main:is_valid() and curfile:is_valid() then
-        local _, cur = git.parse_conflicts(
+        local _, cur = vcs.parse_conflicts(
           api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false),
           main.id
         )

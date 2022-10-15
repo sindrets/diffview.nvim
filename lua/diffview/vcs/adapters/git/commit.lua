@@ -3,8 +3,8 @@ local oop = require('diffview.oop')
 local utils = require("diffview.utils")
 local Commit = require('diffview.vcs.commit').Commit
 
----@module "diffview.vcs.utils"
-local git = lazy.require("diffview.vcs.utils")
+---@module "diffview.vcs.adapters.git.utils"
+local git = lazy.require("diffview.vcs.adapters.git.utils")
 
 ---@type ERevType|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType")

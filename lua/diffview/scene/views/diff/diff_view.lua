@@ -13,7 +13,7 @@ local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|Lazy
 local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
 local async = lazy.require("plenary.async") ---@module "plenary.async"
 local debounce = lazy.require("diffview.debounce") ---@module "diffview.debounce"
-local git = lazy.require("diffview.vcs") ---@module "diffview.vcs"
+local vcs = lazy.require("diffview.vcs") ---@module "diffview.vcs"
 local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local config = lazy.require("diffview.config") ---@module "diffview.config"
@@ -63,7 +63,7 @@ function DiffView:init(opt)
       self.git_ctx,
       self.files,
       self.path_args,
-      self.rev_arg or git.rev_to_pretty_string(self.left, self.right)
+      self.rev_arg or vcs.rev_to_pretty_string(self.left, self.right)
     ),
   })
 
@@ -75,7 +75,7 @@ function DiffView:init(opt)
       local file = entry.layout:get_main_win().file
 
       local count_conflicts = vim.schedule_wrap(function()
-        local conflicts = git.parse_conflicts(api.nvim_buf_get_lines(file.bufnr, 0, -1, false))
+        local conflicts = vcs.parse_conflicts(api.nvim_buf_get_lines(file.bufnr, 0, -1, false))
 
         entry.stats = entry.stats or {}
         entry.stats.conflicts = #conflicts
@@ -275,7 +275,7 @@ end
 ---@return string[] err
 ---@return FileDict
 DiffView.get_updated_files = async.wrap(function(self, callback)
-  git.diff_file_list(
+  vcs.diff_file_list(
       self.git_ctx,
       self.left,
       self.right,
@@ -302,7 +302,7 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
     -- If left is tracking HEAD and right is LOCAL: Update HEAD rev.
     local new_head
     if self.left.track_head and self.right.type == RevType.LOCAL then
-      new_head = git.head_rev(self.git_ctx.toplevel)
+      new_head = vcs.head_rev(self.git_ctx.toplevel)
       if new_head and self.left.commit ~= new_head.commit then
         self.left = new_head
       else
