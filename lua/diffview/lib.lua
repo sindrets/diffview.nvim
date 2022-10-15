@@ -7,7 +7,7 @@ local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type ERevType|Laz
 local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
 local arg_parser = lazy.require("diffview.arg_parser") ---@module "diffview.arg_parser"
 local config = lazy.require("diffview.config") ---@module "diffview.config"
-local git = lazy.require("diffview.vcs.adapters.git.utils") ---@module "diffview.vcs.adapters.git.utils"
+local git = lazy.require("diffview.vcs") ---@module "diffview.vcs"
 local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 

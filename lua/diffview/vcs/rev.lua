@@ -1,8 +1,8 @@
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
----@module "diffview.vcs.adapters.git.utils"
-local git = lazy.require("diffview.vcs.adapters.git.utils")
+---@module "diffview.vcs"
+local git = lazy.require("diffview.vcs")
 
 local M = {}
 
