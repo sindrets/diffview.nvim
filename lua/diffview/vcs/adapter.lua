@@ -48,6 +48,9 @@ function VCSAdapter:exec_sync(args, cwd_or_opt)
   )
 end
 
+function VCSAdapter:file_history_options(range, args)
+end
+
 
 M.VCSAdapter = VCSAdapter
 return M
