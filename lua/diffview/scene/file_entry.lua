@@ -26,7 +26,7 @@ local fstat_cache = {}
 ---@field conflicts integer
 
 ---@class FileEntry : diffview.Object
----@field git_ctx GitContext
+---@field adapter GitAdapter
 ---@field path string
 ---@field oldpath string
 ---@field absolute_path string
@@ -42,7 +42,7 @@ local fstat_cache = {}
 local FileEntry = oop.create_class("FileEntry")
 
 ---@class FileEntry.init.Opt
----@field git_ctx GitContext
+---@field adapter GitAdapter
 ---@field path string
 ---@field oldpath string
 ---@field layout Layout
@@ -56,7 +56,7 @@ local FileEntry = oop.create_class("FileEntry")
 function FileEntry:init(opt)
   self.path = opt.path
   self.oldpath = opt.oldpath
-  self.absolute_path = utils.path:absolute(opt.path, opt.git_ctx.toplevel)
+  self.absolute_path = utils.path:absolute(opt.path, opt.adapter.context.toplevel)
   self.parent_path = utils.path:parent(opt.path) or ""
   self.basename = utils.path:basename(opt.path)
   self.extension = utils.path:extension(opt.path)
@@ -211,7 +211,7 @@ end
 ---@return FileEntry
 function FileEntry.for_d2(layout_class, opt)
   return FileEntry({
-    git_ctx = opt.git_ctx,
+    adapter = opt.adapter,
     path = opt.path,
     oldpath = opt.oldpath,
     status = opt.status,
@@ -220,7 +220,7 @@ function FileEntry.for_d2(layout_class, opt)
     commit = opt.commit,
     layout = layout_class({
       a = File({
-        git_ctx = opt.git_ctx,
+        adapter = opt.adapter,
         path = opt.oldpath or opt.path,
         kind = opt.kind,
         commit = opt.commit,
@@ -229,7 +229,7 @@ function FileEntry.for_d2(layout_class, opt)
         nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_a, opt.status, "a")),
       }),
       b = File({
-        git_ctx = opt.git_ctx,
+        adapter = opt.adapter,
         path = opt.path,
         kind = opt.kind,
         commit = opt.commit,
@@ -254,7 +254,7 @@ end
 ---@return FileEntry
 function FileEntry.for_d3(layout_class, opt)
   return FileEntry({
-    git_ctx = opt.git_ctx,
+    adapter = opt.adapter,
     path = opt.path,
     oldpath = opt.oldpath,
     status = opt.status,
@@ -263,7 +263,7 @@ function FileEntry.for_d3(layout_class, opt)
     commit = opt.commit,
     layout = layout_class({
       a = File({
-        git_ctx = opt.git_ctx,
+        adapter = opt.adapter,
         path = opt.oldpath or opt.path,
         kind = opt.kind,
         commit = opt.commit,
@@ -272,7 +272,7 @@ function FileEntry.for_d3(layout_class, opt)
         nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_a, opt.status, "a")),
       }),
       b = File({
-        git_ctx = opt.git_ctx,
+        adapter = opt.adapter,
         path = opt.path,
         kind = opt.kind,
         commit = opt.commit,
@@ -281,7 +281,7 @@ function FileEntry.for_d3(layout_class, opt)
         nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_b, opt.status, "b")),
       }),
       c = File({
-        git_ctx = opt.git_ctx,
+        adapter = opt.adapter,
         path = opt.path,
         kind = opt.kind,
         commit = opt.commit,
@@ -307,7 +307,7 @@ end
 function FileEntry.with_layout(layout_class, opt)
   local new_layout
   local main_file = File({
-    git_ctx = opt.git_ctx,
+    adapter = opt.adapter,
     path = opt.path,
     kind = opt.kind,
     commit = opt.commit,
@@ -324,7 +324,7 @@ function FileEntry.with_layout(layout_class, opt)
     main_file.nulled = layout_class.should_null(main_file.rev, opt.status, "b")
     new_layout = layout_class({
       a = File({
-        git_ctx = opt.git_ctx,
+        adapter = opt.adapter,
         path = opt.oldpath or opt.path,
         kind = opt.kind,
         commit = opt.commit,
@@ -334,7 +334,7 @@ function FileEntry.with_layout(layout_class, opt)
       }),
       b = main_file,
       c = File({
-        git_ctx = opt.git_ctx,
+        adapter = opt.adapter,
         path = opt.path,
         kind = opt.kind,
         commit = opt.commit,
@@ -343,7 +343,7 @@ function FileEntry.with_layout(layout_class, opt)
         nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_theirs, opt.status, "c")),
       }),
       d = File({
-        git_ctx = opt.git_ctx,
+        adapter = opt.adapter,
         path = opt.path,
         kind = opt.kind,
         commit = opt.commit,
@@ -355,7 +355,7 @@ function FileEntry.with_layout(layout_class, opt)
   end
 
   return FileEntry({
-    git_ctx = opt.git_ctx,
+    adapter = opt.adapter,
     path = opt.path,
     oldpath = opt.oldpath,
     status = opt.status,

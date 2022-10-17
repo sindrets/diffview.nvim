@@ -279,8 +279,7 @@ function FileHistoryPanel:update_entries(callback)
   self.entries = {}
   self.updating = true
 
-  finalizer = vcs.file_history(
-    self.git_ctx,
+  finalizer = self.git_ctx:file_history(
     self.log_options,
     { default_layout = self.parent.get_default_diff2(), },
     update

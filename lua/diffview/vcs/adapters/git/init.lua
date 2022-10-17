@@ -1,11 +1,20 @@
 local oop = require('diffview.oop')
+local CountDownLatch = require("diffview.control").CountDownLatch
 local arg_parser = require('diffview.arg_parser')
 local logger = require('diffview.logger')
 local utils = require('diffview.utils')
 local async = require("plenary.async")
 local config = require('diffview.config')
 local lazy = require('diffview.lazy')
+local FileEntry = require("diffview.scene.file_entry").FileEntry
+local Diff2Hor = require("diffview.scene.layouts.diff_2_hor").Diff2Hor
+local LogEntry = require("diffview.vcs.log_entry").LogEntry
+local RevType = require("diffview.vcs.rev").RevType
+local Rev = require("diffview.vcs.rev").Rev
 local VCSAdapter = require('diffview.vcs.adapter').VCSAdapter
+local Job = require("plenary.job")
+local JobStatus = require('diffview.vcs.utils').JobStatus
+local Commit = require('diffview.vcs.adapters.git.commit').GitCommit
 
 ---@type PathLib
 local pl = lazy.access(utils, "path")
@@ -293,9 +302,9 @@ local incremental_fh_data = async.void(function(state, callback)
   local rev_range = state.prepared_log_opts.rev_range
 
   namestat_job = Job:new({
-    command = git_bin(),
+    command = state.adapter:bin(),
     args = utils.vec_join(
-      git_args(),
+      state.adapter:args(),
       "log",
       rev_range,
       "--pretty=format:%x00%n%H %P%n%an%n%ad%n%ar%n  %D%n  %s",
@@ -305,15 +314,15 @@ local incremental_fh_data = async.void(function(state, callback)
       "--",
       state.path_args
     ),
-    cwd = state.ctx.toplevel,
+    cwd = state.adapter.context.toplevel,
     on_stdout = on_stdout,
     on_exit = on_exit,
   })
 
   numstat_job = Job:new({
-    command = git_bin(),
+    command = state.adapter:bin(),
     args = utils.vec_join(
-      git_args(),
+      state.adapter:args(),
       "log",
       rev_range,
       "--pretty=format:%x00",
@@ -323,7 +332,7 @@ local incremental_fh_data = async.void(function(state, callback)
       "--",
       state.path_args
     ),
-    cwd = state.ctx.toplevel,
+    cwd = state.adapter.context.toplevel,
     on_stdout = on_stdout,
     on_exit = on_exit,
   })
@@ -662,6 +671,284 @@ function GitAdapter:file_history_options(range, args)
 
   return log_options
 end
+
+---@class git.utils.FHState
+---@field thread thread
+---@field adapter GitAdapter
+---@field path_args string[]
+---@field log_options LogOptions
+---@field prepared_log_opts git.utils.PreparedLogOpts
+---@field opt git.utils.FileHistoryWorkerSpec
+---@field single_file boolean
+---@field resume_lock boolean
+---@field cur table
+---@field commit Commit
+---@field entries LogEntry[]
+---@field callback function
+
+---@param state git.utils.FHState
+---@return boolean ok, JobStatus? status
+local function parse_fh_data(state)
+  local cur = state.cur
+
+  -- 'git log --name-status' doesn't work properly for merge commits. It
+  -- lists only an incomplete list of files at best. We need to use 'git
+  -- show' to get file statuses for merge commits. And merges do not always
+  -- have changes.
+  if cur.merge_hash and cur.numstat[1] and #cur.numstat ~= #cur.namestat then
+    local job
+    local job_spec = {
+      command = state.adapter:bin(),
+      args = utils.vec_join(
+        state.adapter:args(),
+        "show",
+        "--format=",
+        "--diff-merges=first-parent",
+        "--name-status",
+        (state.single_file and state.log_options.follow) and "--follow" or nil,
+        cur.right_hash,
+        "--",
+        state.old_path or state.path_args
+      ),
+      cwd = state.ctx.toplevel,
+      on_exit = function(j)
+        if j.code == 0 then
+          cur.namestat = j:result()
+        end
+        handle_co(state.thread, coroutine.resume(state.thread))
+      end,
+    }
+
+    local max_retries = 2
+    local context = "git.utils.file_history_worker()"
+    state.resume_lock = true
+
+    for i = 0, max_retries do
+      -- Git sometimes fails this job silently (exit code 0). Not sure why,
+      -- possibly because we are running multiple git opeartions on the same
+      -- repo concurrently. Retrying the job usually solves this.
+      job = Job:new(job_spec)
+      job:start()
+      coroutine.yield()
+      utils.handle_job(job, { fail_on_empty = true, context = context, log_func = logger.warn })
+
+      if #cur.namestat == 0 then
+        if i < max_retries then
+          logger.warn(("[%s] Retrying %d more time(s)."):format(context, max_retries - i))
+        end
+      else
+        if i > 0 then
+          logger.info(("[%s] Retry successful!"):format(context))
+        end
+        break
+      end
+    end
+
+    state.resume_lock = false
+
+    if job.code ~= 0 then
+      state.callback({}, JobStatus.ERROR, job:stderr_result())
+      return false, JobStatus.FATAL
+    end
+
+    if #cur.namestat == 0 then
+      -- Give up: something has been renamed. We can no longer track the
+      -- history.
+      logger.warn(("[%s] Giving up."):format(context))
+      utils.warn("Displayed history may be incomplete. Check ':DiffviewLog' for details.", true)
+      return false
+    end
+  end
+
+  local files = {}
+  for i = 1, #cur.numstat do
+    local status = cur.namestat[i]:sub(1, 1):gsub("%s", " ")
+    local name = cur.namestat[i]:match("[%a%s][^%s]*\t(.*)")
+    local oldname
+
+    if name:match("\t") ~= nil then
+      oldname = name:match("(.*)\t")
+      name = name:gsub("^.*\t", "")
+      if state.single_file then
+        state.old_path = oldname
+      end
+    end
+
+    local stats = {
+      additions = tonumber(cur.numstat[i]:match("^%d+")),
+      deletions = tonumber(cur.numstat[i]:match("^%d+%s+(%d+)")),
+    }
+
+    if not stats.additions or not stats.deletions then
+      stats = nil
+    end
+
+    table.insert(files, FileEntry.for_d2(state.opt.default_layout or Diff2Hor, {
+      adapter = state.adapter,
+      path = name,
+      oldpath = oldname,
+      status = status,
+      stats = stats,
+      kind = "working",
+      commit = state.commit,
+      rev_a = cur.left_hash and Rev(RevType.COMMIT, cur.left_hash) or Rev.new_null_tree(),
+      rev_b = state.prepared_log_opts.base or Rev(RevType.COMMIT, cur.right_hash),
+    }))
+  end
+
+  if files[1] then
+    table.insert(
+      state.entries,
+      LogEntry({
+        path_args = state.path_args,
+        commit = state.commit,
+        files = files,
+        single_file = state.single_file,
+      })
+    )
+
+    state.callback(state.entries, JobStatus.PROGRESS)
+  end
+
+  return true
+end
+
+
+---@class git.utils.FileHistoryWorkerSpec : git.utils.LayoutOpt
+
+---@param thread thread
+---@param log_opt ConfigLogOptions
+---@param opt git.utils.FileHistoryWorkerSpec
+---@param co_state table
+---@param callback function
+function GitAdapter:file_history_worker(thread, log_opt, opt, co_state, callback)
+  ---@type LogEntry[]
+  local entries = {}
+  local data = {}
+  local data_idx = 1
+  local last_status
+  local err_msg
+
+  local single_file = self:is_single_file(self.context.toplevel, log_opt.single_file.path_args, log_opt.single_file.L)
+
+  ---@type LogOptions
+  local log_options = config.get_log_options(
+    single_file,
+    single_file and log_opt.single_file or log_opt.multi_file
+  )
+
+  local is_trace = #log_options.L > 0
+
+  ---@type git.utils.FHState
+  local state = {
+    thread = thread,
+    adapter = self,
+    path_args = log_opt.single_file.path_args,
+    log_options = log_options,
+    prepared_log_opts = prepare_fh_options(self.context.toplevel, log_options, single_file),
+    opt = opt,
+    callback = callback,
+    entries = entries,
+    single_file = single_file,
+    resume_lock = false,
+  }
+
+  local function data_callback(status, d, msg)
+    if status == JobStatus.PROGRESS then
+      data[#data+1] = d
+    end
+
+    last_status = status
+    if msg then
+      err_msg = msg
+    end
+    if not state.resume_lock and coroutine.status(thread) == "suspended" then
+      self:handle_co(thread, coroutine.resume(thread))
+    end
+
+    if co_state.shutdown then
+      return true
+    end
+  end
+
+  if is_trace then
+    incremental_line_trace_data(state, data_callback)
+  else
+    incremental_fh_data(state, data_callback)
+  end
+
+  while true do
+    if not vim.tbl_contains({ JobStatus.SUCCESS, JobStatus.ERROR, JobStatus.KILLED }, last_status)
+        and not data[data_idx] then
+      coroutine.yield()
+    end
+
+    if last_status == JobStatus.KILLED then
+      logger.warn("File history processing was killed.")
+      return
+    elseif last_status == JobStatus.ERROR then
+      callback(entries, JobStatus.ERROR, err_msg)
+      return
+    elseif last_status == JobStatus.SUCCESS and data_idx > #data then
+      break
+    end
+
+    state.cur = data[data_idx]
+
+    state.commit = Commit({
+      hash = state.cur.right_hash,
+      author = state.cur.author,
+      time = tonumber(state.cur.time),
+      time_offset = state.cur.time_offset,
+      rel_date = state.cur.rel_date,
+      ref_names = state.cur.ref_names,
+      subject = state.cur.subject,
+    })
+
+    local ok, status
+    if log_options.L[1] then
+      ok, status = parse_fh_line_trace_data(state)
+    else
+      ok, status = parse_fh_data(state)
+    end
+
+    if not ok then
+      if status == JobStatus.FATAL then
+        return
+      end
+      break
+    end
+
+    data_idx = data_idx + 1
+  end
+
+  callback(entries, JobStatus.SUCCESS)
+end
+
+---Strange trick to check if a file is binary using only git.
+---@param path string
+---@param rev Rev
+---@return boolean -- True if the file was binary for the given rev, or it didn't exist.
+function GitAdapter:is_binary(path, rev)
+  if rev.type == RevType.STAGE and rev.stage > 0 then
+    return false
+  end
+
+  local cmd = { "-c", "submodule.recurse=false", "grep", "-I", "--name-only", "-e", "." }
+  if rev.type == RevType.LOCAL then
+    cmd[#cmd+1] = "--untracked"
+  elseif rev.type == RevType.STAGE then
+    cmd[#cmd+1] = "--cached"
+  else
+    cmd[#cmd+1] = rev.commit
+  end
+
+  utils.vec_push(cmd, "--", path)
+
+  local _, code = self:exec_sync(cmd, { cwd = self.context.toplevel, silent = true })
+  return code ~= 0
+end
+
 
 M.GitAdapter = GitAdapter
 return M

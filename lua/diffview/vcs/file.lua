@@ -23,7 +23,7 @@ local M = {}
 ---@alias git.FileDataProducer fun(kind: git.FileKind, path: string, pos: "left"|"right"): string[]
 
 ---@class vcs.File : diffview.Object
----@field git_ctx GitContext
+---@field adapter GitAdapter
 ---@filed path string
 ---@field absolute_path string
 ---@field parent_path string
@@ -57,9 +57,9 @@ File.bufopts = {
 ---File constructor
 ---@param opt table
 function File:init(opt)
-  self.git_ctx = opt.git_ctx
+  self.adapter = opt.adapter
   self.path = opt.path
-  self.absolute_path = pl:absolute(opt.path, opt.git_ctx.toplevel)
+  self.absolute_path = pl:absolute(opt.path, opt.adapter.context.toplevel)
   self.parent_path = pl:parent(opt.path) or ""
   self.basename = pl:basename(opt.path)
   self.extension = pl:extension(opt.path)
@@ -122,7 +122,7 @@ function File:create_buffer(callback)
   end
 
   if self.binary == nil and not config.get_config().diff_binaries then
-    self.binary = vcs.is_binary(self.git_ctx.toplevel, self.path, self.rev)
+    self.binary = self.adapter:is_binary(self.path, self.rev)
   end
 
   if self.nulled or self.binary then
@@ -172,13 +172,13 @@ function File:create_buffer(callback)
     api.nvim_buf_set_option(self.bufnr, option, value)
   end
 
-  local fullname = pl:join("diffview://", self.git_ctx.dir, context, self.path)
+  local fullname = pl:join("diffview://", self.adapter.context.dir, context, self.path)
   local ok = pcall(api.nvim_buf_set_name, self.bufnr, fullname)
   if not ok then
     -- Resolve name conflict
     local i = 1
     repeat
-      fullname = pl:join("diffview://", self.git_ctx.dir, context, i, self.path)
+      fullname = pl:join("diffview://", self.adapter.context.dir, context, i, self.path)
       ok = pcall(api.nvim_buf_set_name, self.bufnr, fullname)
       i = i + 1
     until ok
@@ -209,7 +209,7 @@ function File:create_buffer(callback)
 
   else
     vcs.show(
-      self.git_ctx.toplevel,
+      self.adapter.context.toplevel,
       { ("%s:%s"):format(self.rev:object_name() or "", self.path) },
       function(err, result)
         if err then
@@ -387,8 +387,10 @@ end
 
 ---@type vcs.File
 File.NULL_FILE = File({
-  git_ctx = {
-    toplevel = "diffview://",
+  adapter = {
+    context = {
+      toplevel = "diffview://",
+    }
   },
   path = "null",
   kind = "working",
