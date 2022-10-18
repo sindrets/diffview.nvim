@@ -208,7 +208,7 @@ function File:create_buffer(callback)
     end, nil)
 
   else
-    vcs.show(
+    self.adapter:show(
       self.adapter.context.toplevel,
       { ("%s:%s"):format(self.rev:object_name() or "", self.path) },
       function(err, result)
