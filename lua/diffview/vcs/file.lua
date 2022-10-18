@@ -10,7 +10,7 @@ local RevType = lazy.access("diffview.vcs.rev", "RevType")
 ---@module "diffview.config"
 local config = lazy.require("diffview.config")
 ---@module "diffview.vcs"
-local vcs = lazy.require("diffview.vcs")
+local vcs = lazy.require("diffview.vcs.utils")
 ---@module "diffview.utils"
 local utils = lazy.require("diffview.utils")
 
@@ -208,8 +208,8 @@ function File:create_buffer(callback)
     end, nil)
 
   else
-    self.adapter:show(
-      self.adapter.context.toplevel,
+    vcs.show(
+      self.adapter,
       { ("%s:%s"):format(self.rev:object_name() or "", self.path) },
       function(err, result)
         if err then
