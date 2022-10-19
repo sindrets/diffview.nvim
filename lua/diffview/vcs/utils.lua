@@ -51,15 +51,11 @@ end)
 M.show = async.wrap(function(adapter, args, callback) 
   local job = Job:new({
     command = adapter:bin(),
-    args = utils.vec_join(
-      adapter:args(),
-      "show",
-      args
-    ),
+    args = adapter:get_show_args(args),
     cwd = adapter.context.toplevel,
     ---@type Job
     on_exit = async.void(function(j)
-      local context = "git.utils.show()"
+      local context = "vcs.utils.show()"
       utils.handle_job(j, {
         fail_on_empty = true,
         context = context,

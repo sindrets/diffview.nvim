@@ -90,6 +90,10 @@ function GitAdapter:get_command()
   return config.get_config().git_cmd
 end
 
+function GitAdapter:get_show_args(args)
+  return utils.vec_join(self:args(), "show", args)
+end
+
 function GitAdapter:get_context(path)
   local context = {}
   local out, code = self:exec_sync({ "rev-parse", "--path-format=absolute", "--show-toplevel" }, path)
