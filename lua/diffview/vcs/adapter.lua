@@ -23,6 +23,12 @@ function VCSAdapter:get_command()
   oop.abstract_stub()
 end
 
+---@param args string[]
+---@return string[] args to show commit content
+function VCSAdapter:get_show_args(args)
+  oop.abstract_stub()
+end
+
 function VCSAdapter:get_context(path)
   return {}
 end
