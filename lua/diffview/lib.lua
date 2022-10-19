@@ -131,18 +131,49 @@ end
 
 ---@param range? { [1]: integer, [2]: integer }
 ---@param args string[]
-function M.file_history(adapter, range, args)
+function M.file_history(range, args)
   -- TODO: Arg handling is git-specific too?
   local default_args = config.get_config().default_args.DiffviewFileHistory
   local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
   local paths = {}
-  local rel_paths
 
   logger.info("[command call] :DiffviewFileHistory " .. table.concat(vim.tbl_flatten({
     default_args,
     args,
   }), " "))
 
+  for _, path_arg in ipairs(argo.args) do
+    for _, path in ipairs(pl:vim_expand(path_arg, false, true)) do
+      local magic, pattern = pathspec_split(path)
+      pattern = pl:readlink(pattern) or pattern
+      table.insert(paths, magic .. pattern)
+    end
+  end
+
+  ---@type string
+  local cpath = argo:get_flag("C", { no_empty = true, expand = true })
+  local cfile = pl:vim_expand("%")
+  cfile = pl:readlink(cfile) or cfile
+
+  local top_indicators = {}
+  for _, path in ipairs(paths) do
+    if pathspec_split(path) == "" then
+      table.insert(top_indicators, pl:absolute(path, cpath))
+      break
+    end
+  end
+
+  table.insert(top_indicators, cpath and pl:realpath(cpath) or (
+      vim.bo.buftype == ""
+      and pl:absolute(cfile)
+      or nil
+    ))
+
+  if not cpath then
+    table.insert(top_indicators, pl:realpath("."))
+  end
+
+  local adapter = vcs.get_adapter(top_indicators)
   local log_options = adapter:file_history_options(range, args)
 
   if log_options == nil then

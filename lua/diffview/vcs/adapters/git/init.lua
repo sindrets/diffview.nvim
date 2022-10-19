@@ -23,6 +23,72 @@ local M = {}
 
 local GitAdapter = oop.create_class('GitAdapter', VCSAdapter)
 
+---@return string, string
+local function pathspec_split(pathspec)
+  local magic = pathspec:match("^:[/!^]*:?") or pathspec:match("^:%b()") or ""
+  local pattern = pathspec:sub(1 + #magic, -1)
+  return magic or "", pattern or ""
+end
+
+local function pathspec_expand(toplevel, cwd, pathspec)
+  local magic, pattern = pathspec_split(pathspec)
+  if not utils.path:is_abs(pattern) then
+    pattern = utils.path:join(utils.path:relative(cwd, toplevel), pattern)
+  end
+  return magic .. utils.path:convert(pattern)
+end
+
+local function pathspec_modify(pathspec, mods)
+  local magic, pattern = pathspec_split(pathspec)
+  return magic .. utils.path:vim_fnamemodify(pattern, mods)
+end
+
+function M.get_repo_paths(args)
+  local default_args = config.get_config().default_args.DiffviewFileHistory
+  local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
+  local paths = {}
+
+  for _, path_arg in ipairs(argo.args) do
+    for _, path in ipairs(pl:vim_expand(path_arg, false, true)) do
+      local magic, pattern = pathspec_split(path)
+      pattern = pl:readlink(pattern) or pattern
+      table.insert(paths, magic .. pattern)
+    end
+  end
+
+  ---@type string
+  local cpath = argo:get_flag("C", { no_empty = true, expand = true })
+  local cfile = pl:vim_expand("%")
+  cfile = pl:readlink(cfile) or cfile
+
+  local top_indicators = {}
+  for _, path in ipairs(paths) do
+    if pathspec_split(path) == "" then
+      table.insert(top_indicators, pl:absolute(path, cpath))
+      break
+    end
+  end
+
+  table.insert(top_indicators, cpath and pl:realpath(cpath) or (
+      vim.bo.buftype == ""
+      and pl:absolute(cfile)
+      or nil
+    ))
+
+  if not cpath then
+    table.insert(top_indicators, pl:realpath("."))
+  end
+
+  local out, code = utils.system_list(vim.tbl_flatten({ config.get_config().git_cmd, "-C", cpath, "rev-parse" }))
+
+  -- Not in a Git repo
+  if code ~= 0 then
+    return false, {}
+  end
+
+  return true, top_indicators
+end
+
 function GitAdapter:init(path)
   self.super:init(path)
 
@@ -110,27 +176,6 @@ function GitAdapter:get_context(path)
   context.dir = out[1] and vim.trim(out[1])
   return context
 end
-
----@return string, string
-local function pathspec_split(pathspec)
-  local magic = pathspec:match("^:[/!^]*:?") or pathspec:match("^:%b()") or ""
-  local pattern = pathspec:sub(1 + #magic, -1)
-  return magic or "", pattern or ""
-end
-
-local function pathspec_expand(toplevel, cwd, pathspec)
-  local magic, pattern = pathspec_split(pathspec)
-  if not utils.path:is_abs(pattern) then
-    pattern = utils.path:join(utils.path:relative(cwd, toplevel), pattern)
-  end
-  return magic .. utils.path:convert(pattern)
-end
-
-local function pathspec_modify(pathspec, mods)
-  local magic, pattern = pathspec_split(pathspec)
-  return magic .. utils.path:vim_fnamemodify(pattern, mods)
-end
-
 function GitAdapter:find_git_toplevel(top_indicators)
   local toplevel
   for _, p in ipairs(top_indicators) do
@@ -549,37 +594,6 @@ function GitAdapter:file_history_options(range, args)
     default_args,
     args,
   }), " "))
-
-  for _, path_arg in ipairs(argo.args) do
-    for _, path in ipairs(pl:vim_expand(path_arg, false, true)) do
-      local magic, pattern = pathspec_split(path)
-      pattern = pl:readlink(pattern) or pattern
-      table.insert(paths, magic .. pattern)
-    end
-  end
-
-  ---@type string
-  local cpath = argo:get_flag("C", { no_empty = true, expand = true })
-  local cfile = pl:vim_expand("%")
-  cfile = pl:readlink(cfile) or cfile
-
-  local top_indicators = {}
-  for _, path in ipairs(paths) do
-    if pathspec_split(path) == "" then
-      table.insert(top_indicators, pl:absolute(path, cpath))
-      break
-    end
-  end
-
-  table.insert(top_indicators, cpath and pl:realpath(cpath) or (
-      vim.bo.buftype == ""
-      and pl:absolute(cfile)
-      or nil
-    ))
-
-  if not cpath then
-    table.insert(top_indicators, pl:realpath("."))
-  end
 
   local err, git_toplevel = self:find_git_toplevel(top_indicators)
 
