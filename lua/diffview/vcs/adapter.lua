@@ -7,12 +7,11 @@ local M = {}
 local VCSAdapter = oop.create_class('VCSAdapter')
 
 function VCSAdapter:init(path)
-  self.path = path
   self.bootstrap = {
     done = false,
     ok = false,
   }
-  self.context = self:get_context(path)
+  self.context = {}
 end
 
 function VCSAdapter:run_bootstrap()

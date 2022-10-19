@@ -167,7 +167,6 @@ end
 
 ---@param range? { [1]: integer, [2]: integer }
 function M.file_history(range, ...)
-  local adapter = vcs.get_adapter()
   local view = lib.file_history(range, utils.tbl_pack(...))
   if view then
     view:open()

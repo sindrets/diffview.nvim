@@ -75,22 +75,61 @@ function M.get_repo_paths(args)
       or nil
     ))
 
+  local test_args = {}
   if not cpath then
     table.insert(top_indicators, pl:realpath("."))
+  else
+    table.insert(test_args, '-C')
+    table.insert(test_args, cpath)
   end
 
-  local out, code = utils.system_list(vim.tbl_flatten({ config.get_config().git_cmd, "-C", cpath, "rev-parse" }))
+
+  local out, code = utils.system_list(vim.tbl_flatten({ config.get_config().git_cmd, test_args, "rev-parse" }))
 
   -- Not in a Git repo
   if code ~= 0 then
-    return false, {}
+    return nil
   end
 
-  return true, top_indicators
+  return top_indicators
 end
 
-function GitAdapter:init(path)
-  self.super:init(path)
+local function get_toplevel(path)
+  local out, code = utils.system_list(vim.tbl_flatten({config.get_config().git_cmd, {"rev-parse", "--path-format=absolute", "--show-toplevel"}, path}))
+  if code ~= 0 then
+    return nil
+  end
+  return out[1] and vim.trim(out[1])
+end
+
+local function find_git_toplevel(top_indicators)
+  local toplevel
+  for _, p in ipairs(top_indicators) do
+    if not pl:is_dir(p) then
+      p = pl:parent(p)
+    end
+
+    if p and pl:readable(p) then
+      toplevel = get_toplevel(p)
+
+      if toplevel then
+        return nil, toplevel
+      end
+    end
+  end
+
+  return (
+    ("Path not a git repo (or any parent): %s")
+    :format(table.concat(vim.tbl_map(function(v)
+      local rel_path = pl:relative(v, ".")
+      return utils.str_quote(rel_path == "" and "." or rel_path)
+    end, top_indicators) --[[@as vector ]], ", "))
+  )
+
+end
+
+function GitAdapter:init(paths)
+  self.super:init(paths)
 
   self.bootstrap.version_string = nil
   self.bootstrap.version = {}
@@ -101,7 +140,8 @@ function GitAdapter:init(path)
     patch = 0,
   }
 
-  self.context = self:get_context(path)
+  self.context.toplevel = find_git_toplevel(paths)
+  self.context.dir = self:get_dir(self.context.toplevel)
 end
 
 function GitAdapter:run_bootstrap()
@@ -161,47 +201,14 @@ function GitAdapter:get_show_args(args)
   return utils.vec_join(self:args(), "show", args)
 end
 
-function GitAdapter:get_context(path)
-  local context = {}
-  local out, code = self:exec_sync({ "rev-parse", "--path-format=absolute", "--show-toplevel" }, path)
+function GitAdapter:get_dir(path)
+  local out, code = self:exec_sync({ "rev-parse", "--path-format=absolute", "--git-dir" }, path)
   if code ~= 0 then
     return nil
   end
-  context.toplevel = out[1] and vim.trim(out[1])
-
-  out, code = self:exec_sync({ "rev-parse", "--path-format=absolute", "--git-dir" }, path)
-  if code ~= 0 then
-    return nil
-  end
-  context.dir = out[1] and vim.trim(out[1])
-  return context
+  return out[1] and vim.trim(out[1])
 end
-function GitAdapter:find_git_toplevel(top_indicators)
-  local toplevel
-  for _, p in ipairs(top_indicators) do
-    if not pl:is_dir(p) then
-      p = pl:parent(p)
-    end
 
-    if p and pl:readable(p) then
-      local ctxt = self:get_context(p)
-      toplevel = ctxt.toplevel
-
-      if toplevel then
-        return nil, toplevel
-      end
-    end
-  end
-
-  return (
-    ("Path not a git repo (or any parent): %s")
-    :format(table.concat(vim.tbl_map(function(v)
-      local rel_path = pl:relative(v, ".")
-      return utils.str_quote(rel_path == "" and "." or rel_path)
-    end, top_indicators) --[[@as vector ]], ", "))
-  )
-
-end
 
 ---@class git.utils.PreparedLogOpts
 ---@field rev_range string
@@ -584,23 +591,17 @@ end
 
 ---@param range? { [1]: integer, [2]: integer }
 ---@param args string[]
-function GitAdapter:file_history_options(range, args)
+function GitAdapter:file_history_options(range, paths, args)
   local default_args = config.get_config().default_args.DiffviewFileHistory
   local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
-  local paths = {}
   local rel_paths
 
-  logger.info("[command call] :DiffviewFileHistory " .. table.concat(vim.tbl_flatten({
-    default_args,
-    args,
-  }), " "))
+  local cpath = argo:get_flag("C", { no_empty = true, expand = true })
+  local cfile = pl:vim_expand("%")
+  cfile = pl:readlink(cfile) or cfile
 
-  local err, git_toplevel = self:find_git_toplevel(top_indicators)
-
-  if err then
-    utils.err(err)
-    return
-  end
+  print(vim.inspect(paths))
+  local git_toplevel = self.context.toplevel
 
   ---@cast git_toplevel string
   logger.lvl(1).s_debug(("Found git top-level: %s"):format(utils.str_quote(git_toplevel)))

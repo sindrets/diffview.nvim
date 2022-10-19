@@ -9,14 +9,15 @@ function M.get_adapter(args)
   local ok = false
   local paths
 
-  ok, paths = git.get_repo_paths(args)
-  if ok then
-    return git.GitAdapter(paths)
+  paths = git.get_repo_paths(args)
+  if paths then
+    print('toplevel: ', vim.inspect(paths))
+    return git.GitAdapter(paths), paths
   end
 
-  ok, paths = hg.get_repo_paths(args)
-  if ok then
-    return hg.HgAdapter(paths)
+  paths = hg.get_repo_paths(args)
+  if paths then
+    return hg.HgAdapter(paths), paths
   end
 
   utils.err("No valid VCS found for current workspace")
