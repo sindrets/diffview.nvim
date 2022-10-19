@@ -91,7 +91,7 @@ function M.get_repo_paths(args)
     return nil
   end
 
-  return top_indicators
+  return paths, top_indicators
 end
 
 local function get_toplevel(path)
