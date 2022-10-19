@@ -7,7 +7,7 @@ local HgAdapter = oop.create_class('HgAdapter', VCSAdapter)
 
 function M.get_repo_paths(args)
   -- TODO: implement
-  return false, {}
+  return false
 end
 
 M.HgAdapter = HgAdapter
