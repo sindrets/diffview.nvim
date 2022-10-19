@@ -1,6 +1,7 @@
 local utils = require("diffview.utils")
 local async = require("plenary.async")
 local Job = require("plenary.job")
+local Semaphore = require('diffview.control').Semaphore
 
 local M = {}
 
@@ -12,6 +13,40 @@ local JobStatus = {
   KILLED = 4,
   FATAL = 5,
 }
+
+---@type Job[]
+local sync_jobs = {}
+---@type Semaphore
+local job_queue_sem = Semaphore.new(1)
+
+---@param job Job
+local resume_sync_queue = async.void(function(job)
+  local permit = job_queue_sem:acquire()
+  local idx = utils.vec_indexof(sync_jobs, job)
+  if idx > -1 then
+    table.remove(sync_jobs, idx)
+  end
+  permit:forget()
+
+  if sync_jobs[1] and not sync_jobs[1].handle then
+    sync_jobs[1]:start()
+  end
+end)
+
+---@param job Job
+local queue_sync_job = async.void(function(job)
+  job:add_on_exit_callback(function()
+    resume_sync_queue(job)
+  end)
+
+  local permit = job_queue_sem:acquire()
+  table.insert(sync_jobs, job)
+  permit:forget()
+
+  if #sync_jobs == 1 then
+    job:start()
+  end
+end)
 
 M.show = async.wrap(function(adapter, args, callback) 
   local job = Job:new({
