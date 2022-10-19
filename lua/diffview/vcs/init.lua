@@ -10,7 +10,6 @@ function M.get_adapter(args)
 
   paths, toplevel_indicators = git.get_repo_paths(args)
   if paths then
-    print('toplevel: ', vim.inspect(toplevel_indicators))
     return git.GitAdapter(toplevel_indicators), paths
   end
 

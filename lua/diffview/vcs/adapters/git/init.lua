@@ -140,7 +140,8 @@ function GitAdapter:init(paths)
     patch = 0,
   }
 
-  self.context.toplevel = find_git_toplevel(paths)
+  local err, toplevel = find_git_toplevel(paths)
+  self.context.toplevel = toplevel
   self.context.dir = self:get_dir(self.context.toplevel)
 end
 
@@ -603,6 +604,7 @@ function GitAdapter:file_history_options(range, paths, args)
   print(vim.inspect(paths))
   local git_toplevel = self.context.toplevel
 
+  print('git_toplevel = ', vim.inspect(git_toplevel))
   ---@cast git_toplevel string
   logger.lvl(1).s_debug(("Found git top-level: %s"):format(utils.str_quote(git_toplevel)))
 
