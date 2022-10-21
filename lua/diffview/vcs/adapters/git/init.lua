@@ -45,6 +45,10 @@ local function pathspec_modify(pathspec, mods)
   return magic .. utils.path:vim_fnamemodify(pattern, mods)
 end
 
+---Parse arguments to detect repository type
+---@param args string[]
+---@return string[] paths # All paths parsed from arguments
+---@return string[] top_indicators # Paths to consider for finding the toplevel
 function M.get_repo_paths(args)
   local default_args = config.get_config().default_args.DiffviewFileHistory
   local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
@@ -96,6 +100,9 @@ function M.get_repo_paths(args)
   return paths, top_indicators
 end
 
+---Get the git toplevel directory from a path to file or directory
+---@param path string
+---@return string?
 local function get_toplevel(path)
   local out, code = utils.system_list(vim.tbl_flatten({config.get_config().git_cmd, {"rev-parse", "--path-format=absolute", "--show-toplevel"}, path}))
   if code ~= 0 then

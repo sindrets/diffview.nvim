@@ -22,7 +22,8 @@ function VCSAdapter:init(path)
 end
 
 function VCSAdapter:run_bootstrap()
-  oop.abstract_stub()
+  self.bootstrap.done = true
+  self.bootstrap.ok = true
 end
 
 function VCSAdapter:get_command()
