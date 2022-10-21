@@ -140,7 +140,6 @@ function M.file_history(range, args)
   }), " "))
 
   local adapter, paths = vcs.get_adapter(args)
-  print('received: ', vim.inspect(paths))
   local log_options = adapter:file_history_options(range, paths, args)
 
   if log_options == nil then

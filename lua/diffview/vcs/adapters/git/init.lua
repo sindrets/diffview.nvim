@@ -601,10 +601,8 @@ function GitAdapter:file_history_options(range, paths, args)
   local cfile = pl:vim_expand("%")
   cfile = pl:readlink(cfile) or cfile
 
-  print(vim.inspect(paths))
   local git_toplevel = self.context.toplevel
 
-  print('git_toplevel = ', vim.inspect(git_toplevel))
   ---@cast git_toplevel string
   logger.lvl(1).s_debug(("Found git top-level: %s"):format(utils.str_quote(git_toplevel)))
 
