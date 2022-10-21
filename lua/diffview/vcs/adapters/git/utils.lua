@@ -1,4 +1,3 @@
-local Commit = require("diffview.vcs.adapters.git.commit").GitCommit
 local CountDownLatch = require("diffview.control").CountDownLatch
 local Diff2Hor = require("diffview.scene.layouts.diff_2_hor").Diff2Hor
 local FileDict = require("diffview.vcs.file_dict").FileDict
@@ -7,9 +6,7 @@ local Job = require("plenary.job")
 local LogEntry = require("diffview.vcs.log_entry").LogEntry
 local Rev = require("diffview.vcs.rev").Rev
 local RevType = require("diffview.vcs.rev").RevType
-local Semaphore = require("diffview.control").Semaphore
 local async = require("plenary.async")
-local config = require("diffview.config")
 local logger = require("diffview.logger")
 local utils = require("diffview.utils")
 local JobStatus = require("diffview.vcs.utils").JobStatus
@@ -17,15 +14,6 @@ local JobStatus = require("diffview.vcs.utils").JobStatus
 local api = vim.api
 
 local M = {}
-
----@class GitContext
----@field toplevel string Path to the top-level directory of the working tree.
----@field dir string Path to the .git directory.
-
-
----@class git.utils.LayoutOpt
----@field default_layout Diff2
----@field merge_layout Layout
 
 ---@param ctx GitContext
 ---@param left Rev
@@ -951,50 +939,6 @@ function M.git_context(path)
     }
   end
 end
-
-M.show = async.wrap(function(toplevel, args, callback)
-  local job = Job:new({
-    command = git_bin(),
-    args = utils.vec_join(
-      git_args(),
-      "show",
-      args
-    ),
-    cwd = toplevel,
-    ---@type Job
-    on_exit = async.void(function(j)
-      local context = "git.utils.show()"
-      utils.handle_job(j, {
-        fail_on_empty = true,
-        context = context,
-        debug_opt = { no_stdout = true, context = context },
-      })
-
-      if j.code ~= 0 then
-        callback(j:stderr_result() or {}, nil)
-        return
-      end
-
-      local out_status
-
-      if #j:result() == 0 then
-        async.util.scheduler()
-        out_status = ensure_output(2, { j }, context)
-      end
-
-      if out_status == JobStatus.ERROR then
-        callback(j:stderr_result() or {}, nil)
-        return
-      end
-
-      callback(nil, j:result())
-    end),
-  })
-  -- Problem: Running multiple 'show' jobs simultaneously may cause them to fail
-  -- silently.
-  -- Solution: queue them and run them one after another.
-  queue_sync_job(job)
-end, 3)
 
 local CONFLICT_START = [[^<<<<<<< ]]
 local CONFLICT_BASE = [[^||||||| ]]
