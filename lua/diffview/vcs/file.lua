@@ -24,7 +24,7 @@ local M = {}
 
 ---@class vcs.File : diffview.Object
 ---@field adapter GitAdapter
----@filed path string
+---@field path string
 ---@field absolute_path string
 ---@field parent_path string
 ---@field basename string

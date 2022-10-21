@@ -162,36 +162,6 @@ function M.file_history(range, args)
   return v
 end
 
----Try to find the top-level of a working tree by using the given indicative
----paths.
----@param top_indicators string[] A list of paths that might indicate what working tree we are in.
----@return string? err
----@return string? toplevel # The absolute path to the git top-level.
-function M.find_git_toplevel(top_indicators)
-  local toplevel
-  for _, p in ipairs(top_indicators) do
-    if not pl:is_dir(p) then
-      p = pl:parent(p)
-    end
-
-    if p and pl:readable(p) then
-      toplevel = vcs.toplevel(p)
-
-      if toplevel then
-        return nil, toplevel
-      end
-    end
-  end
-
-  return (
-    ("Path not a git repo (or any parent): %s")
-    :format(table.concat(vim.tbl_map(function(v)
-      local rel_path = pl:relative(v, ".")
-      return utils.str_quote(rel_path == "" and "." or rel_path)
-    end, top_indicators) --[[@as vector ]], ", "))
-  )
-end
-
 ---Parse a given rev arg.
 ---@param git_toplevel string
 ---@param rev_arg string

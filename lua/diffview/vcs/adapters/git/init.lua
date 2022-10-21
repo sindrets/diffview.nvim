@@ -11,6 +11,7 @@ local Diff2Hor = require("diffview.scene.layouts.diff_2_hor").Diff2Hor
 local LogEntry = require("diffview.vcs.log_entry").LogEntry
 local RevType = require("diffview.vcs.rev").RevType
 local Rev = require("diffview.vcs.rev").Rev
+---@class VCSAdapter
 local VCSAdapter = require('diffview.vcs.adapter').VCSAdapter
 local Job = require("plenary.job")
 local JobStatus = require('diffview.vcs.utils').JobStatus
@@ -21,6 +22,7 @@ local pl = lazy.access(utils, "path")
 
 local M = {}
 
+---@class GitAdapter : VCSAdapter
 local GitAdapter = oop.create_class('GitAdapter', VCSAdapter)
 
 ---@return string, string
@@ -88,7 +90,7 @@ function M.get_repo_paths(args)
 
   -- Not in a Git repo
   if code ~= 0 then
-    return nil
+    return nil, nil
   end
 
   return paths, top_indicators
@@ -102,6 +104,11 @@ local function get_toplevel(path)
   return out[1] and vim.trim(out[1])
 end
 
+---Try to find the top-level of a working tree by using the given indicative
+---paths.
+---@param top_indicators string[] A list of paths that might indicate what working tree we are in.
+---@return string? err
+---@return string? toplevel # as an absolute path
 local function find_git_toplevel(top_indicators)
   local toplevel
   for _, p in ipairs(top_indicators) do
@@ -125,7 +132,6 @@ local function find_git_toplevel(top_indicators)
       return utils.str_quote(rel_path == "" and "." or rel_path)
     end, top_indicators) --[[@as vector ]], ", "))
   )
-
 end
 
 function GitAdapter:init(paths)
@@ -140,6 +146,7 @@ function GitAdapter:init(paths)
     patch = 0,
   }
 
+  -- TODO: Handler error here
   local err, toplevel = find_git_toplevel(paths)
   self.context.toplevel = toplevel
   self.context.dir = self:get_dir(self.context.toplevel)

@@ -4,6 +4,9 @@ local logger = require('diffview.logger')
 
 local M = {}
 
+---@class VCSAdapter: diffview.Object
+---@field bootstrap boolean[]
+---@field context string[]
 local VCSAdapter = oop.create_class('VCSAdapter')
 
 function VCSAdapter:init(path)
