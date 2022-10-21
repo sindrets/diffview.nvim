@@ -4,6 +4,10 @@ local logger = require('diffview.logger')
 
 local M = {}
 
+---@class vcs.adapter.LayoutOpt
+---@field default_layout Diff2
+---@field merge_layout Layout
+
 ---@class VCSAdapter: diffview.Object
 ---@field bootstrap boolean[]
 ---@field context string[]
@@ -45,6 +49,14 @@ function VCSAdapter:args()
   return utils.vec_slice(self:get_command(), 2)
 end
 
+---Execute a VCS command synchronously.
+---@param args string[]
+---@param cwd_or_opt? string|utils.system_list.Opt
+---@return string[] stdout
+---@return integer code
+---@return string[] stderr
+---@overload fun(args: string[], cwd: string?)
+---@overload fun(args: string[], opt: utils.system_list.Opt?)
 function VCSAdapter:exec_sync(args, cwd_or_opt)
   if not self.bootstrap.done then
     self:run_bootstrap()
@@ -60,13 +72,20 @@ function VCSAdapter:file_history_options(range, args)
   oop.abstract_stub()
 end
 
+---@class vcs.adapter.FileHistoryWorkerSpec : git.utils.LayoutOpt
+
+---@param thread thread
+---@param log_opt ConfigLogOptions
+---@param opt vcs.adapter.FileHistoryWorkerSpec
+---@param co_state table
+---@param callback function
 function VCSAdapter:file_history_worker(thread, log_opt, opt, co_state, callback)
   oop.abstract_stub()
 end
 
 
 ---@param log_opt ConfigLogOptions
----@param opt git.utils.FileHistoryWorkerSpec
+---@param opt vcs.adapter.FileHistoryWorkerSpec
 ---@param callback function
 ---@return fun() finalizer
 function VCSAdapter:file_history(log_opt, opt, callback)

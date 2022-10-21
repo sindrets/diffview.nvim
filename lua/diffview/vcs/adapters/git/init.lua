@@ -842,11 +842,10 @@ local function parse_fh_data(state)
 end
 
 
----@class git.utils.FileHistoryWorkerSpec : git.utils.LayoutOpt
 
 ---@param thread thread
 ---@param log_opt ConfigLogOptions
----@param opt git.utils.FileHistoryWorkerSpec
+---@param opt vcs.adapter.FileHistoryWorkerSpec
 ---@param co_state table
 ---@param callback function
 function GitAdapter:file_history_worker(thread, log_opt, opt, co_state, callback)
