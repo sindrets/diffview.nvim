@@ -77,7 +77,7 @@ function FileHistoryPanel:init(opt)
   self.entries = opt.entries
   self.cur_item = {}
   self.single_file = opt.entries[1] and opt.entries[1].single_file
-  self.option_panel = FHOptionPanel(self)
+  self.option_panel = FHOptionPanel(self, self.git_ctx.flags)
   self.log_options = {
     single_file = vim.tbl_extend(
       "force",

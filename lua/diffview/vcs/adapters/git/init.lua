@@ -983,6 +983,201 @@ function GitAdapter:is_binary(path, rev)
   return code ~= 0
 end
 
+GitAdapter.flags = {
+  ---@type FlagOption[]
+  switches = {
+    { "-f", "--follow", "Follow renames (only for single file)" },
+    { "-p", "--first-parent", "Follow only the first parent upon seeing a merge commit" },
+    { "-s", "--show-pulls", "Show merge commits the first introduced a change to a branch" },
+    { "-R", "--reflog", "Include all reachable objects mentioned by reflogs" },
+    { "-a", "--all", "Include all refs" },
+    { "-m", "--merges", "List only merge commits" },
+    { "-n", "--no-merges", "List no merge commits" },
+    { "-r", "--reverse", "List commits in reverse order" },
+  },
+  ---@type FlagOption[]
+  options = {
+    {
+      "=r", "++rev-range=", "Show only commits in the specified revision range",
+      ---@param panel FHOptionPanel
+      completion = function(panel)
+        return function(arg_lead, _, _)
+          local view = panel.parent.parent
+          return diffview.rev_completion(arg_lead, {
+            accept_range = true,
+            git_toplevel = view.git_ctx.toplevel,
+            git_dir = view.git_ctx.dir,
+          })
+        end
+      end,
+    },
+    {
+      "=b", "++base=", "Set the base revision",
+      ---@param panel FHOptionPanel
+      completion = function(panel)
+        return function(arg_lead, _, _)
+          local view = panel.parent.parent
+          return utils.vec_join("LOCAL", diffview.rev_completion(arg_lead, {
+            git_toplevel = view.git_ctx.toplevel,
+            git_dir = view.git_ctx.dir,
+          }))
+        end
+      end,
+    },
+    { "=n", "--max-count=", "Limit the number of commits" },
+    {
+      "=L", "-L", "Trace line evolution",
+      prompt_label = "(Accepts multiple values)",
+      prompt_fmt = "${label} ",
+      completion = function(_)
+        return function(arg_lead, _, _)
+          return diffview.line_trace_completion(arg_lead)
+        end
+      end,
+      transform = function(values)
+        return utils.tbl_fmap(values, function(v)
+          v = utils.str_match(v, { "^-L(.*)", ".*" })
+          if v == "" then return nil end
+          return v
+        end)
+      end,
+      ---@param self FlagOption
+      ---@param value string|string[]
+      render_value = function(self, value)
+        if #value == 0 then
+          -- Just render the flag name
+          return true, self[2]
+        end
+
+        -- Render a string of quoted args
+        return false, table.concat(vim.tbl_map(function(v)
+          if not v:match("^-L") then
+            -- Prepend the flag if it wasn't specified by the user.
+            v = "-L" .. v
+          end
+          return utils.str_quote(v, { only_if_whitespace = true })
+        end, value), " ")
+      end,
+      render_default = function(_, value)
+        if #value == 0 then
+          -- Just render the flag name
+          return "-L"
+        end
+
+        -- Render a string of quoted args
+        return table.concat(vim.tbl_map(function(v)
+          v = select(1, v:gsub("\\", "\\\\"))
+          return utils.str_quote("-L" .. v, { only_if_whitespace = true })
+        end, value), " ")
+      end,
+    },
+    {
+      "=d", "--diff-merges=", "Determines how merge commits are treated",
+      select = {
+        "",
+        "off",
+        "on",
+        "first-parent",
+        "separate",
+        "combined",
+        "dense-combined",
+        "remerge",
+      },
+    },
+    { "=a", "--author=", "List only commits from a given author", prompt_label = "(Extended regular expression)" },
+    { "=g", "--grep=", "Filter commit messages", prompt_label = "(Extended regular expression)" },
+    {
+      "--", "--", "Limit to files",
+      key = "path_args",
+      prompt_label = "(Path arguments)",
+      prompt_fmt = "${label}${flag_name} ",
+      transform = function(values)
+        return utils.tbl_fmap(values, function(v)
+          if v == "" then return nil end
+          return v
+        end)
+      end,
+      render_value = function(_, value)
+        if #value == 0 then
+          -- Just render the flag name
+          return true, "--"
+        end
+
+        -- Render a string of quoted args
+        return false, table.concat(utils.vec_join(
+          "--",
+          vim.tbl_map(function(v)
+            v = v:gsub("\\", "\\\\")
+            return utils.str_quote(v, { only_if_whitespace = true })
+          end, value)
+        ), " ")
+      end,
+      completion = function(_)
+        return function(_, cmd_line, cur_pos)
+          local ok, ctx = pcall(arg_parser.scan_sh_args, cmd_line, cur_pos)
+
+          if ok then
+            local quoted = vim.tbl_map(function(v)
+              return utils.str_quote(v, { only_if_whitespace = true })
+            end, ctx.args)
+
+            return vim.tbl_map(function(v)
+              return table.concat(utils.vec_join(
+                utils.vec_slice(quoted, 1, ctx.argidx - 1),
+                utils.str_quote(v, { only_if_whitespace = true })
+              ), " ")
+            end, vim.fn.getcompletion(ctx.arg_lead, "file"))
+          end
+        end
+      end,
+    },
+  },
+}
+
+for _, list in pairs(GitAdapter.flags) do
+  for i, option in ipairs(list) do
+    option = vim.tbl_extend("keep", option, {
+      prompt_fmt = "${label}${flag_name}",
+
+      key = option.key or utils.str_match(option[2], {
+        "^%-%-?([^=]+)=?",
+        "^%+%+?([^=]+)=?",
+      }):gsub("%-", "_"),
+
+      ---@param self FlagOption
+      ---@param value string|string[]
+      render_value = function(self, value)
+        local quoted
+
+        if type(value) == "table" then
+          quoted = table.concat(vim.tbl_map(function(v)
+            return self[2] .. utils.str_quote(v, { only_if_whitespace = true })
+          end, value), " ")
+        else
+          quoted = self[2] .. utils.str_quote(value, { only_if_whitespace = true })
+        end
+
+        return value == "", quoted
+      end,
+
+      ---@param value string|string[]
+      render_default = function(_, value)
+        if value == nil then
+          return ""
+        elseif type(value) == "table" then
+          return table.concat(vim.tbl_map(function(v)
+            v = select(1, v:gsub("\\", "\\\\"))
+            return utils.str_quote(v, { only_if_whitespace = true })
+          end, value), " ")
+        end
+        return utils.str_quote(value, { only_if_whitespace = true })
+      end,
+    })
+
+    list[i] = option
+    list[option.key] = option
+  end
+end
 
 M.GitAdapter = GitAdapter
 return M
