@@ -45,16 +45,15 @@ local function pathspec_modify(pathspec, mods)
   return magic .. utils.path:vim_fnamemodify(pattern, mods)
 end
 
----Parse arguments to detect repository type
----@param args string[]
----@return string[] paths # All paths parsed from arguments
----@return string[] top_indicators # Paths to consider for finding the toplevel
-function M.get_repo_paths(args)
-  local default_args = config.get_config().default_args.DiffviewFileHistory
-  local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
+---@param path_args string[] # Raw path args
+---@param cpath string? # Cwd path given by the `-C` flag option
+---@return string[] path_args # Resolved path args
+---@return string[] top_indicators # Top-level indicators
+function M.get_repo_paths(path_args, cpath)
   local paths = {}
+  local top_indicators = {}
 
-  for _, path_arg in ipairs(argo.args) do
+  for _, path_arg in ipairs(path_args) do
     for _, path in ipairs(pl:vim_expand(path_arg, false, true)) do
       local magic, pattern = pathspec_split(path)
       pattern = pl:readlink(pattern) or pattern
@@ -62,12 +61,9 @@ function M.get_repo_paths(args)
     end
   end
 
-  ---@type string
-  local cpath = argo:get_flag("C", { no_empty = true, expand = true })
   local cfile = pl:vim_expand("%")
   cfile = pl:readlink(cfile) or cfile
 
-  local top_indicators = {}
   for _, path in ipairs(paths) do
     if pathspec_split(path) == "" then
       table.insert(top_indicators, pl:absolute(path, cpath))
@@ -76,25 +72,13 @@ function M.get_repo_paths(args)
   end
 
   table.insert(top_indicators, cpath and pl:realpath(cpath) or (
-      vim.bo.buftype == ""
-      and pl:absolute(cfile)
-      or nil
-    ))
+    vim.bo.buftype == ""
+    and pl:absolute(cfile)
+    or nil
+  ))
 
-  local test_args = {}
   if not cpath then
     table.insert(top_indicators, pl:realpath("."))
-  else
-    table.insert(test_args, '-C')
-    table.insert(test_args, cpath)
-  end
-
-
-  local out, code = utils.system_list(vim.tbl_flatten({ config.get_config().git_cmd, test_args, "rev-parse" }))
-
-  -- Not in a Git repo
-  if code ~= 0 then
-    return nil, nil
   end
 
   return paths, top_indicators
@@ -105,6 +89,7 @@ end
 ---@return string?
 local function get_toplevel(path)
   local out, code = utils.system_list(vim.tbl_flatten({config.get_config().git_cmd, {"rev-parse", "--path-format=absolute", "--show-toplevel"}, path}))
+  print('Checking', path, ' -> ', vim.inspect(code), ' : ', vim.inspect(out))
   if code ~= 0 then
     return nil
   end
@@ -116,7 +101,7 @@ end
 ---@param top_indicators string[] A list of paths that might indicate what working tree we are in.
 ---@return string? err
 ---@return string? toplevel # as an absolute path
-local function find_git_toplevel(top_indicators)
+function M.find_toplevel(top_indicators)
   local toplevel
   for _, p in ipairs(top_indicators) do
     if not pl:is_dir(p) then
@@ -125,9 +110,8 @@ local function find_git_toplevel(top_indicators)
 
     if p and pl:readable(p) then
       toplevel = get_toplevel(p)
-
       if toplevel then
-        return nil, toplevel
+        return toplevel
       end
     end
   end
@@ -141,22 +125,36 @@ local function find_git_toplevel(top_indicators)
   )
 end
 
-function GitAdapter:init(paths)
-  self.super:init(paths)
+---@param toplevel string
+---@param path_args string?
+---@param cpath string?
+function M.create(toplevel, path_args, cpath)
+  return GitAdapter({
+    toplevel = toplevel,
+    path_args = path_args,
+    cpath = cpath,
+  })
+end
 
-  self.bootstrap.version_string = nil
-  self.bootstrap.version = {}
-  self.bootstrap.target_version_string = nil
+function GitAdapter:init(opt)
+  opt = opt or {}
+  GitAdapter:super().init(self, opt)
+
   self.bootstrap.target_version = {
     major = 2,
     minor = 31,
     patch = 0,
   }
 
-  -- TODO: Handler error here
-  local err, toplevel = find_git_toplevel(paths)
-  self.context.toplevel = toplevel
-  self.context.dir = self:get_dir(self.context.toplevel)
+  local cwd = opt.cpath or vim.loop.cwd()
+
+  self.ctx = {
+    toplevel = opt.toplevel,
+    git_dir = self:git_dir(opt.toplevel),
+    path_args = vim.tbl_map(function(pathspec)
+      return pathspec_expand(opt.toplevel, cwd, pathspec)
+    end, opt.path_args or {}) --[[@as string[] ]]
+  }
 end
 
 function GitAdapter:run_bootstrap()
@@ -216,7 +214,7 @@ function GitAdapter:get_show_args(args)
   return utils.vec_join(self:args(), "show", args)
 end
 
-function GitAdapter:get_dir(path)
+function GitAdapter:git_dir(path)
   local out, code = self:exec_sync({ "rev-parse", "--path-format=absolute", "--git-dir" }, path)
   if code ~= 0 then
     return nil
@@ -615,8 +613,6 @@ function GitAdapter:file_history_options(range, paths, args)
   local cfile = pl:vim_expand("%")
   cfile = pl:readlink(cfile) or cfile
 
-  local git_toplevel = self.context.toplevel
-
   ---@cast git_toplevel string
   logger.lvl(1).s_debug(("Found git top-level: %s"):format(utils.str_quote(git_toplevel)))
 
@@ -626,13 +622,13 @@ function GitAdapter:file_history_options(range, paths, args)
 
   local cwd = cpath or vim.loop.cwd()
   paths = vim.tbl_map(function(pathspec)
-    return pathspec_expand(git_toplevel, cwd, pathspec)
+    return pathspec_expand(self.ctx.toplevel, cwd, pathspec)
   end, paths) --[[@as string[] ]]
 
   ---@type string
   local range_arg = argo:get_flag("range", { no_empty = true })
   if range_arg then
-    local ok = self:verify_rev_arg(git_toplevel, range_arg)
+    local ok = self:verify_rev_arg(self.ctx.toplevel, range_arg)
     if not ok then
       utils.err(("Bad revision: %s"):format(utils.str_quote(range_arg)))
       return
@@ -672,13 +668,13 @@ function GitAdapter:file_history_options(range, paths, args)
   if range then
     paths, rel_paths = {}, {}
     log_options.L = {
-      ("%d,%d:%s"):format(range[1], range[2], pl:relative(pl:absolute(cfile), git_toplevel))
+      ("%d,%d:%s"):format(range[1], range[2], pl:relative(pl:absolute(cfile), self.ctx.toplevel))
     }
   end
 
   log_options.path_args = paths
 
-  local ok, opt_description = self:file_history_dry_run(git_toplevel, log_options)
+  local ok, opt_description = self:file_history_dry_run(self.ctx.toplevel, log_options)
 
   if not ok then
     utils.info({
@@ -691,15 +687,10 @@ function GitAdapter:file_history_options(range, paths, args)
     return
   end
 
-  local git_ctx = {
-    toplevel = git_toplevel,
-    dir = self.context.dir,
-  }
-
-  if not git_ctx.dir then
+  if not self.ctx.git_dir then
     utils.err(
       ("Failed to find the git dir for the repository: %s")
-      :format(utils.str_quote(git_ctx.toplevel))
+      :format(utils.str_quote(self.ctx.toplevel))
     )
     return
   end

@@ -133,14 +133,34 @@ end
 ---@param args string[]
 function M.file_history(range, args)
   local default_args = config.get_config().default_args.DiffviewFileHistory
+  local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
+  local rel_paths
+
+  local err, adapter = vcs.get_adapter({
+    cmd_ctx = {
+      path_args = argo.args,
+      cpath = argo:get_flag("C", { no_empty = true, expand = true }),
+    },
+  })
+
+  if err then
+    utils.err(err)
+    return
+  end
+
+  rel_paths = vim.tbl_map(function(v)
+    return v == "." and "." or pl:relative(v, ".")
+  end, adapter.ctx.path_args)
+
+  print('path_args: ', vim.inspect(adapter.ctx.path_args))
+  print('rel_paths:', vim.inspect(rel_paths))
 
   logger.info("[command call] :DiffviewFileHistory " .. table.concat(vim.tbl_flatten({
     default_args,
     args,
   }), " "))
 
-  local adapter, paths = vcs.get_adapter(args)
-  local log_options = adapter:file_history_options(range, paths, args)
+  local log_options = adapter:file_history_options(range, rel_paths, args)
 
   if log_options == nil then
     utils.err('Failed to create log options for file_history')

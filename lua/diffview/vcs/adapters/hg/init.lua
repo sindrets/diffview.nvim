@@ -7,7 +7,12 @@ local HgAdapter = oop.create_class('HgAdapter', VCSAdapter)
 
 function M.get_repo_paths(args)
   -- TODO: implement
-  return false
+  return nil
+end
+
+function M.find_toplevel(top_indicators)
+  -- TODO: implement
+  return nil
 end
 
 M.HgAdapter = HgAdapter

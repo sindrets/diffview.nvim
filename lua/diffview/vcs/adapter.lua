@@ -17,6 +17,8 @@ function VCSAdapter:init(path)
   self.bootstrap = {
     done = false,
     ok = false,
+    version = {},
+    version_string = {},
   }
   self.context = {}
 end
