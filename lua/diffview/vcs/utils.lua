@@ -109,7 +109,7 @@ M.show = async.wrap(function(adapter, args, callback)
   local job = Job:new({
     command = adapter:bin(),
     args = adapter:get_show_args(args),
-    cwd = adapter.context.toplevel,
+    cwd = adapter.ctx.toplevel,
     ---@type Job
     on_exit = async.void(function(j)
       local context = "vcs.utils.show()"

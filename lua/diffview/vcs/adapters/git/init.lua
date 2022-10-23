@@ -89,7 +89,6 @@ end
 ---@return string?
 local function get_toplevel(path)
   local out, code = utils.system_list(vim.tbl_flatten({config.get_config().git_cmd, {"rev-parse", "--path-format=absolute", "--show-toplevel"}, path}))
-  print('Checking', path, ' -> ', vim.inspect(code), ' : ', vim.inspect(out))
   if code ~= 0 then
     return nil
   end
@@ -384,7 +383,7 @@ local incremental_fh_data = async.void(function(state, callback)
       "--",
       state.path_args
     ),
-    cwd = state.adapter.context.toplevel,
+    cwd = state.adapter.ctx.toplevel,
     on_stdout = on_stdout,
     on_exit = on_exit,
   })
@@ -402,7 +401,7 @@ local incremental_fh_data = async.void(function(state, callback)
       "--",
       state.path_args
     ),
-    cwd = state.adapter.context.toplevel,
+    cwd = state.adapter.ctx.toplevel,
     on_stdout = on_stdout,
     on_exit = on_exit,
   })
@@ -852,7 +851,7 @@ function GitAdapter:file_history_worker(thread, log_opt, opt, co_state, callback
   local last_status
   local err_msg
 
-  local single_file = self:is_single_file(self.context.toplevel, log_opt.single_file.path_args, log_opt.single_file.L)
+  local single_file = self:is_single_file(self.ctx.toplevel, log_opt.single_file.path_args, log_opt.single_file.L)
 
   ---@type LogOptions
   local log_options = config.get_log_options(
@@ -868,7 +867,7 @@ function GitAdapter:file_history_worker(thread, log_opt, opt, co_state, callback
     adapter = self,
     path_args = log_opt.single_file.path_args,
     log_options = log_options,
-    prepared_log_opts = prepare_fh_options(self.context.toplevel, log_options, single_file),
+    prepared_log_opts = prepare_fh_options(self.ctx.toplevel, log_options, single_file),
     opt = opt,
     callback = callback,
     entries = entries,
@@ -968,7 +967,7 @@ function GitAdapter:is_binary(path, rev)
 
   utils.vec_push(cmd, "--", path)
 
-  local _, code = self:exec_sync(cmd, { cwd = self.context.toplevel, silent = true })
+  local _, code = self:exec_sync(cmd, { cwd = self.ctx.toplevel, silent = true })
   return code ~= 0
 end
 

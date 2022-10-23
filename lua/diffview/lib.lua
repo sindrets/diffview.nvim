@@ -152,9 +152,6 @@ function M.file_history(range, args)
     return v == "." and "." or pl:relative(v, ".")
   end, adapter.ctx.path_args)
 
-  print('path_args: ', vim.inspect(adapter.ctx.path_args))
-  print('rel_paths:', vim.inspect(rel_paths))
-
   logger.info("[command call] :DiffviewFileHistory " .. table.concat(vim.tbl_flatten({
     default_args,
     args,

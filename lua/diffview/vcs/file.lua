@@ -59,7 +59,7 @@ File.bufopts = {
 function File:init(opt)
   self.adapter = opt.adapter
   self.path = opt.path
-  self.absolute_path = pl:absolute(opt.path, opt.adapter.context.toplevel)
+  self.absolute_path = pl:absolute(opt.path, opt.adapter.ctx.toplevel)
   self.parent_path = pl:parent(opt.path) or ""
   self.basename = pl:basename(opt.path)
   self.extension = pl:extension(opt.path)
@@ -172,13 +172,13 @@ function File:create_buffer(callback)
     api.nvim_buf_set_option(self.bufnr, option, value)
   end
 
-  local fullname = pl:join("diffview://", self.adapter.context.dir, context, self.path)
+  local fullname = pl:join("diffview://", self.adapter.ctx.dir, context, self.path)
   local ok = pcall(api.nvim_buf_set_name, self.bufnr, fullname)
   if not ok then
     -- Resolve name conflict
     local i = 1
     repeat
-      fullname = pl:join("diffview://", self.adapter.context.dir, context, i, self.path)
+      fullname = pl:join("diffview://", self.adapter.ctx.dir, context, i, self.path)
       ok = pcall(api.nvim_buf_set_name, self.bufnr, fullname)
       i = i + 1
     until ok
@@ -388,7 +388,7 @@ end
 ---@type vcs.File
 File.NULL_FILE = File({
   adapter = {
-    context = {
+    ctx = {
       toplevel = "diffview://",
     }
   },

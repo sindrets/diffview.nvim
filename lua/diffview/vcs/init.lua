@@ -22,16 +22,10 @@ function M.get_adapter(opt)
     local path_args
     local top_indicators = opt.top_indicators
 
-    print('before', vim.inspect(top_indicators))
-
     if not top_indicators then
       path_args, top_indicators = adapter.get_repo_paths(opt.cmd_ctx.path_args, opt.cmd_ctx.cpath)
     end
-    print('after', vim.inspect(top_indicators))
-
     local toplevel = adapter.find_toplevel(top_indicators)
-
-    print('toplevel: ', vim.inspect(toplevel))
 
     if toplevel then
       -- Create a new adapter instance. Store the resolved path args and the

@@ -56,7 +56,7 @@ local FileEntry = oop.create_class("FileEntry")
 function FileEntry:init(opt)
   self.path = opt.path
   self.oldpath = opt.oldpath
-  self.absolute_path = utils.path:absolute(opt.path, opt.adapter.context.toplevel)
+  self.absolute_path = utils.path:absolute(opt.path, opt.adapter.ctx.toplevel)
   self.parent_path = utils.path:parent(opt.path) or ""
   self.basename = utils.path:basename(opt.path)
   self.extension = utils.path:extension(opt.path)

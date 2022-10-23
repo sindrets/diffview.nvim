@@ -227,6 +227,7 @@ return {
     comp:add_line(cached.root_path)
 
     local offset
+    vim.inspect(panel)
     if panel.single_file then
       line_idx = line_idx + 1
       if #panel.entries > 0 then

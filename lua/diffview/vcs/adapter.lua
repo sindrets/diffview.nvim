@@ -20,7 +20,7 @@ function VCSAdapter:init(path)
     version = {},
     version_string = {},
   }
-  self.context = {}
+  self.ctx = {}
 end
 
 function VCSAdapter:run_bootstrap()
