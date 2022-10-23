@@ -207,91 +207,6 @@ function M.completion(_, cmd_line, cur_pos)
   end
 end
 
-function M.rev_candidates(git_toplevel, git_dir)
-  logger.lvl(1).debug("[completion] Revision candidates requested.")
-  local top_indicators
-  if not (git_toplevel and git_dir) then
-    local cfile = utils.path:vim_expand("%")
-    top_indicators = utils.vec_join(
-      vim.bo.buftype == ""
-          and utils.path:absolute(cfile)
-          or nil,
-      utils.path:realpath(".")
-    )
-  end
-
-  if not (git_toplevel and git_dir) then
-    local err
-    err, git_toplevel = lib.find_git_toplevel(top_indicators)
-
-    if err then
-      return {}
-    end
-
-    ---@cast git_toplevel string
-    git_dir = vcs.git_dir(git_toplevel)
-  end
-
-  if not (git_toplevel and git_dir) then
-    return {}
-  end
-
-  -- stylua: ignore start
-  local targets = {
-    "HEAD", "FETCH_HEAD", "ORIG_HEAD", "MERGE_HEAD",
-    "REBASE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD"
-  }
-  -- stylua: ignore end
-
-  local heads = vim.tbl_filter(
-    function(name) return vim.tbl_contains(targets, name) end,
-    vim.tbl_map(
-      function(v) return utils.path:basename(v) end,
-      vim.fn.glob(git_dir .. "/*", false, true)
-    )
-  )
-  local revs = vcs.exec_sync(
-    { "rev-parse", "--symbolic", "--branches", "--tags", "--remotes" },
-    { cwd = git_toplevel, silent = true }
-  )
-  local stashes = vcs.exec_sync(
-    { "stash", "list", "--pretty=format:%gd" },
-    { cwd = git_toplevel, silent = true }
-  )
-
-  return utils.vec_join(heads, revs, stashes)
-end
-
----@class RevCompletionSpec
----@field accept_range boolean
----@field git_toplevel string
----@field git_dir string
-
----Completion for git revisions.
----@param arg_lead string
----@param opt? RevCompletionSpec
----@return string[]
-function M.rev_completion(arg_lead, opt)
-  ---@type RevCompletionSpec
-  opt = vim.tbl_extend("keep", opt or {}, { accept_range = false })
-  local candidates = M.rev_candidates(opt.git_toplevel, opt.git_dir)
-  local _, range_end = utils.str_match(arg_lead, {
-    "^(%.%.%.?)()$",
-    "^(%.%.%.?)()[^.]",
-    "[^.](%.%.%.?)()$",
-    "[^.](%.%.%.?)()[^.]",
-  })
-
-  if opt.accept_range and range_end then
-    local range_lead = arg_lead:sub(1, range_end - 1)
-    candidates = vim.tbl_map(function(v)
-      return range_lead .. v
-    end, candidates)
-  end
-
-  return M.filter_completion(arg_lead, candidates)
-end
-
 ---Completion for the git-log `-L` flag.
 ---@param arg_lead string
 ---@return string[]?
@@ -310,9 +225,9 @@ function M.line_trace_completion(arg_lead)
   end
 end
 
-M.completers = {
-  ---@param ctx CmdLineContext
-  DiffviewOpen = function(ctx)
+---Create a temporary adapter to get relevant completions
+---@return VCSAdapter?
+function M.get_adapter()
     local cfile = utils.path:vim_expand("%")
     local top_indicators = utils.vec_join(
       vim.bo.buftype == ""
@@ -321,13 +236,27 @@ M.completers = {
       utils.path:realpath(".")
     )
 
-    local has_rev_arg = false
-    local git_dir
-    local err, git_toplevel = lib.find_git_toplevel(top_indicators)
+    print('toplevels = ', vim.inspect(top_indicators))
+    -- Create a short-lived adapter such that we can get relevant completion
+    local err, adapter = vcs.get_adapter({ top_indicators = top_indicators })
 
-    if not err then
-      ---@cast git_toplevel string
-      git_dir = vcs.git_dir(git_toplevel)
+    -- TODO: Can we flag an error here?
+    if err then
+      utils.err(err)
+      return nil
+    end
+
+    return adapter
+end
+
+M.completers = {
+  ---@param ctx CmdLineContext
+  DiffviewOpen = function(ctx)
+    local has_rev_arg = false
+    local adapter = M.get_adapter()
+
+    if not adapter then
+      return nil
     end
 
     for i = 2, math.min(#ctx.args, ctx.divideridx) do
@@ -341,12 +270,12 @@ M.completers = {
 
     if ctx.argidx > ctx.divideridx then
       utils.vec_push(candidates, unpack(vim.fn.getcompletion(ctx.arg_lead, "file", 0)))
-    elseif not has_rev_arg and ctx.arg_lead:sub(1, 1) ~= "-" and git_dir and git_toplevel then
+    elseif not has_rev_arg and ctx.arg_lead:sub(1, 1) ~= "-" and adapter.ctx.dir and adapter.ctx.toplevel then
       utils.vec_push(candidates, unpack(comp_open:get_all_names()))
       utils.vec_push(candidates, unpack(M.rev_completion(ctx.arg_lead, {
         accept_range= true,
-        git_toplevel = git_toplevel,
-        git_dir = git_dir,
+        git_toplevel = adapter.ctx.toplevel,
+        git_dir = adapter.ctx.dir,
       })))
     else
       utils.vec_push(candidates, unpack(
@@ -359,11 +288,12 @@ M.completers = {
   end,
   ---@param ctx CmdLineContext
   DiffviewFileHistory = function(ctx)
+    local adapter = M.get_adapter()
     local candidates = {}
 
     utils.vec_push(candidates, unpack(
-      comp_file_history:get_completion(ctx.arg_lead)
-      or comp_file_history:get_all_names()
+      adapter.comp_file_history:get_completion(ctx.arg_lead)
+      or adapter.comp_file_history:get_all_names()
     ))
 
     utils.vec_push(candidates, unpack(vim.fn.getcompletion(ctx.arg_lead, "file", 0)))

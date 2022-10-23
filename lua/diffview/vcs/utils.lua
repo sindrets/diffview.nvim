@@ -146,5 +146,16 @@ M.show = async.wrap(function(adapter, args, callback)
 
 end, 3)
 
+
+---@param arg_lead string
+---@param items string[]
+---@return string[]
+function M.filter_completion(arg_lead, items)
+  arg_lead, _ = vim.pesc(arg_lead)
+  return vim.tbl_filter(function(item)
+    return item:match(arg_lead)
+  end, items)
+end
+
 M.JobStatus = JobStatus
 return M

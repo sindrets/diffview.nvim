@@ -13,10 +13,14 @@ local M = {}
 ---@field cpath string? # Cwd path given by the `-C` flag option
 
 ---@param opt vcs.init.get_adapter.Opt
----@return err string?
----@return adapter VCSAdapter?
+---@return string? err
+---@return VCSAdapter? adapter
 function M.get_adapter(opt)
   local adapters = { git, hg }
+
+  if not opt.cmd_ctx then
+    opt.cmd_ctx = {}
+  end
 
   for _, adapter in ipairs(adapters) do
     local path_args

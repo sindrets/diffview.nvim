@@ -14,7 +14,8 @@ local Rev = require("diffview.vcs.rev").Rev
 ---@class VCSAdapter
 local VCSAdapter = require('diffview.vcs.adapter').VCSAdapter
 local Job = require("plenary.job")
-local JobStatus = require('diffview.vcs.utils').JobStatus
+local vcs_utils = require('diffview.vcs.utils')
+local JobStatus = vcs_utils.JobStatus
 local Commit = require('diffview.vcs.adapters.git.commit').GitCommit
 
 ---@type PathLib
@@ -1166,6 +1167,126 @@ for _, list in pairs(GitAdapter.flags) do
     list[option.key] = option
   end
 end
+
+function M.rev_candidates(git_toplevel, git_dir)
+  logger.lvl(1).debug("[completion] Revision candidates requested.")
+  local top_indicators
+  if not (git_toplevel and git_dir) then
+    local cfile = utils.path:vim_expand("%")
+    top_indicators = utils.vec_join(
+      vim.bo.buftype == ""
+          and utils.path:absolute(cfile)
+          or nil,
+      utils.path:realpath(".")
+    )
+  end
+
+  if not (git_toplevel and git_dir) then
+    local err
+    err, git_toplevel = lib.find_git_toplevel(top_indicators)
+
+    if err then
+      return {}
+    end
+
+    ---@cast git_toplevel string
+    git_dir = vcs.git_dir(git_toplevel)
+  end
+
+  if not (git_toplevel and git_dir) then
+    return {}
+  end
+
+  -- stylua: ignore start
+  local targets = {
+    "HEAD", "FETCH_HEAD", "ORIG_HEAD", "MERGE_HEAD",
+    "REBASE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD"
+  }
+  -- stylua: ignore end
+
+  local heads = vim.tbl_filter(
+    function(name) return vim.tbl_contains(targets, name) end,
+    vim.tbl_map(
+      function(v) return utils.path:basename(v) end,
+      vim.fn.glob(git_dir .. "/*", false, true)
+    )
+  )
+  local revs = vcs.exec_sync(
+    { "rev-parse", "--symbolic", "--branches", "--tags", "--remotes" },
+    { cwd = git_toplevel, silent = true }
+  )
+  local stashes = vcs.exec_sync(
+    { "stash", "list", "--pretty=format:%gd" },
+    { cwd = git_toplevel, silent = true }
+  )
+
+  return utils.vec_join(heads, revs, stashes)
+end
+
+---@class RevCompletionSpec
+---@field accept_range boolean
+---@field git_toplevel string
+---@field git_dir string
+
+---Completion for git revisions.
+---@param arg_lead string
+---@param opt? RevCompletionSpec
+---@return string[]
+function M.rev_completion(arg_lead, opt)
+  ---@type RevCompletionSpec
+  opt = vim.tbl_extend("keep", opt or {}, { accept_range = false })
+  local candidates = M.rev_candidates(opt.git_toplevel, opt.git_dir)
+  local _, range_end = utils.str_match(arg_lead, {
+    "^(%.%.%.?)()$",
+    "^(%.%.%.?)()[^.]",
+    "[^.](%.%.%.?)()$",
+    "[^.](%.%.%.?)()[^.]",
+  })
+
+  if opt.accept_range and range_end then
+    local range_lead = arg_lead:sub(1, range_end - 1)
+    candidates = vim.tbl_map(function(v)
+      return range_lead .. v
+    end, candidates)
+  end
+
+  return vcs_utils.filter_completion(arg_lead, candidates)
+end
+
+---@type FlagValueMap
+GitAdapter.comp_file_history = arg_parser.FlagValueMap()
+GitAdapter.comp_file_history:put({ "base" }, function(_, arg_lead)
+  return utils.vec_join("LOCAL", M.rev_completion(arg_lead))
+end)
+GitAdapter.comp_file_history:put({ "range" }, function(_, arg_lead)
+  return M.rev_completion(arg_lead, { accept_range = true })
+end)
+GitAdapter.comp_file_history:put({ "C" }, function(_, arg_lead)
+  return vim.fn.getcompletion(arg_lead, "dir")
+end)
+GitAdapter.comp_file_history:put({ "--follow" })
+GitAdapter.comp_file_history:put({ "--first-parent" })
+GitAdapter.comp_file_history:put({ "--show-pulls" })
+GitAdapter.comp_file_history:put({ "--reflog" })
+GitAdapter.comp_file_history:put({ "--all" })
+GitAdapter.comp_file_history:put({ "--merges" })
+GitAdapter.comp_file_history:put({ "--no-merges" })
+GitAdapter.comp_file_history:put({ "--reverse" })
+GitAdapter.comp_file_history:put({ "--max-count", "-n" }, {})
+GitAdapter.comp_file_history:put({ "-L" }, function (_, arg_lead)
+  return M.line_trace_completion(arg_lead)
+end)
+GitAdapter.comp_file_history:put({ "--diff-merges" }, {
+  "off",
+  "on",
+  "first-parent",
+  "separate",
+  "combined",
+  "dense-combined",
+  "remerge",
+})
+GitAdapter.comp_file_history:put({ "--author" }, {})
+GitAdapter.comp_file_history:put({ "--grep" }, {})
 
 M.GitAdapter = GitAdapter
 return M
