@@ -851,7 +851,7 @@ function GitAdapter:file_history_worker(thread, log_opt, opt, co_state, callback
   local last_status
   local err_msg
 
-  local single_file = self:is_single_file(self.ctx.toplevel, log_opt.single_file.path_args, log_opt.single_file.L)
+  local single_file = self:is_single_file(log_opt.single_file.path_args, log_opt.single_file.L)
 
   ---@type LogOptions
   local log_options = config.get_log_options(
