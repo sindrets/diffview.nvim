@@ -22,53 +22,6 @@ local api = vim.api
 
 local M = {}
 
----@type FlagValueMap
-local comp_open = arg_parser.FlagValueMap()
-comp_open:put({ "u", "untracked-files" }, { "true", "normal", "all", "false", "no" })
-comp_open:put({ "cached", "staged" })
-comp_open:put({ "imply-local" })
-comp_open:put({ "C" }, function(_, arg_lead)
-  return vim.fn.getcompletion(arg_lead, "dir")
-end)
-comp_open:put({ "selected-file" }, function (_, arg_lead)
-  return vim.fn.getcompletion(arg_lead, "file")
-end)
-
----@type FlagValueMap
-local comp_file_history = arg_parser.FlagValueMap()
-comp_file_history:put({ "base" }, function(_, arg_lead)
-  return utils.vec_join("LOCAL", M.rev_completion(arg_lead))
-end)
-comp_file_history:put({ "range" }, function(_, arg_lead)
-  return M.rev_completion(arg_lead, { accept_range = true })
-end)
-comp_file_history:put({ "C" }, function(_, arg_lead)
-  return vim.fn.getcompletion(arg_lead, "dir")
-end)
-comp_file_history:put({ "--follow" })
-comp_file_history:put({ "--first-parent" })
-comp_file_history:put({ "--show-pulls" })
-comp_file_history:put({ "--reflog" })
-comp_file_history:put({ "--all" })
-comp_file_history:put({ "--merges" })
-comp_file_history:put({ "--no-merges" })
-comp_file_history:put({ "--reverse" })
-comp_file_history:put({ "--max-count", "-n" }, {})
-comp_file_history:put({ "-L" }, function (_, arg_lead)
-  return M.line_trace_completion(arg_lead)
-end)
-comp_file_history:put({ "--diff-merges" }, {
-  "off",
-  "on",
-  "first-parent",
-  "separate",
-  "combined",
-  "dense-combined",
-  "remerge",
-})
-comp_file_history:put({ "--author" }, {})
-comp_file_history:put({ "--grep" }, {})
-
 function M.setup(user_config)
   config.setup(user_config or {})
 end
@@ -207,24 +160,6 @@ function M.completion(_, cmd_line, cur_pos)
   end
 end
 
----Completion for the git-log `-L` flag.
----@param arg_lead string
----@return string[]?
-function M.line_trace_completion(arg_lead)
-  local range_end = arg_lead:match(".*:()")
-
-  if not range_end then
-    return
-  else
-    local lead = arg_lead:sub(1, range_end - 1)
-    local path_lead = arg_lead:sub(range_end)
-
-    return vim.tbl_map(function(v)
-      return lead .. v
-    end, vim.fn.getcompletion(path_lead, "file"))
-  end
-end
-
 ---Create a temporary adapter to get relevant completions
 ---@return VCSAdapter?
 function M.get_adapter()
@@ -236,8 +171,6 @@ function M.get_adapter()
       utils.path:realpath(".")
     )
 
-    print('toplevels = ', vim.inspect(top_indicators))
-    -- Create a short-lived adapter such that we can get relevant completion
     local err, adapter = vcs.get_adapter({ top_indicators = top_indicators })
 
     -- TODO: Can we flag an error here?
@@ -271,16 +204,14 @@ M.completers = {
     if ctx.argidx > ctx.divideridx then
       utils.vec_push(candidates, unpack(vim.fn.getcompletion(ctx.arg_lead, "file", 0)))
     elseif not has_rev_arg and ctx.arg_lead:sub(1, 1) ~= "-" and adapter.ctx.dir and adapter.ctx.toplevel then
-      utils.vec_push(candidates, unpack(comp_open:get_all_names()))
-      utils.vec_push(candidates, unpack(M.rev_completion(ctx.arg_lead, {
+      utils.vec_push(candidates, unpack(adapter.comp.open:get_all_names()))
+      utils.vec_push(candidates, unpack(adapter:rev_completion(ctx.arg_lead, {
         accept_range= true,
-        git_toplevel = adapter.ctx.toplevel,
-        git_dir = adapter.ctx.dir,
       })))
     else
       utils.vec_push(candidates, unpack(
-        comp_open:get_completion(ctx.arg_lead)
-        or comp_open:get_all_names()
+        adapter.comp.open:get_completion(ctx.arg_lead)
+        or adapter.comp.open:get_all_names()
       ))
     end
 

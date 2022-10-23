@@ -24,7 +24,8 @@ function VCSAdapter:init(path)
   self.ctx = {}
 
   self.comp = {
-    file_history = arg_parser.FlagValueMap()
+    file_history = arg_parser.FlagValueMap(),
+    open = arg_parser.FlagValueMap(),
   }
 end
 

@@ -14,8 +14,8 @@ local Rev = require("diffview.vcs.rev").Rev
 ---@class VCSAdapter
 local VCSAdapter = require('diffview.vcs.adapter').VCSAdapter
 local Job = require("plenary.job")
-local vcs_utils = require('diffview.vcs.utils')
-local JobStatus = vcs_utils.JobStatus
+local JobStatus = require('diffview.vcs.utils').JobStatus
+local diffview = require('diffview')
 local Commit = require('diffview.vcs.adapters.git.commit').GitCommit
 
 ---@type PathLib
@@ -994,10 +994,8 @@ GitAdapter.flags = {
       completion = function(panel)
         return function(arg_lead, _, _)
           local view = panel.parent.parent
-          return diffview.rev_completion(arg_lead, {
+          return view.git_ctx:rev_completion(arg_lead, {
             accept_range = true,
-            git_toplevel = view.git_ctx.ctx.toplevel,
-            git_dir = view.git_ctx.ctx.dir,
           })
         end
       end,
@@ -1008,10 +1006,7 @@ GitAdapter.flags = {
       completion = function(panel)
         return function(arg_lead, _, _)
           local view = panel.parent.parent
-          return utils.vec_join("LOCAL", diffview.rev_completion(arg_lead, {
-            git_toplevel = view.git_ctx.ctx.toplevel,
-            git_dir = view.git_ctx.ctx.dir,
-          }))
+          return utils.vec_join("LOCAL", view.git_ctx:rev_completion(arg_lead, {}))
         end
       end,
     },
@@ -1022,7 +1017,7 @@ GitAdapter.flags = {
       prompt_fmt = "${label} ",
       completion = function(_)
         return function(arg_lead, _, _)
-          return diffview.line_trace_completion(arg_lead)
+          return M.line_trace_completion(arg_lead)
         end
       end,
       transform = function(values)
@@ -1254,10 +1249,39 @@ function GitAdapter:rev_completion(arg_lead, opt)
     end, candidates)
   end
 
-  return vcs_utils.filter_completion(arg_lead, candidates)
+  return diffview.filter_completion(arg_lead, candidates)
 end
 
+---Completion for the git-log `-L` flag.
+---@param arg_lead string
+---@return string[]?
+function M.line_trace_completion(arg_lead)
+  local range_end = arg_lead:match(".*:()")
+
+  if not range_end then
+    return
+  else
+    local lead = arg_lead:sub(1, range_end - 1)
+    local path_lead = arg_lead:sub(range_end)
+
+    return vim.tbl_map(function(v)
+      return lead .. v
+    end, vim.fn.getcompletion(path_lead, "file"))
+  end
+end
+
+
 function GitAdapter:init_completion()
+  self.comp.open:put({ "u", "untracked-files" }, { "true", "normal", "all", "false", "no" })
+  self.comp.open:put({ "cached", "staged" })
+  self.comp.open:put({ "imply-local" })
+  self.comp.open:put({ "C" }, function(_, arg_lead)
+    return vim.fn.getcompletion(arg_lead, "dir")
+  end)
+  self.comp.open:put({ "selected-file" }, function (_, arg_lead)
+    return vim.fn.getcompletion(arg_lead, "file")
+  end)
+
   self.comp.file_history:put({ "base" }, function(_, arg_lead)
     return utils.vec_join("LOCAL", self:rev_completion(arg_lead))
   end)
