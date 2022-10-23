@@ -38,8 +38,8 @@ function FileHistoryView:init(opt)
 end
 
 function FileHistoryView:post_open()
-  self.commit_log_panel = CommitLogPanel(self.git_ctx.toplevel, {
-    name = ("diffview://%s/log/%d/%s"):format(self.git_ctx.dir, self.tabpage, "commit_log"),
+  self.commit_log_panel = CommitLogPanel(self.git_ctx.ctx.toplevel, {
+    name = ("diffview://%s/log/%d/%s"):format(self.git_ctx.ctx.dir, self.tabpage, "commit_log"),
   })
 
   self:init_event_listeners()

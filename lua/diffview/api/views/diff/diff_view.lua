@@ -128,7 +128,7 @@ function CDiffView:create_file_entries(files)
     {
       kind = "staged",
       files = files.staged or {},
-      left = vcs.head_rev(self.git_ctx.toplevel),
+      left = vcs.head_rev(self.git_ctx.ctx.toplevel),
       right = Rev(RevType.STAGE, 0),
     },
   }

@@ -41,8 +41,8 @@ return function(view)
           if l1 then
             l1 = tonumber(l1)
             lpath = utils.path:chain(lpath)
-                :normalize({ cwd = view.git_ctx.toplevel, absolute = true })
-                :relative(view.git_ctx.toplevel)
+                :normalize({ cwd = view.git_ctx.ctx.toplevel, absolute = true })
+                :relative(view.git_ctx.ctx.toplevel)
                 :get()
 
             if lpath == cur.path then

@@ -150,7 +150,7 @@ function GitAdapter:init(opt)
 
   self.ctx = {
     toplevel = opt.toplevel,
-    git_dir = self:git_dir(opt.toplevel),
+    dir = self:get_dir(opt.toplevel),
     path_args = vim.tbl_map(function(pathspec)
       return pathspec_expand(opt.toplevel, cwd, pathspec)
     end, opt.path_args or {}) --[[@as string[] ]]
@@ -214,7 +214,7 @@ function GitAdapter:get_show_args(args)
   return utils.vec_join(self:args(), "show", args)
 end
 
-function GitAdapter:git_dir(path)
+function GitAdapter:get_dir(path)
   local out, code = self:exec_sync({ "rev-parse", "--path-format=absolute", "--git-dir" }, path)
   if code ~= 0 then
     return nil
@@ -528,11 +528,10 @@ local incremental_line_trace_data = async.void(function(state, callback)
 end)
 
 
----@param toplevel string
 ---@param path_args string[]
 ---@param lflags string[]
 ---@return boolean
-function GitAdapter:is_single_file(toplevel, path_args, lflags)
+function GitAdapter:is_single_file(path_args, lflags)
   if lflags and #lflags > 0 then
     local seen = {}
     for i, v in ipairs(lflags) do
@@ -543,35 +542,34 @@ function GitAdapter:is_single_file(toplevel, path_args, lflags)
       seen[path] = true
     end
 
-  elseif path_args and toplevel then
+  elseif path_args and self.ctx.toplevel then
     return #path_args == 1
         and not utils.path:is_dir(path_args[1])
-        and #self:exec_sync({ "ls-files", "--", path_args }, toplevel) < 2
+        and #self:exec_sync({ "ls-files", "--", path_args }, self.ctx.toplevel) < 2
   end
 
   return true
 end
 
----@param toplevel string
 ---@param log_opt LogOptions
 ---@return boolean ok, string description
-function GitAdapter:file_history_dry_run(toplevel, log_opt)
-  local single_file = self:is_single_file(toplevel, log_opt.path_args, log_opt.L)
+function GitAdapter:file_history_dry_run(log_opt)
+  local single_file = self:is_single_file(log_opt.path_args, log_opt.L)
   local log_options = config.get_log_options(single_file, log_opt)
 
   local options = vim.tbl_map(function(v)
     return vim.fn.shellescape(v)
-  end, prepare_fh_options(toplevel, log_options, single_file).flags) --[[@as vector ]]
+  end, prepare_fh_options(self.ctx.toplevel, log_options, single_file).flags) --[[@as vector ]]
 
   local description = utils.vec_join(
-    ("Top-level path: '%s'"):format(utils.path:vim_fnamemodify(toplevel, ":~")),
+    ("Top-level path: '%s'"):format(utils.path:vim_fnamemodify(self.ctx.toplevel, ":~")),
     log_options.rev_range and ("Revision range: '%s'"):format(log_options.rev_range) or nil,
     ("Flags: %s"):format(table.concat(options, " "))
   )
 
   log_options = utils.tbl_clone(log_options) --[[@as LogOptions ]]
   log_options.max_count = 1
-  options = prepare_fh_options(toplevel, log_options, single_file).flags
+  options = prepare_fh_options(self.ctx.toplevel, log_options, single_file).flags
 
   local context = "git.utils.file_history_dry_run()"
   local cmd
@@ -585,7 +583,7 @@ function GitAdapter:file_history_dry_run(toplevel, log_opt)
   end
 
   local out, code = self:exec_sync(cmd, {
-    cwd = toplevel,
+    cwd = self.ctx.toplevel,
     debug_opt = {
       context = context,
       no_stdout = true,
@@ -674,7 +672,7 @@ function GitAdapter:file_history_options(range, paths, args)
 
   log_options.path_args = paths
 
-  local ok, opt_description = self:file_history_dry_run(self.ctx.toplevel, log_options)
+  local ok, opt_description = self:file_history_dry_run(log_options)
 
   if not ok then
     utils.info({
@@ -687,7 +685,7 @@ function GitAdapter:file_history_options(range, paths, args)
     return
   end
 
-  if not self.ctx.git_dir then
+  if not self.ctx.dir then
     utils.err(
       ("Failed to find the git dir for the repository: %s")
       :format(utils.str_quote(self.ctx.toplevel))
@@ -996,8 +994,8 @@ GitAdapter.flags = {
           local view = panel.parent.parent
           return diffview.rev_completion(arg_lead, {
             accept_range = true,
-            git_toplevel = view.git_ctx.toplevel,
-            git_dir = view.git_ctx.dir,
+            git_toplevel = view.git_ctx.ctx.toplevel,
+            git_dir = view.git_ctx.ctx.dir,
           })
         end
       end,
@@ -1009,8 +1007,8 @@ GitAdapter.flags = {
         return function(arg_lead, _, _)
           local view = panel.parent.parent
           return utils.vec_join("LOCAL", diffview.rev_completion(arg_lead, {
-            git_toplevel = view.git_ctx.toplevel,
-            git_dir = view.git_ctx.dir,
+            git_toplevel = view.git_ctx.ctx.toplevel,
+            git_dir = view.git_ctx.ctx.dir,
           }))
         end
       end,

@@ -55,7 +55,7 @@ function DiffView:init(opt)
   self.options.selected_file = self.options.selected_file
     and utils.path:chain(self.options.selected_file)
         :absolute()
-        :relative(self.git_ctx.toplevel)
+        :relative(self.git_ctx.ctx.toplevel)
         :get()
 
   DiffView:super().init(self, {
@@ -119,14 +119,14 @@ end
 function DiffView:post_open()
   vim.cmd("redraw")
 
-  self.commit_log_panel = CommitLogPanel(self.git_ctx.toplevel, {
-    name = ("diffview://%s/log/%d/%s"):format(self.git_ctx.dir, self.tabpage, "commit_log"),
+  self.commit_log_panel = CommitLogPanel(self.git_ctx.ctx.toplevel, {
+    name = ("diffview://%s/log/%d/%s"):format(self.git_ctx.ctx.dir, self.tabpage, "commit_log"),
   })
 
   if config.get_config().watch_index then
     self.watcher = vim.loop.new_fs_poll()
     ---@diagnostic disable-next-line: unused-local
-    self.watcher:start(self.git_ctx.dir .. "/index", 1000, function(err, prev, cur)
+    self.watcher:start(self.git_ctx.ctx.dir .. "/index", 1000, function(err, prev, cur)
       if not err then
         vim.schedule(function()
           if self:is_cur_tabpage() then
@@ -302,7 +302,7 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
     -- If left is tracking HEAD and right is LOCAL: Update HEAD rev.
     local new_head
     if self.left.track_head and self.right.type == RevType.LOCAL then
-      new_head = vcs.head_rev(self.git_ctx.toplevel)
+      new_head = vcs.head_rev(self.git_ctx.ctx.toplevel)
       if new_head and self.left.commit ~= new_head.commit then
         self.left = new_head
       else
@@ -311,7 +311,7 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
       perf:lap("updated head rev")
     end
 
-    local index_stat = utils.path:stat(utils.path:join(self.git_ctx.dir, "index"))
+    local index_stat = utils.path:stat(utils.path:join(self.git_ctx.ctx.dir, "index"))
     local last_winid = api.nvim_get_current_win()
     self:get_updated_files(function(err, new_files)
       if err then
