@@ -291,9 +291,13 @@ M.completers = {
     local adapter = M.get_adapter()
     local candidates = {}
 
+    if not adapter then
+      return nil
+    end
+
     utils.vec_push(candidates, unpack(
-      adapter.comp_file_history:get_completion(ctx.arg_lead)
-      or adapter.comp_file_history:get_all_names()
+      adapter.comp.file_history:get_completion(ctx.arg_lead)
+      or adapter.comp.file_history:get_all_names()
     ))
 
     utils.vec_push(candidates, unpack(vim.fn.getcompletion(ctx.arg_lead, "file", 0)))

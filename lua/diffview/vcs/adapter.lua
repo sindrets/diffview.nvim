@@ -1,6 +1,7 @@
 local oop = require('diffview.oop')
 local utils = require('diffview.utils')
 local logger = require('diffview.logger')
+local arg_parser = require('diffview.arg_parser')
 
 local M = {}
 
@@ -21,6 +22,10 @@ function VCSAdapter:init(path)
     version_string = {},
   }
   self.ctx = {}
+
+  self.comp = {
+    file_history = arg_parser.FlagValueMap()
+  }
 end
 
 function VCSAdapter:run_bootstrap()
@@ -134,6 +139,9 @@ function VCSAdapter:is_binary(path, rev)
   oop.abstract_stub()
 end
 
+function VCSAdapter:init_completion()
+  oop.abstract_stub()
+end
 
 M.VCSAdapter = VCSAdapter
 return M

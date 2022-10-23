@@ -155,6 +155,8 @@ function GitAdapter:init(opt)
       return pathspec_expand(opt.toplevel, cwd, pathspec)
     end, opt.path_args or {}) --[[@as string[] ]]
   }
+
+  self:init_completion()
 end
 
 function GitAdapter:run_bootstrap()
@@ -1168,34 +1170,36 @@ for _, list in pairs(GitAdapter.flags) do
   end
 end
 
-function M.rev_candidates(git_toplevel, git_dir)
+-- Completion
+
+function GitAdapter:rev_candidates()
   logger.lvl(1).debug("[completion] Revision candidates requested.")
-  local top_indicators
-  if not (git_toplevel and git_dir) then
-    local cfile = utils.path:vim_expand("%")
-    top_indicators = utils.vec_join(
-      vim.bo.buftype == ""
-          and utils.path:absolute(cfile)
-          or nil,
-      utils.path:realpath(".")
-    )
-  end
+  -- local top_indicators
+  -- if not (git_toplevel and git_dir) then
+  --   local cfile = utils.path:vim_expand("%")
+  --   top_indicators = utils.vec_join(
+  --     vim.bo.buftype == ""
+  --         and utils.path:absolute(cfile)
+  --         or nil,
+  --     utils.path:realpath(".")
+  --   )
+  -- end
 
-  if not (git_toplevel and git_dir) then
-    local err
-    err, git_toplevel = lib.find_git_toplevel(top_indicators)
+  -- if not (git_toplevel and git_dir) then
+  --   local err
+  --   err, git_toplevel = lib.find_git_toplevel(top_indicators)
 
-    if err then
-      return {}
-    end
+  --   if err then
+  --     return {}
+  --   end
 
-    ---@cast git_toplevel string
-    git_dir = vcs.git_dir(git_toplevel)
-  end
+  --   ---@cast git_toplevel string
+  --   git_dir = vcs.git_dir(git_toplevel)
+  -- end
 
-  if not (git_toplevel and git_dir) then
-    return {}
-  end
+  -- if not (git_toplevel and git_dir) then
+  --   return {}
+  -- end
 
   -- stylua: ignore start
   local targets = {
@@ -1208,16 +1212,16 @@ function M.rev_candidates(git_toplevel, git_dir)
     function(name) return vim.tbl_contains(targets, name) end,
     vim.tbl_map(
       function(v) return utils.path:basename(v) end,
-      vim.fn.glob(git_dir .. "/*", false, true)
+      vim.fn.glob(self.ctx.dir .. "/*", false, true)
     )
   )
-  local revs = vcs.exec_sync(
+  local revs = self:exec_sync(
     { "rev-parse", "--symbolic", "--branches", "--tags", "--remotes" },
-    { cwd = git_toplevel, silent = true }
+    { cwd = self.ctx.toplevel, silent = true }
   )
-  local stashes = vcs.exec_sync(
+  local stashes = self:exec_sync(
     { "stash", "list", "--pretty=format:%gd" },
-    { cwd = git_toplevel, silent = true }
+    { cwd = self.ctx.toplevel, silent = true }
   )
 
   return utils.vec_join(heads, revs, stashes)
@@ -1232,10 +1236,10 @@ end
 ---@param arg_lead string
 ---@param opt? RevCompletionSpec
 ---@return string[]
-function M.rev_completion(arg_lead, opt)
+function GitAdapter:rev_completion(arg_lead, opt)
   ---@type RevCompletionSpec
   opt = vim.tbl_extend("keep", opt or {}, { accept_range = false })
-  local candidates = M.rev_candidates(opt.git_toplevel, opt.git_dir)
+  local candidates = self:rev_candidates()
   local _, range_end = utils.str_match(arg_lead, {
     "^(%.%.%.?)()$",
     "^(%.%.%.?)()[^.]",
@@ -1253,40 +1257,40 @@ function M.rev_completion(arg_lead, opt)
   return vcs_utils.filter_completion(arg_lead, candidates)
 end
 
----@type FlagValueMap
-GitAdapter.comp_file_history = arg_parser.FlagValueMap()
-GitAdapter.comp_file_history:put({ "base" }, function(_, arg_lead)
-  return utils.vec_join("LOCAL", M.rev_completion(arg_lead))
-end)
-GitAdapter.comp_file_history:put({ "range" }, function(_, arg_lead)
-  return M.rev_completion(arg_lead, { accept_range = true })
-end)
-GitAdapter.comp_file_history:put({ "C" }, function(_, arg_lead)
-  return vim.fn.getcompletion(arg_lead, "dir")
-end)
-GitAdapter.comp_file_history:put({ "--follow" })
-GitAdapter.comp_file_history:put({ "--first-parent" })
-GitAdapter.comp_file_history:put({ "--show-pulls" })
-GitAdapter.comp_file_history:put({ "--reflog" })
-GitAdapter.comp_file_history:put({ "--all" })
-GitAdapter.comp_file_history:put({ "--merges" })
-GitAdapter.comp_file_history:put({ "--no-merges" })
-GitAdapter.comp_file_history:put({ "--reverse" })
-GitAdapter.comp_file_history:put({ "--max-count", "-n" }, {})
-GitAdapter.comp_file_history:put({ "-L" }, function (_, arg_lead)
-  return M.line_trace_completion(arg_lead)
-end)
-GitAdapter.comp_file_history:put({ "--diff-merges" }, {
-  "off",
-  "on",
-  "first-parent",
-  "separate",
-  "combined",
-  "dense-combined",
-  "remerge",
-})
-GitAdapter.comp_file_history:put({ "--author" }, {})
-GitAdapter.comp_file_history:put({ "--grep" }, {})
+function GitAdapter:init_completion()
+  self.comp.file_history:put({ "base" }, function(_, arg_lead)
+    return utils.vec_join("LOCAL", self:rev_completion(arg_lead))
+  end)
+  self.comp.file_history:put({ "range" }, function(_, arg_lead)
+    return self:rev_completion(arg_lead, { accept_range = true })
+  end)
+  self.comp.file_history:put({ "C" }, function(_, arg_lead)
+    return vim.fn.getcompletion(arg_lead, "dir")
+  end)
+  self.comp.file_history:put({ "--follow" })
+  self.comp.file_history:put({ "--first-parent" })
+  self.comp.file_history:put({ "--show-pulls" })
+  self.comp.file_history:put({ "--reflog" })
+  self.comp.file_history:put({ "--all" })
+  self.comp.file_history:put({ "--merges" })
+  self.comp.file_history:put({ "--no-merges" })
+  self.comp.file_history:put({ "--reverse" })
+  self.comp.file_history:put({ "--max-count", "-n" }, {})
+  self.comp.file_history:put({ "-L" }, function (_, arg_lead)
+    return M.line_trace_completion(arg_lead)
+  end)
+  self.comp.file_history:put({ "--diff-merges" }, {
+    "off",
+    "on",
+    "first-parent",
+    "separate",
+    "combined",
+    "dense-combined",
+    "remerge",
+  })
+  self.comp.file_history:put({ "--author" }, {})
+  self.comp.file_history:put({ "--grep" }, {})
+end
 
 M.GitAdapter = GitAdapter
 return M
