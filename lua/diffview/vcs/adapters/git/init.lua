@@ -950,6 +950,40 @@ function GitAdapter:file_history_worker(thread, log_opt, opt, co_state, callback
   callback(entries, JobStatus.SUCCESS)
 end
 
+
+function GitAdapter:diffview_options(args)
+  local default_args = config.get_config().default_args.DiffviewOpen
+  local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
+  local rev_arg = argo.args[1]
+  
+  local left, right = M.parse_revs(self.ctx.toplevel, rev_arg, {
+    cached = argo:get_flag({ "cached", "staged" }),
+    imply_local = argo:get_flag("imply-local"),
+  })
+
+  if not (left and right) then
+    return
+  end
+
+  logger.lvl(1).s_debug(("Parsed revs: left = %s, right = %s"):format(left, right))
+
+  ---@type DiffViewOptions
+  local options = {
+    show_untracked = arg_parser.ambiguous_bool(
+      argo:get_flag({ "u", "untracked-files" }, { plain = true }),
+      nil,
+      { "all", "normal", "true" },
+      { "no", "false" }
+    ),
+    selected_file = argo:get_flag("selected-file", { no_empty = true, expand = true })
+      or (vim.bo.buftype == "" and pl:vim_expand("%:p"))
+      or nil,
+  }
+
+  return {left = left, right = right, options = options}
+end
+
+
 ---Strange trick to check if a file is binary using only git.
 ---@param path string
 ---@param rev Rev

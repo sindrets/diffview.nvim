@@ -25,98 +25,34 @@ function M.diffview_open(args)
   local default_args = config.get_config().default_args.DiffviewOpen
   local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
   local rev_arg = argo.args[1]
-  local paths = {}
 
   logger.info("[command call] :DiffviewOpen " .. table.concat(vim.tbl_flatten({
     default_args,
     args,
   }), " "))
 
-  for _, path_arg in ipairs(argo.post_args) do
-    for _, path in ipairs(pl:vim_expand(path_arg, false, true)) do
-      local magic, pattern = vcs.pathspec_split(path)
-      pattern = pl:readlink(pattern) or pattern
-      table.insert(paths, magic .. pattern)
-    end
-  end
-
-  local cfile = pl:vim_expand("%")
-  cfile = pl:readlink(cfile) or cfile
-  ---@type string
-  local cpath = argo:get_flag("C", { no_empty = true, expand = true })
-
-  local top_indicators = {
-    cpath and pl:realpath(cpath) or (
-      vim.bo.buftype == ""
-      and pl:absolute(cfile)
-      or nil
-    ),
-  }
-
-  if not cpath then
-    table.insert(top_indicators, pl:realpath("."))
-  end
-
-  local err, git_toplevel = M.find_git_toplevel(top_indicators)
+  local err, adapter = vcs.get_adapter({
+    cmd_ctx = {
+      path_args = argo.args,
+      cpath = argo:get_flag("C", { no_empty = true, expand = true }),
+    },
+  })
 
   if err then
     utils.err(err)
     return
   end
 
-  ---@cast git_toplevel string
-  logger.lvl(1).s_debug(("Found git top-level: %s"):format(utils.str_quote(git_toplevel)))
-
-  local cwd = cpath or vim.loop.cwd()
-  paths = vim.tbl_map(function(pathspec)
-    return vcs.pathspec_expand(git_toplevel, cwd, pathspec)
-  end, paths) --[[@as string[] ]]
-
-  local left, right = M.parse_revs(git_toplevel, rev_arg, {
-    cached = argo:get_flag({ "cached", "staged" }),
-    imply_local = argo:get_flag("imply-local"),
-  })
-
-  if not (left and right) then
-    return
-  end
-
-  logger.lvl(1).s_debug(("Parsed revs: left = %s, right = %s"):format(left, right))
-
-  ---@type DiffViewOptions
-  local options = {
-    show_untracked = arg_parser.ambiguous_bool(
-      argo:get_flag({ "u", "untracked-files" }, { plain = true }),
-      nil,
-      { "all", "normal", "true" },
-      { "no", "false" }
-    ),
-    selected_file = argo:get_flag("selected-file", { no_empty = true, expand = true })
-      or (vim.bo.buftype == "" and pl:vim_expand("%:p"))
-      or nil,
-  }
-
-  local git_ctx = {
-    toplevel = git_toplevel,
-    dir = vcs.git_dir(git_toplevel),
-  }
-
-  if not git_ctx.dir then
-    utils.err(
-      ("Failed to find the git dir for the repository: %s")
-      :format(utils.str_quote(git_ctx.toplevel))
-    )
-    return
-  end
+  local opts = adapter:diffview_options(args)
 
   ---@type DiffView
   local v = DiffView({
-    git_ctx = git_ctx,
+    git_ctx = adapter,
     rev_arg = rev_arg,
-    path_args = paths,
-    left = left,
-    right = right,
-    options = options,
+    path_args = adapter.ctx.path_args,
+    left = opts.left,
+    right = opts.right,
+    options = opts.options,
   })
 
   if not v:is_valid() then
@@ -136,6 +72,11 @@ function M.file_history(range, args)
   local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
   local rel_paths
 
+  logger.info("[command call] :DiffviewFileHistory " .. table.concat(vim.tbl_flatten({
+    default_args,
+    args,
+  }), " "))
+
   local err, adapter = vcs.get_adapter({
     cmd_ctx = {
       path_args = argo.args,
@@ -151,11 +92,6 @@ function M.file_history(range, args)
   rel_paths = vim.tbl_map(function(v)
     return v == "." and "." or pl:relative(v, ".")
   end, adapter.ctx.path_args)
-
-  logger.info("[command call] :DiffviewFileHistory " .. table.concat(vim.tbl_flatten({
-    default_args,
-    args,
-  }), " "))
 
   local log_options = adapter:file_history_options(range, rel_paths, args)
 
