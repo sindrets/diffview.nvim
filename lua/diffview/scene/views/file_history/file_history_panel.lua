@@ -211,7 +211,11 @@ function FileHistoryPanel:update_entries(callback)
         -- The parent view has closed: shutdown git jobs and clean up.
         finalizer()
         update:close()
-        vim.schedule(function() self.option_panel:sync() end)
+        vim.schedule(function()
+          if self.option_panel then
+            self.option_panel:sync()
+          end
+        end)
         callback(nil, JobStatus.KILLED)
         return
       end
