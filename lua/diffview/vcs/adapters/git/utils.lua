@@ -805,21 +805,6 @@ local function parse_fh_line_trace_data(state)
   return true
 end
 
----Determine whether a rev arg is a range.
----@param rev_arg string
----@return boolean
-function M.is_rev_arg_range(rev_arg)
-  return utils.str_match(rev_arg, {
-    "^%.%.%.?$",
-    "^%.%.%.?[^.]",
-    "[^.]%.%.%.?$",
-    "[^.]%.%.%.?[^.]",
-    "^.-%^@",
-    "^.-%^!",
-    "^.-%^%-%d?",
-  }) ~= nil
-end
-
 ---Convert revs to git rev args.
 ---@param left Rev
 ---@param right Rev
@@ -854,56 +839,6 @@ function M.rev_to_pretty_string(left, right)
     return left:abbrev() .. ".." .. right:abbrev()
   end
   return nil
-end
-
----@param toplevel string
----@return Rev?
-function M.head_rev(toplevel)
-  local out, code = M.exec_sync(
-    { "rev-parse", "HEAD", "--" },
-    { cwd = toplevel, retry_on_empty = 2 }
-  )
-
-  if code ~= 0 then
-    return
-  end
-
-  local s = vim.trim(out[1]):gsub("^%^", "")
-
-  return Rev(RevType.COMMIT, s, true)
-end
-
----Parse two endpoint, commit revs from a symmetric difference notated rev arg.
----@param toplevel string
----@param rev_arg string
----@return Rev? left The left rev.
----@return Rev? right The right rev.
-function M.symmetric_diff_revs(toplevel, rev_arg)
-  local r1 = rev_arg:match("(.+)%.%.%.") or "HEAD"
-  local r2 = rev_arg:match("%.%.%.(.+)") or "HEAD"
-  local out, code, stderr
-
-  local function err()
-    utils.err(utils.vec_join(
-      ("Failed to parse rev '%s'!"):format(rev_arg),
-      "Git output: ",
-      stderr
-    ))
-  end
-
-  out, code, stderr = M.exec_sync({ "merge-base", r1, r2 }, toplevel)
-  if code ~= 0 then
-    return err()
-  end
-  local left_hash = out[1]:gsub("^%^", "")
-
-  out, code, stderr = M.exec_sync({ "rev-parse", "--revs-only", r2 }, toplevel)
-  if code ~= 0 then
-    return err()
-  end
-  local right_hash = out[1]:gsub("^%^", "")
-
-  return Rev(RevType.COMMIT, left_hash), Rev(RevType.COMMIT, right_hash)
 end
 
 ---Derive the top-level path of the working tree of the given path.

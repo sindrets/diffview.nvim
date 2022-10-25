@@ -956,7 +956,7 @@ function GitAdapter:diffview_options(args)
   local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
   local rev_arg = argo.args[1]
   
-  local left, right = M.parse_revs(self.ctx.toplevel, rev_arg, {
+  local left, right = self:parse_revs(rev_arg, {
     cached = argo:get_flag({ "cached", "staged" }),
     imply_local = argo:get_flag("imply-local"),
   })
@@ -983,6 +983,159 @@ function GitAdapter:diffview_options(args)
   return {left = left, right = right, options = options}
 end
 
+---@return Rev?
+function GitAdapter:head_rev()
+  local out, code = self:exec_sync(
+    { "rev-parse", "HEAD", "--" },
+    { cwd = self.ctx.toplevel, retry_on_empty = 2 }
+  )
+
+  if code ~= 0 then
+    return
+  end
+
+  local s = vim.trim(out[1]):gsub("^%^", "")
+
+  return Rev(RevType.COMMIT, s, true)
+end
+
+---Parse two endpoint, commit revs from a symmetric difference notated rev arg.
+---@param rev_arg string
+---@return Rev? left The left rev.
+---@return Rev? right The right rev.
+function GitAdapter:symmetric_diff_revs(rev_arg)
+  local r1 = rev_arg:match("(.+)%.%.%.") or "HEAD"
+  local r2 = rev_arg:match("%.%.%.(.+)") or "HEAD"
+  local out, code, stderr
+
+  local function err()
+    utils.err(utils.vec_join(
+      ("Failed to parse rev '%s'!"):format(rev_arg),
+      "Git output: ",
+      stderr
+    ))
+  end
+
+  out, code, stderr = self:exec_sync({ "merge-base", r1, r2 }, self.ctx.toplevel)
+  if code ~= 0 then
+    return err()
+  end
+  local left_hash = out[1]:gsub("^%^", "")
+
+  out, code, stderr = self:exec_sync({ "rev-parse", "--revs-only", r2 }, self.ctx.toplevel)
+  if code ~= 0 then
+    return err()
+  end
+  local right_hash = out[1]:gsub("^%^", "")
+
+  return Rev(RevType.COMMIT, left_hash), Rev(RevType.COMMIT, right_hash)
+end
+
+---Determine whether a rev arg is a range.
+---@param rev_arg string
+---@return boolean
+function GitAdapter:is_rev_arg_range(rev_arg)
+  return utils.str_match(rev_arg, {
+    "^%.%.%.?$",
+    "^%.%.%.?[^.]",
+    "[^.]%.%.%.?$",
+    "[^.]%.%.%.?[^.]",
+    "^.-%^@",
+    "^.-%^!",
+    "^.-%^%-%d?",
+  }) ~= nil
+end
+
+---Parse a given rev arg.
+---@param git_toplevel string
+---@param rev_arg string
+---@param opt table
+---@return Rev? left
+---@return Rev? right
+function GitAdapter:parse_revs(rev_arg, opt)
+  ---@type Rev?
+  local left
+  ---@type Rev?
+  local right
+
+  local head = self:head_rev()
+  ---@cast head Rev
+
+  if not rev_arg then
+    if opt.cached then
+      left = head or Rev.new_null_tree()
+      right = Rev(RevType.STAGE, 0)
+    else
+      left = Rev(RevType.STAGE, 0)
+      right = Rev(RevType.LOCAL)
+    end
+  elseif rev_arg:match("%.%.%.") then
+    left, right = self:symmetric_diff_revs(rev_arg)
+    if not (left or right) then
+      return
+    elseif opt.imply_local then
+      ---@cast left Rev
+      ---@cast right Rev
+      left, right = self:imply_local(left, right, head)
+    end
+  else
+    local rev_strings, code, stderr = self:exec_sync(
+      { "rev-parse", "--revs-only", rev_arg }, self.ctx.toplevel
+    )
+    if code ~= 0 then
+      utils.err(utils.vec_join(
+        ("Failed to parse rev %s!"):format(utils.str_quote(rev_arg)),
+        "Git output: ",
+        stderr
+      ))
+      return
+    elseif #rev_strings == 0 then
+      utils.err("Bad revision: " .. utils.str_quote(rev_arg))
+      return
+    end
+
+    local is_range = self:is_rev_arg_range(rev_arg)
+
+    if is_range then
+      local right_hash = rev_strings[1]:gsub("^%^", "")
+      right = Rev(RevType.COMMIT, right_hash)
+      if #rev_strings > 1 then
+        local left_hash = rev_strings[2]:gsub("^%^", "")
+        left = Rev(RevType.COMMIT, left_hash)
+      else
+        left = Rev.new_null_tree()
+      end
+
+      if opt.imply_local then
+        left, right = self:imply_local(left, right, head)
+      end
+    else
+      local hash = rev_strings[1]:gsub("^%^", "")
+      left = Rev(RevType.COMMIT, hash)
+      if opt.cached then
+        right = Rev(RevType.STAGE, 0)
+      else
+        right = Rev(RevType.LOCAL)
+      end
+    end
+  end
+
+  return left, right
+end
+
+---@param left Rev
+---@param right Rev
+---@param head Rev
+---@return Rev, Rev
+function GitAdapter:imply_local(left, right, head)
+  if left.commit == head.commit then
+    left = Rev(RevType.LOCAL)
+  end
+  if right.commit == head.commit then
+    right = Rev(RevType.LOCAL)
+  end
+  return left, right
+end
 
 ---Strange trick to check if a file is binary using only git.
 ---@param path string
