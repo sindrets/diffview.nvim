@@ -1137,6 +1137,57 @@ function GitAdapter:imply_local(left, right, head)
   return left, right
 end
 
+---Convert revs to git rev args.
+---@param left Rev
+---@param right Rev
+---@return string[]
+function GitAdapter:rev_to_args(left, right)
+  assert(
+    not (left.type == RevType.LOCAL and right.type == RevType.LOCAL),
+    "Can't diff LOCAL against LOCAL!"
+  )
+
+  if left.type == RevType.COMMIT and right.type == RevType.COMMIT then
+    return { left.commit .. ".." .. right.commit }
+  elseif left.type == RevType.STAGE and right.type == RevType.LOCAL then
+    return {}
+  elseif left.type == RevType.COMMIT and right.type == RevType.STAGE then
+    return { "--cached", left.commit }
+  else
+    return { left.commit }
+  end
+end
+
+function GitAdapter:get_namestat_args(args)
+  return utils.vec_join(self:args(), "diff", "--ignore-submodules", "--name-status", args)
+end
+
+function GitAdapter:get_numstat_args(args)
+  return utils.vec_join(self:args(), "diff", "--ignore-submodules", "--numstat", args)
+end
+
+function GitAdapter:get_files_args(args)
+  return utils.vec_join(self:args(), "ls-files", "--others", "--exclude-standard", args)
+end
+
+---Check if status for untracked files is disabled for a given git repo.
+---@return boolean
+function GitAdapter:show_untracked()
+  local out = self:exec_sync(
+    { "config", "status.showUntrackedFiles" },
+    { cwd = self.ctx.toplevel, silent = true }
+  )
+  return vim.trim(out[1] or "") ~= "no"
+end
+
+---Check if any of the given revs are LOCAL.
+---@param left Rev
+---@param right Rev
+---@return boolean
+function GitAdapter:has_local(left, right)
+  return left.type == RevType.LOCAL or right.type == RevType.LOCAL
+end
+
 ---Strange trick to check if a file is binary using only git.
 ---@param path string
 ---@param rev Rev
@@ -1160,6 +1211,7 @@ function GitAdapter:is_binary(path, rev)
   local _, code = self:exec_sync(cmd, { cwd = self.ctx.toplevel, silent = true })
   return code ~= 0
 end
+
 
 GitAdapter.flags = {
   ---@type FlagOption[]
