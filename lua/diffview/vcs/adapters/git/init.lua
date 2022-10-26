@@ -10,7 +10,7 @@ local FileEntry = require("diffview.scene.file_entry").FileEntry
 local Diff2Hor = require("diffview.scene.layouts.diff_2_hor").Diff2Hor
 local LogEntry = require("diffview.vcs.log_entry").LogEntry
 local RevType = require("diffview.vcs.rev").RevType
-local Rev = require("diffview.vcs.rev").Rev
+local GitRev = require("diffview.vcs.adapters.git.rev").GitRev
 ---@class VCSAdapter
 local VCSAdapter = require('diffview.vcs.adapter').VCSAdapter
 local Job = require("plenary.job")
@@ -25,6 +25,8 @@ local M = {}
 
 ---@class GitAdapter : VCSAdapter
 local GitAdapter = oop.create_class('GitAdapter', VCSAdapter)
+
+GitAdapter.Rev = GitRev
 
 ---@return string, string
 local function pathspec_split(pathspec)
@@ -258,14 +260,14 @@ local function prepare_fh_options(toplevel, log_options, single_file)
 
   if log_options.base then
     if log_options.base == "LOCAL" then
-      base = Rev(RevType.LOCAL)
+      base = GitRev(RevType.LOCAL)
     else
       local ok, out = M.verify_rev_arg(toplevel, log_options.base)
 
       if not ok then
         utils.warn(("Bad base revision, ignoring: %s"):format(utils.str_quote(log_options.base)))
       else
-        base = Rev(RevType.COMMIT, out[1])
+        base = GitRev(RevType.COMMIT, out[1])
       end
     end
   end
@@ -817,8 +819,8 @@ local function parse_fh_data(state)
       stats = stats,
       kind = "working",
       commit = state.commit,
-      rev_a = cur.left_hash and Rev(RevType.COMMIT, cur.left_hash) or Rev.new_null_tree(),
-      rev_b = state.prepared_log_opts.base or Rev(RevType.COMMIT, cur.right_hash),
+      rev_a = cur.left_hash and GitRev(RevType.COMMIT, cur.left_hash) or GitRev.new_null_tree(),
+      rev_b = state.prepared_log_opts.base or GitRev(RevType.COMMIT, cur.right_hash),
     }))
   end
 
@@ -996,7 +998,7 @@ function GitAdapter:head_rev()
 
   local s = vim.trim(out[1]):gsub("^%^", "")
 
-  return Rev(RevType.COMMIT, s, true)
+  return GitRev(RevType.COMMIT, s, true)
 end
 
 ---Parse two endpoint, commit revs from a symmetric difference notated rev arg.
@@ -1028,7 +1030,7 @@ function GitAdapter:symmetric_diff_revs(rev_arg)
   end
   local right_hash = out[1]:gsub("^%^", "")
 
-  return Rev(RevType.COMMIT, left_hash), Rev(RevType.COMMIT, right_hash)
+  return GitRev(RevType.COMMIT, left_hash), GitRev(RevType.COMMIT, right_hash)
 end
 
 ---Determine whether a rev arg is a range.
@@ -1063,11 +1065,11 @@ function GitAdapter:parse_revs(rev_arg, opt)
 
   if not rev_arg then
     if opt.cached then
-      left = head or Rev.new_null_tree()
-      right = Rev(RevType.STAGE, 0)
+      left = head or GitRev.new_null_tree()
+      right = GitRev(RevType.STAGE, 0)
     else
-      left = Rev(RevType.STAGE, 0)
-      right = Rev(RevType.LOCAL)
+      left = GitRev(RevType.STAGE, 0)
+      right = GitRev(RevType.LOCAL)
     end
   elseif rev_arg:match("%.%.%.") then
     left, right = self:symmetric_diff_revs(rev_arg)
@@ -1098,12 +1100,12 @@ function GitAdapter:parse_revs(rev_arg, opt)
 
     if is_range then
       local right_hash = rev_strings[1]:gsub("^%^", "")
-      right = Rev(RevType.COMMIT, right_hash)
+      right = GitRev(RevType.COMMIT, right_hash)
       if #rev_strings > 1 then
         local left_hash = rev_strings[2]:gsub("^%^", "")
-        left = Rev(RevType.COMMIT, left_hash)
+        left = GitRev(RevType.COMMIT, left_hash)
       else
-        left = Rev.new_null_tree()
+        left = GitRev.new_null_tree()
       end
 
       if opt.imply_local then
@@ -1111,11 +1113,11 @@ function GitAdapter:parse_revs(rev_arg, opt)
       end
     else
       local hash = rev_strings[1]:gsub("^%^", "")
-      left = Rev(RevType.COMMIT, hash)
+      left = GitRev(RevType.COMMIT, hash)
       if opt.cached then
-        right = Rev(RevType.STAGE, 0)
+        right = GitRev(RevType.STAGE, 0)
       else
-        right = Rev(RevType.LOCAL)
+        right = GitRev(RevType.LOCAL)
       end
     end
   end
@@ -1129,10 +1131,10 @@ end
 ---@return Rev, Rev
 function GitAdapter:imply_local(left, right, head)
   if left.commit == head.commit then
-    left = Rev(RevType.LOCAL)
+    left = GitRev(RevType.LOCAL)
   end
   if right.commit == head.commit then
-    right = Rev(RevType.LOCAL)
+    right = GitRev(RevType.LOCAL)
   end
   return left, right
 end
@@ -1178,6 +1180,21 @@ function GitAdapter:show_untracked()
     { cwd = self.ctx.toplevel, silent = true }
   )
   return vim.trim(out[1] or "") ~= "no"
+end
+
+---Convert revs to string representation.
+---@param left Rev
+---@param right Rev
+---@return string|nil
+function GitAdapter:rev_to_pretty_string(left, right)
+  if left.track_head and right.type == RevType.LOCAL then
+    return nil
+  elseif left.commit and right.type == RevType.LOCAL then
+    return left:abbrev()
+  elseif left.commit and right.commit then
+    return left:abbrev() .. ".." .. right:abbrev()
+  end
+  return nil
 end
 
 ---Check if any of the given revs are LOCAL.

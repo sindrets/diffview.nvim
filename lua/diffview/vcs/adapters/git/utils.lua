@@ -531,21 +531,6 @@ local function parse_fh_line_trace_data(state)
 end
 
 
----Convert revs to string representation.
----@param left Rev
----@param right Rev
----@return string|nil
-function M.rev_to_pretty_string(left, right)
-  if left.track_head and right.type == RevType.LOCAL then
-    return nil
-  elseif left.commit and right.type == RevType.LOCAL then
-    return left:abbrev()
-  elseif left.commit and right.commit then
-    return left:abbrev() .. ".." .. right:abbrev()
-  end
-  return nil
-end
-
 ---Derive the top-level path of the working tree of the given path.
 ---@param path string
 ---@return string?

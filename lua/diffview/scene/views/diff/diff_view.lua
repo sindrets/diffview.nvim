@@ -63,7 +63,7 @@ function DiffView:init(opt)
       self.git_ctx,
       self.files,
       self.path_args,
-      self.rev_arg or vcs.rev_to_pretty_string(self.left, self.right)
+      self.rev_arg or self.git_ctx:rev_to_pretty_string(self.left, self.right)
     ),
   })
 

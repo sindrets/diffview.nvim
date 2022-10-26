@@ -252,10 +252,10 @@ local tracked_files = async.wrap(function(adapter, left, right, args, kind, opt,
         oldpath = v.oldname,
         status = "U",
         kind = "conflicting",
-        rev_ours = Rev(RevType.STAGE, 2),
-        rev_main = Rev(RevType.LOCAL),
-        rev_theirs = Rev(RevType.STAGE, 3),
-        rev_base = Rev(RevType.STAGE, 1),
+        rev_ours = adapter.Rev(RevType.STAGE, 2),
+        rev_main = adapter.Rev(RevType.LOCAL),
+        rev_theirs = adapter.Rev(RevType.STAGE, 3),
+        rev_base = adapter.Rev(RevType.STAGE, 1),
       }))
     end
   end
@@ -388,8 +388,8 @@ M.diff_file_list = async.wrap(function(adapter, left, right, path_args, dv_opt, 
   if not (left.type == RevType.STAGE and right.type == RevType.LOCAL) then
     latch:count_down()
   else
-    local left_rev = M.head_rev(ctx.toplevel) or Rev.new_null_tree()
-    local right_rev = Rev(RevType.STAGE, 0)
+    local left_rev = adapter:head_rev() or adapter.Rev.new_null_tree()
+    local right_rev = adapter.Rev(RevType.STAGE, 0)
     tracked_files(
       adapter,
       left_rev,
