@@ -3,6 +3,8 @@ local utils = require("diffview.utils")
 local async = require("plenary.async")
 local logger = require("diffview.logger")
 local FileDict = require("diffview.vcs.file_dict").FileDict
+local FileEntry = require("diffview.scene.file_entry").FileEntry
+local RevType = require("diffview.vcs.rev").RevType
 local Job = require("plenary.job")
 local Semaphore = require('diffview.control').Semaphore
 
@@ -245,7 +247,7 @@ local tracked_files = async.wrap(function(adapter, left, right, args, kind, opt,
 
     for _, v in pairs(conflict_map) do
       table.insert(conflicts, FileEntry.with_layout(opt.merge_layout, {
-        git_ctx = adapter,
+        adapter = adapter,
         path = v.name,
         oldpath = v.oldname,
         status = "U",
@@ -260,7 +262,7 @@ local tracked_files = async.wrap(function(adapter, left, right, args, kind, opt,
 
   for _, v in ipairs(data) do
     table.insert(files, FileEntry.for_d2(opt.default_layout, {
-      git_ctx = adapter,
+      adapter = adapter,
       path = v.name,
       oldpath = v.oldname,
       status = v.status,
@@ -303,7 +305,7 @@ local untracked_files = async.wrap(function(adapter, left, right, opt, callback)
       local files = {}
       for _, s in ipairs(j:result()) do
         table.insert(files, FileEntry.for_d2(opt.default_layout, {
-          git_ctx = adapter,
+          adapter = adapter,
           path = s,
           status = "?",
           kind = "working",
