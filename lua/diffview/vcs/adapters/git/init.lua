@@ -232,14 +232,14 @@ end
 ---@return boolean ok, string[] output
 function GitAdapter:verify_rev_arg(rev_arg)
   local out, code = self:exec_sync({ "rev-parse", "--revs-only", rev_arg }, {
-    context = "git.utils.verify_rev_arg()",
+    context = "GitAdapter.verify_rev_arg()",
     cwd = self.ctx.toplevel,
   })
   return code == 0 and (out[2] ~= nil or out[1] and out[1] ~= ""), out
 end
 
 
----@class git.utils.PreparedLogOpts
+---@class GitAdapter.PreparedLogOpts
 ---@field rev_range string
 ---@field base Rev
 ---@field path_args string[]
@@ -248,7 +248,7 @@ end
 ---@param adapter VCSAdapter
 ---@param log_options LogOptions
 ---@param single_file boolean
----@return git.utils.PreparedLogOpts
+---@return GitAdapter.PreparedLogOpts
 local function prepare_fh_options(adapter, log_options, single_file)
   local o = log_options
   local line_trace = vim.tbl_map(function(v)
@@ -325,7 +325,7 @@ local function structure_fh_data(namestat_data, numstat_data)
   }
 end
 
----@param state git.utils.FHState
+---@param state GitAdapter.FHState
 ---@param callback fun(status: JobStatus, data?: table, msg?: string[])
 local incremental_fh_data = async.void(function(state, callback)
   local raw = {}
@@ -429,7 +429,7 @@ local incremental_fh_data = async.void(function(state, callback)
   latch:await()
 
   local debug_opt = {
-    context = "git.utils>incremental_fh_data()",
+    context = "GitAdapter>incremental_fh_data()",
     func = "s_info",
     no_stdout = true,
   }
@@ -448,7 +448,7 @@ local incremental_fh_data = async.void(function(state, callback)
   end
 end)
 
----@param state git.utils.FHState
+---@param state GitAdapter.FHState
 ---@param callback fun(status: JobStatus, data?: table, msg?: string[])
 local incremental_line_trace_data = async.void(function(state, callback)
   local raw = {}
@@ -527,7 +527,7 @@ local incremental_line_trace_data = async.void(function(state, callback)
 
   utils.handle_job(trace_job, {
     debug_opt = {
-      context = "git.utils>incremental_line_trace_data()",
+      context = "GitAdapter>incremental_line_trace_data()",
       func = "s_debug",
       debug_level = 1,
       no_stdout = true,
@@ -587,7 +587,7 @@ function GitAdapter:file_history_dry_run(log_opt)
   log_options.max_count = 1
   options = prepare_fh_options(self, log_options, single_file).flags
 
-  local context = "git.utils.file_history_dry_run()"
+  local context = "GitAdapter.file_history_dry_run()"
   local cmd
 
   if #log_options.L > 0 then
@@ -710,7 +710,7 @@ function GitAdapter:file_history_options(range, paths, args)
   return log_options
 end
 
----@param state git.utils.FHState
+---@param state GitAdapter.FHState
 ---@return boolean ok
 local function parse_fh_line_trace_data(state)
   local cur = state.cur
@@ -757,13 +757,13 @@ local function parse_fh_line_trace_data(state)
 end
 
 
----@class git.utils.FHState
+---@class GitAdapter.FHState
 ---@field thread thread
 ---@field adapter GitAdapter
 ---@field path_args string[]
 ---@field log_options LogOptions
----@field prepared_log_opts git.utils.PreparedLogOpts
----@field opt git.utils.FileHistoryWorkerSpec
+---@field prepared_log_opts GitAdapter.PreparedLogOpts
+---@field opt GitAdapter.FileHistoryWorkerSpec
 ---@field single_file boolean
 ---@field resume_lock boolean
 ---@field cur table
@@ -771,7 +771,7 @@ end
 ---@field entries LogEntry[]
 ---@field callback function
 
----@param state git.utils.FHState
+---@param state GitAdapter.FHState
 ---@return boolean ok, JobStatus? status
 local function parse_fh_data(state)
   local cur = state.cur
@@ -805,7 +805,7 @@ local function parse_fh_data(state)
     }
 
     local max_retries = 2
-    local context = "git.utils.file_history_worker()"
+    local context = "GitAdapter.file_history_worker()"
     state.resume_lock = true
 
     for i = 0, max_retries do
@@ -923,7 +923,7 @@ function GitAdapter:file_history_worker(thread, log_opt, opt, co_state, callback
 
   local is_trace = #log_options.L > 0
 
-  ---@type git.utils.FHState
+  ---@type GitAdapter.FHState
   local state = {
     thread = thread,
     adapter = self,
