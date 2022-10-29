@@ -503,9 +503,9 @@ local incremental_line_trace_data = async.void(function(state, callback)
   local rev_range = state.prepared_log_opts.rev_range
 
   trace_job = Job:new({
-    command = git_bin(),
+    command = state.adapter:bin(),
     args = utils.vec_join(
-      git_args(),
+      state.adapter:args(),
       "-P",
       "log",
       rev_range,
@@ -516,7 +516,7 @@ local incremental_line_trace_data = async.void(function(state, callback)
       state.prepared_log_opts.flags,
       "--"
     ),
-    cwd = state.ctx.toplevel,
+    cwd = state.adapter.ctx.toplevel,
     on_stdout = on_stdout,
     on_exit = on_exit,
   })
