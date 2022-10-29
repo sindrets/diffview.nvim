@@ -192,18 +192,6 @@ function M.get_file_stats(toplevel, path, rev_arg)
   end
 end
 
----Verify that a given git rev is valid.
----@param toplevel string
----@param rev_arg string
----@return boolean ok, string[] output
-function M.verify_rev_arg(toplevel, rev_arg)
-  local out, code = M.exec_sync({ "rev-parse", "--revs-only", rev_arg }, {
-    context = "git.utils.verify_rev_arg()",
-    cwd = toplevel,
-  })
-  return code == 0 and (out[2] ~= nil or out[1] and out[1] ~= ""), out
-end
-
 ---Restore a file to the state it was in, in a given commit / rev. If no commit
 ---is given, unstaged files are restored to the state in index, and staged files
 ---are restored to the state in HEAD. The file will also be written into the

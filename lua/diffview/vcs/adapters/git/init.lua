@@ -227,6 +227,17 @@ function GitAdapter:get_dir(path)
   return out[1] and vim.trim(out[1])
 end
 
+---Verify that a given git rev is valid.
+---@param rev_arg string
+---@return boolean ok, string[] output
+function GitAdapter:verify_rev_arg(rev_arg)
+  local out, code = self:exec_sync({ "rev-parse", "--revs-only", rev_arg }, {
+    context = "git.utils.verify_rev_arg()",
+    cwd = self.ctx.toplevel,
+  })
+  return code == 0 and (out[2] ~= nil or out[1] and out[1] ~= ""), out
+end
+
 
 ---@class git.utils.PreparedLogOpts
 ---@field rev_range string
@@ -234,11 +245,11 @@ end
 ---@field path_args string[]
 ---@field flags string[]
 
----@param toplevel string
+---@param adapter VCSAdapter
 ---@param log_options LogOptions
 ---@param single_file boolean
 ---@return git.utils.PreparedLogOpts
-local function prepare_fh_options(toplevel, log_options, single_file)
+local function prepare_fh_options(adapter, log_options, single_file)
   local o = log_options
   local line_trace = vim.tbl_map(function(v)
     if not v:match("^-L") then
@@ -250,7 +261,7 @@ local function prepare_fh_options(toplevel, log_options, single_file)
   local rev_range, base
 
   if log_options.rev_range then
-    local ok, _ = M.verify_rev_arg(toplevel, log_options.rev_range)
+    local ok, _ = adapter:verify_rev_arg(log_options.rev_range)
 
     if not ok then
       utils.warn(("Bad range revision, ignoring: %s"):format(utils.str_quote(log_options.rev_range)))
@@ -263,7 +274,7 @@ local function prepare_fh_options(toplevel, log_options, single_file)
     if log_options.base == "LOCAL" then
       base = GitRev(RevType.LOCAL)
     else
-      local ok, out = M.verify_rev_arg(toplevel, log_options.base)
+      local ok, out = adapter:verify_rev_arg(log_options.base)
 
       if not ok then
         utils.warn(("Bad base revision, ignoring: %s"):format(utils.str_quote(log_options.base)))
@@ -564,7 +575,7 @@ function GitAdapter:file_history_dry_run(log_opt)
 
   local options = vim.tbl_map(function(v)
     return vim.fn.shellescape(v)
-  end, prepare_fh_options(self.ctx.toplevel, log_options, single_file).flags) --[[@as vector ]]
+  end, prepare_fh_options(self, log_options, single_file).flags) --[[@as vector ]]
 
   local description = utils.vec_join(
     ("Top-level path: '%s'"):format(utils.path:vim_fnamemodify(self.ctx.toplevel, ":~")),
@@ -574,7 +585,7 @@ function GitAdapter:file_history_dry_run(log_opt)
 
   log_options = utils.tbl_clone(log_options) --[[@as LogOptions ]]
   log_options.max_count = 1
-  options = prepare_fh_options(self.ctx.toplevel, log_options, single_file).flags
+  options = prepare_fh_options(self, log_options, single_file).flags
 
   local context = "git.utils.file_history_dry_run()"
   local cmd
@@ -918,7 +929,7 @@ function GitAdapter:file_history_worker(thread, log_opt, opt, co_state, callback
     adapter = self,
     path_args = log_opt.single_file.path_args,
     log_options = log_options,
-    prepared_log_opts = prepare_fh_options(self.ctx.toplevel, log_options, single_file),
+    prepared_log_opts = prepare_fh_options(self, log_options, single_file),
     opt = opt,
     callback = callback,
     entries = entries,
