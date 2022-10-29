@@ -138,6 +138,7 @@ function M.create(toplevel, path_args, cpath)
   })
 end
 
+---@param opt vcs.adapter.VCSAdapter.Opt
 function GitAdapter:init(opt)
   opt = opt or {}
   GitAdapter:super().init(self, opt)
@@ -604,8 +605,6 @@ function GitAdapter:file_history_dry_run(log_opt)
 
 end
 
----@param range? { [1]: integer, [2]: integer }
----@param args string[]
 function GitAdapter:file_history_options(range, paths, args)
   local default_args = config.get_config().default_args.DiffviewFileHistory
   local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))

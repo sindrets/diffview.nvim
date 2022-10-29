@@ -2,6 +2,7 @@ local oop = require('diffview.oop')
 local utils = require('diffview.utils')
 local logger = require('diffview.logger')
 local arg_parser = require('diffview.arg_parser')
+local RevType = require("diffview.vcs.rev").RevType
 
 local M = {}
 
@@ -14,7 +15,13 @@ local M = {}
 ---@field context string[]
 local VCSAdapter = oop.create_class('VCSAdapter')
 
-function VCSAdapter:init(path)
+---@class vcs.adapter.VCSAdapter.Opt
+---@field cpath string? # CWD path
+---@field toplevel string # VCS toplevel path
+---@field path_args string[] # Extra path arguments
+
+---@param opt vcs.adapter.VCSAdapter.Opt
+function VCSAdapter:init(opt)
   self.bootstrap = {
     done = false,
     ok = false,
@@ -34,18 +41,9 @@ function VCSAdapter:run_bootstrap()
   self.bootstrap.ok = true
 end
 
+---@return string # path to binary for VCS command
 function VCSAdapter:get_command()
   oop.abstract_stub()
-end
-
----@param args string[]
----@return string[] args to show commit content
-function VCSAdapter:get_show_args(args)
-  oop.abstract_stub()
-end
-
-function VCSAdapter:get_context(path)
-  return {}
 end
 
 ---@return string cmd The VCS binary.
@@ -57,6 +55,7 @@ end
 function VCSAdapter:args()
   return utils.vec_slice(self:get_command(), 2)
 end
+
 
 ---Execute a VCS command synchronously.
 ---@param args string[]
@@ -77,11 +76,41 @@ function VCSAdapter:exec_sync(args, cwd_or_opt)
   )
 end
 
-function VCSAdapter:file_history_options(range, args)
+
+---@param thread thread
+---@param ok boolean
+---@param result any
+---@return boolean ok
+---@return any result
+function VCSAdapter:handle_co(thread, ok, result)
+  if not ok then
+    local err_msg = utils.vec_join(
+      "Coroutine failed!",
+      debug.traceback(thread, result, 1)
+    )
+    utils.err(err_msg, true)
+    logger.s_error(table.concat(err_msg, "\n"))
+  end
+  return ok, result
+end
+
+-- File History
+
+---@param args string[]
+---@return string[] args to show commit content
+function VCSAdapter:get_show_args(args)
   oop.abstract_stub()
 end
 
----@class vcs.adapter.FileHistoryWorkerSpec : git.utils.LayoutOpt
+---@param range? { [1]: integer, [2]: integer }
+---@param paths string[]
+---@param args string[]
+---@return string[] # Options to show file history
+function VCSAdapter:file_history_options(range, paths, args)
+  oop.abstract_stub()
+end
+
+---@class vcs.adapter.FileHistoryWorkerSpec : vcs.adapter.LayoutOpt
 
 ---@param thread thread
 ---@param log_opt ConfigLogOptions
@@ -91,7 +120,6 @@ end
 function VCSAdapter:file_history_worker(thread, log_opt, opt, co_state, callback)
   oop.abstract_stub()
 end
-
 
 ---@param log_opt ConfigLogOptions
 ---@param opt vcs.adapter.FileHistoryWorkerSpec
@@ -115,21 +143,70 @@ function VCSAdapter:file_history(log_opt, opt, callback)
   end
 end
 
----@param thread thread
----@param ok boolean
----@param result any
----@return boolean ok
----@return any result
-function VCSAdapter:handle_co(thread, ok, result)
-  if not ok then
-    local err_msg = utils.vec_join(
-      "Coroutine failed!",
-      debug.traceback(thread, result, 1)
-    )
-    utils.err(err_msg, true)
-    logger.s_error(table.concat(err_msg, "\n"))
+-- Diff View
+
+---Convert revs to rev args.
+---@param left Rev
+---@param right Rev
+---@return string[]
+function VCSAdapter:rev_to_args(left, right)
+  oop.abstract_stub()
+end
+
+---Arguments to show name and status of files
+---@param args string[] Extra args
+---@return string[]
+function VCSAdapter:get_namestat_args(args)
+  oop.abstract_stub()
+end
+
+---Arguments to show number of changes to files
+---@param args string[] Extra args
+---@return string[]
+function VCSAdapter:get_numstat_args(args)
+  oop.abstract_stub()
+end
+
+---Arguments to list all files
+---@param args string[] Extra args
+---@return string[]
+function VCSAdapter:get_files_args(args)
+  oop.abstract_stub()
+end
+
+---@param args string[]
+---@return {left: string, right: string, options: string[]}
+function VCSAdapter:diffview_options(args)
+  oop.abstract_stub()
+end
+
+---Check if status for untracked files is disabled
+---@return boolean
+function VCSAdapter:show_untracked()
+  return true
+end
+
+---Convert revs to string representation.
+---@param left Rev
+---@param right Rev
+---@return string|nil
+function VCSAdapter:rev_to_pretty_string(left, right)
+  if left.track_head and right.type == RevType.LOCAL then
+    return nil
+  elseif left.commit and right.type == RevType.LOCAL then
+    return left:abbrev()
+  elseif left.commit and right.commit then
+    return left:abbrev() .. ".." .. right:abbrev()
   end
-  return ok, result
+  return nil
+end
+
+---Check if any of the given revs are LOCAL.
+---@param left Rev
+---@param right Rev
+---@return boolean
+function VCSAdapter:has_local(left, right)
+  return left.type == RevType.LOCAL or right.type == RevType.LOCAL
 end
 
 
