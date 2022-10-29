@@ -699,6 +699,53 @@ function GitAdapter:file_history_options(range, paths, args)
   return log_options
 end
 
+---@param state git.utils.FHState
+---@return boolean ok
+local function parse_fh_line_trace_data(state)
+  local cur = state.cur
+
+  local files = {}
+
+  for _, line in ipairs(cur.namestat) do
+    if line:match("^diff %-%-git ") then
+      local a_path = line:match('^diff %-%-git "?a/(.-)"? "?b/')
+      local b_path = line:match('.*"? "?b/(.-)"?$')
+      local oldpath = a_path ~= b_path and a_path or nil
+
+      if state.single_file and oldpath then
+        state.old_path = oldpath
+      end
+
+      table.insert(files, FileEntry.for_d2(Diff2Hor, {
+        adapter = state.adapter,
+        path = b_path,
+        oldpath = oldpath,
+        kind = "working",
+        commit = state.commit,
+        rev_a = cur.left_hash and GitRev(RevType.COMMIT, cur.left_hash) or GitRev.new_null_tree(),
+        rev_b = state.prepared_log_opts.base or GitRev(RevType.COMMIT, cur.right_hash),
+      }))
+    end
+  end
+
+  if files[1] then
+    table.insert(
+      state.entries,
+      LogEntry({
+        path_args = state.path_args,
+        commit = state.commit,
+        files = files,
+        single_file = state.single_file,
+      })
+    )
+
+    state.callback(state.entries, JobStatus.PROGRESS)
+  end
+
+  return true
+end
+
+
 ---@class git.utils.FHState
 ---@field thread thread
 ---@field adapter GitAdapter
