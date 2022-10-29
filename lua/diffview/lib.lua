@@ -33,7 +33,7 @@ function M.diffview_open(args)
 
   local err, adapter = vcs.get_adapter({
     cmd_ctx = {
-      path_args = argo.args,
+      path_args = argo.post_args,
       cpath = argo:get_flag("C", { no_empty = true, expand = true }),
     },
   })
