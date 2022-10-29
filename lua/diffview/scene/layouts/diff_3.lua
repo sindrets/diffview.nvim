@@ -96,7 +96,7 @@ function Diff3:to_diff4(layout)
     b = self.b.file,
     c = self.c.file,
     d = File({
-      git_ctx = main.git_ctx,
+      adapter = main.adapter,
       path = main.path,
       kind = main.kind,
       commit = main.commit,

@@ -24,7 +24,7 @@ local perf_update = PerfTimer("[FileHistoryPanel] update")
 
 ---@class FileHistoryPanel : Panel
 ---@field parent FileHistoryView
----@field git_ctx GitContext
+---@field adapter VCSAdapter
 ---@field entries LogEntry[]
 ---@field rev_range RevRange
 ---@field log_options ConfigLogOptions
@@ -58,7 +58,7 @@ FileHistoryPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 
 ---@class FileHistoryPanel.init.Opt
 ---@field parent FileHistoryView
----@field git_ctx GitContext
+---@field adapter VCSAdapter
 ---@field entries LogEntry[]
 ---@field log_options LogOptions
 
@@ -73,11 +73,11 @@ function FileHistoryPanel:init(opt)
   })
 
   self.parent = opt.parent
-  self.git_ctx = opt.git_ctx
+  self.adapter = opt.adapter
   self.entries = opt.entries
   self.cur_item = {}
   self.single_file = opt.entries[1] and opt.entries[1].single_file
-  self.option_panel = FHOptionPanel(self, self.git_ctx.flags)
+  self.option_panel = FHOptionPanel(self, self.adapter.flags)
   self.log_options = {
     single_file = vim.tbl_extend(
       "force",
@@ -279,7 +279,7 @@ function FileHistoryPanel:update_entries(callback)
   self.entries = {}
   self.updating = true
 
-  finalizer = self.git_ctx:file_history(
+  finalizer = self.adapter:file_history(
     self.log_options,
     { default_layout = self.parent.get_default_diff2(), },
     update

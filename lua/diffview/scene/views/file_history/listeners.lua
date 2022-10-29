@@ -41,8 +41,8 @@ return function(view)
           if l1 then
             l1 = tonumber(l1)
             lpath = utils.path:chain(lpath)
-                :normalize({ cwd = view.git_ctx.ctx.toplevel, absolute = true })
-                :relative(view.git_ctx.ctx.toplevel)
+                :normalize({ cwd = view.adapter.ctx.toplevel, absolute = true })
+                :relative(view.adapter.ctx.toplevel)
                 :get()
 
             if lpath == cur.path then
@@ -72,7 +72,7 @@ return function(view)
             local layout = file.layout --[[@as Diff2 ]]
 
             local new_view = DiffView({
-              git_ctx = view.git_ctx,
+              adapter = view.adapter,
               rev_arg = vcs.rev_to_pretty_string(layout.a.file.rev, layout.b.file.rev),
               left = layout.a.file.rev,
               right = layout.b.file.rev,

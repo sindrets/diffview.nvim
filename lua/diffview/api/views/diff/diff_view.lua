@@ -54,15 +54,15 @@ function CDiffView:init(opt)
   self.fetch_files = opt.update_files
   self.get_file_data = opt.get_file_data
 
-  local git_ctx = {
+  local adapter = {
     toplevel = opt.git_root,
     dir = git_dir,
   }
 
   CDiffView:super().init(self, vim.tbl_extend("force", opt, {
-    git_ctx = git_ctx,
+    adapter = adapter,
     panel = FilePanel(
-      git_ctx,
+      adapter,
       self.files,
       self.path_args,
       self.rev_arg or vcs.rev_to_pretty_string(opt.left, opt.right)
@@ -128,7 +128,7 @@ function CDiffView:create_file_entries(files)
     {
       kind = "staged",
       files = files.staged or {},
-      left = vcs.head_rev(self.git_ctx.ctx.toplevel),
+      left = vcs.head_rev(self.adapter.ctx.toplevel),
       right = Rev(RevType.STAGE, 0),
     },
   }
@@ -139,7 +139,7 @@ function CDiffView:create_file_entries(files)
     for _, file_data in ipairs(v.files) do
       if v.kind == "conflicting" then
         table.insert(entries[v.kind], FileEntry.with_layout(CDiffView.get_default_merge_layout(), {
-          git_ctx = self.git_ctx,
+          adapter = self.adapter,
           path = file_data.path,
           oldpath = file_data.oldpath,
           status = "U",
@@ -152,7 +152,7 @@ function CDiffView:create_file_entries(files)
         }))
       else
         table.insert(entries[v.kind], FileEntry.for_d2(CDiffView.get_default_diff2(), {
-          git_ctx = self.git_ctx,
+          adapter = self.adapter,
           path = file_data.path,
           oldpath = file_data.oldpath,
           status = file_data.status,

@@ -105,7 +105,7 @@ return function(view)
         or (
           view.left.type == RevType.COMMIT
           and vim.tbl_contains({ RevType.STAGE, RevType.LOCAL }, view.right.type)
-          and view.left:is_head(view.git_ctx.ctx.toplevel)
+          and view.left:is_head(view.adapter.ctx.toplevel)
         ) then
         utils.info("Changes not commited yet. No log available for these changes.")
         return
@@ -123,9 +123,9 @@ return function(view)
       if item then
         local code
         if item.kind == "working" or item.kind == "conflicting" then
-          _, code = vcs.exec_sync({ "add", item.path }, view.git_ctx.ctx.toplevel)
+          _, code = vcs.exec_sync({ "add", item.path }, view.adapter.ctx.toplevel)
         elseif item.kind == "staged" then
-          _, code = vcs.exec_sync({ "reset", "--", item.path }, view.git_ctx.ctx.toplevel)
+          _, code = vcs.exec_sync({ "reset", "--", item.path }, view.adapter.ctx.toplevel)
         end
 
         if code ~= 0 then
@@ -180,7 +180,7 @@ return function(view)
       end, view.files.working)
 
       if #args > 0 then
-        local _, code = vcs.exec_sync({ "add", args }, view.git_ctx.ctx.toplevel)
+        local _, code = vcs.exec_sync({ "add", args }, view.adapter.ctx.toplevel)
 
         if code ~= 0 then
           utils.err("Failed to stage files!")
@@ -194,7 +194,7 @@ return function(view)
       end
     end,
     unstage_all = function()
-      local _, code = vcs.exec_sync({ "reset" }, view.git_ctx.ctx.toplevel)
+      local _, code = vcs.exec_sync({ "reset" }, view.adapter.ctx.toplevel)
 
       if code ~= 0 then
         utils.err("Failed to unstage files!")
@@ -220,7 +220,7 @@ return function(view)
           utils.err("The file is open with unsaved changes! Aborting file restoration.")
           return
         end
-        vcs.restore_file(view.git_ctx.ctx.toplevel, file.path, file.kind, commit, function()
+        vcs.restore_file(view.adapter.ctx.toplevel, file.path, file.kind, commit, function()
           async.util.scheduler()
           view:update_files()
         end)

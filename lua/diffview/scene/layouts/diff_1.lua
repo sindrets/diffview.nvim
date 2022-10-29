@@ -90,7 +90,7 @@ function Diff1:to_diff3(layout)
 
   return layout({
     a = File({
-      git_ctx = main.git_ctx,
+      adapter = main.adapter,
       path = main.path,
       kind = main.kind,
       commit = main.commit,
@@ -100,7 +100,7 @@ function Diff1:to_diff3(layout)
     }),
     b = self.a.file,
     c = File({
-      git_ctx = main.git_ctx,
+      adapter = main.adapter,
       path = main.path,
       kind = main.kind,
       commit = main.commit,
@@ -119,7 +119,7 @@ function Diff1:to_diff4(layout)
 
   return layout({
     a = File({
-      git_ctx = main.git_ctx,
+      adapter = main.adapter,
       path = main.path,
       kind = main.kind,
       commit = main.commit,
@@ -129,7 +129,7 @@ function Diff1:to_diff4(layout)
     }),
     b = self.a.file,
     c = File({
-      git_ctx = main.git_ctx,
+      adapter = main.adapter,
       path = main.path,
       kind = main.kind,
       commit = main.commit,
@@ -138,7 +138,7 @@ function Diff1:to_diff4(layout)
       nulled = false, -- FIXME
     }),
     d = File({
-      git_ctx = main.git_ctx,
+      adapter = main.adapter,
       path = main.path,
       kind = main.kind,
       commit = main.commit,

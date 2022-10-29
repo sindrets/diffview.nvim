@@ -176,7 +176,7 @@ local incremental_fh_data = async.void(function(state, callback)
       "--",
       state.path_args
     ),
-    cwd = state.ctx.toplevel,
+    cwd = state.adapter.ctx.toplevel,
     on_stdout = on_stdout,
     on_exit = on_exit,
   })
@@ -194,7 +194,7 @@ local incremental_fh_data = async.void(function(state, callback)
       "--",
       state.path_args
     ),
-    cwd = state.ctx.toplevel,
+    cwd = state.adapter.ctx.toplevel,
     on_stdout = on_stdout,
     on_exit = on_exit,
   })
@@ -292,7 +292,7 @@ local incremental_line_trace_data = async.void(function(state, callback)
       state.prepared_log_opts.flags,
       "--"
     ),
-    cwd = state.ctx.toplevel,
+    cwd = state.adapter.ctx.toplevel,
     on_stdout = on_stdout,
     on_exit = on_exit,
   })
@@ -345,7 +345,7 @@ end
 
 ---@class git.utils.FHState
 ---@field thread thread
----@field ctx GitContext
+---@field adapter VCSAdapter
 ---@field path_args string[]
 ---@field log_options LogOptions
 ---@field prepared_log_opts git.utils.PreparedLogOpts
@@ -381,7 +381,7 @@ local function parse_fh_data(state)
         "--",
         state.old_path or state.path_args
       ),
-      cwd = state.ctx.toplevel,
+      cwd = state.adapter.ctx.toplevel,
       on_exit = function(j)
         if j.code == 0 then
           cur.namestat = j:result()
@@ -455,7 +455,7 @@ local function parse_fh_data(state)
     end
 
     table.insert(files, FileEntry.for_d2(state.opt.default_layout or Diff2Hor, {
-      git_ctx = state.ctx,
+      adapter = state.adapter,
       path = name,
       oldpath = oldname,
       status = status,
@@ -502,7 +502,7 @@ local function parse_fh_line_trace_data(state)
       end
 
       table.insert(files, FileEntry.for_d2(Diff2Hor, {
-        git_ctx = state.ctx,
+        adapter = state.adapter,
         path = b_path,
         oldpath = oldpath,
         kind = "working",
@@ -554,7 +554,7 @@ function M.git_dir(path)
 end
 
 ---@param path string
----@return GitContext?
+---@return VCSAdapter?
 function M.git_context(path)
   local toplevel = M.toplevel(path)
   if toplevel then

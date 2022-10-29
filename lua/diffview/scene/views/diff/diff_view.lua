@@ -26,7 +26,7 @@ local M = {}
 ---@field selected_file? string Path to the preferred initially selected file.
 
 ---@class DiffView : StandardView
----@field git_ctx GitContext
+---@field adapter VCSAdapter
 ---@field rev_arg string
 ---@field path_args string[]
 ---@field left Rev
@@ -45,7 +45,7 @@ local DiffView = oop.create_class("DiffView", StandardView.__get())
 function DiffView:init(opt)
   self.valid = false
   self.files = FileDict()
-  self.git_ctx = opt.git_ctx
+  self.adapter = opt.adapter
   self.path_args = opt.path_args
   self.rev_arg = opt.rev_arg
   self.left = opt.left
@@ -55,15 +55,15 @@ function DiffView:init(opt)
   self.options.selected_file = self.options.selected_file
     and utils.path:chain(self.options.selected_file)
         :absolute()
-        :relative(self.git_ctx.ctx.toplevel)
+        :relative(self.adapter.ctx.toplevel)
         :get()
 
   DiffView:super().init(self, {
     panel = FilePanel(
-      self.git_ctx,
+      self.adapter,
       self.files,
       self.path_args,
-      self.rev_arg or self.git_ctx:rev_to_pretty_string(self.left, self.right)
+      self.rev_arg or self.adapter:rev_to_pretty_string(self.left, self.right)
     ),
   })
 
@@ -119,14 +119,14 @@ end
 function DiffView:post_open()
   vim.cmd("redraw")
 
-  self.commit_log_panel = CommitLogPanel(self.git_ctx.ctx.toplevel, {
-    name = ("diffview://%s/log/%d/%s"):format(self.git_ctx.ctx.dir, self.tabpage, "commit_log"),
+  self.commit_log_panel = CommitLogPanel(self.adapter.ctx.toplevel, {
+    name = ("diffview://%s/log/%d/%s"):format(self.adapter.ctx.dir, self.tabpage, "commit_log"),
   })
 
   if config.get_config().watch_index then
     self.watcher = vim.loop.new_fs_poll()
     ---@diagnostic disable-next-line: unused-local
-    self.watcher:start(self.git_ctx.ctx.dir .. "/index", 1000, function(err, prev, cur)
+    self.watcher:start(self.adapter.ctx.dir .. "/index", 1000, function(err, prev, cur)
       if not err then
         vim.schedule(function()
           if self:is_cur_tabpage() then
@@ -276,7 +276,7 @@ end
 ---@return FileDict
 DiffView.get_updated_files = async.wrap(function(self, callback)
   vcs.diff_file_list(
-      self.git_ctx,
+      self.adapter,
       self.left,
       self.right,
       self.path_args,
@@ -302,7 +302,7 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
     -- If left is tracking HEAD and right is LOCAL: Update HEAD rev.
     local new_head
     if self.left.track_head and self.right.type == RevType.LOCAL then
-      new_head = vcs.head_rev(self.git_ctx.ctx.toplevel)
+      new_head = vcs.head_rev(self.adapter.ctx.toplevel)
       if new_head and self.left.commit ~= new_head.commit then
         self.left = new_head
       else
@@ -311,7 +311,7 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
       perf:lap("updated head rev")
     end
 
-    local index_stat = utils.path:stat(utils.path:join(self.git_ctx.ctx.dir, "index"))
+    local index_stat = utils.path:stat(utils.path:join(self.adapter.ctx.dir, "index"))
     local last_winid = api.nvim_get_current_win()
     self:get_updated_files(function(err, new_files)
       if err then
@@ -355,7 +355,7 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
               end
 
               v.cur_files[ai].status = v.new_files[bi].status
-              v.cur_files[ai]:validate_stage_buffers(self.git_ctx, index_stat)
+              v.cur_files[ai]:validate_stage_buffers(self.adapter, index_stat)
 
               if new_head then
                 v.cur_files[ai]:update_heads(new_head)
@@ -402,7 +402,7 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
         end
 
         perf:lap("updated file list")
-        FileEntry.update_index_stat(self.git_ctx, index_stat)
+        FileEntry.update_index_stat(self.adapter, index_stat)
         self.files:update_file_trees()
         self.panel:update_components()
         self.panel:render()

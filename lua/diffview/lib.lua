@@ -47,7 +47,7 @@ function M.diffview_open(args)
 
   ---@type DiffView
   local v = DiffView({
-    git_ctx = adapter,
+    adapter = adapter,
     rev_arg = rev_arg,
     path_args = adapter.ctx.path_args,
     left = opts.left,
@@ -101,7 +101,7 @@ function M.file_history(range, args)
 
   ---@type FileHistoryView
   local v = FileHistoryView({
-    git_ctx = adapter,
+    adapter = adapter,
     log_options = log_options,
   })
 

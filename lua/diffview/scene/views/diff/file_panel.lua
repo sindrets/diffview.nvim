@@ -11,7 +11,7 @@ local M = {}
 ---@field folder_statuses "never"|"only_folded"|"always"
 
 ---@class FilePanel : Panel
----@field git_ctx GitContext
+---@field adapter VCSAdapter
 ---@field files FileDict
 ---@field path_args string[]
 ---@field rev_pretty_name string|nil
@@ -42,16 +42,16 @@ FilePanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 })
 
 ---FilePanel constructor.
----@param git_ctx GitContext
+---@param adapter VCSAdapter
 ---@param files FileEntry[]
 ---@param path_args string[]
-function FilePanel:init(git_ctx, files, path_args, rev_pretty_name)
+function FilePanel:init(adapter, files, path_args, rev_pretty_name)
   local conf = config.get_config()
   FilePanel:super().init(self, {
     config = conf.file_panel.win_config,
     bufname = "DiffviewFilePanel",
   })
-  self.git_ctx = git_ctx
+  self.adapter = adapter
   self.files = files
   self.path_args = path_args
   self.rev_pretty_name = rev_pretty_name

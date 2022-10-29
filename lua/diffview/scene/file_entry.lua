@@ -166,11 +166,11 @@ function FileEntry:convert_layout(target_layout)
     ))
 end
 
----@param git_ctx GitContext
+---@param adapter VCSAdapter
 ---@param stat? table
-function FileEntry:validate_stage_buffers(git_ctx, stat)
-  stat = stat or utils.path:stat(utils.path:join(git_ctx.ctx.dir, "index"))
-  local cached_stat = utils.tbl_access(fstat_cache, { git_ctx.ctx.toplevel, "index" })
+function FileEntry:validate_stage_buffers(adapter, stat)
+  stat = stat or utils.path:stat(utils.path:join(adapter.ctx.dir, "index"))
+  local cached_stat = utils.tbl_access(fstat_cache, { adapter.ctx.toplevel, "index" })
 
   if stat then
     if not cached_stat or cached_stat.mtime < stat.mtime.sec then
@@ -184,16 +184,16 @@ function FileEntry:validate_stage_buffers(git_ctx, stat)
 end
 
 ---@static
----@param git_ctx GitContext
-function FileEntry.update_index_stat(git_ctx, stat)
-  stat = stat or utils.path:stat(utils.path:join(git_ctx.ctx.toplevel, "index"))
+---@param adapter VCSAdapter
+function FileEntry.update_index_stat(adapter, stat)
+  stat = stat or utils.path:stat(utils.path:join(adapter.ctx.toplevel, "index"))
 
   if stat then
-    if not fstat_cache[git_ctx.ctx.toplevel] then
-      fstat_cache[git_ctx.ctx.toplevel] = {}
+    if not fstat_cache[adapter.ctx.toplevel] then
+      fstat_cache[adapter.ctx.toplevel] = {}
     end
 
-    fstat_cache[git_ctx.ctx.toplevel].index = {
+    fstat_cache[adapter.ctx.toplevel].index = {
       mtime = stat.mtime.sec,
     }
   end

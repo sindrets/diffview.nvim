@@ -1250,7 +1250,7 @@ GitAdapter.flags = {
       completion = function(panel)
         return function(arg_lead, _, _)
           local view = panel.parent.parent
-          return view.git_ctx:rev_completion(arg_lead, {
+          return view.adapter:rev_completion(arg_lead, {
             accept_range = true,
           })
         end
@@ -1262,7 +1262,7 @@ GitAdapter.flags = {
       completion = function(panel)
         return function(arg_lead, _, _)
           local view = panel.parent.parent
-          return utils.vec_join("LOCAL", view.git_ctx:rev_completion(arg_lead, {}))
+          return utils.vec_join("LOCAL", view.adapter:rev_completion(arg_lead, {}))
         end
       end,
     },
