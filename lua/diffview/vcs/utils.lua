@@ -436,5 +436,26 @@ function M.filter_completion(arg_lead, items)
   end, items)
 end
 
+---Restore a file to the state it was in, in a given commit / rev. If no commit
+---is given, unstaged files are restored to the state in index, and staged files
+---are restored to the state in HEAD. The file will also be written into the
+---object database such that the action can be undone.
+---@param adapter VCSAdapter
+---@param path string
+---@param kind '"staged"'|'"working"'
+---@param commit string
+M.restore_file = async.wrap(function(adapter, path, kind, commit, callback)
+  local undo = adapter:file_restore(path, kind, commit)
+  if not undo then
+    utils.err("Failed to revert file! See ':DiffviewLog' for details.", true)
+    return callback()
+  end
+
+  local rev_name = (commit and commit:sub(1, 11)) or (kind == "staged" and "HEAD" or "index")
+  utils.info(("File restored from %s. Undo with %s"):format(rev_name, undo), true)
+  callback()
+end, 5)
+
+
 M.JobStatus = JobStatus
 return M

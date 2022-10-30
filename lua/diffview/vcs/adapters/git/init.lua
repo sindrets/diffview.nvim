@@ -27,6 +27,7 @@ local M = {}
 local GitAdapter = oop.create_class('GitAdapter', VCSAdapter)
 
 GitAdapter.Rev = GitRev
+GitAdapter.has_database = true
 
 ---@return string, string
 local function pathspec_split(pathspec)
@@ -1227,6 +1228,80 @@ end
 
 function GitAdapter:get_files_args(args)
   return utils.vec_join(self:args(), "ls-files", "--others", "--exclude-standard", args)
+end
+
+function GitAdapter:file_restore(path, kind, commit)
+  local out, code
+  local abs_path = utils.path:join(self.ctx.toplevel, path)
+  local rel_path = utils.path:vim_fnamemodify(abs_path, ":~")
+
+  -- Check if file exists in history
+  _, code = self:exec_sync(
+    { "cat-file", "-e", ("%s:%s"):format(kind == "staged" and "HEAD" or "", path) },
+    self.ctx.toplevel
+  )
+  local exists_git = code == 0
+  local exists_local = utils.path:readable(abs_path)
+
+  if exists_local then
+    -- Wite file blob into db
+    out, code = self:exec_sync({ "hash-object", "-w", "--", path }, self.ctx.toplevel)
+    if code ~= 0 then
+      utils.err("Failed to write file blob into the object database. Aborting file restoration.", true)
+      return nil
+    end
+  end
+
+  local undo
+  if exists_local then
+    undo = (":sp %s | %%!git show %s"):format(vim.fn.fnameescape(rel_path), out[1]:sub(1, 11))
+  else
+    undo = (":!git rm %s"):format(vim.fn.fnameescape(path))
+  end
+
+  -- Revert file
+  if not exists_git then
+    local bn = utils.find_file_buffer(abs_path)
+    if bn then
+      async.util.scheduler()
+      local ok, err = utils.remove_buffer(false, bn)
+      if not ok then
+        utils.err({
+          ("Failed to delete buffer '%d'! Aborting file restoration. Error message:")
+            :format(bn),
+          err
+        }, true)
+        return false
+      end
+    end
+
+    if kind == "working" then
+      -- File is untracked and has no history: delete it from fs.
+      local ok, err = utils.path:unlink(abs_path)
+      if not ok then
+        utils.err({
+          ("Failed to delete file '%s'! Aborting file restoration. Error message:")
+            :format(abs_path),
+          err
+        }, true)
+        return nil
+      end
+    else
+      -- File only exists in index
+      out, code = self:exec_sync(
+        { "rm", "-f", "--", path },
+        self.ctx.toplevel
+      )
+    end
+  else
+    -- File exists in history: checkout
+    out, code = self:exec_sync(
+      utils.vec_join("checkout", commit or (kind == "staged" and "HEAD" or nil), "--", path),
+      self.ctx.toplevel
+    )
+  end
+
+  return undo
 end
 
 ---Check if status for untracked files is disabled for a given git repo.

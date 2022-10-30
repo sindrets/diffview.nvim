@@ -15,6 +15,9 @@ local M = {}
 ---@field context string[]
 local VCSAdapter = oop.create_class('VCSAdapter')
 
+---The VCS implements a database to store file states
+VCSAdapter.has_database = false
+
 ---@class vcs.adapter.VCSAdapter.Opt
 ---@field cpath string? # CWD path
 ---@field toplevel string # VCS toplevel path
@@ -171,6 +174,15 @@ end
 ---@param args string[] Extra args
 ---@return string[]
 function VCSAdapter:get_files_args(args)
+  oop.abstract_stub()
+end
+
+---Restore a file to the requested state
+---@param path string # file to restore
+---@param kind '"staged"'|'"working"'
+---@param commit string
+---@return string? Command to undo the restore
+function VCSAdapter:restore_file(path, kind, commit)
   oop.abstract_stub()
 end
 
