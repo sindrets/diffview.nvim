@@ -4,7 +4,7 @@ local actions = lazy.require("diffview.actions") ---@module "diffview.actions"
 local Event = lazy.access("diffview.events", "Event") ---@type EEvent
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type ERevType
 local async = lazy.require("plenary.async") ---@module "plenary.async"
-local vcs = lazy.require("diffview.vcs") ---@module "diffview.vcs"
+local vcs = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
@@ -34,7 +34,7 @@ return function(view)
       end
     end,
     buf_write_post = function()
-      if vcs.has_local(view.left, view.right) then
+      if view.adapter:has_local(view.left, view.right) then
         view.update_needed = true
         if api.nvim_get_current_tabpage() == view.tabpage then
           view:update_files()
@@ -220,7 +220,7 @@ return function(view)
           utils.err("The file is open with unsaved changes! Aborting file restoration.")
           return
         end
-        vcs.restore_file(view.adapter.ctx.toplevel, file.path, file.kind, commit, function()
+        vcs.restore_file(view.adapter, file.path, file.kind, commit, function()
           async.util.scheduler()
           view:update_files()
         end)
