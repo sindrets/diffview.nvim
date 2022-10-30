@@ -121,14 +121,14 @@ return function(view)
 
       local item = view:infer_cur_file(true)
       if item then
-        local code
+        local success
         if item.kind == "working" or item.kind == "conflicting" then
-          _, code = vcs.exec_sync({ "add", item.path }, view.adapter.ctx.toplevel)
+          success = view.adapter:add_file(item.path)
         elseif item.kind == "staged" then
-          _, code = vcs.exec_sync({ "reset", "--", item.path }, view.adapter.ctx.toplevel)
+          success = view.adapter:reset_file(item.path)
         end
 
-        if code ~= 0 then
+        if not success then
           utils.err(("Failed to stage/unstage file: '%s'"):format(item.path))
           return
         end
@@ -180,9 +180,9 @@ return function(view)
       end, view.files.working)
 
       if #args > 0 then
-        local _, code = vcs.exec_sync({ "add", args }, view.adapter.ctx.toplevel)
+        local success = view.adapter:add_file(args)
 
-        if code ~= 0 then
+        if not success then
           utils.err("Failed to stage files!")
           return
         end
@@ -194,9 +194,9 @@ return function(view)
       end
     end,
     unstage_all = function()
-      local _, code = vcs.exec_sync({ "reset" }, view.adapter.ctx.toplevel)
+      local success = view.adapter:reset_file()
 
-      if code ~= 0 then
+      if not success then
         utils.err("Failed to unstage files!")
         return
       end

@@ -1304,6 +1304,16 @@ function GitAdapter:file_restore(path, kind, commit)
   return undo
 end
 
+function GitAdapter:reset_file(paths)
+  local _, code = self:exec_sync({"reset", "--", paths}, self.ctx.toplevel)
+  return code == 0
+end
+
+function GitAdapter:add_file(paths)
+  local _, code = self:exec_sync({"add", "--", paths}, self.ctx.toplevel)
+  return code == 0
+end
+
 ---Check if status for untracked files is disabled for a given git repo.
 ---@return boolean
 function GitAdapter:show_untracked()

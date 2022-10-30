@@ -186,6 +186,20 @@ function VCSAdapter:restore_file(path, kind, commit)
   oop.abstract_stub()
 end
 
+---Add file(s)
+---@param paths string[]
+---@return boolean # add was successful
+function VCSAdapter:add_file(paths)
+  oop.abstract_stub()
+end
+
+---Reset file(s)
+---@param paths string[]
+---@return boolean # reset was successful
+function VCSAdapter:reset_file(paths)
+  oop.abstract_stub()
+end
+
 ---@param args string[]
 ---@return {left: string, right: string, options: string[]}
 function VCSAdapter:diffview_options(args)
