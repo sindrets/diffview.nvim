@@ -27,7 +27,6 @@ local M = {}
 local GitAdapter = oop.create_class('GitAdapter', VCSAdapter)
 
 GitAdapter.Rev = GitRev
-GitAdapter.has_database = true
 
 ---@return string, string
 local function pathspec_split(pathspec)

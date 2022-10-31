@@ -3,6 +3,7 @@ local utils = require('diffview.utils')
 local logger = require('diffview.logger')
 local arg_parser = require('diffview.arg_parser')
 local RevType = require("diffview.vcs.rev").RevType
+local Rev = require("diffview.vcs.rev").Rev
 
 local M = {}
 
@@ -15,8 +16,7 @@ local M = {}
 ---@field context string[]
 local VCSAdapter = oop.create_class('VCSAdapter')
 
----The VCS implements a database to store file states
-VCSAdapter.has_database = false
+VCSAdapter.Rev = Rev
 
 ---@class vcs.adapter.VCSAdapter.Opt
 ---@field cpath string? # CWD path
@@ -243,6 +243,7 @@ function VCSAdapter:is_binary(path, rev)
   oop.abstract_stub()
 end
 
+---Initialize completion parameters
 function VCSAdapter:init_completion()
   oop.abstract_stub()
 end

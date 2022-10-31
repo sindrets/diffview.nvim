@@ -9,7 +9,7 @@ local Rev = lazy.access("diffview.vcs.rev", "Rev")
 local RevType = lazy.access("diffview.vcs.rev", "RevType")
 ---@module "diffview.config"
 local config = lazy.require("diffview.config")
----@module "diffview.vcs"
+---@module "diffview.vcs.utils"
 local vcs = lazy.require("diffview.vcs.utils")
 ---@module "diffview.utils"
 local utils = lazy.require("diffview.utils")
