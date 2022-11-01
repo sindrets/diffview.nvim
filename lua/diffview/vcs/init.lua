@@ -29,9 +29,9 @@ function M.get_adapter(opt)
     if not top_indicators then
       path_args, top_indicators = adapter.get_repo_paths(opt.cmd_ctx.path_args, opt.cmd_ctx.cpath)
     end
-    local toplevel = adapter.find_toplevel(top_indicators)
+    local err, toplevel = adapter.find_toplevel(top_indicators)
 
-    if toplevel then
+    if not err then
       -- Create a new adapter instance. Store the resolved path args and the
       -- cpath in the adapter context.
       return nil, adapter.create(toplevel, path_args, opt.cmd_ctx.cpath)

@@ -113,7 +113,7 @@ function M.find_toplevel(top_indicators)
     if p and pl:readable(p) then
       toplevel = get_toplevel(p)
       if toplevel then
-        return toplevel
+        return nil, toplevel
       end
     end
   end
@@ -124,7 +124,7 @@ function M.find_toplevel(top_indicators)
       local rel_path = pl:relative(v, ".")
       return utils.str_quote(rel_path == "" and "." or rel_path)
     end, top_indicators) --[[@as vector ]], ", "))
-  )
+  ), nil
 end
 
 ---@param toplevel string
