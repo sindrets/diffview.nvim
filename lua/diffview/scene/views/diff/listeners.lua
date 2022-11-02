@@ -105,7 +105,7 @@ return function(view)
         or (
           view.left.type == RevType.COMMIT
           and vim.tbl_contains({ RevType.STAGE, RevType.LOCAL }, view.right.type)
-          and view.left:is_head(view.adapter.ctx.toplevel)
+          and view.left:is_head(view.adapter)
         ) then
         utils.info("Changes not commited yet. No log available for these changes.")
         return
@@ -123,9 +123,9 @@ return function(view)
       if item then
         local success
         if item.kind == "working" or item.kind == "conflicting" then
-          success = view.adapter:add_file(item.path)
+          success = view.adapter:add_files({item.path})
         elseif item.kind == "staged" then
-          success = view.adapter:reset_file(item.path)
+          success = view.adapter:reset_files({item.path})
         end
 
         if not success then
@@ -180,7 +180,7 @@ return function(view)
       end, view.files.working)
 
       if #args > 0 then
-        local success = view.adapter:add_file(args)
+        local success = view.adapter:add_files(args)
 
         if not success then
           utils.err("Failed to stage files!")
@@ -194,7 +194,7 @@ return function(view)
       end
     end,
     unstage_all = function()
-      local success = view.adapter:reset_file()
+      local success = view.adapter:reset_files()
 
       if not success then
         utils.err("Failed to unstage files!")

@@ -46,7 +46,7 @@ function GitRev:init(rev_type, revision, track_head)
 end
 
 ---@param name string
----@param adapter? GitAdapter
+---@param adapter GitAdapter
 ---@return Rev?
 function GitRev.from_name(name, adapter)
   local out, code = adapter:exec_sync({ "rev-parse", "--revs-only", name }, adapter.ctx.toplevel)

@@ -1,4 +1,3 @@
-local utils = require('diffview.utils')
 local git = require('diffview.vcs.adapters.git')
 local hg = require('diffview.vcs.adapters.hg')
 

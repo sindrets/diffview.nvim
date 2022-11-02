@@ -157,7 +157,7 @@ end, 3)
 ---@param right Rev
 ---@param args string[]
 ---@param kind git.FileKind
----@param opt git.utils.LayoutOpt
+---@param opt vcs.adapter.LayoutOpt
 ---@param callback function
 local tracked_files = async.wrap(function(adapter, left, right, args, kind, opt, callback)
   ---@type FileEntry[]
@@ -281,7 +281,7 @@ end, 7)
 ---@param adapter VCSAdapter
 ---@param left Rev
 ---@param right Rev
----@param opt git.utils.LayoutOpt
+---@param opt vcs.adapter.LayoutOpt
 ---@param callback function
 local untracked_files = async.wrap(function(adapter, left, right, opt, callback)
   Job:new({
@@ -326,7 +326,7 @@ end, 5)
 ---@param right Rev
 ---@param path_args string[]|nil
 ---@param dv_opt DiffViewOptions
----@param opt git.utils.LayoutOpt
+---@param opt vcs.adapter.LayoutOpt
 ---@param callback function
 ---@return string[]? err
 ---@return FileDict?

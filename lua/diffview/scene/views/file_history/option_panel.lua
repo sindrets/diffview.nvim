@@ -5,7 +5,6 @@ local JobStatus = lazy.access("diffview.vcs.utils", "JobStatus") ---@type JobSta
 local Panel = lazy.access("diffview.ui.panel", "Panel") ---@type Panel|LazyModule
 local arg_parser = lazy.require("diffview.arg_parser") ---@module "diffview.arg_parser"
 local config = lazy.require("diffview.config") ---@module "diffview.config"
-local diffview = lazy.require("diffview") ---@module "diffview"
 local oop = lazy.require("diffview.oop") ---@module "diffview.oop"
 local panel_renderer = lazy.require("diffview.scene.views.file_history.render") ---@module "diffview.scene.views.file_history.render"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
@@ -42,43 +41,33 @@ FHOptionPanel.bufopts = {
   bufhidden = "hide",
 }
 
----@class FlagOption : string[]
----@field key string
----@field prompt_label string
----@field prompt_fmt string
----@field select string[]
----@field completion string|fun(panel: FHOptionPanel): function
----@field transform fun(values: string[]): any # Transform the values given by the user.
----@field render_value fun(option: FlagOption, value: string|string[]): boolean, string # Render the flag value in the panel.
----@field render_default fun(options: FlagOption, value: string|string[]): string # Render the default text for the input().
-
 ---FHOptionPanel constructor.
 ---@param parent FileHistoryPanel
-function FHOptionPanel:init(parent, flags)
+function FHOptionPanel:init(parent)
   FHOptionPanel:super().init(self, {
     ---@type PanelSplitSpec
     config = {
       position = "bottom",
-      height = #flags.switches + #flags.options + 4,
+      height = #parent.adapter.flags.switches + #parent.adapter.flags.options + 4,
     },
     bufname = "DiffviewFHOptionPanel",
   })
   self.parent = parent
   self.emitter = EventEmitter()
-  self.flags = flags
+  self.flags = parent.adapter.flags
 
   ---@param option_name string
   self.emitter:on("set_option", function(option_name)
     local log_options = self.parent:get_log_options()
     local cur_value = log_options[option_name]
 
-    if flags.switches[option_name] then
+    if self.flags.switches[option_name] then
       self:_set_option(option_name, not cur_value)
       self:render()
       self:redraw()
 
-    elseif flags.options[option_name] then
-      local o = flags.options[option_name]
+    elseif self.flags.options[option_name] then
+      local o = self.flags.options[option_name]
       local prompt = utils.str_template(o.prompt_fmt, {
         label = o.prompt_label and o.prompt_label .. " " or "",
         flag_name = o[2] .. " ",

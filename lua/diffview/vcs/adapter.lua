@@ -12,8 +12,9 @@ local M = {}
 ---@field merge_layout Layout
 
 ---@class VCSAdapter: diffview.Object
----@field bootstrap boolean[]
----@field context string[]
+---@field bootstrap table<string, string | boolean | integer>
+---@field ctx string[]
+---@field flags table<string, FlagOption[]>
 local VCSAdapter = oop.create_class('VCSAdapter')
 
 VCSAdapter.Rev = Rev
@@ -44,10 +45,42 @@ function VCSAdapter:run_bootstrap()
   self.bootstrap.ok = true
 end
 
----@return string # path to binary for VCS command
+---@diagnostic disable: unused-local, missing-return
+
+---@param path string
+---@param rev Rev
+---@return boolean -- True if the file was binary for the given rev, or it didn't exist.
+function VCSAdapter:is_binary(path, rev)
+  oop.abstract_stub()
+end
+
+---Initialize completion parameters
+function VCSAdapter:init_completion()
+  oop.abstract_stub()
+end
+
+---@class RevCompletionSpec
+---@field accept_range boolean
+
+---Completion for revisions.
+---@param arg_lead string
+---@param opt? RevCompletionSpec
+---@return string[]
+function VCSAdapter:rev_completion(arg_lead, opt)
+  oop.abstract_stub()
+end
+
+---@return Rev?
+function VCSAdapter:head_rev()
+  oop.abstract_stub()
+end
+
+---@return string[] # path to binary for VCS command
 function VCSAdapter:get_command()
   oop.abstract_stub()
 end
+
+---@diagnostic enable: unused-local, missing-return
 
 ---@return string cmd The VCS binary.
 function VCSAdapter:bin()
@@ -99,8 +132,10 @@ end
 
 -- File History
 
+---@diagnostic disable: unused-local, missing-return
+
 ---@param args string[]
----@return string[] args to show commit content
+---@return string?[] args to show commit content
 function VCSAdapter:get_show_args(args)
   oop.abstract_stub()
 end
@@ -123,6 +158,8 @@ end
 function VCSAdapter:file_history_worker(thread, log_opt, opt, co_state, callback)
   oop.abstract_stub()
 end
+
+---@diagnostic enable: unused-local, missing-return
 
 ---@param log_opt ConfigLogOptions
 ---@param opt vcs.adapter.FileHistoryWorkerSpec
@@ -148,6 +185,8 @@ end
 
 -- Diff View
 
+---@diagnostic disable: unused-local, missing-return
+
 ---Convert revs to rev args.
 ---@param left Rev
 ---@param right Rev
@@ -157,21 +196,21 @@ function VCSAdapter:rev_to_args(left, right)
 end
 
 ---Arguments to show name and status of files
----@param args string[] Extra args
+---@param args string?[] Extra args
 ---@return string[]
 function VCSAdapter:get_namestat_args(args)
   oop.abstract_stub()
 end
 
 ---Arguments to show number of changes to files
----@param args string[] Extra args
+---@param args string?[] Extra args
 ---@return string[]
 function VCSAdapter:get_numstat_args(args)
   oop.abstract_stub()
 end
 
 ---Arguments to list all files
----@param args string[] Extra args
+---@param args string?[] Extra args
 ---@return string[]
 function VCSAdapter:get_files_args(args)
   oop.abstract_stub()
@@ -189,14 +228,14 @@ end
 ---Add file(s)
 ---@param paths string[]
 ---@return boolean # add was successful
-function VCSAdapter:add_file(paths)
+function VCSAdapter:add_files(paths)
   oop.abstract_stub()
 end
 
 ---Reset file(s)
----@param paths string[]
+---@param paths string?[]
 ---@return boolean # reset was successful
-function VCSAdapter:reset_file(paths)
+function VCSAdapter:reset_files(paths)
   oop.abstract_stub()
 end
 
@@ -209,8 +248,19 @@ end
 ---Check if status for untracked files is disabled
 ---@return boolean
 function VCSAdapter:show_untracked()
-  return true
+  oop.abstract_stub()
 end
+
+---Restore file
+---@param path string
+---@param kind '"staged"' | '"working"'
+---@param commit string?
+---@return boolean # Restore was successful
+function VCSAdapter:file_restore(path, kind, commit)
+  oop.abstract_stub()
+end
+
+---@diagnostic enable: unused-local, missing-return
 
 ---Convert revs to string representation.
 ---@param left Rev
@@ -235,18 +285,22 @@ function VCSAdapter:has_local(left, right)
   return left.type == RevType.LOCAL or right.type == RevType.LOCAL
 end
 
+---@class FlagOption : string[]
+---@field key string
+---@field prompt_label string
+---@field prompt_fmt string
+---@field select string[]
+---@field completion string|fun(panel: FHOptionPanel): function
+---@field transform fun(values: string[]): any # Transform the values given by the user.
+---@field render_value fun(option: FlagOption, value: string|string[]): boolean, string # Render the flag value in the panel.
+---@field render_default fun(options: FlagOption, value: string|string[]): string # Render the default text for the input().
 
----@param path string
----@param rev Rev
----@return boolean -- True if the file was binary for the given rev, or it didn't exist.
-function VCSAdapter:is_binary(path, rev)
-  oop.abstract_stub()
-end
-
----Initialize completion parameters
-function VCSAdapter:init_completion()
-  oop.abstract_stub()
-end
+VCSAdapter.flags = {
+  ---@type FlagOption[]
+  switches = {},
+  ---@type FlagOption[]
+  options = {},
+}
 
 M.VCSAdapter = VCSAdapter
 return M

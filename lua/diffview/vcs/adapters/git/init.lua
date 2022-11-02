@@ -11,7 +11,6 @@ local Diff2Hor = require("diffview.scene.layouts.diff_2_hor").Diff2Hor
 local LogEntry = require("diffview.vcs.log_entry").LogEntry
 local RevType = require("diffview.vcs.rev").RevType
 local GitRev = require("diffview.vcs.adapters.git.rev").GitRev
----@class VCSAdapter
 local VCSAdapter = require('diffview.vcs.adapter').VCSAdapter
 local Job = require("plenary.job")
 local JobStatus = require('diffview.vcs.utils').JobStatus
@@ -245,7 +244,7 @@ end
 ---@field path_args string[]
 ---@field flags string[]
 
----@param adapter VCSAdapter
+---@param adapter GitAdapter
 ---@param log_options LogOptions
 ---@param single_file boolean
 ---@return GitAdapter.PreparedLogOpts
@@ -625,8 +624,7 @@ function GitAdapter:file_history_options(range, paths, args)
   local cfile = pl:vim_expand("%")
   cfile = pl:readlink(cfile) or cfile
 
-  ---@cast git_toplevel string
-  logger.lvl(1).s_debug(("Found git top-level: %s"):format(utils.str_quote(git_toplevel)))
+  logger.lvl(1).s_debug(("Found git top-level: %s"):format(utils.str_quote(self.ctx.toplevel)))
 
   rel_paths = vim.tbl_map(function(v)
     return v == "." and "." or pl:relative(v, ".")
@@ -640,7 +638,7 @@ function GitAdapter:file_history_options(range, paths, args)
   ---@type string
   local range_arg = argo:get_flag("range", { no_empty = true })
   if range_arg then
-    local ok = self:verify_rev_arg(self.ctx.toplevel, range_arg)
+    local ok = self:verify_rev_arg(range_arg)
     if not ok then
       utils.err(("Bad revision: %s"):format(utils.str_quote(range_arg)))
       return
@@ -763,7 +761,7 @@ end
 ---@field path_args string[]
 ---@field log_options LogOptions
 ---@field prepared_log_opts GitAdapter.PreparedLogOpts
----@field opt GitAdapter.FileHistoryWorkerSpec
+---@field opt vcs.adapter.FileHistoryWorkerSpec
 ---@field single_file boolean
 ---@field resume_lock boolean
 ---@field cur table
@@ -795,12 +793,12 @@ local function parse_fh_data(state)
         "--",
         state.old_path or state.path_args
       ),
-      cwd = state.ctx.toplevel,
+      cwd = state.adapter.ctx.toplevel,
       on_exit = function(j)
         if j.code == 0 then
           cur.namestat = j:result()
         end
-        handle_co(state.thread, coroutine.resume(state.thread))
+        state.adapter:handle_co(state.thread, coroutine.resume(state.thread))
       end,
     }
 
@@ -1106,7 +1104,6 @@ function GitAdapter:is_rev_arg_range(rev_arg)
 end
 
 ---Parse a given rev arg.
----@param git_toplevel string
 ---@param rev_arg string
 ---@param opt table
 ---@return Rev? left
@@ -1303,13 +1300,21 @@ function GitAdapter:file_restore(path, kind, commit)
   return undo
 end
 
-function GitAdapter:reset_file(paths)
-  local _, code = self:exec_sync({"reset", "--", paths}, self.ctx.toplevel)
+function GitAdapter:reset_files(paths)
+  local arg_paths = {}
+  if #paths > 0 then
+    arg_paths = vim.tbl_extend("force", { "--" }, paths)
+  end
+  local _, code = self:exec_sync({"reset", arg_paths}, self.ctx.toplevel)
   return code == 0
 end
 
-function GitAdapter:add_file(paths)
-  local _, code = self:exec_sync({"add", "--", paths}, self.ctx.toplevel)
+function GitAdapter:add_files(paths)
+  local arg_paths = {}
+  if #paths > 0 then
+    arg_paths = vim.tbl_extend("force", { "--" }, paths)
+  end
+  local _, code = self:exec_sync({"add", arg_paths}, self.ctx.toplevel)
   return code == 0
 end
 
@@ -1369,7 +1374,6 @@ function GitAdapter:is_binary(path, rev)
   local _, code = self:exec_sync(cmd, { cwd = self.ctx.toplevel, silent = true })
   return code ~= 0
 end
-
 
 GitAdapter.flags = {
   ---@type FlagOption[]
@@ -1566,33 +1570,6 @@ end
 
 function GitAdapter:rev_candidates()
   logger.lvl(1).debug("[completion] Revision candidates requested.")
-  -- local top_indicators
-  -- if not (git_toplevel and git_dir) then
-  --   local cfile = utils.path:vim_expand("%")
-  --   top_indicators = utils.vec_join(
-  --     vim.bo.buftype == ""
-  --         and utils.path:absolute(cfile)
-  --         or nil,
-  --     utils.path:realpath(".")
-  --   )
-  -- end
-
-  -- if not (git_toplevel and git_dir) then
-  --   local err
-  --   err, git_toplevel = lib.find_git_toplevel(top_indicators)
-
-  --   if err then
-  --     return {}
-  --   end
-
-  --   ---@cast git_toplevel string
-  --   git_dir = vcs.git_dir(git_toplevel)
-  -- end
-
-  -- if not (git_toplevel and git_dir) then
-  --   return {}
-  -- end
-
   -- stylua: ignore start
   local targets = {
     "HEAD", "FETCH_HEAD", "ORIG_HEAD", "MERGE_HEAD",
@@ -1618,11 +1595,6 @@ function GitAdapter:rev_candidates()
 
   return utils.vec_join(heads, revs, stashes)
 end
-
----@class RevCompletionSpec
----@field accept_range boolean
----@field git_toplevel string
----@field git_dir string
 
 ---Completion for git revisions.
 ---@param arg_lead string
