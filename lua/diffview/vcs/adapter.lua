@@ -11,10 +11,19 @@ local M = {}
 ---@field default_layout Diff2
 ---@field merge_layout Layout
 
+---@class vcs.adapter.VCSAdapter.Flags
+---@field switches FlagOption[]
+---@field options FlagOption[]
+
+---@class vcs.adapter.VCSAdapter.Ctx
+---@field toplevel string # VCS repository toplevel directory
+---@field dir string # VCS directory
+---@field path_args string[] # Extra path arguments
+
 ---@class VCSAdapter: diffview.Object
 ---@field bootstrap table<string, string | boolean | integer>
----@field ctx string[]
----@field flags table<string, FlagOption[]>
+---@field ctx vcs.adapter.VCSAdapter.Ctx
+---@field flags vcs.adapter.VCSAdapter.Flags
 local VCSAdapter = oop.create_class('VCSAdapter')
 
 VCSAdapter.Rev = Rev
