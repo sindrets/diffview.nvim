@@ -11,6 +11,13 @@ local M = {}
 ---@field default_layout Diff2
 ---@field merge_layout Layout
 
+
+---@class vcs.adapter.VCSAdapter.Bootstrap
+---@field done boolean # Did the bootstrapping
+---@field ok boolean # Bootstrapping was successful
+---@field version table
+---@field version_string string[]
+
 ---@class vcs.adapter.VCSAdapter.Flags
 ---@field switches FlagOption[]
 ---@field options FlagOption[]
@@ -21,7 +28,7 @@ local M = {}
 ---@field path_args string[] # Extra path arguments
 
 ---@class VCSAdapter: diffview.Object
----@field bootstrap table<string, string | boolean | integer>
+---@field bootstrap vcs.adapter.VCSAdapter.Bootstrap
 ---@field ctx vcs.adapter.VCSAdapter.Ctx
 ---@field flags vcs.adapter.VCSAdapter.Flags
 local VCSAdapter = oop.create_class('VCSAdapter')
