@@ -16,7 +16,9 @@ local M = {}
 ---@field done boolean # Did the bootstrapping
 ---@field ok boolean # Bootstrapping was successful
 ---@field version table
----@field version_string string[]
+---@field version_string string
+---@field target_version table
+---@field target_version_string string
 
 ---@class vcs.adapter.VCSAdapter.Flags
 ---@field switches FlagOption[]
@@ -46,7 +48,7 @@ function VCSAdapter:init(opt)
     done = false,
     ok = false,
     version = {},
-    version_string = {},
+    version_string = "",
   }
   self.ctx = {}
 
