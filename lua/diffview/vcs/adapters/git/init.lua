@@ -101,7 +101,7 @@ end
 ---paths.
 ---@param top_indicators string[] A list of paths that might indicate what working tree we are in.
 ---@return string? err
----@return string? toplevel # as an absolute path
+---@return string toplevel # as an absolute path
 function M.find_toplevel(top_indicators)
   local toplevel
   for _, p in ipairs(top_indicators) do
@@ -123,11 +123,11 @@ function M.find_toplevel(top_indicators)
       local rel_path = pl:relative(v, ".")
       return utils.str_quote(rel_path == "" and "." or rel_path)
     end, top_indicators) --[[@as vector ]], ", "))
-  ), nil
+  ), ""
 end
 
 ---@param toplevel string
----@param path_args string?
+---@param path_args string[]
 ---@param cpath string?
 function M.create(toplevel, path_args, cpath)
   return GitAdapter({
