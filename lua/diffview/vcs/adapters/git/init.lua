@@ -1301,20 +1301,12 @@ function GitAdapter:file_restore(path, kind, commit)
 end
 
 function GitAdapter:reset_files(paths)
-  local arg_paths = {}
-  if #paths > 0 then
-    arg_paths = vim.tbl_extend("force", { "--" }, paths)
-  end
-  local _, code = self:exec_sync({"reset", arg_paths}, self.ctx.toplevel)
+  local _, code = self:exec_sync(utils.vec_join("reset", "--", paths), self.ctx.toplevel)
   return code == 0
 end
 
 function GitAdapter:add_files(paths)
-  local arg_paths = {}
-  if #paths > 0 then
-    arg_paths = vim.tbl_extend("force", { "--" }, paths)
-  end
-  local _, code = self:exec_sync({"add", arg_paths}, self.ctx.toplevel)
+  local _, code = self:exec_sync(utils.vec_join("add", "--", paths), self.ctx.toplevel)
   return code == 0
 end
 
