@@ -153,7 +153,7 @@ end
 ---@diagnostic disable: unused-local, missing-return
 
 ---@param args string[]
----@return string?[] args to show commit content
+---@return string[]? args to show commit content
 function VCSAdapter:get_show_args(args)
   oop.abstract_stub()
 end
@@ -214,21 +214,21 @@ function VCSAdapter:rev_to_args(left, right)
 end
 
 ---Arguments to show name and status of files
----@param args string?[] Extra args
+---@param args string[]? Extra args
 ---@return string[]
 function VCSAdapter:get_namestat_args(args)
   oop.abstract_stub()
 end
 
 ---Arguments to show number of changes to files
----@param args string?[] Extra args
+---@param args string[]? Extra args
 ---@return string[]
 function VCSAdapter:get_numstat_args(args)
   oop.abstract_stub()
 end
 
 ---Arguments to list all files
----@param args string?[] Extra args
+---@param args string[]? Extra args
 ---@return string[]
 function VCSAdapter:get_files_args(args)
   oop.abstract_stub()
@@ -251,7 +251,7 @@ function VCSAdapter:add_files(paths)
 end
 
 ---Reset file(s)
----@param paths string?[]
+---@param paths string[]?
 ---@return boolean # reset was successful
 function VCSAdapter:reset_files(paths)
   oop.abstract_stub()
