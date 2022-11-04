@@ -33,15 +33,18 @@ local CDiffView = oop.create_class("CDiffView", DiffView.__get())
 function CDiffView:init(opt)
   logger.info("[api] Creating a new Custom DiffView.")
   self.valid = false
-  local git_dir = vcs.git_dir(opt.git_root)
 
-  if not git_dir then
+  local err, adapter = vcs.get_adapter({ top_indicators = { opt.git_root } })
+
+  if err then
     utils.err(
-      ("Failed to find the git dir for the repository: %s")
+      ("Failed to create an adapter for the repository: %s")
       :format(utils.str_quote(opt.git_root))
     )
     return
   end
+
+  ---@cast adapter -?
 
   -- Fix malformed revs
   for _, v in ipairs({ "left", "right" }) do
@@ -54,18 +57,13 @@ function CDiffView:init(opt)
   self.fetch_files = opt.update_files
   self.get_file_data = opt.get_file_data
 
-  local adapter = {
-    toplevel = opt.git_root,
-    dir = git_dir,
-  }
-
   CDiffView:super().init(self, vim.tbl_extend("force", opt, {
     adapter = adapter,
     panel = FilePanel(
       adapter,
       self.files,
       self.path_args,
-      self.rev_arg or vcs.rev_to_pretty_string(opt.left, opt.right)
+      self.rev_arg or adapter:rev_to_pretty_string(opt.left, opt.right)
     ),
   }))
 
@@ -128,7 +126,7 @@ function CDiffView:create_file_entries(files)
     {
       kind = "staged",
       files = files.staged or {},
-      left = vcs.head_rev(self.adapter.ctx.toplevel),
+      left = self.adapter:head_rev(),
       right = Rev(RevType.STAGE, 0),
     },
   }
