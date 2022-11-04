@@ -12,7 +12,7 @@ end
 
 function M.find_toplevel(top_indicators)
   -- TODO: implement
-  return nil
+  return "", nil
 end
 
 M.HgAdapter = HgAdapter

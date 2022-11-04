@@ -173,10 +173,8 @@ function M.get_adapter()
 
     local err, adapter = vcs.get_adapter({ top_indicators = top_indicators })
 
-    -- TODO: Can we flag an error here?
     if err then
-      utils.err(err)
-      return nil
+      logger.s_warn("[completion] Failed to create adapter: " .. err)
     end
 
     return adapter
@@ -187,10 +185,6 @@ M.completers = {
   DiffviewOpen = function(ctx)
     local has_rev_arg = false
     local adapter = M.get_adapter()
-
-    if not adapter then
-      return nil
-    end
 
     for i = 2, math.min(#ctx.args, ctx.divideridx) do
       if ctx.args[i]:sub(1, 1) ~= "-" and i ~= ctx.argidx then
@@ -203,16 +197,18 @@ M.completers = {
 
     if ctx.argidx > ctx.divideridx then
       utils.vec_push(candidates, unpack(vim.fn.getcompletion(ctx.arg_lead, "file", 0)))
-    elseif not has_rev_arg and ctx.arg_lead:sub(1, 1) ~= "-" and adapter.ctx.dir and adapter.ctx.toplevel then
-      utils.vec_push(candidates, unpack(adapter.comp.open:get_all_names()))
-      utils.vec_push(candidates, unpack(adapter:rev_completion(ctx.arg_lead, {
-        accept_range= true,
-      })))
-    else
-      utils.vec_push(candidates, unpack(
-        adapter.comp.open:get_completion(ctx.arg_lead)
-        or adapter.comp.open:get_all_names()
-      ))
+    elseif adapter then
+      if not has_rev_arg and ctx.arg_lead:sub(1, 1) ~= "-" then
+        utils.vec_push(candidates, unpack(adapter.comp.open:get_all_names()))
+        utils.vec_push(candidates, unpack(adapter:rev_completion(ctx.arg_lead, {
+          accept_range = true,
+        })))
+      else
+        utils.vec_push(candidates, unpack(
+          adapter.comp.open:get_completion(ctx.arg_lead)
+          or adapter.comp.open:get_all_names()
+        ))
+      end
     end
 
     return candidates
@@ -222,14 +218,12 @@ M.completers = {
     local adapter = M.get_adapter()
     local candidates = {}
 
-    if not adapter then
-      return nil
+    if adapter then
+      utils.vec_push(candidates, unpack(
+        adapter.comp.file_history:get_completion(ctx.arg_lead)
+        or adapter.comp.file_history:get_all_names()
+      ))
     end
-
-    utils.vec_push(candidates, unpack(
-      adapter.comp.file_history:get_completion(ctx.arg_lead)
-      or adapter.comp.file_history:get_all_names()
-    ))
 
     utils.vec_push(candidates, unpack(vim.fn.getcompletion(ctx.arg_lead, "file", 0)))
 
