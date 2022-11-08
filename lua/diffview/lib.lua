@@ -3,7 +3,6 @@ local lazy = require("diffview.lazy")
 local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
 local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView") ---@type FileHistoryView|LazyModule
 local Rev = lazy.access("diffview.vcs.rev", "Rev") ---@type Rev|LazyModule
-local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type ERevType|LazyModule
 local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
 local arg_parser = lazy.require("diffview.arg_parser") ---@module "diffview.arg_parser"
 local config = lazy.require("diffview.config") ---@module "diffview.config"
@@ -44,6 +43,11 @@ function M.diffview_open(args)
   end
 
   local opts = adapter:diffview_options(args)
+
+  if opts == nil then
+    utils.err('Failed to create log options for diffview_open')
+    return
+  end
 
   ---@type DiffView
   local v = DiffView({
@@ -96,7 +100,7 @@ function M.file_history(range, args)
   local log_options = adapter:file_history_options(range, rel_paths, args)
 
   if log_options == nil then
-    utils.err('Failed to create log options for file_history')
+    return
   end
 
   ---@type FileHistoryView
