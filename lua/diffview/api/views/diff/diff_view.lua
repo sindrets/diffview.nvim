@@ -3,7 +3,7 @@ local lazy = require("diffview.lazy")
 local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
 local FileEntry = lazy.access("diffview.scene.file_entry", "FileEntry") ---@type FileEntry|LazyModule
 local FilePanel = lazy.access("diffview.scene.views.diff.file_panel", "FilePanel") ---@type FilePanel|LazyModule
-local Rev = lazy.access("diffview.vcs.rev", "Rev") ---@type Rev|LazyModule
+local Rev = lazy.access("diffview.vcs.adapters.git.rev", "GitRev") ---@type GitRev|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local async = lazy.require("plenary.async") ---@module "plenary.async"
 local vcs = lazy.require("diffview.vcs") ---@module "diffview.vcs"
@@ -146,7 +146,6 @@ function CDiffView:create_file_entries(files)
           rev_main = Rev(RevType.LOCAL),
           rev_theirs = Rev(RevType.STAGE, 3),
           rev_base = Rev(RevType.STAGE, 1),
-          get_data = self.get_file_data,
         }))
       else
         table.insert(entries[v.kind], FileEntry.for_d2(CDiffView.get_default_diff2(), {
