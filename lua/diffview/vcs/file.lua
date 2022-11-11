@@ -1,21 +1,14 @@
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
----@module "plenary.async"
-local async = lazy.require("plenary.async")
----@type Rev
-local Rev = lazy.access("diffview.vcs.rev", "Rev")
----@type ERevType
-local RevType = lazy.access("diffview.vcs.rev", "RevType")
----@module "diffview.config"
-local config = lazy.require("diffview.config")
----@module "diffview.vcs.utils"
-local vcs = lazy.require("diffview.vcs.utils")
----@module "diffview.utils"
-local utils = lazy.require("diffview.utils")
+local Rev = lazy.access("diffview.vcs.rev", "Rev") ---@type Rev|LazyModule
+local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type ERevType|LazyModule
+local async = lazy.require("plenary.async") ---@module "plenary.async"
+local config = lazy.require("diffview.config") ---@module "diffview.config"
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
+local vcs = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
 
----@type PathLib
-local pl = lazy.access(utils, "path")
+local pl = lazy.access(utils, "path") ---@type PathLib|LazyModule
 
 local api = vim.api
 local M = {}
@@ -387,10 +380,11 @@ end
 
 ---@type vcs.File
 File.NULL_FILE = File({
+  -- NOTE: consider changing this adapter to be an actual adapter instance
   adapter = {
     ctx = {
       toplevel = "diffview://",
-    }
+    },
   },
   path = "null",
   kind = "working",

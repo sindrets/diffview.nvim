@@ -1,12 +1,12 @@
 local CountDownLatch = require("diffview.control").CountDownLatch
-local utils = require("diffview.utils")
-local async = require("plenary.async")
-local logger = require("diffview.logger")
 local FileDict = require("diffview.vcs.file_dict").FileDict
 local FileEntry = require("diffview.scene.file_entry").FileEntry
-local RevType = require("diffview.vcs.rev").RevType
 local Job = require("plenary.job")
-local Semaphore = require('diffview.control').Semaphore
+local RevType = require("diffview.vcs.rev").RevType
+local Semaphore = require("diffview.control").Semaphore
+local async = require("plenary.async")
+local logger = require("diffview.logger")
+local utils = require("diffview.utils")
 
 local api = vim.api
 

@@ -2,7 +2,6 @@ local lazy = require("diffview.lazy")
 
 local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
 local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView") ---@type FileHistoryView|LazyModule
-local Rev = lazy.access("diffview.vcs.rev", "Rev") ---@type Rev|LazyModule
 local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
 local arg_parser = lazy.require("diffview.arg_parser") ---@module "diffview.arg_parser"
 local config = lazy.require("diffview.config") ---@module "diffview.config"
@@ -41,6 +40,8 @@ function M.diffview_open(args)
     utils.err(err)
     return
   end
+
+  ---@cast adapter -?
 
   local opts = adapter:diffview_options(args)
 
@@ -91,6 +92,8 @@ function M.file_history(range, args)
     utils.err(err)
     return
   end
+
+  ---@cast adapter -?
 
   rel_paths = vim.tbl_map(function(v)
     return v == "." and "." or pl:relative(v, ".")

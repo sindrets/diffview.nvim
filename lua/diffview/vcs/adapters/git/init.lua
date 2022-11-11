@@ -1,21 +1,21 @@
-local oop = require('diffview.oop')
+local Commit = require("diffview.vcs.adapters.git.commit").GitCommit
 local CountDownLatch = require("diffview.control").CountDownLatch
-local arg_parser = require('diffview.arg_parser')
-local logger = require('diffview.logger')
-local utils = require('diffview.utils')
-local async = require("plenary.async")
-local config = require('diffview.config')
-local lazy = require('diffview.lazy')
-local FileEntry = require("diffview.scene.file_entry").FileEntry
 local Diff2Hor = require("diffview.scene.layouts.diff_2_hor").Diff2Hor
+local FileEntry = require("diffview.scene.file_entry").FileEntry
+local GitRev = require("diffview.vcs.adapters.git.rev").GitRev
+local Job = require("plenary.job")
+local JobStatus = require("diffview.vcs.utils").JobStatus
 local LogEntry = require("diffview.vcs.log_entry").LogEntry
 local RevType = require("diffview.vcs.rev").RevType
-local GitRev = require("diffview.vcs.adapters.git.rev").GitRev
-local VCSAdapter = require('diffview.vcs.adapter').VCSAdapter
-local Job = require("plenary.job")
-local JobStatus = require('diffview.vcs.utils').JobStatus
-local diffview = require('diffview')
-local Commit = require('diffview.vcs.adapters.git.commit').GitCommit
+local VCSAdapter = require("diffview.vcs.adapter").VCSAdapter
+local arg_parser = require("diffview.arg_parser")
+local async = require("plenary.async")
+local config = require("diffview.config")
+local diffview = require("diffview")
+local lazy = require("diffview.lazy")
+local logger = require("diffview.logger")
+local oop = require("diffview.oop")
+local utils = require("diffview.utils")
 
 ---@type PathLib
 local pl = lazy.access(utils, "path")
@@ -23,7 +23,7 @@ local pl = lazy.access(utils, "path")
 local M = {}
 
 ---@class GitAdapter : VCSAdapter
-local GitAdapter = oop.create_class('GitAdapter', VCSAdapter)
+local GitAdapter = oop.create_class("GitAdapter", VCSAdapter)
 
 GitAdapter.Rev = GitRev
 
@@ -90,7 +90,11 @@ end
 ---@param path string
 ---@return string?
 local function get_toplevel(path)
-  local out, code = utils.system_list(vim.tbl_flatten({config.get_config().git_cmd, {"rev-parse", "--path-format=absolute", "--show-toplevel"}, path}))
+  local out, code = utils.system_list(vim.tbl_flatten({
+    config.get_config().git_cmd,
+    { "rev-parse", "--path-format=absolute", "--show-toplevel" },
+    path
+  }))
   if code ~= 0 then
     return nil
   end
@@ -527,8 +531,7 @@ local incremental_line_trace_data = async.void(function(state, callback)
   utils.handle_job(trace_job, {
     debug_opt = {
       context = "GitAdapter>incremental_line_trace_data()",
-      func = "s_debug",
-      debug_level = 1,
+      func = "s_info",
       no_stdout = true,
     }
   })
@@ -1012,7 +1015,7 @@ function GitAdapter:diffview_options(args)
   local default_args = config.get_config().default_args.DiffviewOpen
   local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
   local rev_arg = argo.args[1]
-  
+
   local left, right = self:parse_revs(rev_arg, {
     cached = argo:get_flag({ "cached", "staged" }),
     imply_local = argo:get_flag("imply-local"),
