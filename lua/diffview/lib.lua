@@ -45,7 +45,6 @@ function M.diffview_open(args)
   local opts = adapter:diffview_options(args)
 
   if opts == nil then
-    utils.err('Failed to create log options for diffview_open')
     return
   end
 
