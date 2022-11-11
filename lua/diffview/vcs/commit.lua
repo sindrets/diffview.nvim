@@ -1,9 +1,8 @@
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
-local utils = require("diffview.utils")
 
----@type ERevType|LazyModule
-local RevType = lazy.access("diffview.vcs.rev", "RevType")
+local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type ERevType|LazyModule
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local M = {}
 
@@ -38,20 +37,24 @@ function Commit:init(opt)
   self.iso_date = Commit.time_to_iso(self.time, self.time_offset)
 end
 
+---@diagnostic disable: unused-local, missing-return
+
 ---@param rev_arg string
----@param toplevel string
+---@param adapter VCSAdapter
 ---@return Commit?
-function Commit.from_rev_arg(rev_arg, toplevel)
-  return
+function Commit.from_rev_arg(rev_arg, adapter)
+  oop.abstract_stub()
 end
 
+---@diagnostic enable: unused-local, missing-return
+
 ---@param rev Rev
----@param toplevel string
+---@param adapter VCSAdapter
 ---@return Commit?
-function Commit.from_rev(rev, toplevel)
+function Commit.from_rev(rev, adapter)
   assert(rev.type == RevType.COMMIT, "Rev must be of type COMMIT!")
 
-  return Commit.from_rev_arg(rev.commit, toplevel)
+  return Commit.from_rev_arg(rev.commit, adapter)
 end
 
 function Commit.parse_time_offset(iso_date)

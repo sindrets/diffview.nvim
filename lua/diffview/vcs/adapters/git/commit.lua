@@ -1,14 +1,9 @@
 local lazy = require("diffview.lazy")
 local oop = require('diffview.oop')
-local utils = require("diffview.utils")
-local Commit = require('diffview.vcs.commit').Commit
 
----@module "diffview.vcs.adapters.git.utils"
-local git = lazy.require("diffview.vcs.adapters.git.utils")
-
----@type ERevType|LazyModule
-local RevType = lazy.access("diffview.vcs.rev", "RevType")
-
+local Commit = lazy.access("diffview.vcs.commit", "Commit") ---@type Commit|LazyModule
+local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type ERevType|LazyModule
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local M = {}
 
@@ -23,24 +18,24 @@ local M = {}
 ---@field ref_names string
 ---@field subject string
 ---@field body string
-local GitCommit = oop.create_class('GitCommit', Commit)
+local GitCommit = oop.create_class("GitCommit", Commit.__get())
 
 function GitCommit:init(opt)
   GitCommit:super().init(self, opt)
 end
 
 ---@param rev_arg string
----@param git_toplevel string
+---@param adapter GitAdapter
 ---@return GitCommit?
-function GitCommit.from_rev_arg(rev_arg, git_toplevel)
-  local out, code = git.exec_sync({
+function GitCommit.from_rev_arg(rev_arg, adapter)
+  local out, code = adapter:exec_sync({
     "show",
     "--pretty=format:%H %P%n%an%n%ad%n%ar%n  %s",
     "--date=raw",
     "--name-status",
     rev_arg,
     "--",
-  }, git_toplevel)
+  }, adapter.ctx.toplevel)
 
   if code ~= 0 then
     return
@@ -60,12 +55,12 @@ function GitCommit.from_rev_arg(rev_arg, git_toplevel)
 end
 
 ---@param rev Rev
----@param git_toplevel string
+---@param adapter GitAdapter
 ---@return GitCommit?
-function GitCommit.from_rev(rev, git_toplevel)
+function GitCommit.from_rev(rev, adapter)
   assert(rev.type == RevType.COMMIT, "Rev must be of type COMMIT!")
 
-  return GitCommit.from_rev_arg(rev.commit, git_toplevel)
+  return GitCommit.from_rev_arg(rev.commit, adapter)
 end
 
 function GitCommit.parse_time_offset(iso_date)
