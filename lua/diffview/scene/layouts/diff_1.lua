@@ -4,9 +4,9 @@ local oop = require("diffview.oop")
 
 local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3") ---@type Diff3|LazyModule
 local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4") ---@type Diff4|LazyModule
-local File = lazy.access("diffview.git.file", "File") ---@type git.File|LazyModule
-local Rev = lazy.access("diffview.git.rev", "Rev") ---@type Rev|LazyModule
-local RevType = lazy.access("diffview.git.rev", "RevType") ---@type RevType|LazyModule
+local File = lazy.access("diffview.vcs.file", "File") ---@type vcs.File|LazyModule
+local Rev = lazy.access("diffview.vcs.rev", "Rev") ---@type Rev|LazyModule
+local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local Window = lazy.access("diffview.scene.window", "Window") ---@type Window|LazyModule
 
 local api = vim.api
@@ -19,7 +19,7 @@ local Diff1 = oop.create_class("Diff1", Layout)
 ---@alias Diff1.WindowSymbol "a"
 
 ---@class Diff1.init.Opt
----@field a git.File
+---@field a vcs.File
 ---@field winid_a integer
 
 ---@param opt Diff1.init.Opt
@@ -60,7 +60,7 @@ function Diff1:create(pivot)
   self.emitter:emit("create_post", self)
 end
 
----@param file git.File
+---@param file vcs.File
 function Diff1:set_file_a(file)
   self.a:set_file(file)
   file.symbol = "a"
@@ -90,7 +90,7 @@ function Diff1:to_diff3(layout)
 
   return layout({
     a = File({
-      git_ctx = main.git_ctx,
+      adapter = main.adapter,
       path = main.path,
       kind = main.kind,
       commit = main.commit,
@@ -100,7 +100,7 @@ function Diff1:to_diff3(layout)
     }),
     b = self.a.file,
     c = File({
-      git_ctx = main.git_ctx,
+      adapter = main.adapter,
       path = main.path,
       kind = main.kind,
       commit = main.commit,
@@ -119,7 +119,7 @@ function Diff1:to_diff4(layout)
 
   return layout({
     a = File({
-      git_ctx = main.git_ctx,
+      adapter = main.adapter,
       path = main.path,
       kind = main.kind,
       commit = main.commit,
@@ -129,7 +129,7 @@ function Diff1:to_diff4(layout)
     }),
     b = self.a.file,
     c = File({
-      git_ctx = main.git_ctx,
+      adapter = main.adapter,
       path = main.path,
       kind = main.kind,
       commit = main.commit,
@@ -138,7 +138,7 @@ function Diff1:to_diff4(layout)
       nulled = false, -- FIXME
     }),
     d = File({
-      git_ctx = main.git_ctx,
+      adapter = main.adapter,
       path = main.path,
       kind = main.kind,
       commit = main.commit,

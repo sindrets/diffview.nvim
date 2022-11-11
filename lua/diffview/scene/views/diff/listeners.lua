@@ -2,9 +2,9 @@ local lazy = require("diffview.lazy")
 
 local actions = lazy.require("diffview.actions") ---@module "diffview.actions"
 local Event = lazy.access("diffview.events", "Event") ---@type EEvent
-local RevType = lazy.access("diffview.git.rev", "RevType") ---@type ERevType
+local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type ERevType
 local async = lazy.require("plenary.async") ---@module "plenary.async"
-local git = lazy.require("diffview.git.utils") ---@module "diffview.git.utils"
+local vcs = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
@@ -34,7 +34,7 @@ return function(view)
       end
     end,
     buf_write_post = function()
-      if git.has_local(view.left, view.right) then
+      if view.adapter:has_local(view.left, view.right) then
         view.update_needed = true
         if api.nvim_get_current_tabpage() == view.tabpage then
           view:update_files()
@@ -105,7 +105,7 @@ return function(view)
         or (
           view.left.type == RevType.COMMIT
           and vim.tbl_contains({ RevType.STAGE, RevType.LOCAL }, view.right.type)
-          and view.left:is_head(view.git_ctx.toplevel)
+          and view.left:is_head(view.adapter)
         ) then
         utils.info("Changes not commited yet. No log available for these changes.")
         return
@@ -121,14 +121,14 @@ return function(view)
 
       local item = view:infer_cur_file(true)
       if item then
-        local code
+        local success
         if item.kind == "working" or item.kind == "conflicting" then
-          _, code = git.exec_sync({ "add", item.path }, view.git_ctx.toplevel)
+          success = view.adapter:add_files({item.path})
         elseif item.kind == "staged" then
-          _, code = git.exec_sync({ "reset", "--", item.path }, view.git_ctx.toplevel)
+          success = view.adapter:reset_files({item.path})
         end
 
-        if code ~= 0 then
+        if not success then
           utils.err(("Failed to stage/unstage file: '%s'"):format(item.path))
           return
         end
@@ -180,9 +180,9 @@ return function(view)
       end, view.files.working)
 
       if #args > 0 then
-        local _, code = git.exec_sync({ "add", args }, view.git_ctx.toplevel)
+        local success = view.adapter:add_files(args)
 
-        if code ~= 0 then
+        if not success then
           utils.err("Failed to stage files!")
           return
         end
@@ -194,9 +194,9 @@ return function(view)
       end
     end,
     unstage_all = function()
-      local _, code = git.exec_sync({ "reset" }, view.git_ctx.toplevel)
+      local success = view.adapter:reset_files()
 
-      if code ~= 0 then
+      if not success then
         utils.err("Failed to unstage files!")
         return
       end
@@ -220,7 +220,7 @@ return function(view)
           utils.err("The file is open with unsaved changes! Aborting file restoration.")
           return
         end
-        git.restore_file(view.git_ctx.toplevel, file.path, file.kind, commit, function()
+        vcs.restore_file(view.adapter, file.path, file.kind, commit, function()
           async.util.scheduler()
           view:update_files()
         end)

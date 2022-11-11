@@ -3,9 +3,7 @@ local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 
 ---@type ERevType|LazyModule
-local RevType = lazy.access("diffview.git.rev", "RevType")
----@module "diffview.git.utils"
-local git = lazy.require("diffview.git.utils")
+local RevType = lazy.access("diffview.vcs.rev", "RevType")
 
 local M = {}
 
@@ -41,42 +39,19 @@ function Commit:init(opt)
 end
 
 ---@param rev_arg string
----@param git_toplevel string
+---@param toplevel string
 ---@return Commit?
-function Commit.from_rev_arg(rev_arg, git_toplevel)
-  local out, code = git.exec_sync({
-    "show",
-    "--pretty=format:%H %P%n%an%n%ad%n%ar%n  %s",
-    "--date=raw",
-    "--name-status",
-    rev_arg,
-    "--",
-  }, git_toplevel)
-
-  if code ~= 0 then
-    return
-  end
-
-  local right_hash, _, _ = unpack(utils.str_split(out[1]))
-  local time, time_offset = unpack(utils.str_split(out[3]))
-
-  return Commit({
-    hash = right_hash,
-    author = out[2],
-    time = tonumber(time),
-    time_offset = time_offset,
-    rel_date = out[4],
-    subject = out[5]:sub(3),
-  })
+function Commit.from_rev_arg(rev_arg, toplevel)
+  return
 end
 
 ---@param rev Rev
----@param git_toplevel string
+---@param toplevel string
 ---@return Commit?
-function Commit.from_rev(rev, git_toplevel)
+function Commit.from_rev(rev, toplevel)
   assert(rev.type == RevType.COMMIT, "Rev must be of type COMMIT!")
 
-  return Commit.from_rev_arg(rev.commit, git_toplevel)
+  return Commit.from_rev_arg(rev.commit, toplevel)
 end
 
 function Commit.parse_time_offset(iso_date)

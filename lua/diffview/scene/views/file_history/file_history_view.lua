@@ -7,15 +7,14 @@ local FileEntry = lazy.access("diffview.scene.file_entry", "FileEntry") ---@type
 local FileHistoryPanel = lazy.access("diffview.scene.views.file_history.file_history_panel", "FileHistoryPanel") ---@type FileHistoryPanel|LazyModule
 local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
 local config = lazy.require("diffview.config") ---@module "diffview.config"
-local git = lazy.require("diffview.git.utils") ---@module "diffview.git.utils"
 
-local JobStatus = lazy.access(git, "JobStatus") ---@type JobStatus|LazyModule
+local JobStatus = lazy.access("diffview.vcs.utils", "JobStatus") ---@type JobStatus|LazyModule
 local api = vim.api
 
 local M = {}
 
 ---@class FileHistoryView : StandardView
----@field git_ctx GitContext
+---@field adapter VCSAdapter
 ---@field panel FileHistoryPanel
 ---@field commit_log_panel CommitLogPanel
 ---@field valid boolean
@@ -23,12 +22,12 @@ local FileHistoryView = oop.create_class("FileHistoryView", StandardView.__get()
 
 function FileHistoryView:init(opt)
   self.valid = false
-  self.git_ctx = opt.git_ctx
+  self.adapter = opt.adapter
 
   FileHistoryView:super().init(self, {
     panel = FileHistoryPanel({
       parent = self,
-      git_ctx = self.git_ctx,
+      adapter = self.adapter,
       entries = {},
       log_options = opt.log_options,
     }),
@@ -38,8 +37,8 @@ function FileHistoryView:init(opt)
 end
 
 function FileHistoryView:post_open()
-  self.commit_log_panel = CommitLogPanel(self.git_ctx.toplevel, {
-    name = ("diffview://%s/log/%d/%s"):format(self.git_ctx.dir, self.tabpage, "commit_log"),
+  self.commit_log_panel = CommitLogPanel(self.adapter.ctx.toplevel, {
+    name = ("diffview://%s/log/%d/%s"):format(self.adapter.ctx.dir, self.tabpage, "commit_log"),
   })
 
   self:init_event_listeners()

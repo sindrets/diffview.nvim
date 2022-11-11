@@ -1,8 +1,7 @@
 local lazy = require("diffview.lazy")
 
 local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
-local JobStatus = lazy.access("diffview.git.utils", "JobStatus") ---@type JobStatus|LazyModule
-local git = lazy.require("diffview.git.utils") ---@module "diffview.git.utils"
+local JobStatus = lazy.access("diffview.vcs.utils", "JobStatus") ---@type JobStatus|LazyModule
 local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
@@ -41,8 +40,8 @@ return function(view)
           if l1 then
             l1 = tonumber(l1)
             lpath = utils.path:chain(lpath)
-                :normalize({ cwd = view.git_ctx.toplevel, absolute = true })
-                :relative(view.git_ctx.toplevel)
+                :normalize({ cwd = view.adapter.ctx.toplevel, absolute = true })
+                :relative(view.adapter.ctx.toplevel)
                 :get()
 
             if lpath == cur.path then
@@ -72,8 +71,8 @@ return function(view)
             local layout = file.layout --[[@as Diff2 ]]
 
             local new_view = DiffView({
-              git_ctx = view.git_ctx,
-              rev_arg = git.rev_to_pretty_string(layout.a.file.rev, layout.b.file.rev),
+              adapter = view.adapter,
+              rev_arg = view.adapter:rev_to_pretty_string(layout.a.file.rev, layout.b.file.rev),
               left = layout.a.file.rev,
               right = layout.b.file.rev,
               options = {},

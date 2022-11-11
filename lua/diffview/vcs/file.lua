@@ -4,13 +4,13 @@ local oop = require("diffview.oop")
 ---@module "plenary.async"
 local async = lazy.require("plenary.async")
 ---@type Rev
-local Rev = lazy.access("diffview.git.rev", "Rev")
+local Rev = lazy.access("diffview.vcs.rev", "Rev")
 ---@type ERevType
-local RevType = lazy.access("diffview.git.rev", "RevType")
+local RevType = lazy.access("diffview.vcs.rev", "RevType")
 ---@module "diffview.config"
 local config = lazy.require("diffview.config")
----@module "diffview.git.utils"
-local git = lazy.require("diffview.git.utils")
+---@module "diffview.vcs.utils"
+local vcs = lazy.require("diffview.vcs.utils")
 ---@module "diffview.utils"
 local utils = lazy.require("diffview.utils")
 
@@ -22,9 +22,9 @@ local M = {}
 
 ---@alias git.FileDataProducer fun(kind: git.FileKind, path: string, pos: "left"|"right"): string[]
 
----@class git.File : diffview.Object
----@field git_ctx GitContext
----@filed path string
+---@class vcs.File : diffview.Object
+---@field adapter GitAdapter
+---@field path string
 ---@field absolute_path string
 ---@field parent_path string
 ---@field basename string
@@ -40,9 +40,9 @@ local M = {}
 ---@field active boolean
 ---@field ready boolean
 ---@field winopts WindowOptions
-local File = oop.create_class("git.File")
+local File = oop.create_class("vcs.File")
 
----@type table<integer, git.File.AttachState>
+---@type table<integer, vcs.File.AttachState>
 File.attached = {}
 
 ---@static
@@ -57,9 +57,9 @@ File.bufopts = {
 ---File constructor
 ---@param opt table
 function File:init(opt)
-  self.git_ctx = opt.git_ctx
+  self.adapter = opt.adapter
   self.path = opt.path
-  self.absolute_path = pl:absolute(opt.path, opt.git_ctx.toplevel)
+  self.absolute_path = pl:absolute(opt.path, opt.adapter.ctx.toplevel)
   self.parent_path = pl:parent(opt.path) or ""
   self.basename = pl:basename(opt.path)
   self.extension = pl:extension(opt.path)
@@ -122,7 +122,7 @@ function File:create_buffer(callback)
   end
 
   if self.binary == nil and not config.get_config().diff_binaries then
-    self.binary = git.is_binary(self.git_ctx.toplevel, self.path, self.rev)
+    self.binary = self.adapter:is_binary(self.path, self.rev)
   end
 
   if self.nulled or self.binary then
@@ -172,13 +172,13 @@ function File:create_buffer(callback)
     api.nvim_buf_set_option(self.bufnr, option, value)
   end
 
-  local fullname = pl:join("diffview://", self.git_ctx.dir, context, self.path)
+  local fullname = pl:join("diffview://", self.adapter.ctx.dir, context, self.path)
   local ok = pcall(api.nvim_buf_set_name, self.bufnr, fullname)
   if not ok then
     -- Resolve name conflict
     local i = 1
     repeat
-      fullname = pl:join("diffview://", self.git_ctx.dir, context, i, self.path)
+      fullname = pl:join("diffview://", self.adapter.ctx.dir, context, i, self.path)
       ok = pcall(api.nvim_buf_set_name, self.bufnr, fullname)
       i = i + 1
     until ok
@@ -208,8 +208,8 @@ function File:create_buffer(callback)
     end, nil)
 
   else
-    git.show(
-      self.git_ctx.toplevel,
+    vcs.show(
+      self.adapter,
       { ("%s:%s"):format(self.rev:object_name() or "", self.path) },
       function(err, result)
         if err then
@@ -230,7 +230,7 @@ function File:is_valid()
 end
 
 ---@param force? boolean
----@param opt? git.File.AttachState
+---@param opt? vcs.File.AttachState
 function File:attach_buffer(force, opt)
   if self.bufnr then
     File._attach_buffer(self.bufnr, force, opt)
@@ -253,7 +253,7 @@ end
 
 ---@param t1 table
 ---@param t2 table
----@return git.File.AttachState
+---@return vcs.File.AttachState
 local function prepare_attach_opt(t1, t2)
   local res = vim.tbl_extend("keep", t1, {
     keymaps = {},
@@ -275,14 +275,14 @@ local function prepare_attach_opt(t1, t2)
   return res
 end
 
----@class git.File.AttachState
+---@class vcs.File.AttachState
 ---@field keymaps table
 ---@field disable_diagnostics boolean
 
 ---@static
 ---@param bufnr integer
 ---@param force? boolean
----@param opt? git.File.AttachState
+---@param opt? vcs.File.AttachState
 function File._attach_buffer(bufnr, force, opt)
   local new_opt = false
   local cur_state = File.attached[bufnr] or {}
@@ -385,10 +385,12 @@ function File.load_null_buffer(winid)
   File._attach_buffer(bn)
 end
 
----@type git.File
+---@type vcs.File
 File.NULL_FILE = File({
-  git_ctx = {
-    toplevel = "diffview://",
+  adapter = {
+    ctx = {
+      toplevel = "diffview://",
+    }
   },
   path = "null",
   kind = "working",

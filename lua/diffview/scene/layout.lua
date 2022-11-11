@@ -139,7 +139,7 @@ function Layout:find_pivot()
   return pivot
 end
 
----@return git.File[]
+---@return vcs.File[]
 function Layout:files()
   return utils.tbl_fmap(self.windows, function(v)
     return v.file

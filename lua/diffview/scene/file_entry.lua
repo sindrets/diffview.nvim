@@ -1,10 +1,10 @@
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
----@type git.File|LazyModule
-local File = lazy.access("diffview.git.file", "File")
+---@type vcs.File|LazyModule
+local File = lazy.access("diffview.vcs.file", "File")
 ---@type RevType|LazyModule
-local RevType = lazy.access("diffview.git.rev", "RevType")
+local RevType = lazy.access("diffview.vcs.rev", "RevType")
 ---@type Diff1|LazyModule
 local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1")
 ---@type Diff2|LazyModule
@@ -26,7 +26,7 @@ local fstat_cache = {}
 ---@field conflicts integer
 
 ---@class FileEntry : diffview.Object
----@field git_ctx GitContext
+---@field adapter GitAdapter
 ---@field path string
 ---@field oldpath string
 ---@field absolute_path string
@@ -42,7 +42,7 @@ local fstat_cache = {}
 local FileEntry = oop.create_class("FileEntry")
 
 ---@class FileEntry.init.Opt
----@field git_ctx GitContext
+---@field adapter GitAdapter
 ---@field path string
 ---@field oldpath string
 ---@field layout Layout
@@ -56,7 +56,7 @@ local FileEntry = oop.create_class("FileEntry")
 function FileEntry:init(opt)
   self.path = opt.path
   self.oldpath = opt.oldpath
-  self.absolute_path = utils.path:absolute(opt.path, opt.git_ctx.toplevel)
+  self.absolute_path = utils.path:absolute(opt.path, opt.adapter.ctx.toplevel)
   self.parent_path = utils.path:parent(opt.path) or ""
   self.basename = utils.path:basename(opt.path)
   self.extension = utils.path:extension(opt.path)
@@ -166,11 +166,11 @@ function FileEntry:convert_layout(target_layout)
     ))
 end
 
----@param git_ctx GitContext
+---@param adapter VCSAdapter
 ---@param stat? table
-function FileEntry:validate_stage_buffers(git_ctx, stat)
-  stat = stat or utils.path:stat(utils.path:join(git_ctx.dir, "index"))
-  local cached_stat = utils.tbl_access(fstat_cache, { git_ctx.toplevel, "index" })
+function FileEntry:validate_stage_buffers(adapter, stat)
+  stat = stat or utils.path:stat(utils.path:join(adapter.ctx.dir, "index"))
+  local cached_stat = utils.tbl_access(fstat_cache, { adapter.ctx.toplevel, "index" })
 
   if stat then
     if not cached_stat or cached_stat.mtime < stat.mtime.sec then
@@ -184,16 +184,16 @@ function FileEntry:validate_stage_buffers(git_ctx, stat)
 end
 
 ---@static
----@param git_ctx GitContext
-function FileEntry.update_index_stat(git_ctx, stat)
-  stat = stat or utils.path:stat(utils.path:join(git_ctx.toplevel, "index"))
+---@param adapter VCSAdapter
+function FileEntry.update_index_stat(adapter, stat)
+  stat = stat or utils.path:stat(utils.path:join(adapter.ctx.toplevel, "index"))
 
   if stat then
-    if not fstat_cache[git_ctx.toplevel] then
-      fstat_cache[git_ctx.toplevel] = {}
+    if not fstat_cache[adapter.ctx.toplevel] then
+      fstat_cache[adapter.ctx.toplevel] = {}
     end
 
-    fstat_cache[git_ctx.toplevel].index = {
+    fstat_cache[adapter.ctx.toplevel].index = {
       mtime = stat.mtime.sec,
     }
   end
@@ -211,7 +211,7 @@ end
 ---@return FileEntry
 function FileEntry.for_d2(layout_class, opt)
   return FileEntry({
-    git_ctx = opt.git_ctx,
+    adapter = opt.adapter,
     path = opt.path,
     oldpath = opt.oldpath,
     status = opt.status,
@@ -220,7 +220,7 @@ function FileEntry.for_d2(layout_class, opt)
     commit = opt.commit,
     layout = layout_class({
       a = File({
-        git_ctx = opt.git_ctx,
+        adapter = opt.adapter,
         path = opt.oldpath or opt.path,
         kind = opt.kind,
         commit = opt.commit,
@@ -229,7 +229,7 @@ function FileEntry.for_d2(layout_class, opt)
         nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_a, opt.status, "a")),
       }),
       b = File({
-        git_ctx = opt.git_ctx,
+        adapter = opt.adapter,
         path = opt.path,
         kind = opt.kind,
         commit = opt.commit,
@@ -254,7 +254,7 @@ end
 ---@return FileEntry
 function FileEntry.for_d3(layout_class, opt)
   return FileEntry({
-    git_ctx = opt.git_ctx,
+    adapter = opt.adapter,
     path = opt.path,
     oldpath = opt.oldpath,
     status = opt.status,
@@ -263,7 +263,7 @@ function FileEntry.for_d3(layout_class, opt)
     commit = opt.commit,
     layout = layout_class({
       a = File({
-        git_ctx = opt.git_ctx,
+        adapter = opt.adapter,
         path = opt.oldpath or opt.path,
         kind = opt.kind,
         commit = opt.commit,
@@ -272,7 +272,7 @@ function FileEntry.for_d3(layout_class, opt)
         nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_a, opt.status, "a")),
       }),
       b = File({
-        git_ctx = opt.git_ctx,
+        adapter = opt.adapter,
         path = opt.path,
         kind = opt.kind,
         commit = opt.commit,
@@ -281,7 +281,7 @@ function FileEntry.for_d3(layout_class, opt)
         nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_b, opt.status, "b")),
       }),
       c = File({
-        git_ctx = opt.git_ctx,
+        adapter = opt.adapter,
         path = opt.path,
         kind = opt.kind,
         commit = opt.commit,
@@ -307,13 +307,13 @@ end
 function FileEntry.with_layout(layout_class, opt)
   local new_layout
   local main_file = File({
-    git_ctx = opt.git_ctx,
+    adapter = opt.adapter,
     path = opt.path,
     kind = opt.kind,
     commit = opt.commit,
     get_data = opt.get_data,
     rev = opt.rev_main,
-  }) --[[@as git.File ]]
+  }) --[[@as vcs.File ]]
 
   if layout_class:instanceof(Diff1.__get()) then
     main_file.nulled = layout_class.should_null(main_file.rev, opt.status, "a")
@@ -324,7 +324,7 @@ function FileEntry.with_layout(layout_class, opt)
     main_file.nulled = layout_class.should_null(main_file.rev, opt.status, "b")
     new_layout = layout_class({
       a = File({
-        git_ctx = opt.git_ctx,
+        adapter = opt.adapter,
         path = opt.oldpath or opt.path,
         kind = opt.kind,
         commit = opt.commit,
@@ -334,7 +334,7 @@ function FileEntry.with_layout(layout_class, opt)
       }),
       b = main_file,
       c = File({
-        git_ctx = opt.git_ctx,
+        adapter = opt.adapter,
         path = opt.path,
         kind = opt.kind,
         commit = opt.commit,
@@ -343,7 +343,7 @@ function FileEntry.with_layout(layout_class, opt)
         nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_theirs, opt.status, "c")),
       }),
       d = File({
-        git_ctx = opt.git_ctx,
+        adapter = opt.adapter,
         path = opt.path,
         kind = opt.kind,
         commit = opt.commit,
@@ -355,7 +355,7 @@ function FileEntry.with_layout(layout_class, opt)
   end
 
   return FileEntry({
-    git_ctx = opt.git_ctx,
+    adapter = opt.adapter,
     path = opt.path,
     oldpath = opt.oldpath,
     status = opt.status,

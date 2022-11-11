@@ -1,19 +1,18 @@
 local lazy = require("diffview.lazy")
 
 local FHOptionPanel = lazy.access("diffview.scene.views.file_history.option_panel", "FHOptionPanel") ---@type FHOptionPanel|LazyModule
-local LogEntry = lazy.access("diffview.git.log_entry", "LogEntry") ---@type LogEntry|LazyModule
+local LogEntry = lazy.access("diffview.vcs.log_entry", "LogEntry") ---@type LogEntry|LazyModule
 local Panel = lazy.access("diffview.ui.panel", "Panel") ---@type Panel|LazyModule
 local PerfTimer = lazy.access("diffview.perf", "PerfTimer") ---@type PerfTimer|LazyModule
 local config = lazy.require("diffview.config") ---@module "diffview.config"
 local debounce = lazy.require("diffview.debounce") ---@module "diffview.debounce"
-local git = lazy.require("diffview.git.utils") ---@module "diffview.git.utils"
 local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 local oop = lazy.require("diffview.oop") ---@module "diffview.oop"
 local panel_renderer = lazy.require("diffview.scene.views.file_history.render") ---@module "diffview.scene.views.file_history.render"
 local renderer = lazy.require("diffview.renderer") ---@module "diffview.renderer"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
-local JobStatus = git.JobStatus
+local JobStatus = lazy.access('diffview.vcs.utils', 'JobStatus') ---@type JobStatus|LazyModule
 local api = vim.api
 local M = {}
 
@@ -24,7 +23,7 @@ local perf_update = PerfTimer("[FileHistoryPanel] update")
 
 ---@class FileHistoryPanel : Panel
 ---@field parent FileHistoryView
----@field git_ctx GitContext
+---@field adapter VCSAdapter
 ---@field entries LogEntry[]
 ---@field rev_range RevRange
 ---@field log_options ConfigLogOptions
@@ -58,7 +57,7 @@ FileHistoryPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 
 ---@class FileHistoryPanel.init.Opt
 ---@field parent FileHistoryView
----@field git_ctx GitContext
+---@field adapter VCSAdapter
 ---@field entries LogEntry[]
 ---@field log_options LogOptions
 
@@ -73,11 +72,11 @@ function FileHistoryPanel:init(opt)
   })
 
   self.parent = opt.parent
-  self.git_ctx = opt.git_ctx
+  self.adapter = opt.adapter
   self.entries = opt.entries
   self.cur_item = {}
   self.single_file = opt.entries[1] and opt.entries[1].single_file
-  self.option_panel = FHOptionPanel(self)
+  self.option_panel = FHOptionPanel(self, self.adapter.flags)
   self.log_options = {
     single_file = vim.tbl_extend(
       "force",
@@ -283,8 +282,7 @@ function FileHistoryPanel:update_entries(callback)
   self.entries = {}
   self.updating = true
 
-  finalizer = git.file_history(
-    self.git_ctx,
+  finalizer = self.adapter:file_history(
     self.log_options,
     { default_layout = self.parent.get_default_diff2(), },
     update

@@ -9,8 +9,8 @@ local M = {}
 local Diff2Hor = oop.create_class("Diff2Hor", Diff2)
 
 ---@class Diff2Hor.init.Opt
----@field a git.File
----@field b git.File
+---@field a vcs.File
+---@field b vcs.File
 ---@field winid_a integer
 ---@field winid_b integer
 

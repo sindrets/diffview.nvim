@@ -7,12 +7,12 @@ local oop = require("diffview.oop")
 local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1")
 ---@type Diff4|LazyModule
 local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4")
----@type git.File|LazyModule
-local File = lazy.access("diffview.git.file", "File")
+---@type vcs.File|LazyModule
+local File = lazy.access("diffview.vcs.file", "File")
 ---@type Rev|LazyModule
-local Rev = lazy.access("diffview.git.rev", "Rev")
+local Rev = lazy.access("diffview.vcs.rev", "Rev")
 ---@type ERevType|LazyModule
-local RevType = lazy.access("diffview.git.rev", "RevType")
+local RevType = lazy.access("diffview.vcs.rev", "RevType")
 
 local M = {}
 
@@ -25,9 +25,9 @@ local Diff3 = oop.create_class("Diff3", Layout)
 ---@alias Diff3.WindowSymbol "a"|"b"|"c"
 
 ---@class Diff3.init.Opt
----@field a git.File
----@field b git.File
----@field c git.File
+---@field a vcs.File
+---@field b vcs.File
+---@field c vcs.File
 ---@field winid_a integer
 ---@field winid_b integer
 ---@field winid_c integer
@@ -41,19 +41,19 @@ function Diff3:init(opt)
   self:use_windows(self.a, self.b, self.c)
 end
 
----@param file git.File
+---@param file vcs.File
 function Diff3:set_file_a(file)
   self.a:set_file(file)
   file.symbol = "a"
 end
 
----@param file git.File
+---@param file vcs.File
 function Diff3:set_file_b(file)
   self.b:set_file(file)
   file.symbol = "b"
 end
 
----@param file git.File
+---@param file vcs.File
 function Diff3:set_file_c(file)
   self.c:set_file(file)
   file.symbol = "c"
@@ -96,7 +96,7 @@ function Diff3:to_diff4(layout)
     b = self.b.file,
     c = self.c.file,
     d = File({
-      git_ctx = main.git_ctx,
+      adapter = main.adapter,
       path = main.path,
       kind = main.kind,
       commit = main.commit,
