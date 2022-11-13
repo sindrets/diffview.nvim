@@ -223,9 +223,8 @@ function GitAdapter:get_command()
   return config.get_config().git_cmd
 end
 
----@param args table
-function GitAdapter:get_show_args(args)
-  return utils.vec_join(self:args(), "show", args)
+function GitAdapter:get_show_args(path, rev)
+  return utils.vec_join(self:args(), "show", { ("%s:%s"):format(rev:object_name() or "", path) })
 end
 
 function GitAdapter:get_dir(path)

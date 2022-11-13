@@ -166,9 +166,10 @@ end
 
 ---@diagnostic disable: unused-local, missing-return
 
----@param args string[]
+---@param path string
+---@param rev Rev?
 ---@return string[]? args to show commit content
-function VCSAdapter:get_show_args(args)
+function VCSAdapter:get_show_args(path, rev)
   oop.abstract_stub()
 end
 
