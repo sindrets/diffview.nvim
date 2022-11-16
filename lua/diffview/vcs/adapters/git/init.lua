@@ -27,6 +27,7 @@ local M = {}
 local GitAdapter = oop.create_class("GitAdapter", VCSAdapter)
 
 GitAdapter.Rev = GitRev
+GitAdapter.config_key = "git"
 
 ---@return string, string
 function M.pathspec_split(pathspec)
@@ -580,7 +581,7 @@ end
 ---@return boolean ok, string description
 function GitAdapter:file_history_dry_run(log_opt)
   local single_file = self:is_single_file(log_opt.path_args, log_opt.L)
-  local log_options = config.get_log_options(single_file, log_opt)
+  local log_options = config.get_log_options(single_file, log_opt, "git")
 
   local options = vim.tbl_map(function(v)
     return vim.fn.shellescape(v)
@@ -675,7 +676,7 @@ function GitAdapter:file_history_options(range, paths, args)
   for _, names in ipairs(log_flag_names) do
     local key, _ = names[1]:gsub("%-", "_")
     local v = argo:get_flag(names, {
-      expect_string = type(config.log_option_defaults[key]) ~= "boolean",
+      expect_string = type(config.log_option_defaults[self.config_key][key]) ~= "boolean",
       expect_list = names[1] == "L",
     })
     log_options[key] = v
@@ -926,7 +927,8 @@ function GitAdapter:file_history_worker(thread, log_opt, opt, co_state, callback
   ---@type LogOptions
   local log_options = config.get_log_options(
     single_file,
-    single_file and log_opt.single_file or log_opt.multi_file
+    single_file and log_opt.single_file or log_opt.multi_file,
+    "git"
   )
 
   local is_trace = #log_options.L > 0

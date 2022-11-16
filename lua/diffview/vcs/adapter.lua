@@ -41,6 +41,7 @@ local M = {}
 local VCSAdapter = oop.create_class("VCSAdapter")
 
 VCSAdapter.Rev = Rev
+VCSAdapter.config_key = nil
 
 ---@class vcs.adapter.VCSAdapter.Opt
 ---@field cpath string? # CWD path

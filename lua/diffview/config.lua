@@ -77,12 +77,18 @@ M.defaults = {
   file_history_panel = {
     ---@type ConfigLogOptions
     log_options = {
-      single_file = {
-        diff_merges = "combined",
+      git = {
+        single_file = {
+          diff_merges = "combined",
+        },
+        multi_file = {
+          diff_merges = "first-parent",
+        },
       },
-      multi_file = {
-        diff_merges = "first-parent",
-      },
+      hg = {
+        single_file = {},
+        multi_file = {},
+      }
     },
     win_config = {
       position = "bottom",
@@ -238,24 +244,27 @@ M._config = M.defaults
 
 ---@type LogOptions
 M.log_option_defaults = {
-  follow = false,
-  first_parent = false,
-  show_pulls = false,
-  reflog = false,
-  all = false,
-  merges = false,
-  no_merges = false,
-  reverse = false,
-  rev_range = nil,
-  base = nil,
-  max_count = 256,
-  L = {},
-  diff_merges = nil,
-  author = nil,
-  grep = nil,
-  G = nil,
-  S = nil,
-  path_args = {},
+  git = {
+    follow = false,
+    first_parent = false,
+    show_pulls = false,
+    reflog = false,
+    all = false,
+    merges = false,
+    no_merges = false,
+    reverse = false,
+    rev_range = nil,
+    base = nil,
+    max_count = 256,
+    L = {},
+    diff_merges = nil,
+    author = nil,
+    grep = nil,
+    G = nil,
+    S = nil,
+    path_args = {},
+  },
+  hg = {},
 }
 
 ---@return DiffviewConfig
@@ -269,14 +278,15 @@ end
 
 ---@param single_file boolean
 ---@param t LogOptions
+---@param vcs '"git"' | '"hg"'
 ---@return LogOptions
-function M.get_log_options(single_file, t)
+function M.get_log_options(single_file, t, vcs)
   local log_options
 
   if single_file then
-    log_options =  M._config.file_history_panel.log_options.single_file
+    log_options =  M._config.file_history_panel.log_options[vcs].single_file
   else
-    log_options = M._config.file_history_panel.log_options.multi_file
+    log_options = M._config.file_history_panel.log_options[vcs].multi_file
   end
 
   if t then
@@ -452,6 +462,17 @@ function M.setup(user_config)
 
   local user_log_options = utils.tbl_access(user_config, "file_history_panel.log_options")
   if user_log_options then
+    local top_options = {
+      'single_file',
+      'multi_file',
+    }
+    for _, name in ipairs(top_options) do
+      if user_log_options[name] ~= nil then
+        utils.warn("Global config of 'file_panel.log_options' has been deprecated. See ':h diffview.changelog-271'.")
+      end
+      break
+    end
+
     local option_names = {
       "max_count",
       "follow",
@@ -508,15 +529,17 @@ function M.setup(user_config)
   end
 
   for _, name in ipairs({ "single_file", "multi_file" }) do
-    local t = M._config.file_history_panel.log_options
-    t[name] = vim.tbl_extend(
-      "force",
-      M.log_option_defaults,
-      t[name]
-    )
-    for k, _ in pairs(t[name]) do
-      if t[name][k] == "" then
-        t[name][k] = nil
+    for _, vcs in ipairs({ "git", "hg" }) do
+      local t = M._config.file_history_panel.log_options[vcs]
+      t[name] = vim.tbl_extend(
+        "force",
+        M.log_option_defaults[vcs],
+        t[name]
+      )
+      for k, _ in pairs(t[name]) do
+        if t[name][k] == "" then
+          t[name][k] = nil
+        end
       end
     end
   end
