@@ -1,8 +1,8 @@
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
-local Rev = lazy.access("diffview.vcs.rev", "Rev") ---@type Rev|LazyModule
-local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type ERevType|LazyModule
+local GitRev = lazy.access("diffview.vcs.adapters.git.rev", "GitRev") ---@type GitRev|LazyModule
+local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local async = lazy.require("plenary.async") ---@module "plenary.async"
 local config = lazy.require("diffview.config") ---@module "diffview.config"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
@@ -391,7 +391,7 @@ File.NULL_FILE = File({
   status = "X",
   binary = false,
   nulled = true,
-  rev = Rev.new_null_tree(),
+  rev = GitRev.new_null_tree(),
 })
 
 M.File = File

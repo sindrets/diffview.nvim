@@ -12,11 +12,11 @@ local PerfTimer = lazy.access("diffview.perf", "PerfTimer") ---@type PerfTimer|L
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
 local async = lazy.require("plenary.async") ---@module "plenary.async"
+local config = lazy.require("diffview.config") ---@module "diffview.config"
 local debounce = lazy.require("diffview.debounce") ---@module "diffview.debounce"
-local vcs = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
 local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
-local config = lazy.require("diffview.config") ---@module "diffview.config"
+local vcs = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
 
 local api = vim.api
 local M = {}
@@ -26,6 +26,7 @@ local M = {}
 ---@field selected_file? string Path to the preferred initially selected file.
 
 ---@class DiffView : StandardView
+---@operator call:DiffView
 ---@field adapter VCSAdapter
 ---@field rev_arg string
 ---@field path_args string[]
@@ -167,6 +168,7 @@ function DiffView:close()
   end
 end
 
+---@private
 ---@param file FileEntry
 function DiffView:_set_file(file)
   vim.cmd("redraw")

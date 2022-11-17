@@ -154,6 +154,7 @@ function FHOptionPanel:init(parent)
   })
 end
 
+---@private
 function FHOptionPanel:_set_option(name, value)
   self.parent.log_options.single_file[name] = value
   self.parent.log_options.multi_file[name] = value

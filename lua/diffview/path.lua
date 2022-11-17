@@ -23,10 +23,12 @@ function PathLib:init(o)
   self.cwd = o.cwd and self:convert(o.cwd) or nil
 end
 
+---@private
 function PathLib:_cwd()
   return self.cwd or self:convert(uv.cwd())
 end
 
+---@private
 ---@return ...
 function PathLib:_clean(...)
   local argc = select("#", ...)

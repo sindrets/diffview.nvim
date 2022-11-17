@@ -5,17 +5,13 @@
 local oop = require("diffview.oop")
 local M = {}
 
----@class EditToken
----@field NOOP integer
----@field DELETE integer
----@field INSERT integer
----@field REPLACE integer
-local EditToken = oop.enum({
-  "NOOP",
-  "DELETE",
-  "INSERT",
-  "REPLACE",
-})
+---@enum EditToken
+local EditToken = {
+  NOOP    = 1,
+  DELETE  = 2,
+  INSERT  = 3,
+  REPLACE = 4,
+}
 
 ---@class Diff : diffview.Object
 ---@field a any[]

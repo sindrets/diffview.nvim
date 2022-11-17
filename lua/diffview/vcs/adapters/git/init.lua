@@ -90,14 +90,10 @@ end
 ---@param path string
 ---@return string?
 local function get_toplevel(path)
-  local out, code = utils.system_list(
-    vim.tbl_flatten({
-      config.get_config().git_cmd,
-      { "rev-parse", "--path-format=absolute", "--show-toplevel" },
-    }),
-    { cwd = path }
-  )
-
+  local out, code = utils.system_list(vim.tbl_flatten({
+    config.get_config().git_cmd,
+    { "rev-parse", "--path-format=absolute", "--show-toplevel" },
+  }), path)
   if code ~= 0 then
     return nil
   end
@@ -136,6 +132,7 @@ end
 ---@param toplevel string
 ---@param path_args string[]
 ---@param cpath string?
+---@return GitAdapter
 function M.create(toplevel, path_args, cpath)
   return GitAdapter({
     toplevel = toplevel,

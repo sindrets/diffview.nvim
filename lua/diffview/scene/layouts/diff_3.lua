@@ -3,16 +3,11 @@ local Window = require("diffview.scene.window").Window
 local Layout = require("diffview.scene.layout").Layout
 local oop = require("diffview.oop")
 
----@type Diff1|LazyModule
-local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1")
----@type Diff4|LazyModule
-local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4")
----@type vcs.File|LazyModule
-local File = lazy.access("diffview.vcs.file", "File")
----@type Rev|LazyModule
-local Rev = lazy.access("diffview.vcs.rev", "Rev")
----@type ERevType|LazyModule
-local RevType = lazy.access("diffview.vcs.rev", "RevType")
+local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1") ---@type Diff1|LazyModule
+local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4") ---@type Diff4|LazyModule
+local File = lazy.access("diffview.vcs.file", "File") ---@type vcs.File|LazyModule
+local Rev = lazy.access("diffview.vcs.rev", "Rev") ---@type Rev|LazyModule
+local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 
 local M = {}
 

@@ -2,7 +2,7 @@ local lazy = require("diffview.lazy")
 local oop = require('diffview.oop')
 
 local Commit = lazy.access("diffview.vcs.commit", "Commit") ---@type Commit|LazyModule
-local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type ERevType|LazyModule
+local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local M = {}

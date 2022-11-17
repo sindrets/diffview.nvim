@@ -14,11 +14,11 @@ local M = {}
 
 ---@enum JobStatus
 local JobStatus = {
-  SUCCESS = 1,
+  SUCCESS  = 1,
   PROGRESS = 2,
-  ERROR = 3,
-  KILLED = 4,
-  FATAL = 5,
+  ERROR    = 3,
+  KILLED   = 4,
+  FATAL    = 5,
 }
 
 ---@type Job[]

@@ -125,6 +125,7 @@ function Window:detach_file()
 end
 
 ---Check if the file buffer is in use in the current view's layout.
+---@private
 ---@return boolean
 function Window:_is_file_in_use()
   local view = lib.get_current_view() --[[@as StandardView? ]]

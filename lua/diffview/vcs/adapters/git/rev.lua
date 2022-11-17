@@ -58,7 +58,7 @@ function GitRev.from_name(name, adapter)
   return GitRev(RevType.COMMIT, out[1]:gsub("^%^", ""))
 end
 
----@param adapter VCSAdapter
+---@param adapter GitAdapter
 ---@return Rev?
 function GitRev.earliest_commit(adapter)
   local out, code = adapter:exec_sync({
@@ -72,12 +72,10 @@ function GitRev.earliest_commit(adapter)
   return GitRev(RevType.COMMIT, ({ out[1]:gsub("^%^", "") })[1])
 end
 
-function GitRev:object_name()
-  if self.type == RevType.COMMIT then
-    return self.commit
-  elseif self.type == RevType.STAGE then
-    return ":" ..  self.stage
-  end
+---Create a new commit rev with the special empty tree SHA.
+---@return Rev
+function GitRev.new_null_tree()
+  return GitRev(RevType.COMMIT, GitRev.NULL_TREE_SHA)
 end
 
 ---Determine if this rev is currently the head.
@@ -97,10 +95,12 @@ function Rev:is_head(adapter)
   return self.commit == vim.trim(out[1]):gsub("^%^", "")
 end
 
----Create a new commit rev with the special empty tree SHA.
----@return Rev
-function GitRev.new_null_tree()
-  return GitRev(RevType.COMMIT, GitRev.NULL_TREE_SHA)
+function GitRev:object_name()
+  if self.type == RevType.COMMIT then
+    return self.commit
+  elseif self.type == RevType.STAGE then
+    return ":" ..  self.stage
+  end
 end
 
 M.GitRev = GitRev

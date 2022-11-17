@@ -2,19 +2,13 @@ local oop = require("diffview.oop")
 
 local M = {}
 
----@class RevType : EnumValue
-
----@class ERevType
----@field LOCAL RevType
----@field COMMIT RevType
----@field STAGE RevType
----@field CUSTOM RevType
-local RevType = oop.enum({
-  "LOCAL",
-  "COMMIT",
-  "STAGE",
-  "CUSTOM",
-})
+---@enum RevType
+local RevType = {
+  LOCAL   = 1,
+  COMMIT  = 2,
+  STAGE   = 3,
+  CUSTOM  = 4,
+}
 
 ---@alias RevRange { first: Rev, last: Rev }
 
@@ -70,6 +64,8 @@ function Rev:__tostring()
   end
 end
 
+---@diagnostic disable: unused-local, missing-return
+
 ---@param name string
 ---@param adapter? VCSAdapter
 ---@return Rev?
@@ -77,11 +73,26 @@ function Rev.from_name(name, adapter)
   oop.abstract_stub()
 end
 
----@param git_toplevel string
+---@param adapter VCSAdapter
 ---@return Rev?
-function Rev.earliest_commit(git_toplevel)
+function Rev.earliest_commit(adapter)
   oop.abstract_stub()
 end
+
+---Create a new commit rev with the special empty tree SHA.
+---@return Rev
+function Rev.new_null_tree()
+  oop.abstract_stub()
+end
+
+---Determine if this rev is currently the head.
+---@param adapter VCSAdapter
+---@return boolean?
+function Rev:is_head(adapter)
+  oop.abstract_stub()
+end
+
+---@diagnostic enable: unused-local, missing-return
 
 function Rev:object_name()
   oop.abstract_stub()
@@ -94,19 +105,6 @@ function Rev:abbrev(length)
   if self.commit then
     return self.commit:sub(1, length or 7)
   end
-  return nil
-end
-
----Determine if this rev is currently the head.
----@param adapter VCSAdapter
----@return boolean?
-function Rev:is_head(adapter)
-  oop.abstract_stub()
-end
-
----Create a new commit rev with the special empty tree SHA.
----@return Rev
-function Rev.new_null_tree()
   return nil
 end
 

@@ -6,13 +6,10 @@ local utils = lazy.require("diffview.utils")
 
 local M = {}
 
----@class Event
-
----@class EEvent
----@field FILES_STAGED Event
-local Event = oop.enum({
-  "FILES_STAGED",
-})
+---@enum Event
+local Event = {
+  FILES_STAGED = 1,
+}
 
 ---@alias ListenerType '"normal"'|'"once"'|'"any"'|'"any_once"'
 

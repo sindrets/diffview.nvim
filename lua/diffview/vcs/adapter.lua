@@ -27,7 +27,7 @@ local M = {}
 ---@class vcs.adapter.VCSAdapter.Ctx
 ---@field toplevel string # VCS repository toplevel directory
 ---@field dir string # VCS directory
----@field path_args string[] # Extra path arguments
+---@field path_args string[] # Resolved path arguments
 
 ---@class VCSAdapter: diffview.Object
 ---@field bootstrap vcs.adapter.VCSAdapter.Bootstrap

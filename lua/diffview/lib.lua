@@ -46,7 +46,6 @@ function M.diffview_open(args)
     return
   end
 
-  ---@type DiffView
   local v = DiffView({
     adapter = adapter,
     rev_arg = rev_arg,
@@ -97,7 +96,6 @@ function M.file_history(range, args)
     return
   end
 
-  ---@type FileHistoryView
   local v = FileHistoryView({
     adapter = adapter,
     log_options = log_options,
