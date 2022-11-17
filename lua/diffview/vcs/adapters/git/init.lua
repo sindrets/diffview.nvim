@@ -626,7 +626,6 @@ function GitAdapter:file_history_options(range, paths, args)
   local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
   local rel_paths
 
-  local cpath = argo:get_flag("C", { no_empty = true, expand = true })
   local cfile = pl:vim_expand("%")
   cfile = pl:readlink(cfile) or cfile
 
@@ -635,11 +634,6 @@ function GitAdapter:file_history_options(range, paths, args)
   rel_paths = vim.tbl_map(function(v)
     return v == "." and "." or pl:relative(v, ".")
   end, paths)
-
-  local cwd = cpath or vim.loop.cwd()
-  paths = vim.tbl_map(function(pathspec)
-    return pathspec_expand(self.ctx.toplevel, cwd, pathspec)
-  end, paths) --[[@as string[] ]]
 
   ---@type string
   local range_arg = argo:get_flag("range", { no_empty = true })

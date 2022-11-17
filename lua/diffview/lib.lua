@@ -11,9 +11,6 @@ local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
 
----@type PathLib
-local pl = lazy.access(utils, "path")
-
 local M = {}
 
 ---@type View[]
@@ -74,7 +71,6 @@ end
 function M.file_history(range, args)
   local default_args = config.get_config().default_args.DiffviewFileHistory
   local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
-  local rel_paths
 
   logger.info("[command call] :DiffviewFileHistory " .. table.concat(vim.tbl_flatten({
     default_args,
@@ -95,11 +91,7 @@ function M.file_history(range, args)
 
   ---@cast adapter -?
 
-  rel_paths = vim.tbl_map(function(v)
-    return v == "." and "." or pl:relative(v, ".")
-  end, adapter.ctx.path_args)
-
-  local log_options = adapter:file_history_options(range, rel_paths, args)
+  local log_options = adapter:file_history_options(range, adapter.ctx.path_args, args)
 
   if log_options == nil then
     return
