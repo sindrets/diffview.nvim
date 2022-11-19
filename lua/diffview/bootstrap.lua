@@ -9,48 +9,6 @@ local function err(msg)
   vim.cmd("echohl NONE")
 end
 
-local function exists_in_runtime(module_name)
-  --#region From neovim/runtime/lua/vim/_init_packages.lua:
-  local basename = module_name:gsub('%.', '/')
-  local paths = { "lua/" .. basename .. ".lua", "lua/" .. basename .. "/init.lua" }
-
-  local found = vim.api.nvim__get_runtime(paths, false, { is_lua = true })
-  if found[1] then
-    return true
-  end
-
-  local so_paths = {}
-  for _, trail in ipairs(vim._so_trails) do
-    local path = "lua" .. trail:gsub('?', basename) -- so_trails contains a leading slash
-    table.insert(so_paths, path)
-  end
-
-  found = vim.api.nvim__get_runtime(so_paths, false, { is_lua = true })
-  if found[1] then
-    return true
-  end
-  --#endregion
-
-  return false
-end
-
-local function is_module_available(name)
-  if package.loaded[name] then
-    return true
-  end
-
-  ---@diagnostic disable-next-line: undefined-field
-  if _G.__luacache and _G.__luacache.print_profile then
-    -- WORKAROUND: If the user has impatient.nvim with profiling enabled: just
-    -- do a normal require.
-    -- @See [issue #144](https://github.com/sindrets/diffview.nvim/issues/144).
-    local ok, _ = pcall(require, name)
-    return ok
-  end
-
-  return exists_in_runtime(name)
-end
-
 _G.DiffviewGlobal = {
   bootstrap_done = true,
   bootstrap_ok = false,
@@ -60,15 +18,6 @@ if vim.fn.has("nvim-0.7") ~= 1 then
   err(
     "Minimum required version is Neovim 0.7.0! Cannot continue."
     .. " (See ':h diffview.changelog-137')"
-  )
-  return false
-end
-
--- Ensure dependencies
-if not is_module_available("plenary") then
-  err(
-    "Dependency 'plenary.nvim' is not installed! "
-    .. "See ':h diffview.changelog-93' for more information."
   )
   return false
 end
