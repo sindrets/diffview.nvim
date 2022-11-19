@@ -15,6 +15,7 @@ local CountDownLatch = require("diffview.control").CountDownLatch
 local FileEntry = require("diffview.scene.file_entry").FileEntry
 local Diff2Hor = require("diffview.scene.layouts.diff_2_hor").Diff2Hor
 local LogEntry = require("diffview.vcs.log_entry").LogEntry
+local vcs_utils = require("diffview.vcs.utils")
 
 ---@type PathLib
 local pl = lazy.access(utils, "path")
@@ -469,7 +470,7 @@ local function parse_fh_data(state)
   local files = {}
   for i = 1, #cur.numstat - 1 do
     local status = cur.namestat[i]:sub(1, 1):gsub("%s", " ")
-    local name = cur.namestat[i]:match("[%a%s]%s*(.*)")
+    local name = vim.trim(cur.namestat[i]:match("[%a%s]%s*(.*)"))
     local oldname
 
     local stats = {}
@@ -620,6 +621,282 @@ function HgAdapter:file_history_worker(thread, log_opt, opt, co_state, callback)
 
   callback(entries, JobStatus.SUCCESS)
 end
+
+function HgAdapter:diffview_options(args)
+  local default_args = config.get_config().default_args.DiffviewOpen
+  local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
+  local rev_args = argo:get_flag({'rev'})
+
+  local head = self:head_rev()
+  local left = head or HgRev.new_null_tree()
+  local right = HgRev(RevType.LOCAL)
+
+  local options = {
+    show_untracked = true, -- TODO: extract from hg config
+    selected_file = argo:get_flag("selected-file", { no_empty = true, expand = true })
+      or (vim.bo.buftype == "" and pl:vim_expand("%:p"))
+      or nil,
+  }
+
+  return {left = left, right = right, options = options}
+end
+
+function VCSAdapter:rev_to_pretty_string(left, right)
+  if left.track_head and right.type == RevType.LOCAL then
+    return nil
+  elseif left.commit and right.type == RevType.LOCAL then
+    return left:abbrev()
+  elseif left.commit and right.commit then
+    return left:abbrev() .. "::" .. right:abbrev()
+  end
+  return nil
+end
+
+function HgAdapter:head_rev()
+  local out, code = self:exec_sync({ "log", "--template={node}", "--limit=1", "--"}, {cwd = self.ctx.toplevel, retry_on_empty = 2})
+  if code ~= 0 then
+    return
+  end
+
+  local s = vim.trim(out[1]):gsub("^%^", "")
+
+  return HgRev(RevType.COMMIT, s, true)
+end
+
+function HgAdapter:rev_to_args(left, right)
+  assert(
+    not (left.type == RevType.LOCAL and right.type == RevType.LOCAL),
+    "Can't diff LOCAL against LOCAL!"
+  )
+  if left.type == RevType.COMMIT and right.type == RevType.COMMIT then
+    return { '--rev="' .. left.commit .. '::' .. right.commit .. '"' }
+  elseif left.type == RevType.STAGE and right.type == RevType.LOCAL then
+    return {}
+  else
+    return { '--rev=' .. left.commit }
+  end
+end
+
+
+function HgAdapter:get_files_args(args)
+  return utils.vec_join(self:args(), "status", "--print0", "--unknown", "--no-status", "--template={path}\\n", args)
+end
+
+HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, opt, callback)
+  ---@type FileEntry[]
+  local files = {}
+  ---@type FileEntry[]
+  local conflicts = {}
+  ---@type CountDownLatch
+  local latch = CountDownLatch(3)
+  local debug_opt = {
+    context = "HgAdapter>tracked_files()",
+    func = "s_debug",
+    debug_level = 1,
+    no_stdout = true,
+  }
+
+  ---@param job Job
+  local function on_exit(job)
+    utils.handle_job(job, { debug_opt = debug_opt })
+    latch:count_down()
+  end
+
+  local namestat_job = Job:new({
+    command = self:bin(),
+    args = utils.vec_join(
+      self:args(),
+      "status",
+      "--modified",
+      "--added",
+      "--removed",
+      "--deleted",
+      "--template={status} {path}\n",
+      args
+    ),
+    cwd = self.ctx.toplevel,
+    on_exit = on_exit,
+  })
+  local mergestate_job = Job:new({
+    command = self:bin(),
+    args = utils.vec_join(self:args(), "debugmergestate", "-Tjson"),
+    cwd = self.ctx.toplevel,
+    on_exit = on_exit,
+  })
+  local numstat_job = Job:new({
+    command = self:bin(),
+    args = utils.vec_join(self:args(), "diff", "--stat", args),
+    cwd = self.ctx.toplevel,
+    on_exit = on_exit,
+  })
+
+  namestat_job:start()
+  mergestate_job:start()
+  numstat_job:start()
+  latch:await()
+  local out_status
+  if not (#namestat_job:result() == #numstat_job:result() - 1) then
+    out_status = vcs_utils.ensure_output(2, { namestat_job, numstat_job }, "HgAdapter>tracked_files()")
+  end
+
+  if out_status == JobStatus.ERROR or not (namestat_job.code == 0 and numstat_job.code == 0 and mergestate_job.code == 0) then
+    callback(utils.vec_join(namestat_job:stderr_result(), numstat_job:stderr_result(), mergestate_job:stderr_result()), nil)
+    return
+  end
+
+  local numstat_out = numstat_job:result()
+  local namestat_out = namestat_job:result()
+  local mergestate_out = mergestate_job:result()
+
+  local data = {}
+  local conflict_map = {}
+  local file_info = {}
+
+  -- Last line in numstat is a summary and should not be used
+  table.remove(numstat_out, -1)
+
+  for i, s in ipairs(namestat_out) do
+    local status = s:sub(1, 1):gsub("%s", " ")
+    local name = vim.trim(s:match("[%a%s]%s*(.*)"))
+
+    local stats = {}
+    local changes, diffstats = numstat_out[i]:match(".*|%s+(%d+)%s+([+-]+)")
+    if changes and diffstats then
+      local _, adds = diffstats:gsub("+", "")
+
+      stats = {
+        additions = tonumber(adds),
+        deletions = tonumber(changes) - tonumber(adds),
+      }
+    end
+
+    if not (kind == "staged") then
+      file_info[name] = {
+        status = status,
+        name = name,
+        oldname = name, -- TODO
+        stats = stats,
+      }
+    end
+  end
+
+  local find_key = function (t, key, value)
+    for _, v in ipairs(t) do
+      if v[key] == value then
+        return v
+      end
+    end
+  end
+
+  local mergestate = vim.json.decode(table.concat(mergestate_out, ''))
+  for _, file in ipairs(mergestate[1].files) do
+    local base = find_key(file.extras, 'key', 'ancestorlinknode')
+    if file.state == 'u' then
+      file_info[file.path].status = 'U'
+      file_info[file.path].oldname = file.other_path
+      file_info[file.path].base = base and base.value or nil
+      conflict_map[file.path] = file_info[file.path]
+    end
+  end
+  local ours_node = find_key(mergestate[1].commits, 'name', 'local').node
+  local theirs_node = find_key(mergestate[1].commits, 'name', 'other').node
+
+  for _, f in pairs(file_info) do
+    if f.status ~= "U" then
+      table.insert(data, f)
+    end
+  end
+
+  if kind == "working" and next(conflict_map) then
+    -- TODO: read and parse content of .hg/merge/state2
+    --       O(<HASH> : others
+    --       L(<HASH> : local
+    --       ancestorlinknode<HASH> : base
+    --       HASH is 40 hex characters
+    -- hg debugmergestate -Tjson
+    for _, v in pairs(conflict_map) do
+      table.insert(conflicts, FileEntry.with_layout(opt.merge_layout, {
+        adapter = self,
+        path = v.name,
+        oldpath = v.oldname,
+        status = "U",
+        kind = "conflicting",
+        revs = {
+          a = self.Rev(RevType.COMMIT, ours_node),
+          b = self.Rev(RevType.LOCAL),
+          c = self.Rev(RevType.COMMIT, theirs_node),
+          d = self.Rev(RevType.COMMIT, v.base),
+        }
+      }))
+    end
+  end
+
+  for _, v in ipairs(data) do
+    table.insert(files, FileEntry.with_layout(opt.default_layout, {
+      adapter = self,
+      path = v.name,
+      oldpath = v.oldname,
+      status = v.status,
+      stats = v.stats,
+      kind = kind,
+      revs = {
+        a = left,
+        b = right,
+      }
+    }))
+  end
+
+  callback(nil, files, conflicts)
+end, 7)
+
+HgAdapter.untracked_files = async.wrap(function(self, left, right, opt, callback)
+  Job:new({
+    command = self:bin(),
+    args = utils.vec_join(
+      self:args(),
+      "status",
+      "--print0",
+      "--unknown",
+      "--no-status",
+      "--template={path}\\n"
+    ),
+    cwd = self.ctx.toplevel,
+    ---@type Job
+    on_exit = function(j)
+      utils.handle_job(j, {
+        debug_opt = {
+          context = "HgAdapter>untracked_files()",
+          func = "s_debug",
+          debug_level = 1,
+          no_stdout = true,
+        },
+      })
+
+      if j.code ~= 0 then
+        callback(j:stderr_result() or {}, nil)
+        return
+      end
+
+      local files = {}
+      for _, s in ipairs(j:result()) do
+        table.insert(
+          files,
+          FileEntry.with_layout(opt.default_layout, {
+            adapter = self,
+            path = s,
+            status = "?",
+            kind = "working",
+            revs = {
+              a = left,
+              b = right,
+            }
+          })
+        )
+      end
+      callback(nil, files)
+    end,
+  }):start()
+end, 5)
 
 HgAdapter.flags = {
   ---@type FlagOption[]
