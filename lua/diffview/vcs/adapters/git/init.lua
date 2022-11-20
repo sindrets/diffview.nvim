@@ -28,22 +28,22 @@ local GitAdapter = oop.create_class("GitAdapter", VCSAdapter)
 GitAdapter.Rev = GitRev
 
 ---@return string, string
-local function pathspec_split(pathspec)
+function M.pathspec_split(pathspec)
   local magic = pathspec:match("^:[/!^]*:?") or pathspec:match("^:%b()") or ""
   local pattern = pathspec:sub(1 + #magic, -1)
   return magic or "", pattern or ""
 end
 
-local function pathspec_expand(toplevel, cwd, pathspec)
-  local magic, pattern = pathspec_split(pathspec)
+function M.pathspec_expand(toplevel, cwd, pathspec)
+  local magic, pattern = M.pathspec_split(pathspec)
   if not utils.path:is_abs(pattern) then
     pattern = utils.path:join(utils.path:relative(cwd, toplevel), pattern)
   end
   return magic .. utils.path:convert(pattern)
 end
 
-local function pathspec_modify(pathspec, mods)
-  local magic, pattern = pathspec_split(pathspec)
+function M.pathspec_modify(pathspec, mods)
+  local magic, pattern = M.pathspec_split(pathspec)
   return magic .. utils.path:vim_fnamemodify(pattern, mods)
 end
 
@@ -57,7 +57,7 @@ function M.get_repo_paths(path_args, cpath)
 
   for _, path_arg in ipairs(path_args) do
     for _, path in ipairs(pl:vim_expand(path_arg, false, true)) do
-      local magic, pattern = pathspec_split(path)
+      local magic, pattern = M.pathspec_split(path)
       pattern = pl:readlink(pattern) or pattern
       table.insert(paths, magic .. pattern)
     end
@@ -67,7 +67,7 @@ function M.get_repo_paths(path_args, cpath)
   cfile = pl:readlink(cfile) or cfile
 
   for _, path in ipairs(paths) do
-    if pathspec_split(path) == "" then
+    if M.pathspec_split(path) == "" then
       table.insert(top_indicators, pl:absolute(path, cpath))
       break
     end
@@ -158,7 +158,7 @@ function GitAdapter:init(opt)
     toplevel = opt.toplevel,
     dir = self:get_dir(opt.toplevel),
     path_args = vim.tbl_map(function(pathspec)
-      return pathspec_expand(opt.toplevel, cwd, pathspec)
+      return M.pathspec_expand(opt.toplevel, cwd, pathspec)
     end, opt.path_args or {}) --[[@as string[] ]]
   }
 
@@ -304,7 +304,9 @@ local function prepare_fh_options(adapter, log_options, single_file)
       o.max_count and { "-n" .. o.max_count } or nil,
       o.diff_merges and { "--diff-merges=" .. o.diff_merges } or nil,
       o.author and { "-E", "--author=" .. o.author } or nil,
-      o.grep and { "-E", "--grep=" .. o.grep } or nil
+      o.grep and { "-E", "--grep=" .. o.grep } or nil,
+      o.G and { "-E", "-G" .. o.G } or nil,
+      o.S and { "-S" .. o.S, "--pickaxe-regex" } or nil
     )
   }
 end
@@ -659,6 +661,8 @@ function GitAdapter:file_history_options(range, paths, args)
     { "author" },
     { "grep" },
     { "base" },
+    { "G" },
+    { "S" },
   }
 
   ---@type LogOptions
@@ -1462,6 +1466,8 @@ GitAdapter.flags = {
     },
     { "=a", "--author=", "List only commits from a given author", prompt_label = "(Extended regular expression)" },
     { "=g", "--grep=", "Filter commit messages", prompt_label = "(Extended regular expression)" },
+    { "=G", "-G", "Search changes", prompt_label = "(Extended regular expression)" },
+    { "=S", "-S", "Search occurrences", prompt_label = "(Extended regular expression)" },
     {
       "--", "--", "Limit to files",
       key = "path_args",
@@ -1672,6 +1678,8 @@ function GitAdapter:init_completion()
   })
   self.comp.file_history:put({ "--author" }, {})
   self.comp.file_history:put({ "--grep" }, {})
+  self.comp.file_history:put({ "-G" }, {})
+  self.comp.file_history:put({ "-S" }, {})
 end
 
 M.GitAdapter = GitAdapter

@@ -208,6 +208,8 @@ M._config = M.defaults
 ---@field L string[]
 ---@field author string
 ---@field grep string
+---@field G string
+---@field S string
 ---@field diff_merges string
 ---@field rev_range string
 ---@field base string
@@ -230,6 +232,8 @@ M.log_option_defaults = {
   diff_merges = nil,
   author = nil,
   grep = nil,
+  G = nil,
+  S = nil,
   path_args = {},
 }
 
