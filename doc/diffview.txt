@@ -226,12 +226,20 @@ COMMANDS                                        *diffview-commands*
 
         --author={pattern}
                         Limit the commits output to ones with author/committer
-                        header lines that match the specified pattern (regular
-                        expression).
+                        header lines that match the specified {pattern}
+                        (regular expression).
 
         --grep={pattern}
                         Limit the commits output to ones with log message that
-                        matches the specified pattern (regular expression).
+                        matches the specified {pattern} (regular expression).
+
+        -G{pattern}     Look for differences whose patch text contains
+                        added/removed lines that match {pattern} (extended
+                        regular expression).
+
+        -S{pattern}     Look for differences that change the number of
+                        occurences of the specified {pattern} (extended
+                        regular expression) in a file.
 
                                                 *:DiffviewClose*
 :DiffviewClose          Close the active Diffview.
@@ -1347,6 +1355,16 @@ LogOptions                                      *diffview.git.LogOptions*
             {grep} (string)
                 Limit the commits output to ones with log message that matches
                 the specified pattern (regular expression).
+
+            {G} (string)
+                Look for differences whose patch text contains added/removed
+                lines that match the specified pattern (extended regular
+                expression).
+
+            {S} (string)
+                Look for differences that change the number of occurences of
+                the specified pattern (extended regular expression) in a
+                file.
 
 
  vim:tw=78:ts=8:ft=help:norl:
