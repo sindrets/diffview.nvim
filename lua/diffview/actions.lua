@@ -465,6 +465,18 @@ function M.cycle_layout()
   end
 end
 
+function M.help(conf_name)
+  return function()
+    M.HelpPanel = require("diffview.ui.panels.help_panel")
+    M.HelpPanel:init(conf_name, {})
+    M.HelpPanel:focus()
+  end
+end
+
+function M.help_close()
+    M.HelpPanel:destroy()
+end
+
 local action_names = {
   "close",
   "close_all_folds",
