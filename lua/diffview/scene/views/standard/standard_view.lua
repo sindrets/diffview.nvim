@@ -81,14 +81,20 @@ function StandardView:init_layout()
 end
 
 function StandardView:post_layout()
-  if config.get_config().enhanced_diff_hl then
-    self.winopts.diff2.a.winhl = {
-      "DiffAdd:DiffviewDiffAddAsDelete",
-      "DiffDelete:DiffviewDiffDelete",
-    }
-    self.winopts.diff2.b.winhl = {
-      "DiffDelete:DiffviewDiffDelete",
-    }
+  local enhanced_diff_hl = config.get_config().enhanced_diff_hl
+  if enhanced_diff_hl then
+    if (type(enhanced_diff_hl) == "table") then
+      self.winopts.diff2.a.winhl = enhanced_diff_hl.a
+      self.winopts.diff2.b.winhl = enhanced_diff_hl.b
+    else
+      self.winopts.diff2.a.winhl = {
+        "DiffAdd:DiffviewDiffAddAsDelete",
+        "DiffDelete:DiffviewDiffDelete",
+      }
+      self.winopts.diff2.b.winhl = {
+        "DiffDelete:DiffviewDiffDelete",
+      }
+    end
   end
 end
 
