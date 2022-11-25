@@ -16,6 +16,7 @@ local lazy = require("diffview.lazy")
 local logger = require("diffview.logger")
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
+local vcs_utils = require("diffview.vcs.utils")
 
 ---@type PathLib
 local pl = lazy.access(utils, "path")
@@ -1242,17 +1243,6 @@ function GitAdapter:rev_to_args(left, right)
   end
 end
 
-function GitAdapter:get_namestat_args(args)
-  return utils.vec_join(self:args(), "diff", "--ignore-submodules", "--name-status", args)
-end
-
-function GitAdapter:get_numstat_args(args)
-  return utils.vec_join(self:args(), "diff", "--ignore-submodules", "--numstat", args)
-end
-
-function GitAdapter:get_files_args(args)
-  return utils.vec_join(self:args(), "ls-files", "--others", "--exclude-standard", args)
-end
 
 ---@param path string
 ---@param kind vcs.FileKind
@@ -1403,6 +1393,169 @@ function GitAdapter:show_untracked()
   )
   return vim.trim(out[1] or "") ~= "no"
 end
+
+GitAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, opt, callback)
+  ---@type FileEntry[]
+  local files = {}
+  ---@type FileEntry[]
+  local conflicts = {}
+  ---@type CountDownLatch
+  local latch = CountDownLatch(2)
+  local debug_opt = {
+    context = "GitAdapter>tracked_files()",
+    func = "s_debug",
+    debug_level = 1,
+    no_stdout = true,
+  }
+
+  ---@param job Job
+  local function on_exit(job)
+    utils.handle_job(job, { debug_opt = debug_opt })
+    latch:count_down()
+  end
+
+  local namestat_job = Job:new({
+    command = self:bin(),
+    args = utils.vec_join(self:args(), "diff", "--ignore-submodules", "--name-status", args),
+    cwd = self.ctx.toplevel,
+    on_exit = on_exit,
+  })
+  local numstat_job = Job:new({
+    command = self:bin(),
+    args = utils.vec_join(self:args(), "diff", "--ignore-submodules", "--numstat", args),
+    cwd = self.ctx.toplevel,
+    on_exit = on_exit,
+  })
+
+  namestat_job:start()
+  numstat_job:start()
+  latch:await()
+  local out_status
+  if not (#namestat_job:result() == #numstat_job:result()) then
+    out_status = vcs_utils.ensure_output(2, { namestat_job, numstat_job }, "GitAdapter>tracked_files()")
+  end
+
+  if out_status == JobStatus.ERROR or not (namestat_job.code == 0 and numstat_job.code == 0) then
+    callback(utils.vec_join(namestat_job:stderr_result(), numstat_job:stderr_result()), nil)
+    return
+  end
+
+  local numstat_out = numstat_job:result()
+  local namestat_out = namestat_job:result()
+
+  local data = {}
+  local conflict_map = {}
+
+  for i, s in ipairs(namestat_out) do
+    local status = s:sub(1, 1):gsub("%s", " ")
+    local name = s:match("[%a%s][^%s]*\t(.*)")
+    local oldname
+
+    if name:match("\t") ~= nil then
+      oldname = name:match("(.*)\t")
+      name = name:gsub("^.*\t", "")
+    end
+
+    local stats = {
+      additions = tonumber(numstat_out[i]:match("^%d+")),
+      deletions = tonumber(numstat_out[i]:match("^%d+%s+(%d+)")),
+    }
+
+    if not stats.additions or not stats.deletions then
+      stats = nil
+    end
+
+    if not (status == "U" and kind == "staged") then
+      table.insert(data, {
+        status = status,
+        name = name,
+        oldname = oldname,
+        stats = stats,
+      })
+    end
+
+    if status == "U" then
+      conflict_map[name] = data[#data]
+    end
+  end
+
+  if kind == "working" and next(conflict_map) then
+    print('')
+    data = vim.tbl_filter(function(v)
+      return not conflict_map[v.name]
+    end, data)
+
+    for _, v in pairs(conflict_map) do
+      table.insert(conflicts, FileEntry.with_layout(opt.merge_layout, {
+        adapter = self,
+        path = v.name,
+        oldpath = v.oldname,
+        status = "U",
+        kind = "conflicting",
+        rev_ours = self.Rev(RevType.STAGE, 2),
+        rev_main = self.Rev(RevType.LOCAL),
+        rev_theirs = self.Rev(RevType.STAGE, 3),
+        rev_base = self.Rev(RevType.STAGE, 1),
+      }))
+    end
+  end
+
+  for _, v in ipairs(data) do
+    table.insert(files, FileEntry.with_layout(opt.default_layout, {
+      adapter = self,
+      path = v.name,
+      oldpath = v.oldname,
+      status = v.status,
+      stats = v.stats,
+      kind = kind,
+      revs = {
+        a = left,
+        b = right,
+      }
+    }))
+  end
+
+  callback(nil, files, conflicts)
+end, 7)
+
+GitAdapter.untracked_files = async.wrap(function(self, left, right, opt, callback)
+  Job:new({
+    command = self:bin(),
+    args = utils.vec_join(self:args(), "ls-files", "--others", "--exclude-standard"),
+    cwd = self.ctx.toplevel,
+    ---@type Job
+    on_exit = function(j)
+      utils.handle_job(j, {
+        debug_opt = {
+          context = "GitAdapter>untracked_files()",
+          func = "s_debug",
+          debug_level = 1,
+          no_stdout = true,
+        }
+      })
+
+      if j.code ~= 0 then
+        callback(j:stderr_result() or {}, nil)
+        return
+      end
+
+      local files = {}
+      for _, s in ipairs(j:result()) do
+        table.insert(files, FileEntry.with_layout(opt.default_layout, {
+          adapter = self,
+          path = s,
+          status = "?",
+          kind = "working",
+          revs = {
+            a = left,
+            b = right,
+          }
+        }))
+      end
+      callback(nil, files)
+    end
+  }):start()
+end, 5)
 
 ---Convert revs to string representation.
 ---@param left Rev

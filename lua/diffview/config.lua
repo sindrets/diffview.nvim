@@ -492,6 +492,10 @@ function M.setup(user_config)
     end
   end
 
+  if type(M._config.file_history_panel.log_options.git) == "nil" then
+    utils.warn("Global config of 'file_panel.log_options' has been deprecated. See ':h diffview.changelog-XXX'.")
+  end
+
   --#endregion
 
   if #M._config.git_cmd == 0 then

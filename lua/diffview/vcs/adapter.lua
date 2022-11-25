@@ -228,27 +228,6 @@ function VCSAdapter:rev_to_args(left, right)
   oop.abstract_stub()
 end
 
----Arguments to show name and status of files
----@param args string[]? Extra args
----@return string[]
-function VCSAdapter:get_namestat_args(args)
-  oop.abstract_stub()
-end
-
----Arguments to show number of changes to files
----@param args string[]? Extra args
----@return string[]
-function VCSAdapter:get_numstat_args(args)
-  oop.abstract_stub()
-end
-
----Arguments to list all files
----@param args string[]? Extra args
----@return string[]
-function VCSAdapter:get_files_args(args)
-  oop.abstract_stub()
-end
-
 ---Restore a file to the requested state
 ---@param path string # file to restore
 ---@param kind '"staged"'|'"working"'
@@ -301,6 +280,26 @@ function VCSAdapter:stage_index_file(file)
   oop.abstract_stub()
 end
 
+---@param self VCSAdapter
+---@param left Rev
+---@param right Rev
+---@param args string[]
+---@param kind git.FileKind
+---@param opt vcs.adapter.LayoutOpt
+---@param callback function
+VCSAdapter.tracked_files = async.wrap(function(self, left, right, args, kind, opt, callback)
+  oop.abstract_stub()
+end, 7)
+
+---@param self VCSAdapter
+---@param left Rev
+---@param right Rev
+---@param opt vcs.adapter.LayoutOpt
+---@param callback function
+VCSAdapter.untracked_files = async.wrap(function(self, left, right, opt, callback)
+  oop.abstract_stub()
+end, 5)
+
 ---@diagnostic enable: unused-local, missing-return
 
 ---@param self VCSAdapter
@@ -309,7 +308,7 @@ end
 VCSAdapter.show = async.wrap(function(self, args, callback)
   local job = Job:new({
     command = self:bin(),
-    args = self:get_show_args(args),
+    args = self:get_show_args(args.path, args.rev),
     cwd = self.ctx.toplevel,
     ---@type Job
     on_exit = async.void(function(j)

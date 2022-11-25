@@ -142,7 +142,7 @@ function File:_produce_data(callback)
     end, nil)
   else
     self.adapter:show(
-      { ("%s:%s"):format(self.rev:object_name() or "", self.path) },
+      { path = self.path, rev = self.rev },
       function(err, result)
         if err then
           utils.err(
