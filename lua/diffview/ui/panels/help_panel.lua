@@ -87,14 +87,20 @@ end
 
 function HelpPanel:apply_cmd()
   local row, _ = unpack(vim.api.nvim_win_get_cursor(0))
-  local cmd = self.keys[row]
+  local cmd = self.keys[row-2]
   if cmd ~= nil then
+    local keymap_entry = get_user_config().keymaps[self.keymap_name][cmd]
+    if type(keymap_entry) == "function" then
+        keymap_entry()
+    else
+        keymap_entry[1]()
+    end
     self.destroy(self)
-    vim.cmd.normal({ cmd, bang = true })
   end
 end
 
 function HelpPanel:init_buffer()
+  self.current_view_bufid = vim.api.nvim_win_get_buf(0)
   HelpPanel:super().init_buffer(self)
   local conf = get_user_config().keymaps
   local default_opt = { silent = true, nowait = true, buffer = self.bufid }
