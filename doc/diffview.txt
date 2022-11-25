@@ -624,12 +624,12 @@ keymaps                                         *diffview-config-keymaps*
         |vim.keymap.set()|, so the {rhs} can be either a vim command in the
         form of a string, or it can be a lua function: >
 
-                view = {
-                  -- Vim command:
-                  ["a"] = "<Cmd>echom 'foo'<CR>",
-                  -- Lua function:
-                  ["b"] = function() print("bar") end,
-                }
+        view = {
+          -- Vim command:
+          ["a"] = "<Cmd>echom 'foo'<CR>",
+          -- Lua function:
+          ["b"] = function() print("bar") end,
+        }
 <
 
         For more control (i.e. mappings for other modes), you can also define
@@ -638,12 +638,12 @@ keymaps                                         *diffview-config-keymaps*
         |:map-arguments| with the only exception being the `buffer` field, as
         this will be overridden with the target buffer number: >
 
-                view = {
-                  -- Normal and visual mode mapping to vim command:
-                  { { "n", "v" }, "<leader>a", "<Cmd>echom 'foo'<CR>", { silent = true } },
-                  -- Visual mode mapping to lua function:
-                  { "v", "<leader>b", function() print("bar") end, { nowait = true } },
-                }
+        view = {
+          -- Normal and visual mode mapping to vim command:
+          { { "n", "v" }, "<leader>a", "<Cmd>echom 'foo'<CR>", { silent = true } },
+          -- Visual mode mapping to lua function:
+          { "v", "<leader>b", function() print("bar") end, { nowait = true } },
+        }
 <
 
         To disable all the default mappings simply set: >
@@ -654,10 +654,13 @@ keymaps                                         *diffview-config-keymaps*
 <
 
         To disable any single mapping without disabling them all, set its
-        value to `false`: >
+        {rhs} to `false`: >
 
         view = {
+          -- Disable the default normal mode mapping for `<tab>`:
           ["<tab>"] = false,
+          -- Disable the default visual mode mapping for `gf`:
+          { "x", "gf", false },
         }
 <
 
@@ -723,7 +726,7 @@ Actions~
                     • The file under cursor
                     • The file currently open
 
-            {options_panel}
+            {option_panel}
                 Panel used for interactively changing options in i.e. the
                 FileHistoryView.
 
@@ -1137,7 +1140,7 @@ These mappings are available in the file history panel buffer (the panel
 listing the commits).
 
                                                 *diffview-maps-options*
-g!                      Open the options panel.
+g!                      Open the option panel.
 
                                                 *diffview-maps-open_in_diffview*
 <C-d>                   Open the commit entry under the cursor in a Diffview.
@@ -1173,7 +1176,7 @@ o                       Open the diff for the selected item.
                                                 *diffview-maps-file-history-option-panel*
 File history option panel maps~
 
-These mappings are available from the file history options panel. The option
+These mappings are available from the file history option panel. The option
 panel will allow you to change the flags that will be passed to `git-log`. A
 flag can be adjusted either by moving the cursor to its line followed by
 pressing <Tab>, or by using the mappings that are shown directly in the

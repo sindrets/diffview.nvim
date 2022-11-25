@@ -128,17 +128,10 @@ function FileHistoryPanel:setup_buffer()
   local option_rhs = config.actions.options
   local default_opt = { silent = true, nowait = true, buffer = self.bufid }
 
-  for key, mapping in pairs(conf.keymaps.file_history_panel) do
-    local lhs, rhs
-
-    if type(key) == "number" then
-      lhs, rhs = mapping[2], mapping[3]
-      local opt = vim.tbl_extend("force", mapping[4] or {}, { buffer = self.bufid })
-      vim.keymap.set(mapping[1], mapping[2], mapping[3], opt)
-    else
-      lhs, rhs = key, mapping
-      vim.keymap.set("n", key, mapping, default_opt)
-    end
+  for _, mapping in ipairs(conf.keymaps.file_history_panel) do
+    local lhs, rhs = mapping[2], mapping[3]
+    local opt = vim.tbl_extend("force", default_opt, mapping[4] or {}, { buffer = self.bufid })
+    vim.keymap.set(mapping[1], mapping[2], mapping[3], opt)
 
     if rhs == option_rhs then
       self.option_mapping = lhs

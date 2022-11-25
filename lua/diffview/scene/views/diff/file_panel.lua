@@ -75,13 +75,9 @@ function FilePanel:setup_buffer()
   local conf = config.get_config()
 
   local default_opt = { silent = true, nowait = true, buffer = self.bufid }
-  for lhs, mapping in pairs(conf.keymaps.file_panel) do
-    if type(lhs) == "number" then
-      local opt = vim.tbl_extend("force", mapping[4] or {}, { buffer = self.bufid })
-      vim.keymap.set(mapping[1], mapping[2], mapping[3], opt)
-    else
-      vim.keymap.set("n", lhs, mapping, default_opt)
-    end
+  for _, mapping in ipairs(conf.keymaps.file_panel) do
+    local opt = vim.tbl_extend("force", default_opt, mapping[4] or {}, { buffer = self.bufid })
+    vim.keymap.set(mapping[1], mapping[2], mapping[3], opt)
   end
 end
 

@@ -99,93 +99,98 @@ M.defaults = {
     DiffviewFileHistory = {},
   },
   hooks = {},
+  -- Tabularize formatting pattern: `\vactions\.\w+(\(.{-}\))?,?|\{\ desc\ \=`
   keymaps = {
-    disable_defaults = false,
+    disable_defaults = false, -- Disable the default keymaps
     view = {
-      ["<tab>"]      = actions.select_next_entry,
-      ["<s-tab>"]    = actions.select_prev_entry,
-      ["gf"]         = actions.goto_file,
-      ["<C-w><C-f>"] = actions.goto_file_split,
-      ["<C-w>gf"]    = actions.goto_file_tab,
-      ["<leader>e"]  = actions.focus_files,
-      ["<leader>b"]  = actions.toggle_files,
-      ["g<C-x>"]     = actions.cycle_layout,
-      ["[x"]         = actions.prev_conflict,
-      ["]x"]         = actions.next_conflict,
-      ["<leader>co"] = actions.conflict_choose("ours"),
-      ["<leader>ct"] = actions.conflict_choose("theirs"),
-      ["<leader>cb"] = actions.conflict_choose("base"),
-      ["<leader>ca"] = actions.conflict_choose("all"),
-      ["dx"]         = actions.conflict_choose("none"),
+      -- The `view` bindings are active in the diff buffers, only when the current
+      -- tabpage is a Diffview.
+      { "n", "<tab>",      actions.select_next_entry,          { desc = "Open the diff for the next file" } },
+      { "n", "<s-tab>",    actions.select_prev_entry,          { desc = "Open the diff for the previous file" } },
+      { "n", "gf",         actions.goto_file,                  { desc = "Open the file in a new split in the previous tabpage" } },
+      { "n", "<C-w><C-f>", actions.goto_file_split,            { desc = "Open the file in a new split" } },
+      { "n", "<C-w>gf",    actions.goto_file_tab,              { desc = "Open the file in a new tabpage" } },
+      { "n", "<leader>e",  actions.focus_files,                { desc = "Bring focus to the file panel" } },
+      { "n", "<leader>b",  actions.toggle_files,               { desc = "Toggle the file panel." } },
+      { "n", "g<C-x>",     actions.cycle_layout,               { desc = "Cycle through available layouts." } },
+      { "n", "[x",         actions.prev_conflict,              { desc = "In the merge-tool: jump to the previous conflict" } },
+      { "n", "]x",         actions.next_conflict,              { desc = "In the merge-tool: jump to the next conflict" } },
+      { "n", "<leader>co", actions.conflict_choose("ours"),    { desc = "Choose the OURS version of a conflict" } },
+      { "n", "<leader>ct", actions.conflict_choose("theirs"),  { desc = "Choose the THEIRS version of a conflict" } },
+      { "n", "<leader>cb", actions.conflict_choose("base"),    { desc = "Choose the BASE version of a conflict" } },
+      { "n", "<leader>ca", actions.conflict_choose("all"),     { desc = "Choose all the versions of a conflict" } },
+      { "n", "dx",         actions.conflict_choose("none"),    { desc = "Delete the conflict region" } },
     },
-    diff1 = {},
-    diff2 = {},
+    diff1 = { --[[ Mappings in single window diff layouts ]] },
+    diff2 = { --[[ Mappings in 2-way diff layouts ]] },
     diff3 = {
-      { { "n", "x" }, "2do", actions.diffget("ours") },
-      { { "n", "x" }, "3do", actions.diffget("theirs") },
+      -- Mappings in 3-way diff layouts
+      { { "n", "x" }, "2do", actions.diffget("ours"),    { desc = "Obtain the diff hunk from the OURS version of the file" } },
+      { { "n", "x" }, "3do", actions.diffget("theirs"),  { desc = "Obtain the diff hunk from the THEIRS version of the file" } },
     },
     diff4 = {
-      { { "n", "x" }, "1do", actions.diffget("base") },
-      { { "n", "x" }, "2do", actions.diffget("ours") },
-      { { "n", "x" }, "3do", actions.diffget("theirs") },
+      -- Mappings in 4-way diff layouts
+      { { "n", "x" }, "1do", actions.diffget("base"),    { desc = "Obtain the diff hunk from the BASE version of the file" } },
+      { { "n", "x" }, "2do", actions.diffget("ours"),    { desc = "Obtain the diff hunk from the OURS version of the file" } },
+      { { "n", "x" }, "3do", actions.diffget("theirs"),  { desc = "Obtain the diff hunk from the THEIRS version of the file" } },
     },
     file_panel = {
-      ["j"]             = actions.next_entry,
-      ["<down>"]        = actions.next_entry,
-      ["k"]             = actions.prev_entry,
-      ["<up>"]          = actions.prev_entry,
-      ["<cr>"]          = actions.select_entry,
-      ["o"]             = actions.select_entry,
-      ["<2-LeftMouse>"] = actions.select_entry,
-      ["-"]             = actions.toggle_stage_entry,
-      ["S"]             = actions.stage_all,
-      ["U"]             = actions.unstage_all,
-      ["X"]             = actions.restore_entry,
-      ["L"]             = actions.open_commit_log,
-      ["<c-b>"]         = actions.scroll_view(-0.25),
-      ["<c-f>"]         = actions.scroll_view(0.25),
-      ["<tab>"]         = actions.select_next_entry,
-      ["<s-tab>"]       = actions.select_prev_entry,
-      ["gf"]            = actions.goto_file,
-      ["<C-w><C-f>"]    = actions.goto_file_split,
-      ["<C-w>gf"]       = actions.goto_file_tab,
-      ["i"]             = actions.listing_style,
-      ["f"]             = actions.toggle_flatten_dirs,
-      ["R"]             = actions.refresh_files,
-      ["<leader>e"]     = actions.focus_files,
-      ["<leader>b"]     = actions.toggle_files,
-      ["g<C-x>"]        = actions.cycle_layout,
-      ["[x"]            = actions.prev_conflict,
-      ["]x"]            = actions.next_conflict,
+      { "n", "j",             actions.next_entry,           { desc = "Bring the cursor to the next file entry" } },
+      { "n", "<down>",        actions.next_entry,           { desc = "Bring the cursor to the next file entry" } },
+      { "n", "k",             actions.prev_entry,           { desc = "Bring the cursor to the previous file entry." } },
+      { "n", "<up>",          actions.prev_entry,           { desc = "Bring the cursor to the previous file entry." } },
+      { "n", "<cr>",          actions.select_entry,         { desc = "Open the diff for the selected entry." } },
+      { "n", "o",             actions.select_entry,         { desc = "Open the diff for the selected entry." } },
+      { "n", "<2-LeftMouse>", actions.select_entry,         { desc = "Open the diff for the selected entry." } },
+      { "n", "-",             actions.toggle_stage_entry,   { desc = "Stage / unstage the selected entry." } },
+      { "n", "S",             actions.stage_all,            { desc = "Stage all entries." } },
+      { "n", "U",             actions.unstage_all,          { desc = "Unstage all entries." } },
+      { "n", "X",             actions.restore_entry,        { desc = "Restore entry to the state on the left side." } },
+      { "n", "L",             actions.open_commit_log,      { desc = "Open the commit log panel." } },
+      { "n", "<c-b>",         actions.scroll_view(-0.25),   { desc = "Scroll the view up" } },
+      { "n", "<c-f>",         actions.scroll_view(0.25),    { desc = "Scroll the view down" } },
+      { "n", "<tab>",         actions.select_next_entry,    { desc = "Open the diff for the next file" } },
+      { "n", "<s-tab>",       actions.select_prev_entry,    { desc = "Open the diff for the previous file" } },
+      { "n", "gf",            actions.goto_file,            { desc = "Open the file in a new split in the previous tabpage" } },
+      { "n", "<C-w><C-f>",    actions.goto_file_split,      { desc = "Open the file in a new split" } },
+      { "n", "<C-w>gf",       actions.goto_file_tab,        { desc = "Open the file in a new tabpage" } },
+      { "n", "i",             actions.listing_style,        { desc = "Toggle between 'list' and 'tree' views" } },
+      { "n", "f",             actions.toggle_flatten_dirs,  { desc = "Flatten empty subdirectories in tree listing style." } },
+      { "n", "R",             actions.refresh_files,        { desc = "Update stats and entries in the file list." } },
+      { "n", "<leader>e",     actions.focus_files,          { desc = "Bring focus to the file panel" } },
+      { "n", "<leader>b",     actions.toggle_files,         { desc = "Toggle the file panel" } },
+      { "n", "g<C-x>",        actions.cycle_layout,         { desc = "Cycle available layouts" } },
+      { "n", "[x",            actions.prev_conflict,        { desc = "Go to the previous conflict" } },
+      { "n", "]x",            actions.next_conflict,        { desc = "Go to the next conflict" } },
     },
     file_history_panel = {
-      ["g!"]            = actions.options,
-      ["<C-A-d>"]       = actions.open_in_diffview,
-      ["y"]             = actions.copy_hash,
-      ["L"]             = actions.open_commit_log,
-      ["zR"]            = actions.open_all_folds,
-      ["zM"]            = actions.close_all_folds,
-      ["j"]             = actions.next_entry,
-      ["<down>"]        = actions.next_entry,
-      ["k"]             = actions.prev_entry,
-      ["<up>"]          = actions.prev_entry,
-      ["<cr>"]          = actions.select_entry,
-      ["o"]             = actions.select_entry,
-      ["<2-LeftMouse>"] = actions.select_entry,
-      ["<c-b>"]         = actions.scroll_view(-0.25),
-      ["<c-f>"]         = actions.scroll_view(0.25),
-      ["<tab>"]         = actions.select_next_entry,
-      ["<s-tab>"]       = actions.select_prev_entry,
-      ["gf"]            = actions.goto_file,
-      ["<C-w><C-f>"]    = actions.goto_file_split,
-      ["<C-w>gf"]       = actions.goto_file_tab,
-      ["<leader>e"]     = actions.focus_files,
-      ["<leader>b"]     = actions.toggle_files,
-      ["g<C-x>"]        = actions.cycle_layout,
+      { "n", "g!",            actions.options,             { desc = "Open the option panel" } },
+      { "n", "<C-A-d>",       actions.open_in_diffview,    { desc = "Open the entry under the cursor in a diffview" } },
+      { "n", "y",             actions.copy_hash,           { desc = "Copy the commit hash of the entry under the cursor" } },
+      { "n", "L",             actions.open_commit_log,     { desc = "Show commit details" } },
+      { "n", "zR",            actions.open_all_folds,      { desc = "Expand all folds" } },
+      { "n", "zM",            actions.close_all_folds,     { desc = "Collapse all folds" } },
+      { "n", "j",             actions.next_entry,          { desc = "Bring the cursor to the next file entry" } },
+      { "n", "<down>",        actions.next_entry,          { desc = "Bring the cursor to the next file entry" } },
+      { "n", "k",             actions.prev_entry,          { desc = "Bring the cursor to the previous file entry." } },
+      { "n", "<up>",          actions.prev_entry,          { desc = "Bring the cursor to the previous file entry." } },
+      { "n", "<cr>",          actions.select_entry,        { desc = "Open the diff for the selected entry." } },
+      { "n", "o",             actions.select_entry,        { desc = "Open the diff for the selected entry." } },
+      { "n", "<2-LeftMouse>", actions.select_entry,        { desc = "Open the diff for the selected entry." } },
+      { "n", "<c-b>",         actions.scroll_view(-0.25),  { desc = "Scroll the view up" } },
+      { "n", "<c-f>",         actions.scroll_view(0.25),   { desc = "Scroll the view down" } },
+      { "n", "<tab>",         actions.select_next_entry,   { desc = "Open the diff for the next file" } },
+      { "n", "<s-tab>",       actions.select_prev_entry,   { desc = "Open the diff for the previous file" } },
+      { "n", "gf",            actions.goto_file,           { desc = "Open the file in a new split in the previous tabpage" } },
+      { "n", "<C-w><C-f>",    actions.goto_file_split,     { desc = "Open the file in a new split" } },
+      { "n", "<C-w>gf",       actions.goto_file_tab,       { desc = "Open the file in a new tabpage" } },
+      { "n", "<leader>e",     actions.focus_files,         { desc = "Bring focus to the file panel" } },
+      { "n", "<leader>b",     actions.toggle_files,        { desc = "Toggle the file panel" } },
+      { "n", "g<C-x>",        actions.cycle_layout,        { desc = "Cycle available layouts" } },
     },
     option_panel = {
-      ["<tab>"] = actions.select_entry,
-      ["q"]     = actions.close,
+      { "n", "<tab>", actions.select_entry,  { desc = "Change the current option" } },
+      { "n", "q",     actions.close,         { desc = "Close the panel" } },
     },
   },
 }
@@ -320,11 +325,61 @@ local function fmt_enum(values, no_quote)
   end, values), "|")
 end
 
+---@param ... table
+---@return table
+function M.extend_keymaps(...)
+  local argc = select("#", ...)
+  local argv = { ... }
+  local contexts = {}
+
+  for i = 1, argc do
+    local cur = argv[i]
+    if type(cur) == "table" then
+      contexts[#contexts + 1] = { subject = cur, expanded = {} }
+    end
+  end
+
+  for _, ctx in ipairs(contexts) do
+    -- Expand the normal mode maps
+    for lhs, rhs in pairs(ctx.subject) do
+      if type(lhs) == "string" then
+        ctx.expanded["n " .. lhs] = {
+          "n",
+          lhs,
+          rhs,
+          { silent = true, nowait = true },
+        }
+      end
+    end
+
+    for _, map in ipairs(ctx.subject) do
+      for _, mode in ipairs(type(map[1]) == "table" and map[1] or { map[1] }) do
+        ctx.expanded[mode .. " " .. map[2]] = utils.vec_join(
+          mode,
+          map[2],
+          utils.vec_slice(map, 3)
+        )
+      end
+    end
+  end
+
+  local merged = vim.tbl_extend("force", unpack(
+    vim.tbl_map(function(v)
+      return v.expanded
+    end, contexts)
+  ))
+
+  return vim.tbl_values(merged)
+end
+
 function M.setup(user_config)
   user_config = user_config or {}
 
-  M._config = utils.tbl_deep_clone(M.defaults)
-  M._config = vim.tbl_deep_extend("force", M._config, user_config)
+  M._config = vim.tbl_deep_extend(
+    "force",
+    utils.tbl_deep_clone(M.defaults),
+    user_config
+  )
   ---@type EventEmitter
   M.user_emitter = EventEmitter()
 
@@ -443,17 +498,28 @@ function M.setup(user_config)
   if M._config.keymaps.disable_defaults then
     for name, _ in pairs(M._config.keymaps) do
       if name ~= "disable_defaults" then
-        M._config.keymaps[name] = utils.tbl_access(user_config, "keymaps." .. name) or {}
+        M._config.keymaps[name] = utils.tbl_access(user_config, { "keymaps", name }) or {}
       end
+    end
+  end
+
+  -- Merge default and user keymaps
+  for name, keymap in pairs(M.defaults.keymaps) do
+    if type(name) == "string" and type(keymap) == "table" then
+      M._config.keymaps[name] = M.extend_keymaps(
+        keymap,
+        utils.tbl_access(user_config, { "keymaps", name }) or {}
+      )
     end
   end
 
   -- Disable keymaps set to `false`
   for name, keymaps in pairs(M._config.keymaps) do
     if type(name) == "string" and type(keymaps) == "table" then
-      for lhs, rhs in pairs(keymaps) do
-        if type(lhs) == "string" and type(rhs) == "boolean" and not rhs then
-          keymaps[lhs] = nil
+      for i = #keymaps, 1, -1 do
+        local v = keymaps[i]
+        if type(v) == "table" and not v[3] then
+          table.remove(keymaps, i)
         end
       end
     end

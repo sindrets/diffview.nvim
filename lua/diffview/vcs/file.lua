@@ -289,16 +289,12 @@ function File._attach_buffer(bufnr, force, opt)
     local conf = config.get_config()
 
     -- Keymaps
-    state.keymaps = utils.tbl_deep_union_extend(conf.keymaps.view, state.keymaps)
+    state.keymaps = config.extend_keymaps(conf.keymaps.view, state.keymaps)
     local default_map_opt = { silent = true, nowait = true, buffer = bufnr }
 
-    for lhs, mapping in pairs(state.keymaps) do
-      if type(lhs) == "number" then
-        local map_opt = vim.tbl_extend("force", mapping[4] or {}, { buffer = bufnr })
-        vim.keymap.set(mapping[1], mapping[2], mapping[3], map_opt)
-      else
-        vim.keymap.set("n", lhs, mapping, default_map_opt)
-      end
+    for _, mapping in ipairs(state.keymaps) do
+      local map_opt = vim.tbl_extend("force", default_map_opt, mapping[4] or {}, { buffer = bufnr })
+      vim.keymap.set(mapping[1], mapping[2], mapping[3], map_opt)
     end
 
     -- Diagnostics
