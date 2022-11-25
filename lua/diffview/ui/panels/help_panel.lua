@@ -100,7 +100,6 @@ function HelpPanel:apply_cmd()
 end
 
 function HelpPanel:init_buffer()
-  self.current_view_bufid = vim.api.nvim_win_get_buf(0)
   HelpPanel:super().init_buffer(self)
   local conf = get_user_config().keymaps
   local default_opt = { silent = true, nowait = true, buffer = self.bufid }
