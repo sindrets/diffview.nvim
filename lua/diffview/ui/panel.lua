@@ -416,7 +416,13 @@ function Panel:on_autocmd(event, opts)
   local callback = function(_, state)
     local win_match, buf_match
     if state.event:match("^Win") then
-      win_match = tonumber(state.match)
+      if vim.tbl_contains({ "WinLeave", "WinEnter" }, state.event)
+          and api.nvim_get_current_win() == self.winid
+      then
+        buf_match = state.buf
+      else
+        win_match = tonumber(state.match)
+      end
     elseif state.event:match("^Buf") then
       buf_match = state.buf
     end
