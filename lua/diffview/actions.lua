@@ -1,6 +1,7 @@
 local lazy = require("diffview.lazy")
 
 local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
+local HelpPanel = lazy.access("diffview.ui.panels.help_panel", "HelpPanel") ---@type HelpPanel|LazyModule
 local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView") ---@type FileHistoryView|LazyModule
 local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
 local vcs = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
@@ -467,15 +468,12 @@ end
 
 function M.help(conf_name)
   return function()
-    M.HelpPanel = require("diffview.ui.panels.help_panel")
-    M.HelpPanel:init(conf_name, {})
-    M.HelpPanel:focus()
+    local help_panel = HelpPanel(conf_name) --[[@as HelpPanel ]]
+    help_panel:focus()
   end
 end
 
-function M.help_close()
-    M.HelpPanel:destroy()
-end
+function M.help_close() end
 
 local action_names = {
   "close",
