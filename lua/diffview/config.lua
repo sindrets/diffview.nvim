@@ -202,8 +202,8 @@ M.defaults = {
       { "n", "g?",    actions.help("option_panel"),  { desc = "Open the help panel" } },
     },
     help_panel = {
-      { "n", "q",     actions.help_close,  { desc = "Close help menu" } },
-      { "n", "<esc>", actions.help_close,  { desc = "Close help menu" } },
+      { "n", "q",     actions.close,  { desc = "Close help menu" } },
+      { "n", "<esc>", actions.close,  { desc = "Close help menu" } },
     },
   },
 }

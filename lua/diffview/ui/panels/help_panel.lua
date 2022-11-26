@@ -26,18 +26,21 @@ HelpPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 HelpPanel.default_type = "float"
 
 ---@class HelpPanelSpec
+---@field parent StandardView
 ---@field config PanelConfig
 ---@field name string
 
+---@param parent StandardView
 ---@param keymap_name string
 ---@param opt HelpPanelSpec
-function HelpPanel:init(keymap_name, opt)
+function HelpPanel:init(parent, keymap_name, opt)
   opt = opt or {}
   HelpPanel:super().init(self, {
     bufname = opt.name,
     config = opt.config or get_user_config().help_panel.win_config,
   })
 
+  self.parent = parent
   self.keymap_name = keymap_name
   self.lines = {}
 
@@ -46,6 +49,19 @@ function HelpPanel:init(keymap_name, opt)
       vim.bo[self.bufid].bufhidden = "wipe"
     end,
   })
+
+  self:on_autocmd("WinLeave", {
+    callback = function()
+      pcall(self.close, self)
+    end,
+  })
+
+  parent.emitter:on("close", function(e)
+    if self:is_focused() then
+      pcall(self.close, self)
+      e:stop_propagation()
+    end
+  end)
 end
 
 function HelpPanel:apply_cmd()

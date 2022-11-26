@@ -468,12 +468,14 @@ end
 
 function M.help(conf_name)
   return function()
-    local help_panel = HelpPanel(conf_name) --[[@as HelpPanel ]]
-    help_panel:focus()
+    local view = lib.get_current_view()
+
+    if view then
+      local help_panel = HelpPanel(view, conf_name) --[[@as HelpPanel ]]
+      help_panel:focus()
+    end
   end
 end
-
-function M.help_close() end
 
 local action_names = {
   "close",
