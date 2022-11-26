@@ -92,7 +92,7 @@ function File:post_buf_created()
   local view = require("diffview.lib").get_current_view()
 
   if view then
-    view.emitter:on("diff_buf_win_enter", function(bufnr, winid)
+    view.emitter:on("diff_buf_win_enter", function(_, bufnr, winid)
       if bufnr == self.bufnr then
         api.nvim_win_call(winid, function()
           DiffviewGlobal.emitter:emit("diff_buf_read", self.bufnr)

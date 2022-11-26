@@ -491,7 +491,9 @@ function M.setup(user_config)
 
   for event, callback in pairs(M._config.hooks) do
     if type(callback) == "function" then
-      M.user_emitter:on(event, callback)
+      M.user_emitter:on(event, function (_, ...)
+        callback(...)
+      end)
     end
   end
 

@@ -27,7 +27,7 @@ return function(view)
         end
       end
     end,
-    diff_buf_read = function(bufnr)
+    diff_buf_read = function(_, bufnr)
       -- Set the cursor at the beginning of the -L range if possible.
 
       local log_options = view.panel:get_log_options()

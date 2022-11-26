@@ -6,8 +6,8 @@ local utils = lazy.require("diffview.utils")
 
 local M = {}
 
----@enum Event
-local Event = {
+---@enum EventName
+local EventName = {
   FILES_STAGED = 1,
 }
 
@@ -18,10 +18,26 @@ local Event = {
 ---@field callback function The original callback
 ---@field call function
 
+---@class Event : diffview.Object
+---@operator call:Event
+---@field id any
+---@field propagate boolean
+local Event = oop.create_class("Event")
+
+function Event:init(opt)
+  self.id = opt.id
+  self.propagate = true
+end
+
+function Event:stop_propagation()
+  self.propagate = false
+end
+
+
 ---@class EventEmitter : diffview.Object
----@field event_map table<Event, Listener[]> # Registered events mapped to subscribed listeners.
+---@field event_map table<any, Listener[]> # Registered events mapped to subscribed listeners.
 ---@field any_listeners Listener[] # Listeners subscribed to all events.
----@field emit_lock table<Event, boolean>
+---@field emit_lock table<any, boolean>
 local EventEmitter = oop.create_class("EventEmitter")
 
 ---EventEmitter constructor.
@@ -32,49 +48,48 @@ function EventEmitter:init()
 end
 
 ---Subscribe to a given event.
----@param event any Event identifier.
----@param callback function
-function EventEmitter:on(event, callback)
-  if not self.event_map[event] then
-    self.event_map[event] = {}
+---@param event_id any Event identifier.
+---@param callback fun(event: Event, ...)
+function EventEmitter:on(event_id, callback)
+  if not self.event_map[event_id] then
+    self.event_map[event_id] = {}
   end
 
-  table.insert(self.event_map[event], {
+  table.insert(self.event_map[event_id], 1, {
     type = "normal",
     callback = callback,
-    call = function(args)
-      return callback(utils.tbl_unpack(args))
+    call = function(event, args)
+      return callback(event, utils.tbl_unpack(args))
     end,
   })
 end
 
 ---Subscribe a one-shot listener to a given event.
----@param event any Event identifier.
----@param callback function
-function EventEmitter:once(event, callback)
-  if not self.event_map[event] then
-    self.event_map[event] = {}
+---@param event_id any Event identifier.
+---@param callback fun(event: Event, ...)
+function EventEmitter:once(event_id, callback)
+  if not self.event_map[event_id] then
+    self.event_map[event_id] = {}
   end
 
   local emitted = false
 
-  table.insert(self.event_map[event], {
+  table.insert(self.event_map[event_id], 1, {
     type = "once",
     callback = callback,
-    call = function(args)
+    call = function(event, args)
       if not emitted then
         emitted = true
-        self:off(callback, event)
-        return callback(utils.tbl_unpack(args))
+        return callback(event, utils.tbl_unpack(args))
       end
     end,
   })
 end
 
 ---Add a new any-listener, subscribed to all events.
----@param callback function
+---@param callback fun(event: Event, ...)
 function EventEmitter:on_any(callback)
-  table.insert(self.any_listeners, {
+  table.insert(self.any_listeners, 1, {
     type = "any",
     callback = callback,
     call = function(event, args)
@@ -84,11 +99,11 @@ function EventEmitter:on_any(callback)
 end
 
 ---Add a new one-shot any-listener, subscribed to all events.
----@param callback function
+---@param callback fun(event: Event, ...)
 function EventEmitter:once_any(callback)
   local emitted = false
 
-  table.insert(self.any_listeners, {
+  table.insert(self.any_listeners, 1, {
     type = "any_once",
     callback = callback,
     call = function(event, args)
@@ -103,13 +118,13 @@ end
 ---Unsubscribe a listener. If no event is given, the listener is unsubscribed
 ---from all events.
 ---@param callback function
----@param event? any Only unsubscribe listeners from this event.
-function EventEmitter:off(callback, event)
+---@param event_id? any Only unsubscribe listeners from this event.
+function EventEmitter:off(callback, event_id)
   ---@type Listener[][]
   local all
 
-  if event then
-    all = { self.event_map[event] }
+  if event_id then
+    all = { self.event_map[event_id] }
   else
     all = utils.vec_join(
       vim.tbl_values(self.event_map),
@@ -133,63 +148,87 @@ function EventEmitter:off(callback, event)
 end
 
 ---Clear all listeners for a given event. If no event is given: clear all listeners.
----@param event any?
-function EventEmitter:clear(event)
+---@param event_id any?
+function EventEmitter:clear(event_id)
   for e, _ in pairs(self.event_map) do
-    if event == nil or event == e then
+    if event_id == nil or event_id == e then
       self.event_map[e] = nil
     end
   end
 end
 
----Notify all listeners subscribed to a given event.
----@param event any Event identifier.
----@param ... any Event callback args.
-function EventEmitter:emit(event, ...)
-  if not self.emit_lock[event] then
-    local args = utils.tbl_pack(...)
+---@param listeners Listener[]
+---@param event Event
+---@param args table
+---@return Listener[]
+local function filter_call(listeners, event, args)
+  listeners = utils.vec_slice(listeners) --[[@as Listener[] ]]
+  local result = {}
 
-    if type(self.event_map[event]) == "table" then
-      self.event_map[event] = utils.tbl_fmap(self.event_map[event], function(listeners)
-        return not listeners.call(args) and listeners or nil
-      end)
+  for i = 1, #listeners do
+    local cur = listeners[i]
+    local ret = cur.call(event, args)
+
+    if not (cur.type == "once" or cur.type == "any_once") and not ret then
+      result[#result + 1] = cur
     end
 
-    self.any_listeners = utils.tbl_fmap(self.any_listeners, function(listeners)
-      return not listeners.call(event, args) and listeners or nil
-    end)
+    if not event.propagate then
+      for j = i + 1, #listeners do result[j] = listeners[j] end
+      break
+    end
+  end
+
+  return result
+end
+
+---Notify all listeners subscribed to a given event.
+---@param event_id any Event identifier.
+---@param ... any Event callback args.
+function EventEmitter:emit(event_id, ...)
+  if not self.emit_lock[event_id] then
+    local args = utils.tbl_pack(...)
+    local e = Event({ id = event_id })
+
+    if type(self.event_map[event_id]) == "table" then
+      self.event_map[event_id] = filter_call(self.event_map[event_id], e, args)
+    end
+
+    if e.propagate then
+      self.any_listeners = filter_call(self.any_listeners, e, args)
+    end
   end
 end
 
 ---Non-recursively notify all listeners subscribed to a given event.
----@param event any Event identifier.
+---@param event_id any Event identifier.
 ---@param ... any Event callback args.
-function EventEmitter:nore_emit(event, ...)
-  if not self.emit_lock[event] then
-    self.emit_lock[event] = true
+function EventEmitter:nore_emit(event_id, ...)
+  if not self.emit_lock[event_id] then
+    self.emit_lock[event_id] = true
     local args = utils.tbl_pack(...)
+    local e = Event({ id = event_id })
 
-    if type(self.event_map[event]) == "table" then
-      self.event_map[event] = utils.tbl_fmap(self.event_map[event], function(listeners)
-        return not listeners.call(args) and listeners or nil
-      end)
+    if type(self.event_map[event_id]) == "table" then
+      self.event_map[event_id] = filter_call(self.event_map[event_id], e, args)
     end
 
-    self.any_listeners = utils.tbl_fmap(self.any_listeners, function(listeners)
-      return not listeners.call(event, args) and listeners or nil
-    end)
+    if e.propagate then
+      self.any_listeners = filter_call(self.any_listeners, e, args)
+    end
 
-    self.emit_lock[event] = false
+    self.emit_lock[event_id] = false
   end
 end
 
 ---Get all listeners subscribed to the given event.
----@param event any Event identifier.
+---@param event_id any Event identifier.
 ---@return Listener[]?
-function EventEmitter:get(event)
-  return self.event_map[event]
+function EventEmitter:get(event_id)
+  return self.event_map[event_id]
 end
 
+M.EventName = EventName
 M.Event = Event
 M.EventEmitter = EventEmitter
 return M

@@ -2,7 +2,7 @@ local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
 local CommitLogPanel = lazy.access("diffview.ui.panels.commit_log_panel", "CommitLogPanel") ---@type CommitLogPanel|LazyModule
-local Event = lazy.access("diffview.events", "Event") ---@type Event|LazyModule
+local EventName = lazy.access("diffview.events", "EventName") ---@type EventName|LazyModule
 local FileEntry = lazy.access("diffview.scene.file_entry", "FileEntry") ---@type FileEntry|LazyModule
 local FileHistoryPanel = lazy.access("diffview.scene.views.file_history.file_history_panel", "FileHistoryPanel") ---@type FileHistoryPanel|LazyModule
 local JobStatus = lazy.access("diffview.vcs.utils", "JobStatus") ---@type JobStatus|LazyModule
@@ -173,7 +173,7 @@ function FileHistoryView:file_safeguard()
 end
 
 function FileHistoryView:on_files_staged(callback)
-  self.emitter:on(Event.FILES_STAGED, callback)
+  self.emitter:on(EventName.FILES_STAGED, callback)
 end
 
 function FileHistoryView:init_event_listeners()

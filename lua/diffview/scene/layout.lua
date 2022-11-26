@@ -23,13 +23,13 @@ function Layout:init(opt)
 
     ---@param other Layout
     ---@diagnostic disable-next-line: unused-local
-    self.emitter:on("create_pre", function(other)
+    self.emitter:on("create_pre", function(_, other)
       last_equalalways = vim.o.equalalways
       vim.opt.equalalways = true
     end)
 
     ---@param other Layout
-    self.emitter:on("create_post", function(other)
+    self.emitter:on("create_post", function(_, other)
       other:open_null()
       other:open_files()
       vim.opt.equalalways = last_equalalways

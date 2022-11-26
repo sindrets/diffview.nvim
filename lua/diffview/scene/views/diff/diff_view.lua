@@ -4,7 +4,7 @@ local oop = require("diffview.oop")
 local CommitLogPanel = lazy.access("diffview.ui.panels.commit_log_panel", "CommitLogPanel") ---@type CommitLogPanel|LazyModule
 local Diff = lazy.access("diffview.diff", "Diff") ---@type Diff|LazyModule
 local EditToken = lazy.access("diffview.diff", "EditToken") ---@type EditToken|LazyModule
-local Event = lazy.access("diffview.events", "Event") ---@type Event|LazyModule
+local EventName = lazy.access("diffview.events", "EventName") ---@type EventName|LazyModule
 local FileDict = lazy.access("diffview.vcs.file_dict", "FileDict") ---@type FileDict|LazyModule
 local FileEntry = lazy.access("diffview.scene.file_entry", "FileEntry") ---@type FileEntry|LazyModule
 local FilePanel = lazy.access("diffview.scene.views.diff.file_panel", "FilePanel") ---@type FilePanel|LazyModule
@@ -71,7 +71,7 @@ function DiffView:init(opt)
   self.attached_bufs = {}
 
   ---@param entry FileEntry
-  self.emitter:on("file_open_post", function(entry)
+  self.emitter:on("file_open_post", function(_, entry)
     if entry.kind == "conflicting" then
       local file = entry.layout:get_main_win().file
 
@@ -466,7 +466,7 @@ function DiffView:file_safeguard()
 end
 
 function DiffView:on_files_staged(callback)
-  self.emitter:on(Event.FILES_STAGED, callback)
+  self.emitter:on(EventName.FILES_STAGED, callback)
 end
 
 function DiffView:init_event_listeners()

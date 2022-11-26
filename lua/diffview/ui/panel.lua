@@ -413,7 +413,7 @@ function Panel:on_autocmd(event, opts)
     event = { event }
   end
 
-  local callback = function(state)
+  local callback = function(_, state)
     local win_match, buf_match
     if state.event:match("^Win") then
       win_match = tonumber(state.match)

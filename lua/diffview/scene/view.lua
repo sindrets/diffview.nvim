@@ -52,7 +52,7 @@ function View:init(opt)
   self.closing = utils.sate(opt.closing, false)
 
   local function wrap_event(event)
-    DiffviewGlobal.emitter:on(event, function(view, ...)
+    DiffviewGlobal.emitter:on(event, function(_, view, ...)
       local cur_view = require("diffview.lib").get_current_view()
 
       if (view and view == self) or (not view and cur_view == self) then

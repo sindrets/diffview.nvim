@@ -57,7 +57,7 @@ function FHOptionPanel:init(parent)
   self.flags = parent.adapter.flags
 
   ---@param option_name string
-  self.emitter:on("set_option", function(option_name)
+  self.emitter:on("set_option", function(_, option_name)
     local log_options = self.parent:get_log_options()
     local cur_value = log_options[option_name]
 

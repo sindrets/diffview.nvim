@@ -1,6 +1,6 @@
 local lazy = require("diffview.lazy")
 
-local Event = lazy.access("diffview.events", "Event") ---@type Event|LazyModule
+local EventName = lazy.access("diffview.events", "EventName") ---@type EventName|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local actions = lazy.require("diffview.actions") ---@module "diffview.actions"
 local async = lazy.require("plenary.async") ---@module "plenary.async"
@@ -52,7 +52,7 @@ return function(view)
       end
     end,
     ---@diagnostic disable-next-line: unused-local
-    files_updated = function(files)
+    files_updated = function(_, files)
       view.initialized = true
     end,
     close = function()
@@ -171,7 +171,7 @@ return function(view)
         view:update_files(function()
           view.panel:highlight_cur_file()
         end)
-        view.emitter:emit(Event.FILES_STAGED, view)
+        view.emitter:emit(EventName.FILES_STAGED, view)
       end
     end,
     stage_all = function()
@@ -190,7 +190,7 @@ return function(view)
         view:update_files(function()
           view.panel:highlight_cur_file()
         end)
-        view.emitter:emit(Event.FILES_STAGED, view)
+        view.emitter:emit(EventName.FILES_STAGED, view)
       end
     end,
     unstage_all = function()
@@ -202,7 +202,7 @@ return function(view)
       end
 
       view:update_files()
-      view.emitter:emit(Event.FILES_STAGED, view)
+      view.emitter:emit(EventName.FILES_STAGED, view)
     end,
     restore_entry = async.void(function()
       local commit
