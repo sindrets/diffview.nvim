@@ -339,11 +339,11 @@ function M.get_file_icon(name, ext, render_data, line_idx, offset)
   end
 
   if icon then
-    if hl then
+    if hl and render_data then
       render_data:add_hl(hl, line_idx, offset, offset + string.len(icon) + 1)
     end
 
-    return icon .. " "
+    return icon .. " ", hl
   end
 
   return ""

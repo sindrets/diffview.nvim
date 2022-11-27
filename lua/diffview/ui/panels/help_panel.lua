@@ -191,39 +191,31 @@ end
 function HelpPanel:render()
   self.render_data:clear()
 
-  local line_idx, offset, s = 0, 0, ""
+  local s = ""
 
   -- Heading
   local comp = self.components.heading.comp
   s = "Keymap Overview — <CR> To Use"
   s = string.rep(" ", math.floor(self.state.width * 0.5 - vim.str_utfindex(s) * 0.5)) .. s
-  comp:add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
-  comp:add_line(s)
+  comp:add_line(s, "DiffviewFilePanelTitle")
 
   for _, section in ipairs(self.components.sections) do
     ---@cast section CompStruct
 
     -- Section heading
     comp = section.section_heading.comp
-    comp:add_line("")
+    comp:add_line()
     s = string.rep(" ", math.floor(self.state.width * 0.5 - #comp.context.label * 0.5)) .. comp.context.label
-    comp:add_hl("Statement", 1, 0, #s)
-    comp:add_line(s)
-    s = ("%14s    CALLBACK"):format("KEYS")
-    comp:add_hl("DiffviewFilePanelCounter", 2, 0, #s)
-    comp:add_line(s)
+    comp:add_line(s, "Statement")
+    comp:add_line(("%14s    CALLBACK"):format("KEYS"), "DiffviewFilePanelCounter")
 
     for _, item in ipairs(section.items) do
       ---@cast item CompStruct
       comp = item.comp
-      s = comp.context.label_lhs
-      comp:add_hl("DiffviewSecondary", 0, 0, #s)
-      offset = #s
-      s = s .. " -> "
-      comp:add_hl("DiffviewNonText", 0, offset, #s)
-      offset = #s
-      s = s .. comp.context.label_rhs
-      comp:add_line(s)
+      comp:add_text(comp.context.label_lhs, "DiffviewSecondary")
+      comp:add_text(" -> ", "DiffviewNonText")
+      comp:add_text(comp.context.label_rhs)
+      comp:ln()
     end
   end
 end

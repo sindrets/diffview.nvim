@@ -31,6 +31,7 @@ M.last_draw_time = 0
 ---@field parent RenderComponent
 ---@field lines string[]
 ---@field hl renderer.HlList
+---@field line_buffer string
 ---@field components RenderComponent[]
 ---@field lstart integer 0 indexed, Inclusive
 ---@field lend integer Exclusive
@@ -44,6 +45,7 @@ function RenderComponent:init(name)
   self.name = name or RenderComponent.next_uid()
   self.lines = {}
   self.hl = {}
+  self.line_buffer = ""
   self.components = {}
   self.lstart = -1
   self.lend = -1
@@ -132,9 +134,16 @@ function RenderComponent:remove_component(component)
   return false
 end
 
----@param line string
-function RenderComponent:add_line(line)
-  self.lines[#self.lines + 1] = line
+---@param line string?
+---@param hl_group string?
+function RenderComponent:add_line(line, hl_group)
+  if line and hl_group then
+    local first = #self.line_buffer
+    self:add_hl(hl_group, #self.lines, first, first + #line)
+  end
+
+  self.lines[#self.lines + 1] = self.line_buffer .. (line or "")
+  self.line_buffer = ""
 end
 
 ---@param group string
@@ -148,6 +157,23 @@ function RenderComponent:add_hl(group, line_idx, first, last)
     first = first,
     last = last,
   }
+end
+
+---@param text string
+---@param hl_group string?
+function RenderComponent:add_text(text, hl_group)
+  if hl_group then
+    local first = #self.line_buffer
+    self:add_hl(hl_group, #self.lines, first, first + #text)
+  end
+
+  self.line_buffer = self.line_buffer .. text
+end
+
+---Finalize current line
+function RenderComponent:ln()
+  self.lines[#self.lines + 1] = self.line_buffer
+  self.line_buffer = ""
 end
 
 function RenderComponent:clear()
