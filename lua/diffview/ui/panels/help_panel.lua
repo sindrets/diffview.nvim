@@ -16,7 +16,7 @@ local HelpPanel = oop.create_class("HelpPanel", Panel)
 HelpPanel.winopts = vim.tbl_extend("force", Panel.winopts, {
   wrap = false,
   breakindent = true,
-  scl = "no",
+  signcolumn = "no",
 })
 
 HelpPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
@@ -74,7 +74,7 @@ function HelpPanel:apply_cmd()
       api.nvim_feedkeys(utils.t(mapping[2]), "m", false)
     end)
 
-    self:destroy()
+    pcall(self.close, self)
   end
 end
 
@@ -89,7 +89,7 @@ function HelpPanel:init_buffer()
   end
 
   vim.keymap.set("n", "<cr>", function()
-    self.apply_cmd(self)
+    self:apply_cmd()
   end, default_opt)
 end
 
@@ -100,18 +100,34 @@ function HelpPanel:update_components()
   if not maps then
     utils.err(("Unknown keymap group '%s'!"):format(self.keymap_name))
   else
-    maps = utils.vec_slice(maps)
+    maps = vim.tbl_map(function(v)
+      local desc = v[4] and v[4].desc
+
+      if not desc then
+        if type(v[3]) == "string" then
+          desc = v[3]
+        elseif type(v[3]) == "function" then
+          local info = debug.getinfo(v[3], "S")
+          desc = ("<Lua @ %s:%d>"):format(info.short_src, info.linedefined)
+        end
+      end
+
+      return utils.vec_join(v, desc)
+    end, maps)
     -- Sort mappings by description
     table.sort(maps, function(a, b)
-      return tostring(a[4] and a[4].desc or a[2]) < tostring(b[4] and b[4].desc or b[2])
+      a, b = a[5], b[5]
+      -- Ensure lua functions are sorted last
+      if a:match("^<Lua") then a = "~" .. a end
+      if b:match("^<Lua") then b = "~" .. b end
+      return a < b
     end)
 
     local lines = { "" }
     local max_width = 0
 
     for _, mapping in ipairs(maps) do
-      local lhs, rhs, opt = mapping[2], mapping[3], mapping[4] or {}
-      local txt = string.format("%14s -> %s", lhs, opt.desc or rhs)
+      local txt = string.format("%14s -> %s", mapping[2], mapping[5])
 
       max_width = math.max(max_width, #txt)
       table.insert(lines, txt)
@@ -119,7 +135,7 @@ function HelpPanel:update_components()
 
     local height = #lines + 1
     local width = max_width + 2
-    local title_line = ("Keymaps for '%s' | <cr> to use"):format(self.keymap_name)
+    local title_line = ("Keymaps for '%s' — <cr> to use"):format(self.keymap_name)
     title_line = string.rep(" ", math.floor(width * 0.5 - #title_line * 0.5) - 1) .. title_line
     table.insert(lines, 1, title_line)
 
