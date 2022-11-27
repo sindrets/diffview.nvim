@@ -177,7 +177,7 @@ return function(view)
     stage_all = function()
       local args = vim.tbl_map(function(file)
         return file.path
-      end, view.files.working)
+      end, utils.vec_join(view.files.working, view.files.conflicting))
 
       if #args > 0 then
         local success = view.adapter:add_files(args)
