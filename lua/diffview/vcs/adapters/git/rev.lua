@@ -43,6 +43,10 @@ function GitRev:init(rev_type, revision, track_head)
     ---@cast revision number
     self.stage = revision
   end
+
+  if self.type == RevType.STAGE and not self.stage then
+    self.stage = 0
+  end
 end
 
 ---@param name string
