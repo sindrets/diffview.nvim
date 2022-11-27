@@ -318,6 +318,10 @@ require("diffview").setup({
       { "n", "<tab>", actions.select_entry,  { desc = "Change the current option" } },
       { "n", "q",     actions.close,         { desc = "Close the panel" } },
     },
+    help_panel = {
+      { "n", "q",     actions.close,  { desc = "Close help menu" } },
+      { "n", "<esc>", actions.close,  { desc = "Close help menu" } },
+    },
   },
 })
 ```

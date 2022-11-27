@@ -1,6 +1,7 @@
 local lazy = require("diffview.lazy")
 
 local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
+local HelpPanel = lazy.access("diffview.ui.panels.help_panel", "HelpPanel") ---@type HelpPanel|LazyModule
 local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView") ---@type FileHistoryView|LazyModule
 local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
 local vcs = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
@@ -462,6 +463,17 @@ function M.cycle_layout()
     main = view.cur_layout:get_main_win()
 
     if was_focused then main:focus() end
+  end
+end
+
+function M.help(conf_name)
+  return function()
+    local view = lib.get_current_view()
+
+    if view then
+      local help_panel = HelpPanel(view, conf_name) --[[@as HelpPanel ]]
+      help_panel:focus()
+    end
   end
 end
 
