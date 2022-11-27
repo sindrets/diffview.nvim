@@ -308,7 +308,8 @@ function Panel:close()
     elseif self:is_focused() then
       vim.cmd("wincmd p")
     end
-    api.nvim_win_hide(self.winid)
+
+    pcall(api.nvim_win_close, self.winid, true)
   end
 end
 

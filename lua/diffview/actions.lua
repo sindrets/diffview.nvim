@@ -466,12 +466,15 @@ function M.cycle_layout()
   end
 end
 
-function M.help(conf_name)
+---@param keymap_groups string|string[]
+function M.help(keymap_groups)
+  keymap_groups = type(keymap_groups) == "table" and keymap_groups or { keymap_groups }
+
   return function()
     local view = lib.get_current_view()
 
     if view then
-      local help_panel = HelpPanel(view, conf_name) --[[@as HelpPanel ]]
+      local help_panel = HelpPanel(view, keymap_groups) --[[@as HelpPanel ]]
       help_panel:focus()
     end
   end

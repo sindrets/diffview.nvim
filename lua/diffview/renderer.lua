@@ -173,6 +173,7 @@ function RenderComponent:destroy()
   self.components = nil
 end
 
+---@return RenderComponent?
 function RenderComponent:get_comp_on_line(line)
   line = line - 1
 

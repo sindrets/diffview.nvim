@@ -8,9 +8,9 @@ local api = vim.api
 local M = {}
 
 ---@class HelpPanel : Panel
----@field keymap_name string
----@field lines string[]
----@field maps table[]
+---@field parent StandardView
+---@field keymap_groups string[]
+---@field state table
 local HelpPanel = oop.create_class("HelpPanel", Panel)
 
 HelpPanel.winopts = vim.tbl_extend("force", Panel.winopts, {
@@ -26,23 +26,36 @@ HelpPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 HelpPanel.default_type = "float"
 
 ---@class HelpPanelSpec
----@field parent StandardView
 ---@field config PanelConfig
 ---@field name string
 
 ---@param parent StandardView
----@param keymap_name string
+---@param keymap_groups string[]
 ---@param opt HelpPanelSpec
-function HelpPanel:init(parent, keymap_name, opt)
+function HelpPanel:init(parent, keymap_groups, opt)
   opt = opt or {}
   HelpPanel:super().init(self, {
     bufname = opt.name,
-    config = opt.config or get_user_config().help_panel.win_config,
+    config = opt.config or function()
+      local c = vim.deepcopy(Panel.default_config_float)
+      local viewport_width = vim.o.columns
+      local viewport_height = vim.o.lines
+      c.col = math.floor(viewport_width * 0.5 - self.state.width * 0.5)
+      c.row = math.floor(viewport_height * 0.5 - self.state.height * 0.5)
+      c.width = self.state.width
+      c.height = self.state.height
+
+      return c
+    end,
   })
 
   self.parent = parent
-  self.keymap_name = keymap_name
+  self.keymap_groups = keymap_groups
   self.lines = {}
+  self.state = {
+    width = 50,
+    height = 4,
+  }
 
   self:on_autocmd("BufWinEnter", {
     callback = function()
@@ -52,13 +65,13 @@ function HelpPanel:init(parent, keymap_name, opt)
 
   self:on_autocmd("WinLeave", {
     callback = function()
-      pcall(self.close, self)
+      self:close()
     end,
   })
 
   parent.emitter:on("close", function(e)
     if self:is_focused() then
-      pcall(self.close, self)
+      self:close()
       e:stop_propagation()
     end
   end)
@@ -66,15 +79,19 @@ end
 
 function HelpPanel:apply_cmd()
   local row, _ = unpack(vim.api.nvim_win_get_cursor(0))
-  local mapping = self.maps[row-2]
-  local last_winid = vim.fn.win_getid(vim.fn.winnr("#"))
+  local comp = self.components.comp:get_comp_on_line(row)
 
-  if mapping then
-    api.nvim_win_call(last_winid, function()
-      api.nvim_feedkeys(utils.t(mapping[2]), "m", false)
-    end)
+  if comp then
+    local mapping = comp.context.mapping
+    local last_winid = vim.fn.win_getid(vim.fn.winnr("#"))
 
-    pcall(self.close, self)
+    if mapping then
+      api.nvim_win_call(last_winid, function()
+        api.nvim_feedkeys(utils.t(mapping[2]), "m", false)
+      end)
+
+      self:close()
+    end
   end
 end
 
@@ -95,70 +112,120 @@ end
 
 function HelpPanel:update_components()
   local keymaps = get_user_config().keymaps
-  local maps = keymaps[self.keymap_name]
+  local width = 50
+  local height = 0
+  local sections = { name = "sections" }
 
-  if not maps then
-    utils.err(("Unknown keymap group '%s'!"):format(self.keymap_name))
-  else
-    maps = vim.tbl_map(function(v)
-      local desc = v[4] and v[4].desc
+  for _, group in ipairs(self.keymap_groups) do
+    local maps = keymaps[group]
 
-      if not desc then
-        if type(v[3]) == "string" then
-          desc = v[3]
-        elseif type(v[3]) == "function" then
-          local info = debug.getinfo(v[3], "S")
-          desc = ("<Lua @ %s:%d>"):format(info.short_src, info.linedefined)
+    if not maps then
+      utils.err(("help_panel :: Unknown keymap group '%s'!"):format(group))
+    else
+      maps = utils.tbl_fmap(maps, function(v)
+        if v[1] ~= "n" then return nil end
+        local desc = v[4] and v[4].desc
+
+        if not desc then
+          if type(v[3]) == "string" then
+            desc = v[3]
+          elseif type(v[3]) == "function" then
+            local info = debug.getinfo(v[3], "S")
+            desc = ("<Lua @ %s:%d>"):format(info.short_src, info.linedefined)
+          end
         end
+
+        return utils.vec_join(v, desc)
+      end)
+
+      if #maps == 0 then goto continue end
+
+      -- Sort mappings by description
+      table.sort(maps, function(a, b)
+        a, b = a[5], b[5]
+        -- Ensure lua functions are sorted last
+        if a:match("^<Lua") then a = "~" .. a end
+        if b:match("^<Lua") then b = "~" .. b end
+        return a < b
+      end)
+
+      height = height + #maps + 3
+      local items = { name = "items" }
+      local section_schema = {
+        name = "section",
+        {
+          name = "section_heading",
+          context = {
+            label = group:upper():gsub("_", "-")
+          },
+        },
+        items,
+      }
+
+      for _, mapping in ipairs(maps) do
+        width = math.max(width, 14 + 4 + #mapping[5] + 2)
+        table.insert(items, {
+          name = "item",
+          context = {
+            label_lhs = ("%14s"):format(mapping[2]),
+            label_rhs = ("%s"):format(mapping[5]),
+            mapping = mapping,
+          },
+        })
       end
 
-      return utils.vec_join(v, desc)
-    end, maps)
-    -- Sort mappings by description
-    table.sort(maps, function(a, b)
-      a, b = a[5], b[5]
-      -- Ensure lua functions are sorted last
-      if a:match("^<Lua") then a = "~" .. a end
-      if b:match("^<Lua") then b = "~" .. b end
-      return a < b
-    end)
-
-    local lines = { "" }
-    local max_width = 0
-
-    for _, mapping in ipairs(maps) do
-      local txt = string.format("%14s -> %s", mapping[2], mapping[5])
-
-      max_width = math.max(max_width, #txt)
-      table.insert(lines, txt)
+      table.insert(sections, section_schema)
     end
 
-    local height = #lines + 1
-    local width = max_width + 2
-    local title_line = ("Keymaps for '%s' — <cr> to use"):format(self.keymap_name)
-    title_line = string.rep(" ", math.floor(width * 0.5 - #title_line * 0.5) - 1) .. title_line
-    table.insert(lines, 1, title_line)
-
-    self.maps = maps
-    self.lines = lines
-
-    self.config_producer = function()
-      local c = vim.deepcopy(Panel.default_config_float)
-      local viewport_width = vim.o.columns
-      local viewport_height = vim.o.lines
-      c.col = math.floor(viewport_width * 0.5 - width * 0.5)
-      c.row = math.floor(viewport_height * 0.5 - height * 0.5)
-      c.width = width
-      c.height = height
-
-      return c
-    end
+    ::continue::
   end
+
+  self.state.width = width
+  self.state.height = height + 1
+  self.components = self.render_data:create_component({
+    { name = "heading" },
+    sections,
+  })
 end
 
 function HelpPanel:render()
   self.render_data:clear()
-  self.render_data.lines = utils.vec_slice(self.lines or {})
+
+  local line_idx, offset, s = 0, 0, ""
+
+  -- Heading
+  local comp = self.components.heading.comp
+  s = "Keymap Overview — <CR> To Use"
+  s = string.rep(" ", math.floor(self.state.width * 0.5 - vim.str_utfindex(s) * 0.5)) .. s
+  comp:add_hl("DiffviewFilePanelTitle", line_idx, 0, #s)
+  comp:add_line(s)
+
+  for _, section in ipairs(self.components.sections) do
+    ---@cast section CompStruct
+
+    -- Section heading
+    comp = section.section_heading.comp
+    comp:add_line("")
+    s = string.rep(" ", math.floor(self.state.width * 0.5 - #comp.context.label * 0.5)) .. comp.context.label
+    comp:add_hl("Statement", 1, 0, #s)
+    comp:add_line(s)
+    s = ("%14s    CALLBACK"):format("KEYS")
+    comp:add_hl("DiffviewFilePanelCounter", 2, 0, #s)
+    comp:add_line(s)
+
+    for _, item in ipairs(section.items) do
+      ---@cast item CompStruct
+      comp = item.comp
+      s = comp.context.label_lhs
+      comp:add_hl("DiffviewSecondary", 0, 0, #s)
+      offset = #s
+      s = s .. " -> "
+      comp:add_hl("DiffviewNonText", 0, offset, #s)
+      offset = #s
+      s = s .. comp.context.label_rhs
+      comp:add_line(s)
+    end
+  end
 end
 
 M.HelpPanel = HelpPanel
