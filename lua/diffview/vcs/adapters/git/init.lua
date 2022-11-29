@@ -1058,6 +1058,23 @@ function GitAdapter:head_rev()
   return GitRev(RevType.COMMIT, s, true)
 end
 
+---@param path string
+---@param rev_arg string?
+---@return string?
+function GitAdapter:file_blob_hash(path, rev_arg)
+  local out, code = self:exec_sync({
+    "rev-parse",
+    "--revs-only",
+    ("%s:%s"):format(rev_arg or "", path)
+  }, self.ctx.toplevel)
+
+  if code ~= 0 then
+    return
+  end
+
+  return vim.trim(out[1])
+end
+
 ---Parse two endpoint, commit revs from a symmetric difference notated rev arg.
 ---@param rev_arg string
 ---@return Rev? left The left rev.
@@ -1316,7 +1333,6 @@ function GitAdapter:stage_index_file(file)
     })
 
     vim.cmd("silent noautocmd keepalt '[,']write " .. temp)
-    print(temp)
 
     out, code = self:exec_sync(
       { "--literal-pathspecs", "hash-object", "-w", "--", pl:convert(temp) },

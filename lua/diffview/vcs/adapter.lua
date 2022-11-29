@@ -98,6 +98,14 @@ function VCSAdapter:head_rev()
   oop.abstract_stub()
 end
 
+---Get the hash for a file's blob in a given rev.
+---@param path string
+---@param rev_arg string?
+---@return string?
+function VCSAdapter:file_blob_hash(path, rev_arg)
+  oop.abstract_stub()
+end
+
 ---@return string[] # path to binary for VCS command
 function VCSAdapter:get_command()
   oop.abstract_stub()
@@ -284,6 +292,7 @@ function VCSAdapter:file_restore(path, kind, commit)
   oop.abstract_stub()
 end
 
+---Update the index entry for a given file with the contents of an index buffer.
 ---@param file vcs.File
 ---@return boolean success
 function VCSAdapter:stage_index_file(file)

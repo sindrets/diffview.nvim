@@ -24,6 +24,7 @@ local M = {}
 ---@field kind vcs.FileKind
 ---@field nulled boolean
 ---@field rev Rev
+---@field blob_hash string?
 ---@field commit Commit?
 ---@field symbol string?
 ---@field get_data git.FileDataProducer?
@@ -131,6 +132,32 @@ function File:_create_local_buffer(callback)
   return self.bufnr
 end
 
+function File:_produce_data(callback)
+  if self.get_data and vim.is_callable(self.get_data) then
+    async.run(function()
+      local pos = self.symbol == "a" and "left" or "right"
+      local data = self.get_data(self.kind, self.path, pos)
+      callback(data)
+      ---@diagnostic disable-next-line: param-type-mismatch
+    end, nil)
+  else
+    self.adapter:show(
+      { ("%s:%s"):format(self.rev:object_name() or "", self.path) },
+      function(err, result)
+        if err then
+          utils.err(
+            ("Failed to create diff buffer: '%s'"):format(api.nvim_buf_get_name(self.bufnr)),
+            true
+          )
+          return
+        end
+
+        callback(result)
+      end
+    )
+  end
+end
+
 ---@param callback function
 function File:create_buffer(callback)
   if self == File.NULL_FILE then
@@ -178,6 +205,7 @@ function File:create_buffer(callback)
   local bufopts = vim.deepcopy(File.bufopts)
 
   if self.rev.type == RevType.STAGE and self.rev.stage == 0 then
+    self.blob_hash = self.adapter:file_blob_hash(self.path)
     bufopts.modifiable = true
     bufopts.buftype = nil
     bufopts.undolevels = nil
@@ -198,45 +226,23 @@ function File:create_buffer(callback)
 
   api.nvim_buf_set_name(self.bufnr, fullname)
 
-  local function data_callback(lines)
-    vim.schedule(function()
-      if api.nvim_buf_is_valid(self.bufnr) then
-        local last_modifiable = vim.bo[self.bufnr].modifiable
-        local last_modified = vim.bo[self.bufnr].modified
-        vim.bo[self.bufnr].modifiable = true
-        api.nvim_buf_set_lines(self.bufnr, 0, -1, false, lines)
-        api.nvim_buf_call(self.bufnr, function()
-          vim.cmd("filetype detect")
-        end)
-        vim.bo[self.bufnr].modifiable = last_modifiable
-        vim.bo[self.bufnr].modified = last_modified
-        self:post_buf_created()
-        callback()
-      end
-    end)
-  end
+  self:_produce_data(vim.schedule_wrap(function(lines)
+    if api.nvim_buf_is_valid(self.bufnr) then
+      local last_modifiable = vim.bo[self.bufnr].modifiable
+      local last_modified = vim.bo[self.bufnr].modified
+      vim.bo[self.bufnr].modifiable = true
+      api.nvim_buf_set_lines(self.bufnr, 0, -1, false, lines)
 
-  if self.get_data and vim.is_callable(self.get_data) then
-    async.run(function()
-      local pos = self.symbol == "a" and "left" or "right"
-      local data = self.get_data(self.kind, self.path, pos)
-      data_callback(data)
-      ---@diagnostic disable-next-line: param-type-mismatch
-    end, nil)
+      api.nvim_buf_call(self.bufnr, function()
+        vim.cmd("filetype detect")
+      end)
 
-  else
-    self.adapter:show(
-      { ("%s:%s"):format(self.rev:object_name() or "", self.path) },
-      function(err, result)
-        if err then
-          utils.err(string.format("Failed to create diff buffer: '%s'", fullname), true)
-          return
-        end
-
-        data_callback(result)
-      end
-    )
-  end
+      vim.bo[self.bufnr].modifiable = last_modifiable
+      vim.bo[self.bufnr].modified = last_modified
+      self:post_buf_created()
+      callback()
+    end
+  end))
 
   return self.bufnr
 end
