@@ -284,6 +284,12 @@ function VCSAdapter:file_restore(path, kind, commit)
   oop.abstract_stub()
 end
 
+---@param file vcs.File
+---@return boolean success
+function VCSAdapter:stage_index_file(file)
+  oop.abstract_stub()
+end
+
 ---@diagnostic enable: unused-local, missing-return
 
 ---@param self VCSAdapter

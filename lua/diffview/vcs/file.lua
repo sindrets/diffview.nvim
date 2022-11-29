@@ -37,6 +37,9 @@ local File = oop.create_class("vcs.File")
 ---@type table<integer, vcs.File.AttachState>
 File.attached = {}
 
+---@type table<string, table<string, integer>>
+File.index_bufmap = {}
+
 ---@static
 File.bufopts = {
   buftype = "nowrite",
@@ -103,6 +106,31 @@ function File:post_buf_created()
   end
 end
 
+function File:_create_local_buffer(callback)
+  self.bufnr = utils.find_file_buffer(self.absolute_path)
+
+  if not self.bufnr then
+    local winid = utils.temp_win()
+    assert(winid ~= 0, "Failed to create temporary window!")
+
+    api.nvim_win_call(winid, function()
+      vim.cmd("edit " .. vim.fn.fnameescape(self.absolute_path))
+      self.bufnr = api.nvim_get_current_buf()
+      vim.bo[self.bufnr].bufhidden = "hide"
+    end)
+
+    api.nvim_win_close(winid, true)
+  else
+    -- NOTE: LSP servers might load buffers in the background and unlist
+    -- them. Explicitly set the buffer as listed when loading it here.
+    vim.bo[self.bufnr].buflisted = true
+  end
+
+  self:post_buf_created()
+  vim.schedule(callback)
+  return self.bufnr
+end
+
 ---@param callback function
 function File:create_buffer(callback)
   if self == File.NULL_FILE then
@@ -125,31 +153,8 @@ function File:create_buffer(callback)
   end
 
   if self.rev.type == RevType.LOCAL then
-    self.bufnr = utils.find_file_buffer(self.absolute_path)
-
-    if not self.bufnr then
-      local winid = utils.temp_win()
-      assert(winid ~= 0, "Failed to create temporary window!")
-
-      api.nvim_win_call(winid, function()
-        vim.cmd("edit " .. vim.fn.fnameescape(self.absolute_path))
-        self.bufnr = api.nvim_get_current_buf()
-        vim.bo[self.bufnr].bufhidden = "hide"
-      end)
-
-      api.nvim_win_close(winid, true)
-    else
-      -- NOTE: LSP servers might load buffers in the background and unlist
-      -- them. Explicitly set the buffer as listed when loading it here.
-      vim.bo[self.bufnr].buflisted = true
-    end
-
-    self:post_buf_created()
-    vim.schedule(callback)
-    return self.bufnr
+    return self:_create_local_buffer(callback)
   end
-
-  self.bufnr = api.nvim_create_buf(false, false)
 
   local context
   if self.rev.type == RevType.COMMIT then
@@ -160,31 +165,51 @@ function File:create_buffer(callback)
     context = "[custom]"
   end
 
-  for option, value in pairs(File.bufopts) do
+  local fullname = pl:join("diffview://", self.adapter.ctx.dir, context, self.path)
+
+  self.bufnr = utils.find_named_buffer(fullname)
+
+  if self.bufnr then
+    vim.schedule(callback)
+    return self.bufnr
+  end
+
+  self.bufnr = api.nvim_create_buf(false, false)
+  local bufopts = vim.deepcopy(File.bufopts)
+
+  if self.rev.type == RevType.STAGE and self.rev.stage == 0 then
+    bufopts.modifiable = true
+    bufopts.buftype = nil
+    bufopts.undolevels = nil
+    utils.tbl_set(File.index_bufmap, { self.adapter.ctx.toplevel, self.path }, self.bufnr)
+
+    api.nvim_create_autocmd("BufWriteCmd", {
+      buffer = self.bufnr,
+      nested = true,
+      callback = function()
+        self.adapter:stage_index_file(self)
+      end,
+    })
+  end
+
+  for option, value in pairs(bufopts) do
     api.nvim_buf_set_option(self.bufnr, option, value)
   end
 
-  local fullname = pl:join("diffview://", self.adapter.ctx.dir, context, self.path)
-  local ok = pcall(api.nvim_buf_set_name, self.bufnr, fullname)
-  if not ok then
-    -- Resolve name conflict
-    local i = 1
-    repeat
-      fullname = pl:join("diffview://", self.adapter.ctx.dir, context, i, self.path)
-      ok = pcall(api.nvim_buf_set_name, self.bufnr, fullname)
-      i = i + 1
-    until ok
-  end
+  api.nvim_buf_set_name(self.bufnr, fullname)
 
   local function data_callback(lines)
     vim.schedule(function()
       if api.nvim_buf_is_valid(self.bufnr) then
+        local last_modifiable = vim.bo[self.bufnr].modifiable
+        local last_modified = vim.bo[self.bufnr].modified
         vim.bo[self.bufnr].modifiable = true
         api.nvim_buf_set_lines(self.bufnr, 0, -1, false, lines)
         api.nvim_buf_call(self.bufnr, function()
           vim.cmd("filetype detect")
         end)
-        vim.bo[self.bufnr].modifiable = false
+        vim.bo[self.bufnr].modifiable = last_modifiable
+        vim.bo[self.bufnr].modified = last_modified
         self:post_buf_created()
         callback()
       end
