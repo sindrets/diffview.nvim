@@ -1227,6 +1227,9 @@ function GitAdapter:get_files_args(args)
   return utils.vec_join(self:args(), "ls-files", "--others", "--exclude-standard", args)
 end
 
+---@param path string
+---@param kind vcs.FileKind
+---@param commit string?
 function GitAdapter:file_restore(path, kind, commit)
   local out, code
   local abs_path = utils.path:join(self.ctx.toplevel, path)
@@ -1245,7 +1248,7 @@ function GitAdapter:file_restore(path, kind, commit)
     out, code = self:exec_sync({ "hash-object", "-w", "--", path }, self.ctx.toplevel)
     if code ~= 0 then
       utils.err("Failed to write file blob into the object database. Aborting file restoration.", true)
-      return nil
+      return false
     end
   end
 
@@ -1272,7 +1275,7 @@ function GitAdapter:file_restore(path, kind, commit)
       end
     end
 
-    if kind == "working" then
+    if kind == "working" or kind == "conflicting" then
       -- File is untracked and has no history: delete it from fs.
       local ok, err = utils.path:unlink(abs_path)
       if not ok then
@@ -1281,7 +1284,7 @@ function GitAdapter:file_restore(path, kind, commit)
             :format(abs_path),
           err
         }, true)
-        return nil
+        return false
       end
     else
       -- File only exists in index
@@ -1298,7 +1301,7 @@ function GitAdapter:file_restore(path, kind, commit)
     )
   end
 
-  return undo
+  return true, undo
 end
 
 function GitAdapter:reset_files(paths)

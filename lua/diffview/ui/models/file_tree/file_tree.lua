@@ -8,7 +8,7 @@ local M = {}
 ---@class DirData
 ---@field name string
 ---@field path string
----@field kind git.FileKind
+---@field kind vcs.FileKind
 ---@field collapsed boolean
 ---@field status string
 ---@field _node Node

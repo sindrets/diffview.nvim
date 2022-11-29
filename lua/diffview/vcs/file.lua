@@ -6,14 +6,13 @@ local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|Lazy
 local async = lazy.require("plenary.async") ---@module "plenary.async"
 local config = lazy.require("diffview.config") ---@module "diffview.config"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
-local vcs = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
 
 local pl = lazy.access(utils, "path") ---@type PathLib|LazyModule
 
 local api = vim.api
 local M = {}
 
----@alias git.FileDataProducer fun(kind: git.FileKind, path: string, pos: "left"|"right"): string[]
+---@alias git.FileDataProducer fun(kind: vcs.FileKind, path: string, pos: "left"|"right"): string[]
 
 ---@class vcs.File : diffview.Object
 ---@field adapter GitAdapter
@@ -22,7 +21,7 @@ local M = {}
 ---@field parent_path string
 ---@field basename string
 ---@field extension string
----@field kind git.FileKind
+---@field kind vcs.FileKind
 ---@field nulled boolean
 ---@field rev Rev
 ---@field commit Commit?
@@ -201,8 +200,7 @@ function File:create_buffer(callback)
     end, nil)
 
   else
-    vcs.show(
-      self.adapter,
+    self.adapter:show(
       { ("%s:%s"):format(self.rev:object_name() or "", self.path) },
       function(err, result)
         if err then

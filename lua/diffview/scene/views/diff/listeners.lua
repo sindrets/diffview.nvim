@@ -5,7 +5,7 @@ local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|Lazy
 local actions = lazy.require("diffview.actions") ---@module "diffview.actions"
 local async = lazy.require("plenary.async") ---@module "plenary.async"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
-local vcs = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
+local vcs_utils = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
 
 local api = vim.api
 
@@ -220,7 +220,7 @@ return function(view)
           utils.err("The file is open with unsaved changes! Aborting file restoration.")
           return
         end
-        vcs.restore_file(view.adapter, file.path, file.kind, commit, function()
+        vcs_utils.restore_file(view.adapter, file.path, file.kind, commit, function()
           async.util.scheduler()
           view:update_files()
         end)

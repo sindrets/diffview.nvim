@@ -1,20 +1,13 @@
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
----@type vcs.File|LazyModule
-local File = lazy.access("diffview.vcs.file", "File")
----@type RevType|LazyModule
-local RevType = lazy.access("diffview.vcs.rev", "RevType")
----@type Diff1|LazyModule
-local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1")
----@type Diff2|LazyModule
-local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2")
----@type Diff3|LazyModule
-local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3")
----@type Diff4|LazyModule
-local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4")
----@module "diffview.utils"
-local utils = lazy.require("diffview.utils")
+local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1") ---@type Diff1|LazyModule
+local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2") ---@type Diff2|LazyModule
+local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3") ---@type Diff3|LazyModule
+local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4") ---@type Diff4|LazyModule
+local File = lazy.access("diffview.vcs.file", "File") ---@type vcs.File|LazyModule
+local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local M = {}
 
@@ -36,7 +29,7 @@ local fstat_cache = {}
 ---@field layout Layout
 ---@field status string
 ---@field stats GitStats
----@field kind git.FileKind
+---@field kind vcs.FileKind
 ---@field commit Commit|nil
 ---@field active boolean
 local FileEntry = oop.create_class("FileEntry")
@@ -48,7 +41,7 @@ local FileEntry = oop.create_class("FileEntry")
 ---@field layout Layout
 ---@field status string
 ---@field stats GitStats
----@field kind git.FileKind
+---@field kind vcs.FileKind
 ---@field commit? Commit
 
 ---FileEntry constructor

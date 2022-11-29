@@ -1,16 +1,21 @@
-local oop = require('diffview.oop')
-local utils = require('diffview.utils')
-local logger = require('diffview.logger')
-local arg_parser = require('diffview.arg_parser')
-local RevType = require("diffview.vcs.rev").RevType
-local Rev = require("diffview.vcs.rev").Rev
+local Job = require("plenary.job")
+local async = require("plenary.async")
+local lazy = require("diffview.lazy")
+local oop = require("diffview.oop")
+
+local JobStatus = lazy.access("diffview.vcs.utils", "JobStatus") ---@type JobStatus|LazyModule
+local Rev = lazy.access("diffview.vcs.rev", "Rev") ---@type Rev|LazyModule
+local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
+local arg_parser = lazy.require("diffview.arg_parser") ---@module "diffview.arg_parser"
+local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
+local vcs_utils = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
 
 local M = {}
 
 ---@class vcs.adapter.LayoutOpt
 ---@field default_layout Diff2
 ---@field merge_layout Layout
-
 
 ---@class vcs.adapter.VCSAdapter.Bootstrap
 ---@field done boolean # Did the bootstrapping
@@ -33,7 +38,7 @@ local M = {}
 ---@field bootstrap vcs.adapter.VCSAdapter.Bootstrap
 ---@field ctx vcs.adapter.VCSAdapter.Ctx
 ---@field flags vcs.adapter.VCSAdapter.Flags
-local VCSAdapter = oop.create_class('VCSAdapter')
+local VCSAdapter = oop.create_class("VCSAdapter")
 
 VCSAdapter.Rev = Rev
 
@@ -271,14 +276,58 @@ end
 
 ---Restore file
 ---@param path string
----@param kind '"staged"' | '"working"'
+---@param kind vcs.FileKind
 ---@param commit string?
----@return boolean # Restore was successful
+---@return boolean success
+---@return string? undo # If the adapter supports it: a command that will undo the restoration.
 function VCSAdapter:file_restore(path, kind, commit)
   oop.abstract_stub()
 end
 
 ---@diagnostic enable: unused-local, missing-return
+
+---@param self VCSAdapter
+---@param args string[]
+---@param callback fun(stderr: string[]?, stdout: string[]?)
+VCSAdapter.show = async.wrap(function(self, args, callback)
+  local job = Job:new({
+    command = self:bin(),
+    args = self:get_show_args(args),
+    cwd = self.ctx.toplevel,
+    ---@type Job
+    on_exit = async.void(function(j)
+      local context = "vcs.utils.show()"
+      utils.handle_job(j, {
+        fail_on_empty = true,
+        context = context,
+        debug_opt = { no_stdout = true, context = context },
+      })
+
+      if j.code ~= 0 then
+        callback(j:stderr_result() or {}, nil)
+        return
+      end
+
+      local out_status
+
+      if #j:result() == 0 then
+        async.util.scheduler()
+        out_status = vcs_utils.ensure_output(2, { j }, context)
+      end
+
+      if out_status == JobStatus.ERROR then
+        callback(j:stderr_result() or {}, nil)
+        return
+      end
+
+      callback(nil, j:result())
+    end),
+  })
+  -- Problem: Running multiple 'show' jobs simultaneously may cause them to fail
+  -- silently.
+  -- Solution: queue them and run them one after another.
+  vcs_utils.queue_sync_job(job)
+end, 3)
 
 ---Convert revs to string representation.
 ---@param left Rev

@@ -27,7 +27,7 @@ local sync_jobs = {}
 local job_queue_sem = Semaphore.new(1)
 
 ---@param job Job
-local resume_sync_queue = async.void(function(job)
+M.resume_sync_queue = async.void(function(job)
   local permit = job_queue_sem:acquire()
   local idx = utils.vec_indexof(sync_jobs, job)
   if idx > -1 then
@@ -41,9 +41,9 @@ local resume_sync_queue = async.void(function(job)
 end)
 
 ---@param job Job
-local queue_sync_job = async.void(function(job)
+M.queue_sync_job = async.void(function(job)
   job:add_on_exit_callback(function()
-    resume_sync_queue(job)
+    M.resume_sync_queue(job)
   end)
 
   local permit = job_queue_sem:acquire()
@@ -57,7 +57,7 @@ end)
 
 ---@param max_retries integer
 ---@vararg Job
-local ensure_output = async.wrap(function(max_retries, jobs, log_context, callback)
+M.ensure_output = async.wrap(function(max_retries, jobs, log_context, callback)
   local num_bad_jobs
   local num_retries = 0
   local new_jobs = {}
@@ -111,52 +111,11 @@ local ensure_output = async.wrap(function(max_retries, jobs, log_context, callba
   callback(JobStatus.ERROR)
 end, 4)
 
-M.show = async.wrap(function(adapter, args, callback) 
-  local job = Job:new({
-    command = adapter:bin(),
-    args = adapter:get_show_args(args),
-    cwd = adapter.ctx.toplevel,
-    ---@type Job
-    on_exit = async.void(function(j)
-      local context = "vcs.utils.show()"
-      utils.handle_job(j, {
-        fail_on_empty = true,
-        context = context,
-        debug_opt = { no_stdout = true, context = context },
-      })
-
-      if j.code ~= 0 then
-        callback(j:stderr_result() or {}, nil)
-        return
-      end
-
-      local out_status
-
-      if #j:result() == 0 then
-        async.util.scheduler()
-        out_status = ensure_output(2, { j }, context)
-      end
-
-      if out_status == JobStatus.ERROR then
-        callback(j:stderr_result() or {}, nil)
-        return
-      end
-
-      callback(nil, j:result())
-    end),
-  })
-  -- Problem: Running multiple 'show' jobs simultaneously may cause them to fail
-  -- silently.
-  -- Solution: queue them and run them one after another.
-  queue_sync_job(job)
-
-end, 3)
-
 ---@param adapter VCSAdapter
 ---@param left Rev
 ---@param right Rev
 ---@param args string[]
----@param kind git.FileKind
+---@param kind vcs.FileKind
 ---@param opt vcs.adapter.LayoutOpt
 ---@param callback function
 local tracked_files = async.wrap(function(adapter, left, right, args, kind, opt, callback)
@@ -197,7 +156,7 @@ local tracked_files = async.wrap(function(adapter, left, right, args, kind, opt,
   latch:await()
   local out_status
   if not (#namestat_job:result() == #numstat_job:result()) then
-    out_status = ensure_output(2, { namestat_job, numstat_job }, "git.utils>tracked_files()")
+    out_status = M.ensure_output(2, { namestat_job, numstat_job }, "git.utils>tracked_files()")
   end
 
   if out_status == JobStatus.ERROR or not (namestat_job.code == 0 and numstat_job.code == 0) then
@@ -444,17 +403,22 @@ end
 ---object database such that the action can be undone.
 ---@param adapter VCSAdapter
 ---@param path string
----@param kind '"staged"'|'"working"'
+---@param kind vcs.FileKind
 ---@param commit string
 M.restore_file = async.wrap(function(adapter, path, kind, commit, callback)
-  local undo = adapter:file_restore(path, kind, commit)
-  if not undo then
+  local ok, undo = adapter:file_restore(path, kind, commit)
+
+  if not ok then
     utils.err("Failed to revert file! See ':DiffviewLog' for details.", true)
     return callback()
   end
 
   local rev_name = (commit and commit:sub(1, 11)) or (kind == "staged" and "HEAD" or "index")
-  utils.info(("File restored from %s. Undo with %s"):format(rev_name, undo), true)
+  utils.info(("File restored from %s. %s"):format(
+    rev_name,
+    undo and "Undo with " .. undo
+  ), true)
+
   callback()
 end, 5)
 
@@ -474,7 +438,7 @@ local CONFLICT_END = [[^>>>>>>> ]]
 ---@param winid? integer
 ---@return ConflictRegion[] conflicts
 ---@return ConflictRegion? cur_conflict The conflict under the cursor in the given window.
----@return integer cur_conflict_idx Index of the current conflict. Will be 0 if the cursor if before the first conflict, and `#conflicts + 1` if the cursor is after the last conflict.
+---@return integer cur_conflict_idx Index of the current conflict. Will be 0 if the cursor is before the first conflict, and `#conflicts + 1` if the cursor is after the last conflict.
 function M.parse_conflicts(lines, winid)
   local ret = {}
   local has_start, has_base, has_sep = false, false, false

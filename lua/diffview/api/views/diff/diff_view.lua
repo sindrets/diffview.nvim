@@ -6,7 +6,7 @@ local FilePanel = lazy.access("diffview.scene.views.diff.file_panel", "FilePanel
 local Rev = lazy.access("diffview.vcs.adapters.git.rev", "GitRev") ---@type GitRev|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local async = lazy.require("plenary.async") ---@module "plenary.async"
-local vcs = lazy.require("diffview.vcs") ---@module "diffview.vcs"
+local vcs_utils = lazy.require("diffview.vcs") ---@module "diffview.vcs"
 local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 local oop = lazy.require("diffview.oop") ---@module "diffview.oop"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
@@ -34,7 +34,7 @@ function CDiffView:init(opt)
   logger.info("[api] Creating a new Custom DiffView.")
   self.valid = false
 
-  local err, adapter = vcs.get_adapter({ top_indicators = { opt.git_root } })
+  local err, adapter = vcs_utils.get_adapter({ top_indicators = { opt.git_root } })
 
   if err then
     utils.err(
