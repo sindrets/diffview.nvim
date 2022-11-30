@@ -55,6 +55,14 @@ COMMANDS                                        *diffview-commands*
             :DiffviewOpen HEAD~2 -- lua/diffview plugin
             :DiffviewOpen d4a7b0d -uno
 <
+
+                                                *diffview-staging*
+        You can stage individual hunks by editing any buffer that represents
+        the index (after running `:DiffviewOpen` with no [git-rev] the entries
+        under "Changes" will have the index buffer on the left side, and the
+        entries under "Staged changes" will have it on the right side). Once
+        you write to an index buffer the index will be updated.
+
                                                 *diffview-merge-tool*
         If you call `:DiffviewOpen` during a merge or a rebase, the view will
         list the conflicted files in their own section. When opening a
@@ -98,7 +106,7 @@ COMMANDS                                        *diffview-commands*
         layouts. To configure a different default layout, see
         |diffview-config-view.x.layout|.
 
-    Options:~
+    Options: ~
         -u[value], --untracked-files[={value}]
                         Specify whether or not to show untracked files. If
                         flag is given without value; defaults to `true`.
@@ -171,7 +179,7 @@ COMMANDS                                        *diffview-commands*
             :'<,'>DiffviewFileHistory
 <
 
-    Options:~
+    Options: ~
         --base={git-rev}
                         Specify a base git rev from which the right side of
                         the diff will be created. Use the special value
@@ -506,7 +514,7 @@ log_options                                     *diffview-config-log_options*
         to define different default log options for history targeting singular
         files, and history targeting multiple paths, and/or directories.
 
-        Fields:~
+        Fields: ~
             {single_file} (`LogOptions`)
                 See |diffview.git.LogOptions|.
 
@@ -535,34 +543,34 @@ hooks                                           *diffview-config-hooks*
         Diffview. The hook events are also available as User autocommands. See
         |diffview-user-autocmds| for more details.
 
-        Available Events:~
+        Available Events: ~
             {view_opened} (`fun(view: View)`)
                 Emitted after a new view has been opened. It's called after
                 initializing the layout in the new tabpage (all windows are
                 ready).
 
-                Callback Parameters:~
+                Callback Parameters: ~
                     {view} (`View`)
                         The `View` instance that was opened.
 
             {view_closed} (`fun(view: View)`)
                 Emitted after closing a view.
 
-                Callback Parameters:~
+                Callback Parameters: ~
                     {view} (`View`)
                         The `View` instance that was closed.
 
             {view_enter} (`fun(view: View)`)
                 Emitted just after entering the tabpage of a view.
 
-                Callback Parameters:~
+                Callback Parameters: ~
                     {view} (`View`)
                         The `View` instance that was entered.
 
             {view_leave} (`fun(view: View)`)
                 Emitted just before leaving the tabpage of a view.
 
-                Callback Parameters:~
+                Callback Parameters: ~
                     {view} (`View`)
                         The `View` instance that's about to be left.
 
@@ -577,7 +585,7 @@ hooks                                           *diffview-config-hooks*
                 that |:setlocal| will apply settings to the relevant buffer /
                 window.
 
-                Callback Parameters:~
+                Callback Parameters: ~
                     {bufnr} (`integer`)
                         The buffer number of the new buffer.
 
@@ -589,7 +597,7 @@ hooks                                           *diffview-config-hooks*
                 that |:setlocal| will apply settings to the relevant buffer /
                 window.
 
-                Callback Parameters:~
+                Callback Parameters: ~
                     {bufnr} (`integer`)
                         The buffer number of the new buffer.
                     {winid} (`integer`)
@@ -665,7 +673,7 @@ keymaps                                         *diffview-config-keymaps*
 <
 
                                                 *diffview-actions*
-Actions~
+Actions ~
 
         Actions are key-mappable functions. You can access an action through
         the config module: >
@@ -680,7 +688,7 @@ Actions~
         Following are the different contexts described alongside possible
         subjects, upon which actions called from their context, will act on.
 
-        Contexts:~
+        Contexts: ~
             {diff_view}
                 The windows containing the diff buffers in a Diffview.
 
@@ -738,7 +746,7 @@ Actions~
                 Any of the panels.
 
                                                 *diffview-available-actions*
-Available Actions~
+Available Actions ~
 
 close                                           *diffview-actions-close*
         Contexts: `view`, `panel`
@@ -978,7 +986,7 @@ view_windo({cmd}, [targets])                    *diffview-actions-view_windo*
                 |diffview-config-view.x.layout|.
 
                                                 *diffview-unused-actions*
-Unused actions~
+Unused actions ~
 
 Not all actions are mapped by default. The unused actions offer variations on
 the functionality provided by other actions, or just different functionality
@@ -1037,7 +1045,7 @@ file panel.
             • |diffview-actions|
 
                                                 *diffview-file-inference*
-File inference~
+File inference ~
 
 Actions that target a file will infer the target file according to a set of
 simple rules:
@@ -1048,7 +1056,7 @@ simple rules:
           the entry under the cursor.
 
                                                 *diffview-maps-view*
-View maps~
+View maps ~
 
 These maps are available in the diff buffers while a Diffview is the current
 tabpage.
@@ -1087,7 +1095,7 @@ gf                      Open the local version of the file in a new split in a
 y                       Copy the commit hash of the entry under the cursor.
 
                                                 *diffview-maps-file-panel*
-File panel maps~
+File panel maps ~
 
 These maps are available in the file panel buffer.
 
@@ -1134,7 +1142,7 @@ R                       Update the stats and entries in the file list.
 <leader>e               Bring focus to the file panel.
 
                                                 *diffview-maps-file-history-panel*
-File history panel maps~
+File history panel maps ~
 
 These mappings are available in the file history panel buffer (the panel
 listing the commits).
@@ -1174,7 +1182,7 @@ o                       Open the diff for the selected item.
 <leader>e               Bring focus to the file history panel.
 
                                                 *diffview-maps-file-history-option-panel*
-File history option panel maps~
+File history option panel maps ~
 
 These mappings are available from the file history option panel. The option
 panel will allow you to change the flags that will be passed to `git-log`. A
