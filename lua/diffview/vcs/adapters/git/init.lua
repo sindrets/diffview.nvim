@@ -19,6 +19,7 @@ local utils = require("diffview.utils")
 
 ---@type PathLib
 local pl = lazy.access(utils, "path")
+local api = vim.api
 
 local M = {}
 
@@ -1057,6 +1058,23 @@ function GitAdapter:head_rev()
   return GitRev(RevType.COMMIT, s, true)
 end
 
+---@param path string
+---@param rev_arg string?
+---@return string?
+function GitAdapter:file_blob_hash(path, rev_arg)
+  local out, code = self:exec_sync({
+    "rev-parse",
+    "--revs-only",
+    ("%s:%s"):format(rev_arg or "", path)
+  }, self.ctx.toplevel)
+
+  if code ~= 0 then
+    return
+  end
+
+  return vim.trim(out[1])
+end
+
 ---Parse two endpoint, commit revs from a symmetric difference notated rev arg.
 ---@param rev_arg string
 ---@return Rev? left The left rev.
@@ -1302,6 +1320,59 @@ function GitAdapter:file_restore(path, kind, commit)
   end
 
   return true, undo
+end
+
+---@param file vcs.File
+function GitAdapter:stage_index_file(file)
+  local out, code, err
+  local temp = vim.fn.tempname()
+
+  local ok, ret = pcall(function()
+    api.nvim_exec_autocmds("BufWritePre", {
+      pattern = api.nvim_buf_get_name(file.bufnr),
+    })
+
+    vim.cmd("silent noautocmd keepalt '[,']write " .. temp)
+
+    out, code = self:exec_sync(
+      { "--literal-pathspecs", "hash-object", "-w", "--", pl:convert(temp) },
+      self.ctx.toplevel
+    )
+
+    if code ~= 0 then
+      utils.err("Failed to write file blob into the object database. Aborting.")
+      return false
+    end
+
+    local blob_hash = out[1]
+
+    out, code = self:exec_sync({ "ls-files", "--stage", file.path }, self.ctx.toplevel)
+    local old_mode = out[1]:match("^(%d+)")
+
+    if not old_mode then
+      old_mode = vim.fn.executable(file.absolute_path) and "100755" or "100644"
+    end
+
+    out, code, err = self:exec_sync({ "update-index", "--index-info" }, {
+      cwd = self.ctx.toplevel,
+      writer = ("%s %s %d\t%s"):format(old_mode, blob_hash, file.rev.stage, file.path),
+    })
+
+    if code ~= 0 then
+      utils.err(utils.vec_join("Failed to update index!", err))
+      return false
+    end
+
+    vim.bo[file.bufnr].modified = false
+    api.nvim_exec_autocmds("BufWritePost", {
+      pattern = api.nvim_buf_get_name(file.bufnr),
+    })
+  end)
+
+  vim.fn.delete(temp)
+  if not ok then error(ret) end
+
+  return ret
 end
 
 function GitAdapter:reset_files(paths)

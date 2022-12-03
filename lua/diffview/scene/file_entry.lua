@@ -9,6 +9,8 @@ local File = lazy.access("diffview.vcs.file", "File") ---@type vcs.File|LazyModu
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
+local api = vim.api
+
 local M = {}
 
 local fstat_cache = {}
@@ -168,8 +170,28 @@ function FileEntry:validate_stage_buffers(adapter, stat)
   if stat then
     if not cached_stat or cached_stat.mtime < stat.mtime.sec then
       for _, f in ipairs(self.layout:files()) do
-        if f.rev.type == RevType.STAGE then
-          f:dispose_buffer()
+        if f.rev.type == RevType.STAGE and f:is_valid() then
+          if f.rev.stage == 0 then
+            local is_modified = vim.bo[f.bufnr].modified
+
+            if f.blob_hash then
+              local new_hash = f.adapter:file_blob_hash(f.path)
+              if new_hash and new_hash ~= f.blob_hash and is_modified then
+                utils.warn((
+                  "A file was changed in the index since you started editing it!"
+                  .. " Be careful not to lose any staged changes when writing to this buffer: %s"
+                ):format(api.nvim_buf_get_name(f.bufnr)))
+              end
+            elseif not is_modified then
+              -- Should be very rare that we don't have an index-buffer's blob
+              -- hash. But in that case, we can't warn the user when a file
+              -- changes in the index while they're editing its index buffer.
+              f:dispose_buffer()
+            end
+
+          else
+            f:dispose_buffer()
+          end
         end
       end
     end

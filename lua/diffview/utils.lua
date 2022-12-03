@@ -387,6 +387,7 @@ end
 
 ---@class utils.system_list.Opt
 ---@field cwd string Working directory of the job.
+---@field writer Job|table|string Something that will write to the stdin of this job.
 ---@field silent boolean Supress log output.
 ---@field fail_on_empty boolean Return code 1 if stdout is empty and code is 0.
 ---@field retry_on_empty integer Number of times to retry job if stdout is empty and code is 0. Implies `fail_on_empty`.
@@ -428,6 +429,7 @@ function M.system_list(cmd, cwd_or_opt)
     command = command,
     args = cmd,
     cwd = opt.cwd,
+    writer = opt.writer,
     on_stderr = function(_, data)
       table.insert(stderr, data)
     end,
@@ -706,6 +708,44 @@ function M.tbl_fmap(t, func)
   end
 
   return ret
+end
+
+---Set a value in a table, creating all missing intermediate tables in the
+---table path.
+---@param t table
+---@param table_path string|string[] Either a `.` separated string of table keys, or a list.
+---@param value any
+function M.tbl_set(t, table_path, value)
+  local keys = type(table_path) == "table"
+      and table_path
+      or vim.split(table_path, ".", { plain = true })
+
+  local cur = t
+
+  for i = 1, #keys - 1 do
+    local k = keys[i]
+
+    if not cur[k] then
+      cur[k] = {}
+    end
+
+    cur = cur[k]
+  end
+
+  cur[keys[#keys]] = value
+end
+
+---Ensure that the table path is a table in `t`.
+---@param t table
+---@param table_path string|string[] Either a `.` separated string of table keys, or a list.
+function M.tbl_ensure(t, table_path)
+  local keys = type(table_path) == "table"
+      and table_path
+      or vim.split(table_path, ".", { plain = true })
+
+  if not M.tbl_access(t, keys) then
+    M.tbl_set(t, keys, {})
+  end
 end
 
 ---Create a shallow copy of a portion of a vector. Negative numbers indexes

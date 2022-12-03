@@ -115,6 +115,14 @@ Additional commands for convenience:
 With a Diffview open and the default key bindings, you can cycle through changed
 files with `<tab>` and `<s-tab>` (see configuration to change the key bindings).
 
+#### Staging
+
+You can stage individual hunks by editing any buffer that represents the index
+(after running `:DiffviewOpen` with no `[git-rev]` the entries under "Changes"
+will have the index buffer on the left side, and the entries under "Staged
+changes" will have it on the right side). Once you write to an index buffer the
+index will be updated.
+
 ### `:[range]DiffviewFileHistory [paths] [options]`
 
 Opens a new file history view that lists all commits that affected the given
