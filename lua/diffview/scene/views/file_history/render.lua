@@ -155,10 +155,12 @@ return {
 
     perf:reset()
     panel.render_data:clear()
+
     if not cache[panel] then
       prepare_panel_cache(panel)
     end
 
+    local conf = config.get_config()
     local comp = panel.components.header.comp
     local log_options = panel:get_log_options()
     local cached = cache[panel]
@@ -197,6 +199,12 @@ return {
     if panel.option_mapping then
       comp:add_text("Options: ", "DiffviewFilePanelPath")
       comp:add_text(panel.option_mapping, "DiffviewFilePanelCounter")
+      comp:ln()
+    end
+
+    if conf.show_help_hints and panel.help_mapping then
+      comp:add_text("Help: ", "DiffviewFilePanelPath")
+      comp:add_text(panel.help_mapping, "DiffviewFilePanelCounter")
       comp:ln()
     end
 

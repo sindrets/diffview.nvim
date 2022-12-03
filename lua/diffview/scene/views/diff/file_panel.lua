@@ -21,6 +21,7 @@ local M = {}
 ---@field render_data RenderData
 ---@field components CompStruct
 ---@field constrain_cursor function
+---@field help_mapping string
 local FilePanel = oop.create_class("FilePanel", Panel)
 
 FilePanel.winopts = vim.tbl_extend("force", Panel.winopts, {
@@ -79,6 +80,9 @@ function FilePanel:setup_buffer()
     local opt = vim.tbl_extend("force", default_opt, mapping[4] or {}, { buffer = self.bufid })
     vim.keymap.set(mapping[1], mapping[2], mapping[3], opt)
   end
+
+  local help_keymap = config.find_help_keymap(conf.keymaps.file_panel)
+  if help_keymap then self.help_mapping = help_keymap[2] end
 end
 
 function FilePanel:update_components()

@@ -39,6 +39,7 @@ M.defaults = {
   enhanced_diff_hl = false,
   git_cmd = { "git" },
   use_icons = true,
+  show_help_hints = true,
   watch_index = true,
   icons = {
     folder_closed = "",
@@ -328,6 +329,22 @@ function M.get_layout_keymaps(layout)
     return M._config.keymaps.diff3
   elseif layout:instanceof(Diff4.__get()) then
     return M._config.keymaps.diff4
+  end
+end
+
+function M.find_option_keymap(t)
+  for _, mapping in ipairs(t) do
+    if mapping[3] and mapping[3] == actions.options then
+      return mapping
+    end
+  end
+end
+
+function M.find_help_keymap(t)
+  for _, mapping in ipairs(t) do
+    if type(mapping[4]) == "table" and mapping[4].desc == "Open the help panel" then
+      return mapping
+    end
   end
 end
 

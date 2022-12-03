@@ -34,6 +34,7 @@ local perf_update = PerfTimer("[FileHistoryPanel] update")
 ---@field render_data RenderData
 ---@field option_panel FHOptionPanel
 ---@field option_mapping string
+---@field help_mapping string
 ---@field components CompStruct
 ---@field constrain_cursor function
 local FileHistoryPanel = oop.create_class("FileHistoryPanel", Panel.__get())
@@ -125,18 +126,18 @@ end
 
 function FileHistoryPanel:setup_buffer()
   local conf = config.get_config()
-  local option_rhs = config.actions.options
   local default_opt = { silent = true, nowait = true, buffer = self.bufid }
 
   for _, mapping in ipairs(conf.keymaps.file_history_panel) do
-    local lhs, rhs = mapping[2], mapping[3]
     local opt = vim.tbl_extend("force", default_opt, mapping[4] or {}, { buffer = self.bufid })
     vim.keymap.set(mapping[1], mapping[2], mapping[3], opt)
-
-    if rhs == option_rhs then
-      self.option_mapping = lhs
-    end
   end
+
+  local option_keymap = config.find_option_keymap(conf.keymaps.file_history_panel)
+  if option_keymap then self.option_mapping = option_keymap[2] end
+
+  local help_keymap = config.find_help_keymap(conf.keymaps.file_history_panel)
+  if help_keymap then self.help_mapping = help_keymap[2] end
 end
 
 function FileHistoryPanel:update_components()

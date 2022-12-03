@@ -126,7 +126,9 @@ return function(panel)
   end
 
   panel.render_data:clear()
+  local conf = config.get_config()
   local width = panel:get_width()
+
   if width == -1 then
     local panel_config = panel:get_config()
     width = panel_config.width
@@ -139,6 +141,12 @@ return function(panel)
     utils.path:shorten(utils.path:vim_fnamemodify(panel.adapter.ctx.toplevel, ":~"), width - 6),
     "DiffviewFilePanelRootPath"
   )
+
+  if conf.show_help_hints and panel.help_mapping then
+    comp:add_text("Help: ", "DiffviewFilePanelPath")
+    comp:add_line(panel.help_mapping, "DiffviewFilePanelCounter")
+    comp:add_line()
+  end
 
   if #panel.files.conflicting > 0 then
     comp = panel.components.conflicting.title.comp
