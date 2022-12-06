@@ -132,10 +132,10 @@ end
 function StandardView:use_entry(entry)
   if entry.layout:instanceof(Diff1.__get()) then
     local layout = entry.layout --[[@as Diff1 ]]
-    layout.a.file.winopts = vim.tbl_extend(
+    layout.b.file.winopts = vim.tbl_extend(
       "force",
-      layout.a.file.winopts,
-      self.winopts.diff1.a or {}
+      layout.b.file.winopts,
+      self.winopts.diff1.b or {}
     )
 
   elseif entry.layout:instanceof(Diff2.__get()) then

@@ -213,24 +213,28 @@ local tracked_files = async.wrap(function(adapter, left, right, args, kind, opt,
         oldpath = v.oldname,
         status = "U",
         kind = "conflicting",
-        rev_ours = adapter.Rev(RevType.STAGE, 2),
-        rev_main = adapter.Rev(RevType.LOCAL),
-        rev_theirs = adapter.Rev(RevType.STAGE, 3),
-        rev_base = adapter.Rev(RevType.STAGE, 1),
+        revs = {
+          a = adapter.Rev(RevType.STAGE, 2),  -- ours
+          b = adapter.Rev(RevType.LOCAL),     -- local
+          c = adapter.Rev(RevType.STAGE, 3),  -- theirs
+          d = adapter.Rev(RevType.STAGE, 1),  -- base
+        },
       }))
     end
   end
 
   for _, v in ipairs(data) do
-    table.insert(files, FileEntry.for_d2(opt.default_layout, {
+    table.insert(files, FileEntry.with_layout(opt.default_layout, {
       adapter = adapter,
       path = v.name,
       oldpath = v.oldname,
       status = v.status,
       stats = v.stats,
       kind = kind,
-      rev_a = left,
-      rev_b = right,
+      revs = {
+        a = left,
+        b = right,
+      },
     }))
   end
 
@@ -265,13 +269,15 @@ local untracked_files = async.wrap(function(adapter, left, right, opt, callback)
 
       local files = {}
       for _, s in ipairs(j:result()) do
-        table.insert(files, FileEntry.for_d2(opt.default_layout, {
+        table.insert(files, FileEntry.with_layout(opt.default_layout, {
           adapter = adapter,
           path = s,
           status = "?",
           kind = "working",
-          rev_a = left,
-          rev_b = right,
+          revs = {
+            a = left,
+            b = right,
+          },
         }))
       end
       callback(nil, files)

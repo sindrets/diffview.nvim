@@ -13,20 +13,20 @@ local api = vim.api
 local M = {}
 
 ---@class Diff1 : Layout
----@field a Window
+---@field b Window
 local Diff1 = oop.create_class("Diff1", Layout)
 
----@alias Diff1.WindowSymbol "a"
+---@alias Diff1.WindowSymbol "b"
 
 ---@class Diff1.init.Opt
----@field a vcs.File
----@field winid_a integer
+---@field b vcs.File
+---@field winid_b integer
 
 ---@param opt Diff1.init.Opt
 function Diff1:init(opt)
   Diff1:super().init(self)
-  self.a = Window({ file = opt.a, id = opt.winid_a })
-  self:use_windows(self.a)
+  self.b = Window({ file = opt.b, id = opt.winid_b })
+  self:use_windows(self.b)
 end
 
 ---@override
@@ -48,22 +48,22 @@ function Diff1:create(pivot)
     vim.cmd("aboveleft vsp")
     curwin = api.nvim_get_current_win()
 
-    if self.a then
-      self.a:set_id(curwin)
+    if self.b then
+      self.b:set_id(curwin)
     else
-      self.a = Window({ id = curwin })
+      self.b = Window({ id = curwin })
     end
   end)
 
   api.nvim_win_close(pivot, true)
-  self.windows = { self.a }
+  self.windows = { self.b }
   self.emitter:emit("create_post", self)
 end
 
 ---@param file vcs.File
-function Diff1:set_file_a(file)
-  self.a:set_file(file)
-  file.symbol = "a"
+function Diff1:set_file_b(file)
+  self.b:set_file(file)
+  file.symbol = "b"
 end
 
 ---@param entry FileEntry
@@ -71,7 +71,7 @@ function Diff1:use_entry(entry)
   local layout = entry.layout --[[@as Diff1 ]]
   assert(layout:instanceof(Diff1))
 
-  self:set_file_a(layout.a.file)
+  self:set_file_b(layout.b.file)
 
   if self:is_valid() then
     self:open_files()
@@ -79,7 +79,7 @@ function Diff1:use_entry(entry)
 end
 
 function Diff1:get_main_win()
-  return self.a
+  return self.b
 end
 
 ---@param layout Diff3
@@ -98,7 +98,7 @@ function Diff1:to_diff3(layout)
       rev = Rev(RevType.STAGE, 2),
       nulled = false, -- FIXME
     }),
-    b = self.a.file,
+    b = self.b.file,
     c = File({
       adapter = main.adapter,
       path = main.path,
@@ -127,7 +127,7 @@ function Diff1:to_diff4(layout)
       rev = Rev(RevType.STAGE, 2),
       nulled = false, -- FIXME
     }),
-    b = self.a.file,
+    b = self.b.file,
     c = File({
       adapter = main.adapter,
       path = main.path,

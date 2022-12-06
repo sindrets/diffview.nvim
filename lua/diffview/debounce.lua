@@ -58,13 +58,11 @@ function M.debounce_trailing(ms, rush_first, fn)
   local debounced_fn, args
 
   debounced_fn = wrap(timer, function(...)
-    if lock then
-      args = utils.tbl_pack(...)
-    else
+    if not lock and rush_first and args == nil then
       lock = true
-      if rush_first then
-        fn(...)
-      end
+      fn(...)
+    else
+      args = utils.tbl_pack(...)
     end
 
     timer:start(ms, 0, function()

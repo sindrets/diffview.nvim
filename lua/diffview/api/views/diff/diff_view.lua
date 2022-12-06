@@ -142,21 +142,25 @@ function CDiffView:create_file_entries(files)
           oldpath = file_data.oldpath,
           status = "U",
           kind = "conflicting",
-          rev_ours = Rev(RevType.STAGE, 2),
-          rev_main = Rev(RevType.LOCAL),
-          rev_theirs = Rev(RevType.STAGE, 3),
-          rev_base = Rev(RevType.STAGE, 1),
+          revs = {
+            a = Rev(RevType.STAGE, 2),
+            b = Rev(RevType.LOCAL),
+            c = Rev(RevType.STAGE, 3),
+            d = Rev(RevType.STAGE, 1),
+          },
         }))
       else
-        table.insert(entries[v.kind], FileEntry.for_d2(CDiffView.get_default_diff2(), {
+        table.insert(entries[v.kind], FileEntry.with_layout(CDiffView.get_default_layout(), {
           adapter = self.adapter,
           path = file_data.path,
           oldpath = file_data.oldpath,
           status = file_data.status,
           stats = file_data.stats,
           kind = v.kind,
-          rev_a = v.left,
-          rev_b = v.right,
+          revs = {
+            a = v.left,
+            b = v.right,
+          },
           get_data = self.get_file_data,
           --FIXME: left_null, right_null
         }))

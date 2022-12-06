@@ -102,22 +102,20 @@ end
 
 ---@return Diff2
 function View.get_default_diff2()
-  local name = View.get_default_layout_name()
-
-  if name == -1 then
-    if prefer_horizontal() then
-      return Diff2Hor.__get()
-    else
-      return Diff2Ver.__get()
-    end
+  if prefer_horizontal() then
+    return Diff2Hor.__get()
+  else
+    return Diff2Ver.__get()
   end
-
-  return config.name_to_layout(name) --[[@as Diff2 ]]
 end
 
 ---@return Diff3
 function View.get_default_diff3()
-  return Diff3Hor.__get()
+  if prefer_horizontal() then
+    return Diff3Hor.__get()
+  else
+    return Diff3Ver.__get()
+  end
 end
 
 ---@return Diff4
@@ -132,7 +130,13 @@ end
 
 ---@return Layout # (class) The default layout class.
 function View.get_default_layout()
-  return View.get_default_diff2()
+  local name = View.get_default_layout_name()
+
+  if name == -1 then
+    return View.get_default_diff2()
+  end
+
+  return config.name_to_layout(name --[[@as string ]])
 end
 
 ---@return Layout
@@ -140,11 +144,7 @@ function View.get_default_merge_layout()
   local name = config.get_config().view.merge_tool.layout
 
   if name == -1 then
-    if prefer_horizontal() then
-      return Diff3Hor.__get()
-    else
-      return Diff3Ver.__get()
-    end
+    return View.get_default_diff3()
   end
 
   return config.name_to_layout(name)

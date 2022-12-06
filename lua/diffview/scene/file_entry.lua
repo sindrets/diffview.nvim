@@ -1,10 +1,6 @@
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
-local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1") ---@type Diff1|LazyModule
-local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2") ---@type Diff2|LazyModule
-local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3") ---@type Diff3|LazyModule
-local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4") ---@type Diff4|LazyModule
 local File = lazy.access("diffview.vcs.file", "File") ---@type vcs.File|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
@@ -20,6 +16,12 @@ local fstat_cache = {}
 ---@field deletions integer
 ---@field conflicts integer
 
+---@class RevMap
+---@field a Rev
+---@field b Rev
+---@field c Rev
+---@field d Rev
+
 ---@class FileEntry : diffview.Object
 ---@field adapter GitAdapter
 ---@field path string
@@ -28,6 +30,7 @@ local fstat_cache = {}
 ---@field parent_path string
 ---@field basename string
 ---@field extension string
+---@field revs RevMap
 ---@field layout Layout
 ---@field status string
 ---@field stats GitStats
@@ -40,6 +43,7 @@ local FileEntry = oop.create_class("FileEntry")
 ---@field adapter GitAdapter
 ---@field path string
 ---@field oldpath string
+---@field revs RevMap
 ---@field layout Layout
 ---@field status string
 ---@field stats GitStats
@@ -49,12 +53,14 @@ local FileEntry = oop.create_class("FileEntry")
 ---FileEntry constructor
 ---@param opt FileEntry.init.Opt
 function FileEntry:init(opt)
+  self.adapter = opt.adapter
   self.path = opt.path
   self.oldpath = opt.oldpath
   self.absolute_path = utils.path:absolute(opt.path, opt.adapter.ctx.toplevel)
   self.parent_path = utils.path:parent(opt.path) or ""
   self.basename = utils.path:basename(opt.path)
   self.extension = utils.path:extension(opt.path)
+  self.revs = opt.revs
   self.layout = opt.layout
   self.status = opt.status
   self.stats = opt.stats
@@ -92,73 +98,33 @@ end
 
 ---@param target_layout Layout
 function FileEntry:convert_layout(target_layout)
-    local cur_layout = self.layout
+  local get_data
 
-    if cur_layout:class() == target_layout:class() then return end
-
-    if cur_layout:instanceof(Diff1.__get()) then
-      ---@cast cur_layout Diff1
-      if target_layout:instanceof(Diff3.__get()) then
-        ---@cast target_layout Diff3
-        self.layout = cur_layout:to_diff3(target_layout)
-        return
-      elseif target_layout:instanceof(Diff4.__get()) then
-        ---@cast target_layout Diff4
-        self.layout = cur_layout:to_diff4(target_layout)
-        return
-      end
-    elseif cur_layout:instanceof(Diff2.__get()) then
-      ---@cast cur_layout Diff2
-      if target_layout:instanceof(Diff2.__get()) then
-        self.layout = target_layout({
-          a = cur_layout.a.file,
-          b = cur_layout.b.file,
-        })
-        return
-      end
-    elseif cur_layout:instanceof(Diff3.__get()) then
-      ---@cast cur_layout Diff3
-      if target_layout:instanceof(Diff1.__get()) then
-        ---@cast target_layout Diff1
-        self.layout = cur_layout:to_diff1(target_layout)
-        return
-      elseif target_layout:instanceof(Diff3.__get()) then
-        self.layout = target_layout({
-          a = cur_layout.a.file,
-          b = cur_layout.b.file,
-          c = cur_layout.c.file,
-        })
-        return
-      elseif target_layout:instanceof(Diff4.__get()) then
-        ---@cast target_layout Diff4
-        self.layout = cur_layout:to_diff4(target_layout)
-        return
-      end
-    elseif cur_layout:instanceof(Diff4.__get()) then
-      ---@cast cur_layout Diff4
-      if target_layout:instanceof(Diff1.__get()) then
-        ---@cast target_layout Diff1
-        self.layout = cur_layout:to_diff1(target_layout)
-        return
-      elseif target_layout:instanceof(Diff4.__get()) then
-        self.layout = target_layout({
-          a = cur_layout.a.file,
-          b = cur_layout.b.file,
-          c = cur_layout.c.file,
-          d = cur_layout.d.file,
-        })
-        return
-      elseif target_layout:instanceof(Diff3.__get()) then
-        ---@cast target_layout Diff3
-        self.layout = cur_layout:to_diff3(target_layout)
-        return
-      end
+  for _, file in ipairs(self.layout:files()) do
+    if file.get_data then
+      get_data = file.get_data
+      break
     end
+  end
 
-    error(("Unimplemented layout conversion: %s to %s"):format(
-      cur_layout:class(),
-      target_layout:class()
-    ))
+  local function create_file(rev, symbol)
+    return File({
+      adapter = self.adapter,
+      path = self.path,
+      kind = self.kind,
+      commit = self.commit,
+      get_data = get_data,
+      rev = rev,
+      nulled = select(2, pcall(target_layout.should_null, rev, self.status, symbol)),
+    }) --[[@as vcs.File ]]
+  end
+
+  self.layout = target_layout({
+    a = utils.tbl_access(self.layout, "a.file") or create_file(self.revs.a, "a"),
+    b = utils.tbl_access(self.layout, "b.file") or create_file(self.revs.b, "b"),
+    c = utils.tbl_access(self.layout, "c.file") or create_file(self.revs.c, "c"),
+    d = utils.tbl_access(self.layout, "d.file") or create_file(self.revs.d, "d"),
+  })
 end
 
 ---@param adapter VCSAdapter
@@ -214,105 +180,7 @@ function FileEntry.update_index_stat(adapter, stat)
   end
 end
 
----@class FileEntry.from_d2.Opt : FileEntry.init.Opt
----@field rev_a Rev
----@field rev_b Rev
----@field nulled boolean
----@field get_data git.FileDataProducer?
-
----Create a file entry for a 2-way split diff layout.
----@param layout_class Diff2 (class)
----@param opt FileEntry.from_d2.Opt
----@return FileEntry
-function FileEntry.for_d2(layout_class, opt)
-  return FileEntry({
-    adapter = opt.adapter,
-    path = opt.path,
-    oldpath = opt.oldpath,
-    status = opt.status,
-    stats = opt.stats,
-    kind = opt.kind,
-    commit = opt.commit,
-    layout = layout_class({
-      a = File({
-        adapter = opt.adapter,
-        path = opt.oldpath or opt.path,
-        kind = opt.kind,
-        commit = opt.commit,
-        get_data = opt.get_data,
-        rev = opt.rev_a,
-        nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_a, opt.status, "a")),
-      }),
-      b = File({
-        adapter = opt.adapter,
-        path = opt.path,
-        kind = opt.kind,
-        commit = opt.commit,
-        get_data = opt.get_data,
-        rev = opt.rev_b,
-        nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_b, opt.status, "b")),
-      }),
-    }),
-  })
-end
-
----@class FileEntry.from_d3.Opt : FileEntry.init.Opt
----@field rev_a Rev
----@field rev_b Rev
----@field rev_c Rev
----@field nulled boolean
----@field get_data git.FileDataProducer?
-
----Create a file entry for a 2-way split diff layout.
----@param layout_class Diff3 (class)
----@param opt FileEntry.from_d3.Opt
----@return FileEntry
-function FileEntry.for_d3(layout_class, opt)
-  return FileEntry({
-    adapter = opt.adapter,
-    path = opt.path,
-    oldpath = opt.oldpath,
-    status = opt.status,
-    stats = opt.stats,
-    kind = opt.kind,
-    commit = opt.commit,
-    layout = layout_class({
-      a = File({
-        adapter = opt.adapter,
-        path = opt.oldpath or opt.path,
-        kind = opt.kind,
-        commit = opt.commit,
-        get_data = opt.get_data,
-        rev = opt.rev_a,
-        nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_a, opt.status, "a")),
-      }),
-      b = File({
-        adapter = opt.adapter,
-        path = opt.path,
-        kind = opt.kind,
-        commit = opt.commit,
-        get_data = opt.get_data,
-        rev = opt.rev_b,
-        nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_b, opt.status, "b")),
-      }),
-      c = File({
-        adapter = opt.adapter,
-        path = opt.path,
-        kind = opt.kind,
-        commit = opt.commit,
-        get_data = opt.get_data,
-        rev = opt.rev_c,
-        nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_c, opt.status, "c")),
-      }),
-    }),
-  })
-end
-
 ---@class FileEntry.with_layout.Opt : FileEntry.init.Opt
----@field rev_main Rev
----@field rev_ours Rev
----@field rev_theirs Rev
----@field rev_base Rev
 ---@field nulled boolean
 ---@field get_data git.FileDataProducer?
 
@@ -320,53 +188,19 @@ end
 ---@param opt FileEntry.with_layout.Opt
 ---@return FileEntry
 function FileEntry.with_layout(layout_class, opt)
-  local new_layout
-  local main_file = File({
-    adapter = opt.adapter,
-    path = opt.path,
-    kind = opt.kind,
-    commit = opt.commit,
-    get_data = opt.get_data,
-    rev = opt.rev_main,
-  }) --[[@as vcs.File ]]
-
-  if layout_class:instanceof(Diff1.__get()) then
-    main_file.nulled = layout_class.should_null(main_file.rev, opt.status, "a")
-    new_layout = layout_class({
-      a = main_file,
-    })
-  else
-    main_file.nulled = layout_class.should_null(main_file.rev, opt.status, "b")
-    new_layout = layout_class({
-      a = File({
-        adapter = opt.adapter,
-        path = opt.oldpath or opt.path,
-        kind = opt.kind,
-        commit = opt.commit,
-        get_data = opt.get_data,
-        rev = opt.rev_ours,
-        nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_ours, opt.status, "a")),
-      }),
-      b = main_file,
-      c = File({
-        adapter = opt.adapter,
-        path = opt.path,
-        kind = opt.kind,
-        commit = opt.commit,
-        get_data = opt.get_data,
-        rev = opt.rev_theirs,
-        nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_theirs, opt.status, "c")),
-      }),
-      d = File({
-        adapter = opt.adapter,
-        path = opt.path,
-        kind = opt.kind,
-        commit = opt.commit,
-        get_data = opt.get_data,
-        rev = opt.rev_base,
-        nulled = utils.sate(opt.nulled, layout_class.should_null(opt.rev_base, opt.status, "d")),
-      }),
-    })
+  local function create_file(rev, symbol)
+    return File({
+      adapter = opt.adapter,
+      path = opt.path,
+      kind = opt.kind,
+      commit = opt.commit,
+      get_data = opt.get_data,
+      rev = rev,
+      nulled = utils.sate(
+        opt.nulled,
+        select(2, pcall(layout_class.should_null, rev, opt.status, symbol))
+      ),
+    }) --[[@as vcs.File ]]
   end
 
   return FileEntry({
@@ -377,7 +211,13 @@ function FileEntry.with_layout(layout_class, opt)
     stats = opt.stats,
     kind = opt.kind,
     commit = opt.commit,
-    layout = new_layout,
+    revs = opt.revs,
+    layout = layout_class({
+      a = create_file(opt.revs.a, "a"),
+      b = create_file(opt.revs.b, "b"),
+      c = create_file(opt.revs.c, "c"),
+      d = create_file(opt.revs.d, "d"),
+    }),
   })
 end
 

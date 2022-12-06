@@ -332,13 +332,10 @@ view.x.layout                                   *diffview-config-view.x.layout*
                 you prefer to edit conflict markers manually without the
                 visual noise from diffs.
 
-                Window symbols:
-                  • A: LOCAL
-
                 ┌──────────────┐
                 │              │
                 │              │
-                │      A       │
+                │      B       │
                 │              │
                 │              │
                 └──────────────┘

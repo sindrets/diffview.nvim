@@ -727,14 +727,16 @@ local function parse_fh_line_trace_data(state)
         state.old_path = oldpath
       end
 
-      table.insert(files, FileEntry.for_d2(Diff2Hor, {
+      table.insert(files, FileEntry.with_layout(state.opt.default_layout or Diff2Hor, {
         adapter = state.adapter,
         path = b_path,
         oldpath = oldpath,
         kind = "working",
         commit = state.commit,
-        rev_a = cur.left_hash and GitRev(RevType.COMMIT, cur.left_hash) or GitRev.new_null_tree(),
-        rev_b = state.prepared_log_opts.base or GitRev(RevType.COMMIT, cur.right_hash),
+        revs = {
+          a = cur.left_hash and GitRev(RevType.COMMIT, cur.left_hash) or GitRev.new_null_tree(),
+          b = state.prepared_log_opts.base or GitRev(RevType.COMMIT, cur.right_hash),
+        },
       }))
     end
   end
@@ -868,7 +870,7 @@ local function parse_fh_data(state)
       stats = nil
     end
 
-    table.insert(files, FileEntry.for_d2(state.opt.default_layout or Diff2Hor, {
+    table.insert(files, FileEntry.with_layout(state.opt.default_layout or Diff2Hor, {
       adapter = state.adapter,
       path = name,
       oldpath = oldname,
@@ -876,8 +878,10 @@ local function parse_fh_data(state)
       stats = stats,
       kind = "working",
       commit = state.commit,
-      rev_a = cur.left_hash and GitRev(RevType.COMMIT, cur.left_hash) or GitRev.new_null_tree(),
-      rev_b = state.prepared_log_opts.base or GitRev(RevType.COMMIT, cur.right_hash),
+      revs = {
+        a = cur.left_hash and GitRev(RevType.COMMIT, cur.left_hash) or GitRev.new_null_tree(),
+        b = state.prepared_log_opts.base or GitRev(RevType.COMMIT, cur.right_hash),
+      },
     }))
   end
 
