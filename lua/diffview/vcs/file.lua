@@ -5,10 +5,17 @@ local GitRev = lazy.access("diffview.vcs.adapters.git.rev", "GitRev") ---@type G
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local async = lazy.require("plenary.async") ---@module "plenary.async"
 local config = lazy.require("diffview.config") ---@module "diffview.config"
+local debounce = lazy.require("diffview.debounce") ---@module "diffview.debounce"
+local gs_actions = lazy.require("gitsigns.actions") ---@module "gitsigns.actions"
 local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local pl = lazy.access(utils, "path") ---@type PathLib|LazyModule
+
+local gs_refresh = debounce.debounce_trailing(20, false, vim.schedule_wrap(function(callback)
+  gs_actions.refresh()
+  if vim.is_callable(callback) then callback() end
+end))
 
 local api = vim.api
 local M = {}
@@ -279,10 +286,18 @@ end
 ---@param t2 table
 ---@return vcs.File.AttachState
 local function prepare_attach_opt(t1, t2)
-  local res = vim.tbl_extend("keep", t1, {
+  ---@class vcs.File.AttachState
+  local default_opt = {
     keymaps = {},
     disable_diagnostics = false,
-  })
+    inline_diff = {
+      enabled = false,
+      base = nil --[[@as string? ]],
+      update = nil --[[@as function? ]],
+    }
+  }
+
+  local res = vim.tbl_extend("force", default_opt, t1)
 
   for k, v in pairs(t2) do
     local t = type(res[k])
@@ -298,10 +313,6 @@ local function prepare_attach_opt(t1, t2)
 
   return res
 end
-
----@class vcs.File.AttachState
----@field keymaps table
----@field disable_diagnostics boolean
 
 ---@param force? boolean
 ---@param opt? vcs.File.AttachState
@@ -332,6 +343,23 @@ function File:attach_buffer(force, opt)
         vim.diagnostic.disable(self.bufnr)
       end
 
+      -- Inline diff
+      if state.inline_diff.enabled then
+        local gitsigns = require("gitsigns")
+        local gs_config = require("gitsigns.config").config
+        gitsigns.attach(self.bufnr, {
+          file = self.path,
+          toplevel = self.adapter.ctx.toplevel,
+          gitdir = self.adapter.ctx.dir,
+          commit = self.rev.type ~= RevType.LOCAL and self.rev:object_name() or nil,
+          base = utils.sate(state.inline_diff.base, self.rev.type == RevType.STAGE and "HEAD"),
+        })
+        gs_config.linehl = true
+        gs_config.show_deleted = true
+        gs_config.word_diff = true
+        gs_refresh(state.inline_diff.update)
+      end
+
       File.attached[self.bufnr] = state
     end
   end
@@ -357,6 +385,15 @@ function File:detach_buffer()
       -- Diagnostics
       if state.disable_diagnostics then
         vim.diagnostic.enable(self.bufnr)
+      end
+
+      -- Inline diff
+      if state.inline_diff.enabled then
+        local gs_config = require("gitsigns.config").config
+        gs_config.linehl = false
+        gs_config.show_deleted = false
+        gs_config.word_diff = false
+        gs_refresh(state.inline_diff.update)
       end
 
       File.attached[self.bufnr] = nil

@@ -9,6 +9,7 @@ local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local vcs_utils = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
 
 local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1") ---@type Diff1|LazyModule
+local Diff1Inline = lazy.access("diffview.scene.layouts.diff_1_inline", "Diff1Inline") ---@type Diff1Inline|LazyModule
 local Diff2Hor = lazy.access("diffview.scene.layouts.diff_2_hor", "Diff2Hor") ---@type Diff2Hor|LazyModule
 local Diff2Ver = lazy.access("diffview.scene.layouts.diff_2_ver", "Diff2Ver") ---@type Diff2Ver|LazyModule
 local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3") ---@type Diff3|LazyModule
@@ -418,6 +419,7 @@ function M.cycle_layout()
     standard = {
       Diff2Hor.__get(),
       Diff2Ver.__get(),
+      Diff1Inline.__get(),
     },
     merge_tool = {
       Diff3Hor.__get(),

@@ -4,6 +4,7 @@ local actions = require("diffview.actions")
 local lazy = require("diffview.lazy")
 
 local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1") ---@type Diff1|LazyModule
+local Diff1Inline = lazy.access("diffview.scene.layouts.diff_1_inline", "Diff1Inline") ---@type Diff1Inline|LazyModule
 local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2") ---@type Diff2|LazyModule
 local Diff2Hor = lazy.access("diffview.scene.layouts.diff_2_hor", "Diff2Hor") ---@type Diff2Hor|LazyModule
 local Diff2Ver = lazy.access("diffview.scene.layouts.diff_2_ver", "Diff2Ver") ---@type Diff2Ver|LazyModule
@@ -312,6 +313,7 @@ function M.get_log_options(single_file, t, vcs)
 end
 
 ---@alias LayoutName "diff1_plain"
+---       | "diff1_inline"
 ---       | "diff2_horizontal"
 ---       | "diff2_vertical"
 ---       | "diff3_horizontal"
@@ -321,6 +323,7 @@ end
 
 local layout_map = {
   diff1_plain = Diff1,
+  diff1_inline = Diff1Inline,
   diff2_horizontal = Diff2Hor,
   diff2_vertical = Diff2Ver,
   diff3_horizontal = Diff3Hor,
@@ -510,7 +513,7 @@ function M.setup(user_config)
   do
     -- Validate layouts
     local view = M._config.view
-    local standard_layouts = { "diff2_horizontal", "diff2_vertical", -1 }
+    local standard_layouts = { "diff2_horizontal", "diff2_vertical", "diff1_inline", -1 }
     local merge_layuots = {
       "diff1_plain",
       "diff3_horizontal",
