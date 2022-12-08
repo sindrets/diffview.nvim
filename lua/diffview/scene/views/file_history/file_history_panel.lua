@@ -278,7 +278,7 @@ function FileHistoryPanel:update_entries(callback)
 
   finalizer = self.adapter:file_history(
     self.log_options,
-    { default_layout = self.parent.get_default_diff2(), },
+    { default_layout = self.parent.get_default_layout(), },
     update
   )
 

@@ -214,5 +214,17 @@ function FileHistoryView.get_default_layout_name()
   return config.get_config().view.file_history.layout
 end
 
+---@override
+---@return Layout # (class) The default layout class.
+function FileHistoryView.get_default_layout()
+  local name = FileHistoryView.get_default_layout_name()
+
+  if name == -1 then
+    return FileHistoryView.get_default_diff2()
+  end
+
+  return config.name_to_layout(name --[[@as string ]])
+end
+
 M.FileHistoryView = FileHistoryView
 return M

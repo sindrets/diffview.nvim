@@ -284,7 +284,7 @@ DiffView.get_updated_files = async.wrap(function(self, callback)
       self.path_args,
       self.options,
       {
-        default_layout = DiffView.get_default_diff2(),
+        default_layout = DiffView.get_default_layout(),
         merge_layout = DiffView.get_default_merge_layout(),
       },
       callback
