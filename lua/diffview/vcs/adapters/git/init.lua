@@ -30,7 +30,11 @@ GitAdapter.Rev = GitRev
 
 ---@return string, string
 function M.pathspec_split(pathspec)
-  local magic = pathspec:match("^:[/!^]*:?") or pathspec:match("^:%b()") or ""
+  local magic = utils.str_match(pathspec, {
+    "^:[/!^]+:?",
+    "^:%b()",
+    "^:",
+  }) or ""
   local pattern = pathspec:sub(1 + #magic, -1)
   return magic or "", pattern or ""
 end
@@ -1572,7 +1576,10 @@ GitAdapter.flags = {
           end, value)
         ), " ")
       end,
-      completion = function(_)
+      ---@param panel FHOptionPanel
+      completion = function(panel)
+        local view = panel.parent.parent
+
         return function(_, cmd_line, cur_pos)
           local ok, ctx = pcall(arg_parser.scan_sh_args, cmd_line, cur_pos)
 
@@ -1586,7 +1593,7 @@ GitAdapter.flags = {
                 utils.vec_slice(quoted, 1, ctx.argidx - 1),
                 utils.str_quote(v, { only_if_whitespace = true })
               ), " ")
-            end, vim.fn.getcompletion(ctx.arg_lead, "file"))
+            end, view.adapter:path_completion(ctx.arg_lead))
           end
         end
       end,
@@ -1640,6 +1647,14 @@ for _, list in pairs(GitAdapter.flags) do
 end
 
 -- Completion
+
+function GitAdapter:path_completion(arg_lead)
+  local magic, pattern = M.pathspec_split(arg_lead)
+
+  return vim.tbl_map(function(v)
+    return magic .. v
+  end, vim.fn.getcompletion(pattern, "file", 0))
+end
 
 function GitAdapter:rev_candidates()
   logger.lvl(1).debug("[completion] Revision candidates requested.")

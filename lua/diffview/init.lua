@@ -190,7 +190,11 @@ M.completers = {
     local candidates = {}
 
     if ctx.argidx > ctx.divideridx then
-      utils.vec_push(candidates, unpack(vim.fn.getcompletion(ctx.arg_lead, "file", 0)))
+      if adapter then
+        utils.vec_push(candidates, unpack(adapter:path_completion(ctx.arg_lead)))
+      else
+        utils.vec_push(candidates, unpack(vim.fn.getcompletion(ctx.arg_lead, "file", 0)))
+      end
     elseif adapter then
       if not has_rev_arg and ctx.arg_lead:sub(1, 1) ~= "-" then
         utils.vec_push(candidates, unpack(adapter.comp.open:get_all_names()))
@@ -217,9 +221,10 @@ M.completers = {
         adapter.comp.file_history:get_completion(ctx.arg_lead)
         or adapter.comp.file_history:get_all_names()
       ))
+      utils.vec_push(candidates, unpack(adapter:path_completion(ctx.arg_lead)))
+    else
+      utils.vec_push(candidates, unpack(vim.fn.getcompletion(ctx.arg_lead, "file", 0)))
     end
-
-    utils.vec_push(candidates, unpack(vim.fn.getcompletion(ctx.arg_lead, "file", 0)))
 
     return candidates
   end,

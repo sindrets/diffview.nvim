@@ -384,5 +384,11 @@ VCSAdapter.flags = {
   options = {},
 }
 
+---@param arg_lead string
+---@return string[]
+function VCSAdapter:path_completion(arg_lead)
+  return vim.fn.getcompletion(arg_lead, "file", 0)
+end
+
 M.VCSAdapter = VCSAdapter
 return M
