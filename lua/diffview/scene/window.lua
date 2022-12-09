@@ -7,6 +7,7 @@ local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_hist
 local GitAdapter = lazy.access("diffview.vcs.adapters.git", "GitAdapter") ---@type GitAdapter|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local config = lazy.require("diffview.config") ---@module "diffview.config"
+local gs_actions = lazy.require("gitsigns.actions") ---@module "gitsigns.actions"
 local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
@@ -227,8 +228,8 @@ function Window:apply_file_winopts(overrides)
     if overrides then
       utils.set_local(self.id, vim.tbl_extend("force", self.file.winopts, overrides))
     else
-    utils.set_local(self.id, self.file.winopts)
-  end
+      utils.set_local(self.id, self.file.winopts)
+    end
   end
 end
 
@@ -244,6 +245,48 @@ end
 
 function Window:set_file(file)
   self.file = file
+end
+
+function Window:gs_update_folds()
+  if self:is_file_open() and vim.wo[self.id].foldenable then
+    api.nvim_win_call(self.id, function()
+      pcall(vim.cmd, "norm! zE") -- Delete all folds in window
+      local hunks = gs_actions.get_hunks(self.file.bufnr) or {}
+      local context
+
+      for _, v in ipairs(vim.opt.diffopt:get()) do
+        context = tonumber(v:match("^context:(%d+)"))
+        if context then break end
+      end
+
+      context = math.max(1, context or 6)
+
+      local prev_last = -context + 1
+      local lcount = api.nvim_buf_line_count(self.file.bufnr)
+
+      for i = 1, #hunks + 1 do
+        local hunk = hunks[i]
+        local first, last
+
+        if hunk then
+          first = hunk.added.start
+          last = first + hunk.added.count - 1
+        else
+          first = lcount + context
+          last = first
+        end
+
+        -- print(prev_last, first, last, hunk and "hunk" or "nil")
+
+        if first - prev_last > context * 2 + 1 then
+          -- print("FOLD:", prev_last + context, first - context)
+          vim.cmd(("%d,%dfold"):format(prev_last + context, first - context))
+        end
+
+        prev_last = last
+      end
+    end)
+  end
 end
 
 M.Window = Window

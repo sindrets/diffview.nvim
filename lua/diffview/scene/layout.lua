@@ -323,5 +323,7 @@ function Layout:sync_scroll()
   end
 end
 
+function Layout:gs_update_folds() end
+
 M.Layout = Layout
 return M
