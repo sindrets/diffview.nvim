@@ -23,7 +23,7 @@ local function render_files(comp, files)
     comp:add_text(icon, icon_hl)
 
     if #file.parent_path > 0 then
-      comp:add_text(file.path .. "/", "DiffviewFilePanelPath")
+      comp:add_text(file.parent_path .. "/", "DiffviewFilePanelPath")
     end
 
     comp:add_text(file.basename, "DiffviewFilePanelFileName")
@@ -181,7 +181,7 @@ return {
           comp:add_text(file.parent_path .. "/", "DiffviewFilePanelPath")
         end
 
-        comp:add_text(file.path, "DiffviewFilePanelFileName")
+        comp:add_text(file.basename, "DiffviewFilePanelFileName")
         comp:ln()
       end
     elseif #cached.args > 0 then
