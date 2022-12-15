@@ -146,7 +146,7 @@ function File:_produce_data(callback)
       function(err, result)
         if err then
           utils.err(
-            ("Failed to create diff buffer: '%s'"):format(api.nvim_buf_get_name(self.bufnr)),
+            ("Failed to create diff buffer: '%s'"):format(self.path),
             true
           )
           return
