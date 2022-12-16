@@ -75,8 +75,8 @@ M.defaults = {
     },
   },
   file_history_panel = {
-    ---@type ConfigLogOptions
     log_options = {
+      ---@type ConfigLogOptions
       git = {
         single_file = {
           diff_merges = "combined",
@@ -85,10 +85,11 @@ M.defaults = {
           diff_merges = "first-parent",
         },
       },
+      ---@type ConfigLogOptions
       hg = {
         single_file = {},
         multi_file = {},
-      }
+      },
     },
     win_config = {
       position = "bottom",
@@ -222,7 +223,7 @@ M.defaults = {
 M.user_emitter = EventEmitter()
 M._config = M.defaults
 
----@class LogOptions
+---@class GitLogOptions
 ---@field follow boolean
 ---@field first_parent boolean
 ---@field show_pulls boolean
@@ -242,8 +243,12 @@ M._config = M.defaults
 ---@field base string
 ---@field path_args string[]
 
----@type LogOptions
+---@class HgLogOptions
+
+---@alias LogOptions GitLogOptions|HgLogOptions
+
 M.log_option_defaults = {
+  ---@type GitLogOptions
   git = {
     follow = false,
     first_parent = false,
@@ -264,6 +269,7 @@ M.log_option_defaults = {
     S = nil,
     path_args = {},
   },
+  ---@type HgLogOptions
   hg = {},
 }
 
@@ -277,9 +283,9 @@ function M.get_config()
 end
 
 ---@param single_file boolean
----@param t LogOptions
----@param vcs '"git"' | '"hg"'
----@return LogOptions
+---@param t GitLogOptions|HgLogOptions
+---@param vcs "git"|"hg"
+---@return GitLogOptions|HgLogOptions
 function M.get_log_options(single_file, t, vcs)
   local log_options
 
@@ -463,8 +469,8 @@ function M.setup(user_config)
   local user_log_options = utils.tbl_access(user_config, "file_history_panel.log_options")
   if user_log_options then
     local top_options = {
-      'single_file',
-      'multi_file',
+      "single_file",
+      "multi_file",
     }
     for _, name in ipairs(top_options) do
       if user_log_options[name] ~= nil then
@@ -490,10 +496,6 @@ function M.setup(user_config)
         break
       end
     end
-  end
-
-  if type(M._config.file_history_panel.log_options.git) == "nil" then
-    utils.warn("Global config of 'file_panel.log_options' has been deprecated. See ':h diffview.changelog-XXX'.")
   end
 
   --#endregion

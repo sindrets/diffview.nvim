@@ -168,7 +168,7 @@ end
 
 ---@param path string
 ---@param rev Rev?
----@return string[]? args to show commit content
+---@return string[] args to show commit content
 function VCSAdapter:get_show_args(path, rev)
   oop.abstract_stub()
 end
@@ -284,7 +284,7 @@ end
 ---@param left Rev
 ---@param right Rev
 ---@param args string[]
----@param kind git.FileKind
+---@param kind vcs.FileKind
 ---@param opt vcs.adapter.LayoutOpt
 ---@param callback function
 VCSAdapter.tracked_files = async.wrap(function(self, left, right, args, kind, opt, callback)
@@ -303,12 +303,13 @@ end, 5)
 ---@diagnostic enable: unused-local, missing-return
 
 ---@param self VCSAdapter
----@param args string[]
+---@param path string
+---@param rev? Rev
 ---@param callback fun(stderr: string[]?, stdout: string[]?)
-VCSAdapter.show = async.wrap(function(self, args, callback)
+VCSAdapter.show = async.wrap(function(self, path, rev, callback)
   local job = Job:new({
     command = self:bin(),
-    args = self:get_show_args(args.path, args.rev),
+    args = self:get_show_args(path, rev),
     cwd = self.ctx.toplevel,
     ---@type Job
     on_exit = async.void(function(j)
@@ -343,7 +344,7 @@ VCSAdapter.show = async.wrap(function(self, args, callback)
   -- silently.
   -- Solution: queue them and run them one after another.
   vcs_utils.queue_sync_job(job)
-end, 3)
+end, 4)
 
 ---Convert revs to string representation.
 ---@param left Rev

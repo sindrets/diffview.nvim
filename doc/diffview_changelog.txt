@@ -9,11 +9,11 @@ NOTE: This changelog only encompasses breaking changes.
 
 PR: https://github.com/sindrets/diffview.nvim/pull/271
 
-The config for log options has changed. The table is now divided into
-sub-tables per VCS type. This allows you to define
-different default log options for history for different VCS tools.
-To update your config, just move all your log options into the new table keys
-`git` :
+The config for log options has changed. In preparation of adding support of
+other VCS, the table is now divided into sub-tables per VCS type. This allows
+you to define different default log options for different VCS tools. To update
+your config, just move all your current log options into the new table key
+`git`:
 
         Before: ~
 >
@@ -27,7 +27,6 @@ To update your config, just move all your log options into the new table keys
                       },
                       multi_file = {
                         max_count = 128,
-                        -- follow = false   -- `follow` only applies to single-file history
                       },
                     },
                   },
@@ -39,20 +38,20 @@ To update your config, just move all your log options into the new table keys
                 require("diffview").setup({
                   -- ...
                   file_history_panel = {
-                    git = {
-                      log_options = {
+                    log_options = {
+                      git = {
                         single_file = {
                           max_count = 512,
                           follow = true,
                         },
                         multi_file = {
                           max_count = 128,
-                          -- follow = false   -- `follow` only applies to single-file history
                         },
                       },
                     },
                   },
                 })
+<
                                                 *diffview.changelog-190*
 
 PR: https://github.com/sindrets/diffview.nvim/pull/190

@@ -162,7 +162,6 @@ M.diff_file_list = async.wrap(function(adapter, left, right, path_args, dv_opt, 
 
       ---@diagnostic disable-next-line: redefined-local
       local err, ufiles = adapter:untracked_files(left, right, opt)
-      print('untracked: ', #ufiles)
       if err then
         errors[#errors+1] = err
         utils.err("Failed to get git status for untracked files!", true)

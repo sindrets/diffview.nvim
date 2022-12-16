@@ -224,8 +224,10 @@ function GitAdapter:get_command()
   return config.get_config().git_cmd
 end
 
+---@param path string
+---@param rev Rev?
 function GitAdapter:get_show_args(path, rev)
-  return utils.vec_join(self:args(), "show", { ("%s:%s"):format(rev:object_name() or "", path) })
+  return utils.vec_join(self:args(), "show", ("%s:%s"):format(rev and rev:object_name() or "", path))
 end
 
 function GitAdapter:get_dir(path)
@@ -255,7 +257,7 @@ end
 ---@field flags string[]
 
 ---@param adapter GitAdapter
----@param log_options LogOptions
+---@param log_options GitLogOptions
 ---@param single_file boolean
 ---@return GitAdapter.PreparedLogOpts
 local function prepare_fh_options(adapter, log_options, single_file)
@@ -577,11 +579,11 @@ function GitAdapter:is_single_file(path_args, lflags)
   return true
 end
 
----@param log_opt LogOptions
+---@param log_opt GitLogOptions
 ---@return boolean ok, string description
 function GitAdapter:file_history_dry_run(log_opt)
   local single_file = self:is_single_file(log_opt.path_args, log_opt.L)
-  local log_options = config.get_log_options(single_file, log_opt, "git")
+  local log_options = config.get_log_options(single_file, log_opt, "git") --[[@as GitLogOptions ]]
 
   local options = vim.tbl_map(function(v)
     return vim.fn.shellescape(v)
@@ -593,7 +595,7 @@ function GitAdapter:file_history_dry_run(log_opt)
     ("Flags: %s"):format(table.concat(options, " "))
   )
 
-  log_options = utils.tbl_clone(log_options) --[[@as LogOptions ]]
+  log_options = utils.tbl_clone(log_options) --[[@as GitLogOptions ]]
   log_options.max_count = 1
   options = prepare_fh_options(self, log_options, single_file).flags
 
@@ -671,8 +673,7 @@ function GitAdapter:file_history_options(range, paths, args)
     { "S" },
   }
 
-  ---@type LogOptions
-  local log_options = { rev_range = range_arg }
+  local log_options = { rev_range = range_arg } --[[@as GitLogOptions ]]
   for _, names in ipairs(log_flag_names) do
     local key, _ = names[1]:gsub("%-", "_")
     local v = argo:get_flag(names, {
@@ -768,7 +769,7 @@ end
 ---@field thread thread
 ---@field adapter GitAdapter
 ---@field path_args string[]
----@field log_options LogOptions
+---@field log_options GitLogOptions
 ---@field prepared_log_opts GitAdapter.PreparedLogOpts
 ---@field opt vcs.adapter.FileHistoryWorkerSpec
 ---@field single_file boolean
@@ -924,7 +925,7 @@ function GitAdapter:file_history_worker(thread, log_opt, opt, co_state, callback
 
   local single_file = self:is_single_file(log_opt.single_file.path_args, log_opt.single_file.L)
 
-  ---@type LogOptions
+  ---@type GitLogOptions
   local log_options = config.get_log_options(
     single_file,
     single_file and log_opt.single_file or log_opt.multi_file,
@@ -1394,7 +1395,7 @@ function GitAdapter:show_untracked()
   return vim.trim(out[1] or "") ~= "no"
 end
 
-GitAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, opt, callback)
+GitAdapter.tracked_files = async.wrap(function(self, left, right, args, kind, opt, callback)
   ---@type FileEntry[]
   local files = {}
   ---@type FileEntry[]
@@ -1480,7 +1481,6 @@ GitAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, o
   end
 
   if kind == "working" and next(conflict_map) then
-    print('')
     data = vim.tbl_filter(function(v)
       return not conflict_map[v.name]
     end, data)
@@ -1492,10 +1492,12 @@ GitAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, o
         oldpath = v.oldname,
         status = "U",
         kind = "conflicting",
-        rev_ours = self.Rev(RevType.STAGE, 2),
-        rev_main = self.Rev(RevType.LOCAL),
-        rev_theirs = self.Rev(RevType.STAGE, 3),
-        rev_base = self.Rev(RevType.STAGE, 1),
+        revs = {
+          a = self.Rev(RevType.STAGE, 2),  -- ours
+          b = self.Rev(RevType.LOCAL),     -- local
+          c = self.Rev(RevType.STAGE, 3),  -- theirs
+          d = self.Rev(RevType.STAGE, 1),  -- base
+        },
       }))
     end
   end
