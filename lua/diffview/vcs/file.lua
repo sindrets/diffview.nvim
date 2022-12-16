@@ -142,13 +142,15 @@ function File:_produce_data(callback)
     end, nil)
   else
     self.adapter:show(
-      { ("%s:%s"):format(self.rev:object_name() or "", self.path) },
+      self.path,
+      self.rev,
       function(err, result)
         if err then
-          utils.err(
-            ("Failed to create diff buffer: '%s'"):format(api.nvim_buf_get_name(self.bufnr)),
-            true
-          )
+          vim.schedule(function()
+            utils.err(("Failed to create diff buffer: '%s'"):format(
+              api.nvim_buf_get_name(self.bufnr)
+            ))
+          end)
           return
         end
 

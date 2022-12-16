@@ -27,14 +27,6 @@ function Commit:init(opt)
   self.subject = opt.subject
   self.body = opt.body
 
-  if opt.time_offset then
-    self.time_offset = Commit.parse_time_offset(opt.time_offset)
-    self.time = self.time - self.time_offset
-  else
-    self.time_offset = 0
-  end
-
-  self.iso_date = Commit.time_to_iso(self.time, self.time_offset)
 end
 
 ---@diagnostic disable: unused-local, missing-return

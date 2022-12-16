@@ -41,6 +41,7 @@ local M = {}
 local VCSAdapter = oop.create_class("VCSAdapter")
 
 VCSAdapter.Rev = Rev
+VCSAdapter.config_key = nil
 
 ---@class vcs.adapter.VCSAdapter.Opt
 ---@field cpath string? # CWD path
@@ -165,9 +166,10 @@ end
 
 ---@diagnostic disable: unused-local, missing-return
 
----@param args string[]
----@return string[]? args to show commit content
-function VCSAdapter:get_show_args(args)
+---@param path string
+---@param rev Rev?
+---@return string[] args to show commit content
+function VCSAdapter:get_show_args(path, rev)
   oop.abstract_stub()
 end
 
@@ -226,27 +228,6 @@ function VCSAdapter:rev_to_args(left, right)
   oop.abstract_stub()
 end
 
----Arguments to show name and status of files
----@param args string[]? Extra args
----@return string[]
-function VCSAdapter:get_namestat_args(args)
-  oop.abstract_stub()
-end
-
----Arguments to show number of changes to files
----@param args string[]? Extra args
----@return string[]
-function VCSAdapter:get_numstat_args(args)
-  oop.abstract_stub()
-end
-
----Arguments to list all files
----@param args string[]? Extra args
----@return string[]
-function VCSAdapter:get_files_args(args)
-  oop.abstract_stub()
-end
-
 ---Restore a file to the requested state
 ---@param path string # file to restore
 ---@param kind '"staged"'|'"working"'
@@ -299,15 +280,36 @@ function VCSAdapter:stage_index_file(file)
   oop.abstract_stub()
 end
 
+---@param self VCSAdapter
+---@param left Rev
+---@param right Rev
+---@param args string[]
+---@param kind vcs.FileKind
+---@param opt vcs.adapter.LayoutOpt
+---@param callback function
+VCSAdapter.tracked_files = async.wrap(function(self, left, right, args, kind, opt, callback)
+  oop.abstract_stub()
+end, 7)
+
+---@param self VCSAdapter
+---@param left Rev
+---@param right Rev
+---@param opt vcs.adapter.LayoutOpt
+---@param callback function
+VCSAdapter.untracked_files = async.wrap(function(self, left, right, opt, callback)
+  oop.abstract_stub()
+end, 5)
+
 ---@diagnostic enable: unused-local, missing-return
 
 ---@param self VCSAdapter
----@param args string[]
+---@param path string
+---@param rev? Rev
 ---@param callback fun(stderr: string[]?, stdout: string[]?)
-VCSAdapter.show = async.wrap(function(self, args, callback)
+VCSAdapter.show = async.wrap(function(self, path, rev, callback)
   local job = Job:new({
     command = self:bin(),
-    args = self:get_show_args(args),
+    args = self:get_show_args(path, rev),
     cwd = self.ctx.toplevel,
     ---@type Job
     on_exit = async.void(function(j)
@@ -342,7 +344,7 @@ VCSAdapter.show = async.wrap(function(self, args, callback)
   -- silently.
   -- Solution: queue them and run them one after another.
   vcs_utils.queue_sync_job(job)
-end, 3)
+end, 4)
 
 ---Convert revs to string representation.
 ---@param left Rev

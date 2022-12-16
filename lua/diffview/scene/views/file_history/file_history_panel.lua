@@ -81,12 +81,12 @@ function FileHistoryPanel:init(opt)
   self.log_options = {
     single_file = vim.tbl_extend(
       "force",
-      conf.file_history_panel.log_options.single_file,
+      conf.file_history_panel.log_options[self.adapter.config_key].single_file,
       opt.log_options
     ),
     multi_file = vim.tbl_extend(
       "force",
-      conf.file_history_panel.log_options.multi_file,
+      conf.file_history_panel.log_options[self.adapter.config_key].multi_file,
       opt.log_options
     ),
   }
