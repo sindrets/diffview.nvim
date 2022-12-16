@@ -110,7 +110,7 @@ function FileEntry:convert_layout(target_layout)
   local function create_file(rev, symbol)
     return File({
       adapter = self.adapter,
-      path = self.path,
+      path = symbol == "a" and self.oldpath or self.path,
       kind = self.kind,
       commit = self.commit,
       get_data = get_data,
@@ -191,7 +191,7 @@ function FileEntry.with_layout(layout_class, opt)
   local function create_file(rev, symbol)
     return File({
       adapter = opt.adapter,
-      path = opt.path,
+      path = symbol == "a" and opt.oldpath or opt.path,
       kind = opt.kind,
       commit = opt.commit,
       get_data = opt.get_data,
