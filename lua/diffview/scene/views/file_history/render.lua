@@ -250,12 +250,12 @@ return {
     for _, item in ipairs(panel.components.switches.items) do
       ---@type RenderComponent
       comp = item.comp
-      local option = comp.context[2]
-      local enabled = log_options[comp.context[1]]
+      local option = comp.context.option --[[@as FlagOption ]]
+      local enabled = log_options[option.key] --[[@as boolean ]]
 
-      comp:add_text(" " .. option[1] .. " ", "DiffviewSecondary")
-      comp:add_text(option[3] .. " (", "DiffviewFilePanelFileName")
-      comp:add_text(option[2], enabled and "DiffviewFilePanelCounter" or "DiffviewDim1")
+      comp:add_text(" " .. option.keymap .. " ", "DiffviewSecondary")
+      comp:add_text(option.desc .. " (", "DiffviewFilePanelFileName")
+      comp:add_text(option.flag_name, enabled and "DiffviewFilePanelCounter" or "DiffviewDim1")
       comp:add_text(")", "DiffviewFilePanelFileName")
       comp:ln()
     end
@@ -268,13 +268,13 @@ return {
       ---@type RenderComponent
       comp = item.comp
       ---@type FlagOption
-      local option = comp.context[2]
-      local value = log_options[comp.context[1]] or ""
+      local option = comp.context.option --[[@as FlagOption ]]
+      local value = log_options[option.key] or ""
 
-      comp:add_text(" " .. option[1] .. " ", "DiffviewSecondary")
-      comp:add_text(option[3] .. " (", "DiffviewFilePanelFileName")
+      comp:add_text(" " .. option.keymap .. " ", "DiffviewSecondary")
+      comp:add_text(option.desc .. " (", "DiffviewFilePanelFileName")
 
-      local empty, display_value = option:render_value(value)
+      local empty, display_value = option:render_display(value)
       comp:add_text(display_value, not empty and "DiffviewFilePanelCounter" or "DiffviewDim1")
 
       comp:add_text(")", "DiffviewFilePanelFileName")

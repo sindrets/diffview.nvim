@@ -2,6 +2,7 @@ local Commit = require("diffview.vcs.adapters.git.commit").GitCommit
 local CountDownLatch = require("diffview.control").CountDownLatch
 local Diff2Hor = require("diffview.scene.layouts.diff_2_hor").Diff2Hor
 local FileEntry = require("diffview.scene.file_entry").FileEntry
+local FlagOption = require("diffview.vcs.flag_option").FlagOption
 local GitRev = require("diffview.vcs.adapters.git.rev").GitRev
 local Job = require("plenary.job")
 local JobStatus = require("diffview.vcs.utils").JobStatus
@@ -11,7 +12,6 @@ local VCSAdapter = require("diffview.vcs.adapter").VCSAdapter
 local arg_parser = require("diffview.arg_parser")
 local async = require("plenary.async")
 local config = require("diffview.config")
-local diffview = require("diffview")
 local lazy = require("diffview.lazy")
 local logger = require("diffview.logger")
 local oop = require("diffview.oop")
@@ -1656,88 +1656,52 @@ end
 GitAdapter.flags = {
   ---@type FlagOption[]
   switches = {
-    { "-f", "--follow", "Follow renames (only for single file)" },
-    { "-p", "--first-parent", "Follow only the first parent upon seeing a merge commit" },
-    { "-s", "--show-pulls", "Show merge commits the first introduced a change to a branch" },
-    { "-R", "--reflog", "Include all reachable objects mentioned by reflogs" },
-    { "-a", "--all", "Include all refs" },
-    { "-m", "--merges", "List only merge commits" },
-    { "-n", "--no-merges", "List no merge commits" },
-    { "-r", "--reverse", "List commits in reverse order" },
+    FlagOption("-f", "--follow", "Follow renames (only for single file)"),
+    FlagOption("-p", "--first-parent", "Follow only the first parent upon seeing a merge commit"),
+    FlagOption("-s", "--show-pulls", "Show merge commits the first introduced a change to a branch"),
+    FlagOption("-R", "--reflog", "Include all reachable objects mentioned by reflogs"),
+    FlagOption("-a", "--all", "Include all refs"),
+    FlagOption("-m", "--merges", "List only merge commits"),
+    FlagOption("-n", "--no-merges", "List no merge commits"),
+    FlagOption("-r", "--reverse", "List commits in reverse order"),
   },
   ---@type FlagOption[]
   options = {
-    {
-      "=r", "++rev-range=", "Show only commits in the specified revision range",
+    FlagOption("=r", "++rev-range=", "Show only commits in the specified revision range", {
       ---@param panel FHOptionPanel
       completion = function(panel)
-        return function(arg_lead, _, _)
-          local view = panel.parent.parent
-          return view.adapter:rev_completion(arg_lead, {
-            accept_range = true,
-          })
+        local view = panel.parent.parent
+
+        ---@param ctx CmdLineContext
+        return function(ctx)
+          return view.adapter:rev_candidates(ctx.arg_lead, { accept_range = true })
         end
       end,
-    },
-    {
-      "=b", "++base=", "Set the base revision",
+    }),
+    FlagOption("=b", "++base=", "Set the base revision", {
       ---@param panel FHOptionPanel
       completion = function(panel)
-        return function(arg_lead, _, _)
-          local view = panel.parent.parent
-          return utils.vec_join("LOCAL", view.adapter:rev_completion(arg_lead, {}))
+        local view = panel.parent.parent
+
+        ---@param ctx CmdLineContext
+        return function(ctx)
+          return utils.vec_join("LOCAL", view.adapter:rev_candidates(ctx.arg_lead))
         end
       end,
-    },
-    { "=n", "--max-count=", "Limit the number of commits" },
-    {
-      "=L", "-L", "Trace line evolution",
+    }),
+    FlagOption("=n", "--max-count=", "Limit the number of commits" ),
+    FlagOption("=L", "-L", "Trace line evolution", {
+      expect_list = true,
       prompt_label = "(Accepts multiple values)",
-      prompt_fmt = "${label} ",
+      -- prompt_fmt = "${label} ",
       completion = function(_)
-        return function(arg_lead, _, _)
-          return M.line_trace_completion(arg_lead)
+        ---@param ctx CmdLineContext
+        return function(ctx)
+          return M.line_trace_candidates(ctx.arg_lead)
         end
       end,
-      transform = function(values)
-        return utils.tbl_fmap(values, function(v)
-          v = utils.str_match(v, { "^-L(.*)", ".*" })
-          if v == "" then return nil end
-          return v
-        end)
-      end,
-      ---@param self FlagOption
-      ---@param value string|string[]
-      render_value = function(self, value)
-        if #value == 0 then
-          -- Just render the flag name
-          return true, self[2]
-        end
-
-        -- Render a string of quoted args
-        return false, table.concat(vim.tbl_map(function(v)
-          if not v:match("^-L") then
-            -- Prepend the flag if it wasn't specified by the user.
-            v = "-L" .. v
-          end
-          return utils.str_quote(v, { only_if_whitespace = true })
-        end, value), " ")
-      end,
-      render_default = function(_, value)
-        if #value == 0 then
-          -- Just render the flag name
-          return "-L"
-        end
-
-        -- Render a string of quoted args
-        return table.concat(vim.tbl_map(function(v)
-          v = select(1, v:gsub("\\", "\\\\"))
-          return utils.str_quote("-L" .. v, { only_if_whitespace = true })
-        end, value), " ")
-      end,
-    },
-    {
-      "=d", "--diff-merges=", "Determines how merge commits are treated",
+    }),
+    FlagOption("=d", "--diff-merges=", "Determines how merge commits are treated", {
       select = {
         "",
         "off",
@@ -1748,102 +1712,42 @@ GitAdapter.flags = {
         "dense-combined",
         "remerge",
       },
-    },
-    { "=a", "--author=", "List only commits from a given author", prompt_label = "(Extended regular expression)" },
-    { "=g", "--grep=", "Filter commit messages", prompt_label = "(Extended regular expression)" },
-    { "=G", "-G", "Search changes", prompt_label = "(Extended regular expression)" },
-    { "=S", "-S", "Search occurrences", prompt_label = "(Extended regular expression)" },
-    {
-      "--", "--", "Limit to files",
+    }),
+    FlagOption("=a", "--author=", "List only commits from a given author", {
+      prompt_label = "(Extended regular expression)"
+    }),
+    FlagOption("=g", "--grep=", "Filter commit messages", {
+      prompt_label = "(Extended regular expression)"
+    }),
+    FlagOption("=G", "-G", "Search changes", {
+      prompt_label = "(Extended regular expression)"
+    }),
+    FlagOption("=S", "-S", "Search occurrences", {
+      prompt_label = "(Extended regular expression)"
+    }),
+    FlagOption("--", "--", "Limit to files", {
       key = "path_args",
+      expect_list = true,
       prompt_label = "(Path arguments)",
       prompt_fmt = "${label}${flag_name} ",
-      transform = function(values)
-        return utils.tbl_fmap(values, function(v)
-          if v == "" then return nil end
-          return v
-        end)
-      end,
-      render_value = function(_, value)
-        if #value == 0 then
-          -- Just render the flag name
-          return true, "--"
-        end
-
-        -- Render a string of quoted args
-        return false, table.concat(utils.vec_join(
-          "--",
-          vim.tbl_map(function(v)
-            v = v:gsub("\\", "\\\\")
-            return utils.str_quote(v, { only_if_whitespace = true })
-          end, value)
-        ), " ")
-      end,
+      value_fmt = "${value}",
+      display_fmt = "${flag_name} ${values}",
       ---@param panel FHOptionPanel
       completion = function(panel)
         local view = panel.parent.parent
 
-        return function(_, cmd_line, cur_pos)
-          local ok, ctx = pcall(arg_parser.scan_sh_args, cmd_line, cur_pos)
-
-          if ok then
-            local quoted = vim.tbl_map(function(v)
-              return utils.str_quote(v, { only_if_whitespace = true })
-            end, ctx.args)
-
-            return vim.tbl_map(function(v)
-              return table.concat(utils.vec_join(
-                utils.vec_slice(quoted, 1, ctx.argidx - 1),
-                utils.str_quote(v, { only_if_whitespace = true })
-              ), " ")
-            end, view.adapter:path_completion(ctx.arg_lead))
-          end
+        ---@param ctx CmdLineContext
+        return function(ctx)
+          return view.adapter:path_candidates(ctx.arg_lead)
         end
       end,
-    },
+    }),
   },
 }
 
+-- Add reverse lookups
 for _, list in pairs(GitAdapter.flags) do
   for i, option in ipairs(list) do
-    option = vim.tbl_extend("keep", option, {
-      prompt_fmt = "${label}${flag_name}",
-
-      key = option.key or utils.str_match(option[2], {
-        "^%-%-?([^=]+)=?",
-        "^%+%+?([^=]+)=?",
-      }):gsub("%-", "_"),
-
-      ---@param self FlagOption
-      ---@param value string|string[]
-      render_value = function(self, value)
-        local quoted
-
-        if type(value) == "table" then
-          quoted = table.concat(vim.tbl_map(function(v)
-            return self[2] .. utils.str_quote(v, { only_if_whitespace = true })
-          end, value), " ")
-        else
-          quoted = self[2] .. utils.str_quote(value, { only_if_whitespace = true })
-        end
-
-        return value == "", quoted
-      end,
-
-      ---@param value string|string[]
-      render_default = function(_, value)
-        if value == nil then
-          return ""
-        elseif type(value) == "table" then
-          return table.concat(vim.tbl_map(function(v)
-            v = select(1, v:gsub("\\", "\\\\"))
-            return utils.str_quote(v, { only_if_whitespace = true })
-          end, value), " ")
-        end
-        return utils.str_quote(value, { only_if_whitespace = true })
-      end,
-    })
-
     list[i] = option
     list[option.key] = option
   end
@@ -1851,7 +1755,7 @@ end
 
 -- Completion
 
-function GitAdapter:path_completion(arg_lead)
+function GitAdapter:path_candidates(arg_lead)
   local magic, pattern = M.pathspec_split(arg_lead)
 
   return vim.tbl_map(function(v)
@@ -1859,8 +1763,13 @@ function GitAdapter:path_completion(arg_lead)
   end, vim.fn.getcompletion(pattern, "file", 0))
 end
 
-function GitAdapter:rev_candidates()
+---Get completion candidates for git revisions.
+---@param arg_lead string
+---@param opt? RevCompletionSpec
+function GitAdapter:rev_candidates(arg_lead, opt)
+  opt = vim.tbl_extend("keep", opt or {}, { accept_range = false }) --[[@as RevCompletionSpec ]]
   logger.lvl(1).debug("[completion] Revision candidates requested.")
+
   -- stylua: ignore start
   local targets = {
     "HEAD", "FETCH_HEAD", "ORIG_HEAD", "MERGE_HEAD",
@@ -1884,38 +1793,31 @@ function GitAdapter:rev_candidates()
     { cwd = self.ctx.toplevel, silent = true }
   )
 
-  return utils.vec_join(heads, revs, stashes)
-end
+  local ret = utils.vec_join(heads, revs, stashes)
 
----Completion for git revisions.
----@param arg_lead string
----@param opt? RevCompletionSpec
----@return string[]
-function GitAdapter:rev_completion(arg_lead, opt)
-  ---@type RevCompletionSpec
-  opt = vim.tbl_extend("keep", opt or {}, { accept_range = false })
-  local candidates = self:rev_candidates()
-  local _, range_end = utils.str_match(arg_lead, {
-    "^(%.%.%.?)()$",
-    "^(%.%.%.?)()[^.]",
-    "[^.](%.%.%.?)()$",
-    "[^.](%.%.%.?)()[^.]",
-  })
+  if opt.accept_range then
+    local _, range_end = utils.str_match(arg_lead, {
+      "^(%.%.%.?)()$",
+      "^(%.%.%.?)()[^.]",
+      "[^.](%.%.%.?)()$",
+      "[^.](%.%.%.?)()[^.]",
+    })
 
-  if opt.accept_range and range_end then
-    local range_lead = arg_lead:sub(1, range_end - 1)
-    candidates = vim.tbl_map(function(v)
-      return range_lead .. v
-    end, candidates)
+    if range_end then
+      local range_lead = arg_lead:sub(1, range_end - 1)
+      ret = vim.tbl_map(function(v)
+        return range_lead .. v
+      end, ret)
+    end
   end
 
-  return diffview.filter_completion(arg_lead, candidates)
+  return ret
 end
 
 ---Completion for the git-log `-L` flag.
 ---@param arg_lead string
 ---@return string[]?
-function M.line_trace_completion(arg_lead)
+function M.line_trace_candidates(arg_lead)
   local range_end = arg_lead:match(".*:()")
 
   if not range_end then
@@ -1943,10 +1845,10 @@ function GitAdapter:init_completion()
   end)
 
   self.comp.file_history:put({ "base" }, function(_, arg_lead)
-    return utils.vec_join("LOCAL", self:rev_completion(arg_lead))
+    return utils.vec_join("LOCAL", self:rev_candidates(arg_lead))
   end)
   self.comp.file_history:put({ "range" }, function(_, arg_lead)
-    return self:rev_completion(arg_lead, { accept_range = true })
+    return self:rev_candidates(arg_lead, { accept_range = true })
   end)
   self.comp.file_history:put({ "C" }, function(_, arg_lead)
     return vim.fn.getcompletion(arg_lead, "dir")
@@ -1961,7 +1863,7 @@ function GitAdapter:init_completion()
   self.comp.file_history:put({ "--reverse" })
   self.comp.file_history:put({ "--max-count", "-n" }, {})
   self.comp.file_history:put({ "-L" }, function (_, arg_lead)
-    return M.line_trace_completion(arg_lead)
+    return M.line_trace_candidates(arg_lead)
   end)
   self.comp.file_history:put({ "--diff-merges" }, {
     "off",

@@ -90,7 +90,7 @@ end
 ---@param arg_lead string
 ---@param opt? RevCompletionSpec
 ---@return string[]
-function VCSAdapter:rev_completion(arg_lead, opt)
+function VCSAdapter:rev_candidates(arg_lead, opt)
   oop.abstract_stub()
 end
 
@@ -385,16 +385,6 @@ function VCSAdapter:has_local(left, right)
   return left.type == RevType.LOCAL or right.type == RevType.LOCAL
 end
 
----@class FlagOption : string[]
----@field key string
----@field prompt_label string
----@field prompt_fmt string
----@field select string[]
----@field completion string|fun(panel: FHOptionPanel): function
----@field transform fun(values: string[]): any # Transform the values given by the user.
----@field render_value fun(option: FlagOption, value: string|string[]): boolean, string # Render the flag value in the panel.
----@field render_default fun(options: FlagOption, value: string|string[]): string # Render the default text for the input().
-
 VCSAdapter.flags = {
   ---@type FlagOption[]
   switches = {},
@@ -404,7 +394,7 @@ VCSAdapter.flags = {
 
 ---@param arg_lead string
 ---@return string[]
-function VCSAdapter:path_completion(arg_lead)
+function VCSAdapter:path_candidates(arg_lead)
   return vim.fn.getcompletion(arg_lead, "file", 0)
 end
 

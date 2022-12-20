@@ -7,7 +7,8 @@ vim.g.diffview_nvim_loaded = 1
 local lazy = require("diffview.lazy")
 
 ---@module "diffview"
-local diffview = lazy.require("diffview")
+local arg_parser = lazy.require("diffview.arg_parser") ---@module "diffview.arg_parser"
+local diffview = lazy.require("diffview") ---@module "diffview"
 
 local api = vim.api
 local command = api.nvim_create_user_command
@@ -19,18 +20,18 @@ local function completion(...)
 end
 
 -- Create commands
-command("DiffviewOpen", function(state)
-  diffview.open(unpack(state.fargs))
+command("DiffviewOpen", function(ctx)
+  diffview.open(arg_parser.scan(ctx.args).args)
 end, { nargs = "*", complete = completion })
 
-command("DiffviewFileHistory", function(state)
+command("DiffviewFileHistory", function(ctx)
   local range
 
-  if state.range > 0 then
-    range = { state.line1, state.line2 }
+  if ctx.range > 0 then
+    range = { ctx.line1, ctx.line2 }
   end
 
-  diffview.file_history(range, unpack(state.fargs))
+  diffview.file_history(range, arg_parser.scan(ctx.args).args)
 end, { nargs = "*", complete = completion, range = true })
 
 command("DiffviewClose", function()
