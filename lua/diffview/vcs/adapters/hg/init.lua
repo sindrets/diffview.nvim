@@ -953,8 +953,8 @@ end, 4)
 HgAdapter.flags = {
   ---@type FlagOption[]
   switches = {
-    {'--follow', '-f', 'Follow renames'},
-    {'--no-merges', '-M', 'List no merge changesets'},
+    { '-f', '--follow', 'Follow renames' },
+    { '-M', '--no-merges', 'List no merge changesets' },
   },
   ---@type FlagOption[]
   options = {
