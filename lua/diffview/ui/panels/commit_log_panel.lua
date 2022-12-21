@@ -47,15 +47,15 @@ end
 ---@field args string[]
 ---@field name string
 
----@param git_toplevel string
+---@param adapter VCSAdapter
 ---@param opt CommitLogPanelSpec
-function CommitLogPanel:init(git_toplevel, opt)
+function CommitLogPanel:init(adapter, opt)
   CommitLogPanel:super().init(self, {
     bufname = opt.name,
     config = opt.config or get_user_config().commit_log_panel.win_config,
   })
 
-  self.git_toplevel = git_toplevel
+  self.adapter = adapter
   self.args = opt.args or { "-n256" }
 
   self:on_autocmd("BufWinEnter" , {
@@ -73,14 +73,9 @@ CommitLogPanel.update = async.void(function(self, args)
   end
 
   Job:new({
-    command = "git",
-    args = utils.vec_join(
-      "log",
-      "--first-parent",
-      "--stat",
-      args or self.args
-    ),
-    cwd = self.git_toplevel,
+    command = self.adapter:bin(),
+    args = self.adapter:get_log_args(args or self.args),
+    cwd = self.adapter.ctx.toplevel,
     on_exit = vim.schedule_wrap(function(job)
       if job.code ~= 0 then
         utils.err("Failed to open log!")

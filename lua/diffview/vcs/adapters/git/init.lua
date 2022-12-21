@@ -230,6 +230,10 @@ function GitAdapter:get_show_args(path, rev)
   return utils.vec_join(self:args(), "show", ("%s:%s"):format(rev and rev:object_name() or "", path))
 end
 
+function GitAdapter:get_log_args(args)
+  return utils.vec_join("log", "--first-parent", "--stat", args)
+end
+
 function GitAdapter:get_dir(path)
   local out, code = self:exec_sync({ "rev-parse", "--path-format=absolute", "--git-dir" }, path)
   if code ~= 0 then
