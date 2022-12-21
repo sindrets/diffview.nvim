@@ -698,7 +698,7 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
 
   ---@param job Job
   local function on_exit(job)
-    utils.handle_job(job, { debug_opt = debug_opt })
+    utils.handle_job(job, { debug_opt = debug_opt, fail_on_empty = false })
     latch:count_down()
   end
 
@@ -735,8 +735,12 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
   numstat_job:start()
   latch:await()
   local out_status
-  if not (#namestat_job:result() == #numstat_job:result() - 1) then
-    out_status = vcs_utils.ensure_output(2, { namestat_job, numstat_job }, "HgAdapter>tracked_files()")
+  if
+    not (#namestat_job:result() == 0 and #numstat_job:result() == 0)
+    and not (#namestat_job:result() == #numstat_job:result() - 1)
+  then
+    out_status =
+      vcs_utils.ensure_output(2, { namestat_job, numstat_job }, "HgAdapter>tracked_files()")
   end
 
   if out_status == JobStatus.ERROR or not (namestat_job.code == 0 and numstat_job.code == 0 and mergestate_job.code == 0) then
@@ -798,8 +802,12 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
       conflict_map[file.path] = file_info[file.path]
     end
   end
-  local ours_node = find_key(mergestate[1].commits, 'name', 'local').node
-  local theirs_node = find_key(mergestate[1].commits, 'name', 'other').node
+  local ours_node
+  local theirs_node
+  if #mergestate[1].commits > 0 then
+    ours_node = find_key(mergestate[1].commits, 'name', 'local').node
+    theirs_node = find_key(mergestate[1].commits, 'name', 'other').node
+  end
 
   for _, f in pairs(file_info) do
     if f.status ~= "U" then
