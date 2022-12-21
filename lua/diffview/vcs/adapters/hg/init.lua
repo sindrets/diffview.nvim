@@ -125,6 +125,11 @@ function HgAdapter:get_show_args(path, rev)
   return utils.vec_join(self:args(), "cat", "--rev", rev:object_name(), "--", path)
 end
 
+function HgAdapter:get_log_args(args)
+print(" args:", vim.inspect(args)) -- __AUTO_GENERATED_PRINT_VAR__
+  return utils.vec_join(self:args(), "log", "--stat", args)
+end
+
 function HgAdapter:file_history_options(range, paths, args)
   local default_args = config.get_config().default_args.DiffviewFileHistory
   local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
