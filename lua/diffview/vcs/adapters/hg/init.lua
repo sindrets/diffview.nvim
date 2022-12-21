@@ -783,31 +783,27 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
     end
   end
 
-  local find_key = function (t, key, value)
-    for _, v in ipairs(t) do
-      if v[key] == value then
-        return v
-      end
-    end
-  end
-
   local mergestate = vim.json.decode(table.concat(mergestate_out, ''))
   for _, file in ipairs(mergestate[1].files) do
-    local base = find_key(file.extras, 'key', 'ancestorlinknode')
+    local base = nil
+    for _, extra in ipairs(file.extras) do
+      if extra.key == 'ancestorlinknode' then
+        base = extra.value
+      end
+    end
     if file.state == 'u' then
       file_info[file.path].status = 'U'
+      file_info[file.path].base = base
       if file.other_path ~= file.path then
         file_info[file.path].oldname = file.other_path
       end
-      file_info[file.path].base = base and base.value or nil
       conflict_map[file.path] = file_info[file.path]
     end
   end
-  local ours_node
-  local theirs_node
-  if #mergestate[1].commits > 0 then
-    ours_node = find_key(mergestate[1].commits, 'name', 'local').node
-    theirs_node = find_key(mergestate[1].commits, 'name', 'other').node
+
+  local nodes = {}
+  for _, commit in ipairs(mergestate[1].commits) do
+    nodes[commit.name] = commit.node
   end
 
   for _, f in pairs(file_info) do
@@ -825,9 +821,9 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
         status = "U",
         kind = "conflicting",
         revs = {
-          a = self.Rev(RevType.COMMIT, ours_node),
+          a = self.Rev(RevType.COMMIT, nodes['local']),
           b = self.Rev(RevType.LOCAL),
-          c = self.Rev(RevType.COMMIT, theirs_node),
+          c = self.Rev(RevType.COMMIT, nodes.other),
           d = self.Rev(RevType.COMMIT, v.base),
         }
       }))
