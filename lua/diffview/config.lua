@@ -564,10 +564,12 @@ function M.setup(user_config)
         M._config.keymaps[name] = utils.tbl_access(user_config, { "keymaps", name }) or {}
       end
     end
+  else
+    M._config.keymaps = utils.tbl_clone(M.defaults.keymaps)
   end
 
   -- Merge default and user keymaps
-  for name, keymap in pairs(M.defaults.keymaps) do
+  for name, keymap in pairs(M._config.keymaps) do
     if type(name) == "string" and type(keymap) == "table" then
       M._config.keymaps[name] = M.extend_keymaps(
         keymap,
