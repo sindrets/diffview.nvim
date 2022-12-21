@@ -778,7 +778,6 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
       file_info[name] = {
         status = status,
         name = name,
-        oldname = name, -- TODO
         stats = stats,
       }
     end
@@ -797,7 +796,9 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
     local base = find_key(file.extras, 'key', 'ancestorlinknode')
     if file.state == 'u' then
       file_info[file.path].status = 'U'
-      file_info[file.path].oldname = file.other_path
+      if file.other_path ~= file.path then
+        file_info[file.path].oldname = file.other_path
+      end
       file_info[file.path].base = base and base.value or nil
       conflict_map[file.path] = file_info[file.path]
     end
