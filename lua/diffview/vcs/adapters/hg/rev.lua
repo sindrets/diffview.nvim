@@ -7,7 +7,7 @@ local M = {}
 ---@class HgRev : Rev
 local HgRev = oop.create_class("HgRev", Rev)
 
-HgRev.NULL_TREE_SHA = "000000000000000000000000000000000000000"
+HgRev.NULL_TREE_SHA = "0000000000000000000000000000000000000000"
 
 function HgRev:init(rev_type, revision, track_head)
   local t = type(revision)

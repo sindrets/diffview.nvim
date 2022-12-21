@@ -816,12 +816,6 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
   end
 
   if kind == "working" and next(conflict_map) then
-    -- TODO: read and parse content of .hg/merge/state2
-    --       O(<HASH> : others
-    --       L(<HASH> : local
-    --       ancestorlinknode<HASH> : base
-    --       HASH is 40 hex characters
-    -- hg debugmergestate -Tjson
     for _, v in pairs(conflict_map) do
       table.insert(conflicts, FileEntry.with_layout(opt.merge_layout, {
         adapter = self,
@@ -905,6 +899,56 @@ HgAdapter.untracked_files = async.wrap(function(self, left, right, opt, callback
     end,
   }):start()
 end, 5)
+
+---@param self HgAdapter
+---@param path string
+---@param rev? Rev
+---@param callback fun(stderr: string[]?, stdout: string[]?)
+HgAdapter.show = async.wrap(function(self, path, rev, callback)
+  -- File did not exist, need to return an empty buffer
+  if not(rev) or (rev:object_name() == self.Rev.NULL_TREE_SHA) then
+    callback(nil, {})
+    return
+  end
+
+  local job = Job:new({
+    command = self:bin(),
+    args = self:get_show_args(path, rev),
+    cwd = self.ctx.toplevel,
+    ---@type Job
+    on_exit = async.void(function(j)
+      local context = "HgAdapter.show()"
+      utils.handle_job(j, {
+        fail_on_empty = true,
+        context = context,
+        debug_opt = { no_stdout = true, context = context },
+      })
+
+      if j.code ~= 0 then
+        callback(j:stderr_result() or {}, nil)
+        return
+      end
+
+      local out_status
+
+      if #j:result() == 0 then
+        async.util.scheduler()
+        out_status = vcs_utils.ensure_output(2, { j }, context)
+      end
+
+      if out_status == JobStatus.ERROR then
+        callback(j:stderr_result() or {}, nil)
+        return
+      end
+
+      callback(nil, j:result())
+    end),
+  })
+  -- Problem: Running multiple 'show' jobs simultaneously may cause them to fail
+  -- silently.
+  -- Solution: queue them and run them one after another.
+  vcs_utils.queue_sync_job(job)
+end, 4)
 
 HgAdapter.flags = {
   ---@type FlagOption[]
