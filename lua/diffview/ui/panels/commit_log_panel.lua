@@ -8,7 +8,7 @@ local utils = require("diffview.utils")
 local M = {}
 
 ---@class CommitLogPanel : Panel
----@field git_toplevel string
+---@field adapter VCSAdapter
 ---@field args string[]
 ---@field job_out string[]
 local CommitLogPanel = oop.create_class("CommitLogPanel", Panel)

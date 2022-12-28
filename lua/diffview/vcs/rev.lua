@@ -66,6 +66,15 @@ end
 
 ---@diagnostic disable: unused-local, missing-return
 
+---Get the argument describing the range between the two given revs. If a
+---single rev is given, the returned argument describes the *range* of the
+---single commit pointed to by that rev.
+---@abstract
+---@param rev_from Rev|string
+---@param rev_to? Rev|string
+---@return string?
+function Rev.to_range(rev_from, rev_to) oop.abstract_stub() end
+
 ---@param name string
 ---@param adapter? VCSAdapter
 ---@return Rev?
