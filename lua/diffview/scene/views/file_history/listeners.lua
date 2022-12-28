@@ -138,7 +138,7 @@ return function(view)
       if file then
         local entry = view.panel:find_entry(file)
         if entry then
-          view.commit_log_panel:update(entry.commit.hash .. "^!")
+          view.commit_log_panel:update(view.adapter.Rev.to_range(entry.commit.hash))
         end
       end
     end,

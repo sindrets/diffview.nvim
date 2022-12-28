@@ -120,7 +120,7 @@ end
 function DiffView:post_open()
   vim.cmd("redraw")
 
-  self.commit_log_panel = CommitLogPanel(self.adapter.ctx.toplevel, {
+  self.commit_log_panel = CommitLogPanel(self.adapter, {
     name = ("diffview://%s/log/%d/%s"):format(self.adapter.ctx.dir, self.tabpage, "commit_log"),
   })
 

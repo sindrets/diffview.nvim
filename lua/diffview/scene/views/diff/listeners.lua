@@ -101,18 +101,14 @@ return function(view)
       end
     end,
     open_commit_log = function()
-      if (view.left.type == RevType.STAGE and view.right.type == RevType.LOCAL)
-        or (
-          view.left.type == RevType.COMMIT
-          and vim.tbl_contains({ RevType.STAGE, RevType.LOCAL }, view.right.type)
-          and view.left:is_head(view.adapter)
-        ) then
+      local range = view.adapter.Rev.to_range(view.left, view.right)
+
+      if not range or view.left:is_head(view.adapter) then
         utils.info("Changes not commited yet. No log available for these changes.")
         return
       end
 
-      local rev_arg = ("%s..%s"):format(view.left.commit, view.right.commit or "HEAD")
-      view.commit_log_panel:update(rev_arg)
+      view.commit_log_panel:update(range)
     end,
     toggle_stage_entry = function()
       if not (view.left.type == RevType.STAGE and view.right.type == RevType.LOCAL) then

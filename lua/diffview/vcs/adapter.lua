@@ -173,6 +173,12 @@ function VCSAdapter:get_show_args(path, rev)
   oop.abstract_stub()
 end
 
+---@param args string[]
+---@return string[] args to show commit log message
+function VCSAdapter:get_log_args(args)
+  oop.abstract_stub()
+end
+
 ---@param range? { [1]: integer, [2]: integer }
 ---@param paths string[]
 ---@param args string[]

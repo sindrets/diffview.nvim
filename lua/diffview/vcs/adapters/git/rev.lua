@@ -49,6 +49,35 @@ function GitRev:init(rev_type, revision, track_head)
   end
 end
 
+---@param rev_from GitRev|string
+---@param rev_to? GitRev|string
+---@return string?
+function GitRev.to_range(rev_from, rev_to)
+  if type(rev_from) ~= "string" and rev_from.type ~= RevType.COMMIT then
+    -- The range between either LOCAL or STAGE, and any other rev, will always
+    -- be empty.
+    return nil
+  end
+
+  local name_from = type(rev_from) == "string" and rev_from or rev_from:object_name()
+  local name_to
+
+  if rev_to then
+    if type(rev_to) == "string" then
+      name_to = rev_to
+    else
+      -- If the rev is either of type LOCAL or STAGE, just fall back to HEAD.
+      name_to = rev_to.type == RevType.COMMIT and rev_to:object_name() or "HEAD"
+    end
+  end
+
+  if not name_to then
+    return name_from .. "^!"
+  else
+    return name_from .. ".." .. name_to
+  end
+end
+
 ---@param name string
 ---@param adapter GitAdapter
 ---@return Rev?
@@ -85,8 +114,8 @@ end
 ---Determine if this rev is currently the head.
 ---@param adapter GitAdapter
 ---@return boolean?
-function Rev:is_head(adapter)
-  if not self.type == RevType.COMMIT then
+function GitRev:is_head(adapter)
+  if self.type ~= RevType.COMMIT then
     return false
   end
 
