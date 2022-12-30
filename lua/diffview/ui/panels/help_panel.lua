@@ -125,6 +125,9 @@ function HelpPanel:update_components()
       maps = utils.tbl_fmap(maps, function(v)
         if v[1] ~= "n" then return nil end
         local desc = v[4] and v[4].desc
+        if desc == false then
+          desc = "diffview_ignored"
+        end
 
         if not desc then
           if type(v[3]) == "string" then
@@ -212,10 +215,12 @@ function HelpPanel:render()
     for _, item in ipairs(section.items) do
       ---@cast item CompStruct
       comp = item.comp
+      if comp.context.label_rhs == "diffview_ignored" then goto continue end
       comp:add_text(comp.context.label_lhs, "DiffviewSecondary")
       comp:add_text(" -> ", "DiffviewNonText")
       comp:add_text(comp.context.label_rhs)
       comp:ln()
+      ::continue::
     end
   end
 end
