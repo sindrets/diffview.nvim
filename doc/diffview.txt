@@ -651,6 +651,14 @@ keymaps                                         *diffview-config-keymaps*
         }
 <
 
+        Specially, setting `desc` to false will ignore mapping in the help panel: >
+
+        view = {
+          -- Ignore mapping in the help panel
+          { "n", "<2-LeftMouse>", actions.select_entry, { desc = false } },
+        }
+<
+
         To disable all the default mappings simply set: >
 
         keymaps = {

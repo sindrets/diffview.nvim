@@ -68,7 +68,7 @@ set of paths, and view the changes made in a diff split. This is a porcelain
 interface for git-log, and supports a good number of its options. Things like:
 
 - Filtering commits by grepping commit messages and commit authors.
-- Tracing the line evolution of a given set of line ranges for multiple files. 
+- Tracing the line evolution of a given set of line ranges for multiple files.
 - Only listing changes for a specific commit range, branch, or tag.
 - Following file changes through renames.
 
@@ -175,7 +175,7 @@ require("diffview").setup({
   },
   view = {
     -- Configure the layout and behavior of different types of views.
-    -- Available layouts: 
+    -- Available layouts:
     --  'diff1_plain'
     --    |'diff2_horizontal'
     --    |'diff2_vertical'
@@ -412,6 +412,16 @@ view = {
   -- Visual mode mapping to lua function:
   { "v", "<leader>b", function() print("bar") end, { nowait = true } },
 }
+```
+
+Specially, setting `desc` to false will ignore mapping in the help panel:
+
+```lua
+view = {
+  -- Ignore mapping in the help panel
+  { "n", "<2-LeftMouse>", actions.select_entry, { desc = false } },
+}
+
 ```
 
 To disable any single mapping without disabling them all, set its `{rhs}` to
