@@ -1081,11 +1081,12 @@ function GitAdapter:file_blob_hash(path, rev_arg)
     "rev-parse",
     "--revs-only",
     ("%s:%s"):format(rev_arg or "", path)
-  }, self.ctx.toplevel)
+  }, {
+    cwd = self.ctx.toplevel,
+    retry_on_empty = 2,
+  })
 
-  if code ~= 0 then
-    return
-  end
+  if code ~= 0 then return end
 
   return vim.trim(out[1])
 end
