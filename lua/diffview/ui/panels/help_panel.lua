@@ -215,12 +215,12 @@ function HelpPanel:render()
     for _, item in ipairs(section.items) do
       ---@cast item CompStruct
       comp = item.comp
-      if comp.context.label_rhs == "diffview_ignored" then goto continue end
-      comp:add_text(comp.context.label_lhs, "DiffviewSecondary")
-      comp:add_text(" -> ", "DiffviewNonText")
-      comp:add_text(comp.context.label_rhs)
-      comp:ln()
-      ::continue::
+      if comp.context.label_rhs ~= "diffview_ignored" then
+        comp:add_text(comp.context.label_lhs, "DiffviewSecondary")
+        comp:add_text(" -> ", "DiffviewNonText")
+        comp:add_text(comp.context.label_rhs)
+        comp:ln()
+      end
     end
   end
 end
