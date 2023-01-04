@@ -149,6 +149,19 @@ function M.dispose_stray_views()
   end
 end
 
+---Get the first open Diffview.
+---@return View?
+function M.get_any_view()
+  local tabpage = api.nvim_get_current_tabpage()
+  for _, view in ipairs(M.views) do
+    if view.tabpage == tabpage then
+      return view
+    end
+  end
+
+  return M.views[0] or M.views[1]
+end
+
 ---Get the currently open Diffview.
 ---@return View?
 function M.get_current_view()

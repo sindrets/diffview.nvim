@@ -106,6 +106,12 @@ function M.init()
 end
 
 function M.open(...)
+  local view = lib.get_any_view()
+  if view then
+    view:close()
+    lib.dispose_view(view)
+  end
+
   local view = lib.diffview_open(utils.tbl_pack(...))
   if view then
     view:open()
@@ -128,7 +134,7 @@ function M.close(tabpage)
     return
   end
 
-  local view = lib.get_current_view()
+  local view = lib.get_any_view()
   if view then
     view:close()
     lib.dispose_view(view)
