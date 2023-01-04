@@ -33,5 +33,12 @@ function HgRev:object_name()
   return self.commit
 end
 
+function HgRev.to_range(rev_from, rev_to)
+  if rev_to then
+    return rev_from .. "::" .. rev_to
+  end
+  return rev_from
+end
+
 M.HgRev = HgRev
 return M
