@@ -414,16 +414,6 @@ view = {
 }
 ```
 
-Specially, setting `desc` to false will ignore mapping in the help panel:
-
-```lua
-view = {
-  -- Ignore mapping in the help panel
-  { "n", "<2-LeftMouse>", actions.select_entry, { desc = false } },
-}
-
-```
-
 To disable any single mapping without disabling them all, set its `{rhs}` to
 `false`:
 
