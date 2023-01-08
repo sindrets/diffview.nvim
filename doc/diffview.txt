@@ -651,6 +651,15 @@ keymaps                                         *diffview-config-keymaps*
         }
 <
 
+        Setting a mapping's `desc` field to `"diffview_ignore"` will hide the
+        mapping from the help panel: >
+
+        view = {
+          -- Ignore mapping in the help panel
+          { "n", "<2-LeftMouse>", actions.select_entry, { desc = "diffview_ignore" } },
+        }
+<
+
         To disable all the default mappings simply set: >
 
         keymaps = {

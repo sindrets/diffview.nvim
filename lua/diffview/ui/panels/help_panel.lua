@@ -149,7 +149,6 @@ function HelpPanel:update_components()
         return a < b
       end)
 
-      height = height + #maps + 3
       local items = { name = "items" }
       local section_schema = {
         name = "section",
@@ -163,17 +162,22 @@ function HelpPanel:update_components()
       }
 
       for _, mapping in ipairs(maps) do
-        width = math.max(width, 14 + 4 + #mapping[5] + 2)
-        table.insert(items, {
-          name = "item",
-          context = {
-            label_lhs = ("%14s"):format(mapping[2]),
-            label_rhs = ("%s"):format(mapping[5]),
-            mapping = mapping,
-          },
-        })
+        local desc = mapping[5]
+
+        if desc ~= "diffview_ignore" then
+          width = math.max(width, 14 + 4 + #mapping[5] + 2)
+          table.insert(items, {
+            name = "item",
+            context = {
+              label_lhs = ("%14s"):format(mapping[2]),
+              label_rhs = desc,
+              mapping = mapping,
+            },
+          })
+        end
       end
 
+      height = height + #items + 3
       table.insert(sections, section_schema)
     end
 
