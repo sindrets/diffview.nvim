@@ -694,6 +694,10 @@ function GitAdapter:file_history_options(range, paths, args)
     }
   end
 
+  if log_options.L and next(log_options.L) then
+    log_options.follow = false -- '--follow' is not compatible with '-L'
+  end
+
   log_options.path_args = paths
 
   local ok, opt_description = self:file_history_dry_run(log_options)
