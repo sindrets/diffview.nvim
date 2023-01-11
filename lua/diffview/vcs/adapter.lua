@@ -131,8 +131,8 @@ end
 ---@return string[] stdout
 ---@return integer code
 ---@return string[] stderr
----@overload fun(args: string[], cwd: string?)
----@overload fun(args: string[], opt: utils.system_list.Opt?)
+---@overload fun(self: VCSAdapter, args: string[], cwd: string?)
+---@overload fun(self: VCSAdapter, args: string[], opt: utils.system_list.Opt?)
 function VCSAdapter:exec_sync(args, cwd_or_opt)
   if not self.bootstrap.done then
     self:run_bootstrap()
@@ -176,6 +176,16 @@ end
 ---@param args string[]
 ---@return string[] args to show commit log message
 function VCSAdapter:get_log_args(args)
+  oop.abstract_stub()
+end
+
+---@class vcs.MergeContext
+---@field ours { hash: string, ref_names: string? }
+---@field theirs { hash: string, ref_names: string? }
+---@field base { hash: string, ref_names: string? }
+
+---@return vcs.MergeContext
+function VCSAdapter:get_merge_context()
   oop.abstract_stub()
 end
 

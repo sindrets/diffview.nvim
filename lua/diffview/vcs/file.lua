@@ -32,6 +32,7 @@ local M = {}
 ---@field binary boolean
 ---@field active boolean
 ---@field ready boolean
+---@field winbar string?
 ---@field winopts WindowOptions
 local File = oop.create_class("vcs.File")
 
@@ -253,28 +254,6 @@ function File:is_valid()
   return self.bufnr and api.nvim_buf_is_valid(self.bufnr)
 end
 
----@param force? boolean
----@param opt? vcs.File.AttachState
-function File:attach_buffer(force, opt)
-  if self.bufnr then
-    File._attach_buffer(self.bufnr, force, opt)
-  end
-end
-
-function File:detach_buffer()
-  if self.bufnr then
-    File._detach_buffer(self.bufnr)
-  end
-end
-
-function File:dispose_buffer()
-  if self.bufnr and api.nvim_buf_is_loaded(self.bufnr) then
-    File._detach_buffer(self.bufnr)
-    File.safe_delete_buf(self.bufnr)
-    self.bufnr = nil
-  end
-end
-
 ---@param t1 table
 ---@param t2 table
 ---@return vcs.File.AttachState
@@ -303,64 +282,72 @@ end
 ---@field keymaps table
 ---@field disable_diagnostics boolean
 
----@static
----@param bufnr integer
 ---@param force? boolean
 ---@param opt? vcs.File.AttachState
-function File._attach_buffer(bufnr, force, opt)
-  local new_opt = false
-  local cur_state = File.attached[bufnr] or {}
-  local state = prepare_attach_opt(cur_state, opt or {})
+function File:attach_buffer(force, opt)
+  if self.bufnr then
+    local new_opt = false
+    local cur_state = File.attached[self.bufnr] or {}
+    local state = prepare_attach_opt(cur_state, opt or {})
 
-  if opt then
-    new_opt = not vim.deep_equal(cur_state or {}, opt)
-  end
-
-  if force or new_opt or not cur_state then
-    local conf = config.get_config()
-
-    -- Keymaps
-    state.keymaps = config.extend_keymaps(conf.keymaps.view, state.keymaps)
-    local default_map_opt = { silent = true, nowait = true, buffer = bufnr }
-
-    for _, mapping in ipairs(state.keymaps) do
-      local map_opt = vim.tbl_extend("force", default_map_opt, mapping[4] or {}, { buffer = bufnr })
-      vim.keymap.set(mapping[1], mapping[2], mapping[3], map_opt)
+    if opt then
+      new_opt = not vim.deep_equal(cur_state or {}, opt)
     end
 
-    -- Diagnostics
-    if state.disable_diagnostics then
-      vim.diagnostic.disable(bufnr)
-    end
+    if force or new_opt or not cur_state then
+      local conf = config.get_config()
 
-    File.attached[bufnr] = state
+      -- Keymaps
+      state.keymaps = config.extend_keymaps(conf.keymaps.view, state.keymaps)
+      local default_map_opt = { silent = true, nowait = true, buffer = self.bufnr }
+
+      for _, mapping in ipairs(state.keymaps) do
+        local map_opt = vim.tbl_extend("force", default_map_opt, mapping[4] or {}, { buffer = self.bufnr })
+        vim.keymap.set(mapping[1], mapping[2], mapping[3], map_opt)
+      end
+
+      -- Diagnostics
+      if state.disable_diagnostics then
+        vim.diagnostic.disable(self.bufnr)
+      end
+
+      File.attached[self.bufnr] = state
+    end
   end
 end
 
----@static
----@param bufnr integer
-function File._detach_buffer(bufnr)
-  local state = File.attached[bufnr]
+function File:detach_buffer()
+  if self.bufnr then
+    local state = File.attached[self.bufnr]
 
-  if state then
-    -- Keymaps
-    for lhs, mapping in pairs(state.keymaps) do
-      if type(lhs) == "number" then
-        local modes = type(mapping[1]) == "table" and mapping[1] or { mapping[1] }
-        for _, mode in ipairs(modes) do
-          pcall(api.nvim_buf_del_keymap, bufnr, mode, mapping[2])
+    if state then
+      -- Keymaps
+      for lhs, mapping in pairs(state.keymaps) do
+        if type(lhs) == "number" then
+          local modes = type(mapping[1]) == "table" and mapping[1] or { mapping[1] }
+          for _, mode in ipairs(modes) do
+            pcall(api.nvim_buf_del_keymap, self.bufnr, mode, mapping[2])
+          end
+        else
+          pcall(api.nvim_buf_del_keymap, self.bufnr, "n", lhs)
         end
-      else
-        pcall(api.nvim_buf_del_keymap, bufnr, "n", lhs)
       end
-    end
 
-    -- Diagnostics
-    if state.disable_diagnostics then
-      vim.diagnostic.enable(bufnr)
-    end
+      -- Diagnostics
+      if state.disable_diagnostics then
+        vim.diagnostic.enable(self.bufnr)
+      end
 
-    File.attached[bufnr] = nil
+      File.attached[self.bufnr] = nil
+    end
+  end
+end
+
+function File:dispose_buffer()
+  if self.bufnr and api.nvim_buf_is_loaded(self.bufnr) then
+    self:detach_buffer()
+    File.safe_delete_buf(self.bufnr)
+    self.bufnr = nil
   end
 end
 
@@ -402,7 +389,7 @@ end
 function File.load_null_buffer(winid)
   local bn = File._get_null_buffer()
   api.nvim_win_set_buf(winid, bn)
-  File._attach_buffer(bn)
+  File.NULL_FILE:attach_buffer()
 end
 
 ---@type vcs.File

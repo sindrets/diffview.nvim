@@ -94,6 +94,10 @@ function Window:open_file(callback)
             and config.get_config().view.merge_tool.disable_diagnostics,
       })
 
+      if self.file.winbar then
+        vim.wo[self.id].winbar = self.file.winbar
+      end
+
       api.nvim_win_call(self.id, function()
         DiffviewGlobal.emitter:emit("diff_buf_win_enter", self.file.bufnr, self.id)
       end)
@@ -103,6 +107,8 @@ function Window:open_file(callback)
         callback(self.file)
       end
     end
+
+    vim.wo[self.id].winbar = nil
 
     if self.file:is_valid() then
       on_load()
@@ -114,6 +120,7 @@ end
 
 function Window:open_null()
   if self:is_valid() then
+    vim.wo[self.id].winbar = nil
     File.load_null_buffer(self.id)
   end
 end

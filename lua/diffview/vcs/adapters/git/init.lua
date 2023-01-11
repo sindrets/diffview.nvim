@@ -253,6 +253,43 @@ function GitAdapter:verify_rev_arg(rev_arg)
   return code == 0 and (out[2] ~= nil or out[1] and out[1] ~= ""), out
 end
 
+---@return vcs.MergeContext
+function GitAdapter:get_merge_context()
+  local their_head
+
+  for _, name in ipairs({ "MERGE_HEAD", "REBASE_HEAD", "REVERT_HEAD" }) do
+    if pl:readable(pl:join(self.ctx.dir, name)) then
+      their_head = name
+      break
+    end
+  end
+
+  assert(their_head)
+  local ret = {}
+  local out, code = self:exec_sync({ "show", "-s", "--pretty=format:%H%n%D", "HEAD", "--" }, self.ctx.toplevel)
+
+  ret.ours = code ~= 0 and {} or  {
+    hash = out[1],
+    ref_names = out[2],
+  }
+
+  out, code = self:exec_sync({ "show", "-s", "--pretty=format:%H%n%D", their_head, "--" }, self.ctx.toplevel)
+
+  ret.theirs = code ~= 0 and {} or  {
+    hash = out[1],
+    rev_names = out[2],
+  }
+
+  out, code = self:exec_sync({ "merge-base", "HEAD", their_head }, self.ctx.toplevel)
+  assert(code == 0)
+
+  ret.base = {
+    hash = out[1],
+    ref_names = self:exec_sync({ "show", "-s", "--pretty=format:%D" }, self.ctx.toplevel)[1],
+  }
+
+  return ret
+end
 
 ---@class GitAdapter.PreparedLogOpts
 ---@field rev_range string
