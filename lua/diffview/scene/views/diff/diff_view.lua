@@ -357,7 +357,7 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
               end
 
               v.cur_files[ai].status = v.new_files[bi].status
-              v.cur_files[ai]:validate_stage_buffers(self.adapter, index_stat)
+              v.cur_files[ai]:validate_stage_buffers(index_stat)
 
               if new_head then
                 v.cur_files[ai]:update_heads(new_head)

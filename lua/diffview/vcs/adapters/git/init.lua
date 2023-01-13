@@ -1372,6 +1372,7 @@ function GitAdapter:stage_index_file(file)
       return false
     end
 
+    file.blob_hash = blob_hash
     vim.bo[file.bufnr].modified = false
     api.nvim_exec_autocmds("BufWritePost", {
       pattern = api.nvim_buf_get_name(file.bufnr),
