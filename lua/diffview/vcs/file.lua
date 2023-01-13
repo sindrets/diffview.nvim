@@ -80,6 +80,26 @@ function File:init(opt)
     foldlevel = 0,
     foldenable = true,
   }
+
+  -- Set winbar info
+  if self.rev then
+    local winbar
+
+    if self.rev.type == RevType.LOCAL then
+      winbar = " WORKING TREE - ${path}"
+    elseif self.rev.type == RevType.COMMIT then
+      winbar = " ${object_path}"
+    elseif self.rev.type == RevType.STAGE then
+      winbar = " INDEX - ${object_path}"
+    end
+
+    if winbar then
+      self.winbar = utils.str_template(winbar, {
+        path = self.path,
+        object_path = self.rev:object_name(10) .. ":" .. self.path,
+      })
+    end
+  end
 end
 
 ---@param force? boolean Also delete buffers for LOCAL files.

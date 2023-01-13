@@ -101,11 +101,13 @@ function Rev:is_head(adapter)
   oop.abstract_stub()
 end
 
----@diagnostic enable: unused-local, missing-return
-
-function Rev:object_name()
+---@param abbrev_len? integer
+---@return string
+function Rev:object_name(abbrev_len)
   oop.abstract_stub()
 end
+
+---@diagnostic enable: unused-local, missing-return
 
 ---Get an abbreviated commit SHA. Returns `nil` if this Rev is not a commit.
 ---@param length integer|nil

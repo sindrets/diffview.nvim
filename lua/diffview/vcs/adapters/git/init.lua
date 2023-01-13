@@ -285,7 +285,7 @@ function GitAdapter:get_merge_context()
 
   ret.base = {
     hash = out[1],
-    ref_names = self:exec_sync({ "show", "-s", "--pretty=format:%D" }, self.ctx.toplevel)[1],
+    ref_names = self:exec_sync({ "show", "-s", "--pretty=format:%D", out[1] }, self.ctx.toplevel)[1],
   }
 
   return ret

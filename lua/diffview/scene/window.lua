@@ -2,6 +2,7 @@ local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
 local File = lazy.access("diffview.vcs.file", "File") ---@type vcs.File|LazyModule
+local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView") ---@type FileHistoryView|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local config = lazy.require("diffview.config") ---@module "diffview.config"
 local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
@@ -62,6 +63,12 @@ function Window:is_focused()
   return self:is_valid() and api.nvim_get_current_win() == self.id
 end
 
+function Window:pre_open()
+  if vim.fn.has("nvim-0.8") == 1 then
+    vim.wo[self.id].winbar = nil
+  end
+end
+
 ---@param callback fun(file: vcs.File)
 function Window:load_file(callback)
   assert(self.file)
@@ -81,6 +88,7 @@ function Window:open_file(callback)
 
   if self:is_valid() and self.file.active then
     local function on_load()
+      local conf = config.get_config()
       api.nvim_win_set_buf(self.id, self.file.bufnr)
 
       if self.file.rev.type == RevType.LOCAL then
@@ -91,10 +99,10 @@ function Window:open_file(callback)
       self.file:attach_buffer(false, {
         keymaps = config.get_layout_keymaps(self.parent),
         disable_diagnostics = self.file.kind == "conflicting"
-            and config.get_config().view.merge_tool.disable_diagnostics,
+            and conf.view.merge_tool.disable_diagnostics,
       })
 
-      if self.file.winbar then
+      if self:show_winbar_info() then
         vim.wo[self.id].winbar = self.file.winbar
       end
 
@@ -108,7 +116,7 @@ function Window:open_file(callback)
       end
     end
 
-    vim.wo[self.id].winbar = nil
+    self:pre_open()
 
     if self.file:is_valid() then
       on_load()
@@ -118,9 +126,29 @@ function Window:open_file(callback)
   end
 end
 
+---@return boolean
+function Window:show_winbar_info()
+  if self.file and self.file.winbar and vim.fn.has("nvim-0.8") == 1 then
+    local conf = config.get_config()
+    local view = lib.get_current_view()
+
+    if self.file.kind == "conflicting" then
+      return conf.view.merge_tool.winbar_info
+    else
+      if view and view:class() == FileHistoryView.__get() then
+        return conf.view.file_history.winbar_info
+      else
+        return conf.view.default.winbar_info
+      end
+    end
+  end
+
+  return false
+end
+
 function Window:open_null()
   if self:is_valid() then
-    vim.wo[self.id].winbar = nil
+    self:pre_open()
     File.load_null_buffer(self.id)
   end
 end
