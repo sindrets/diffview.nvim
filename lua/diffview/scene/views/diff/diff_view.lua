@@ -171,6 +171,8 @@ end
 ---@private
 ---@param file FileEntry
 function DiffView:_set_file(file)
+  self.panel:render()
+  self.panel:redraw()
   vim.cmd("redraw")
 
   self.cur_layout:detach_files()

@@ -83,6 +83,8 @@ end
 ---@private
 ---@param file FileEntry
 function FileHistoryView:_set_file(file)
+  self.panel:render()
+  self.panel:redraw()
   vim.cmd("redraw")
 
   self.cur_layout:detach_files()

@@ -12,6 +12,7 @@ local M = {}
 ---@field time number
 ---@field time_offset number
 ---@field date string
+---@field iso_date string
 ---@field rel_date string
 ---@field ref_names string
 ---@field subject string
@@ -26,7 +27,6 @@ function Commit:init(opt)
   self.ref_names = opt.ref_names ~= "" and opt.ref_names or nil
   self.subject = opt.subject
   self.body = opt.body
-
 end
 
 ---@diagnostic disable: unused-local, missing-return

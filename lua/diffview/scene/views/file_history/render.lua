@@ -26,7 +26,7 @@ local function render_files(comp, files)
       comp:add_text(file.parent_path .. "/", "DiffviewFilePanelPath")
     end
 
-    comp:add_text(file.basename, "DiffviewFilePanelFileName")
+    comp:add_text(file.basename, file.active and "DiffviewFilePanelSelected" or "DiffviewFilePanelFileName")
 
     if file.stats then
       comp:add_text(" " .. file.stats.additions, "DiffviewFilePanelInsertions")
@@ -40,10 +40,11 @@ local function render_files(comp, files)
   perf:lap("files")
 end
 
+---@param panel FileHistoryPanel
 ---@param parent CompStruct RenderComponent struct
 ---@param entries LogEntry[]
 ---@param updating boolean
-local function render_entries(parent, entries, updating)
+local function render_entries(panel, parent, entries, updating)
   local c = config.get_config()
   local max_num_files = -1
   local max_len_stats = 7
@@ -112,7 +113,10 @@ local function render_entries(parent, entries, updating)
       subject = "[empty message]"
     end
 
-    comp:add_text(subject .. " ", "DiffviewFilePanelFileName")
+    comp:add_text(
+      subject .. " ",
+      panel.cur_item[1] == entry and "DiffviewFilePanelSelected" or "DiffviewFilePanelFileName"
+    )
 
     if entry.commit then
       -- 3 months
@@ -222,7 +226,7 @@ return {
     perf:lap("header")
 
     if #panel.entries > 0 then
-      render_entries(panel.components.log.entries, panel.entries, panel.updating)
+      render_entries(panel, panel.components.log.entries, panel.entries, panel.updating)
     end
 
     perf:time()

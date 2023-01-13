@@ -6,7 +6,7 @@ local utils = require("diffview.utils")
 ---@param show_path boolean
 ---@param depth integer|nil
 local function render_file(comp, show_path, depth)
-  ---@type table
+  ---@type FileEntry
   local file = comp.context
 
   comp:add_text(file.status .. " ", hl.get_git_hl(file.status))
@@ -17,7 +17,7 @@ local function render_file(comp, show_path, depth)
 
   local icon, icon_hl = hl.get_file_icon(file.basename, file.extension)
   comp:add_text(icon, icon_hl)
-  comp:add_text(file.basename, "DiffviewFilePanelFileName")
+  comp:add_text(file.basename, file.active and "DiffviewFilePanelSelected" or "DiffviewFilePanelFileName")
 
   if file.stats then
     if file.stats.additions then

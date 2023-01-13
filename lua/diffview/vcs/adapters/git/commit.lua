@@ -9,15 +9,6 @@ local M = {}
 
 
 ---@class GitCommit : Commit
----@field hash string
----@field author string
----@field time number
----@field time_offset number
----@field date string
----@field rel_date string
----@field ref_names string
----@field subject string
----@field body string
 local GitCommit = oop.create_class("GitCommit", Commit.__get())
 
 function GitCommit:init(opt)

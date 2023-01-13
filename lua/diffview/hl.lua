@@ -405,6 +405,7 @@ M.hl_links = {
   EndOfBuffer = "EndOfBuffer",
   FilePanelRootPath = "DiffviewFilePanelTitle",
   FilePanelFileName = "Normal",
+  FilePanelSelected = "Type",
   FilePanelPath = "Comment",
   FilePanelInsertions = "diffAdded",
   FilePanelDeletions = "diffRemoved",
