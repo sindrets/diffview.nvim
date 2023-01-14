@@ -406,6 +406,12 @@ view.x.layout                                   *diffview-config-view.x.layout*
                 │              │
                 └──────────────┘
 
+view.x.winbar_info                              *diffview-config-view.x.winbar_info*
+        Type: `boolean`, Default: (see example config above)
+
+        Use the 'winbar' to show contextual info about the different versions
+        of a file in a diff.
+
                                                 *diffview-config-view.merge_tool.disable_diagnostics*
 view.merge_tool.disable_diagnostics
         Type: `boolean`, Default: `true`
