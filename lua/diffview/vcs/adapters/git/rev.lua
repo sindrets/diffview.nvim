@@ -128,12 +128,20 @@ function GitRev:is_head(adapter)
   return self.commit == vim.trim(out[1]):gsub("^%^", "")
 end
 
-function GitRev:object_name()
+---@param abbrev_len? integer
+---@return string
+function GitRev:object_name(abbrev_len)
   if self.type == RevType.COMMIT then
+    if abbrev_len then
+      return self.commit:sub(1, abbrev_len)
+    end
+
     return self.commit
   elseif self.type == RevType.STAGE then
     return ":" ..  self.stage
   end
+
+  return "UNKNOWN"
 end
 
 M.GitRev = GitRev

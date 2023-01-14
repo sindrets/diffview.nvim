@@ -186,6 +186,11 @@ function StandardView:use_entry(entry)
       layout.c.file.winopts,
       self.winopts.diff4.c or {}
     )
+    layout.d.file.winopts = vim.tbl_extend(
+      "force",
+      layout.d.file.winopts,
+      self.winopts.diff4.d or {}
+    )
   end
 
   local old_layout = self.cur_layout

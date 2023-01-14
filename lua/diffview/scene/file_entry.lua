@@ -36,6 +36,7 @@ local fstat_cache = {}
 ---@field stats GitStats
 ---@field kind vcs.FileKind
 ---@field commit Commit|nil
+---@field merge_ctx vcs.MergeContext?
 ---@field active boolean
 local FileEntry = oop.create_class("FileEntry")
 
@@ -49,6 +50,7 @@ local FileEntry = oop.create_class("FileEntry")
 ---@field stats GitStats
 ---@field kind vcs.FileKind
 ---@field commit? Commit
+---@field merge_ctx? vcs.MergeContext
 
 ---FileEntry constructor
 ---@param opt FileEntry.init.Opt
@@ -66,6 +68,7 @@ function FileEntry:init(opt)
   self.stats = opt.stats
   self.kind = opt.kind
   self.commit = opt.commit
+  self.merge_ctx = opt.merge_ctx
   self.active = false
 end
 
@@ -125,6 +128,7 @@ function FileEntry:convert_layout(target_layout)
     c = utils.tbl_access(self.layout, "c.file") or create_file(self.revs.c, "c"),
     d = utils.tbl_access(self.layout, "d.file") or create_file(self.revs.d, "d"),
   })
+  self:update_merge_context()
 end
 
 ---@param stat? table
@@ -163,6 +167,40 @@ function FileEntry:validate_stage_buffers(stat)
         end
       end
     end
+  end
+end
+
+---Update winbar info
+---@param ctx? vcs.MergeContext
+function FileEntry:update_merge_context(ctx)
+  ctx = ctx or self.merge_ctx
+  if ctx then self.merge_ctx = ctx else return end
+
+  local layout = self.layout --[[@as Diff4 ]]
+
+  if layout.a then
+    layout.a.file.winbar = (" OURS (Current changes) %s %s"):format(
+      (ctx.ours.hash):sub(1, 10),
+      ctx.ours.ref_names and ("(" .. ctx.ours.ref_names .. ")") or ""
+    )
+  end
+
+  if layout.b then
+    layout.b.file.winbar = " LOCAL (Working tree)"
+  end
+
+  if layout.c then
+    layout.c.file.winbar = (" THEIRS (Incoming changes) %s %s"):format(
+      (ctx.theirs.hash):sub(1, 10),
+      ctx.theirs.ref_names and ("(" .. ctx.theirs.ref_names .. ")") or ""
+    )
+  end
+
+  if layout.d then
+    layout.d.file.winbar = (" BASE (Common ancestor) %s %s"):format(
+      (ctx.base.hash):sub(1, 10),
+      ctx.base.ref_names and ("(" .. ctx.base.ref_names .. ")") or ""
+    )
   end
 end
 

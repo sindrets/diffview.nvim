@@ -37,6 +37,7 @@ local M = {}
 ---@field commit_log_panel CommitLogPanel
 ---@field files FileDict
 ---@field file_idx integer
+---@field merge_ctx? vcs.MergeContext
 ---@field initialized boolean
 ---@field valid boolean
 ---@field watcher any UV fs poll handle.
@@ -325,125 +326,133 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
           callback(err)
         end
         return
-      else
-        perf:lap("received new file list")
-        local files = {
-          { cur_files = self.files.conflicting, new_files = new_files.conflicting },
-          { cur_files = self.files.working, new_files = new_files.working },
-          { cur_files = self.files.staged, new_files = new_files.staged },
-        }
+      end
 
-        async.util.scheduler()
+      perf:lap("received new file list")
 
-        for _, v in ipairs(files) do
-          ---@param aa FileEntry
-          ---@param bb FileEntry
-          local diff = Diff(v.cur_files, v.new_files, function(aa, bb)
-            return aa.path == bb.path and aa.oldpath == bb.oldpath
-          end)
-          local script = diff:create_edit_script()
+      local files = {
+        { cur_files = self.files.conflicting, new_files = new_files.conflicting },
+        { cur_files = self.files.working, new_files = new_files.working },
+        { cur_files = self.files.staged, new_files = new_files.staged },
+      }
 
-          local ai = 1
-          local bi = 1
+      async.util.scheduler()
 
-          for _, opr in ipairs(script) do
-            if opr == EditToken.NOOP then
-              -- Update status and stats
-              local a_stats = v.cur_files[ai].stats
-              local b_stats = v.new_files[bi].stats
+      for _, v in ipairs(files) do
+        ---@param aa FileEntry
+        ---@param bb FileEntry
+        local diff = Diff(v.cur_files, v.new_files, function(aa, bb)
+          return aa.path == bb.path and aa.oldpath == bb.oldpath
+        end)
+        local script = diff:create_edit_script()
 
-              if a_stats then
-                v.cur_files[ai].stats = vim.tbl_extend("force", a_stats, b_stats or {})
+        local ai = 1
+        local bi = 1
+
+        for _, opr in ipairs(script) do
+          if opr == EditToken.NOOP then
+            -- Update status and stats
+            local a_stats = v.cur_files[ai].stats
+            local b_stats = v.new_files[bi].stats
+
+            if a_stats then
+              v.cur_files[ai].stats = vim.tbl_extend("force", a_stats, b_stats or {})
+            else
+              v.cur_files[ai].stats = v.new_files[bi].stats
+            end
+
+            v.cur_files[ai].status = v.new_files[bi].status
+            v.cur_files[ai]:validate_stage_buffers(index_stat)
+
+            if new_head then
+              v.cur_files[ai]:update_heads(new_head)
+            end
+
+            ai = ai + 1
+            bi = bi + 1
+
+          elseif opr == EditToken.DELETE then
+            if self.panel.cur_file == v.cur_files[ai] then
+              local file_list = self.panel:ordered_file_list()
+              if file_list[1] == self.panel.cur_file then
+                self.panel:set_cur_file(nil)
               else
-                v.cur_files[ai].stats = v.new_files[bi].stats
+                self.panel:set_cur_file(self.panel:prev_file())
               end
-
-              v.cur_files[ai].status = v.new_files[bi].status
-              v.cur_files[ai]:validate_stage_buffers(index_stat)
-
-              if new_head then
-                v.cur_files[ai]:update_heads(new_head)
-              end
-
-              ai = ai + 1
-              bi = bi + 1
-
-            elseif opr == EditToken.DELETE then
-              if self.panel.cur_file == v.cur_files[ai] then
-                local file_list = self.panel:ordered_file_list()
-                if file_list[1] == self.panel.cur_file then
-                  self.panel:set_cur_file(nil)
-                else
-                  self.panel:set_cur_file(self.panel:prev_file())
-                end
-              end
-
-              v.cur_files[ai]:destroy()
-              table.remove(v.cur_files, ai)
-
-            elseif opr == EditToken.INSERT then
-              table.insert(v.cur_files, ai, v.new_files[bi])
-              ai = ai + 1
-              bi = bi + 1
-
-            elseif opr == EditToken.REPLACE then
-              if self.panel.cur_file == v.cur_files[ai] then
-                local file_list = self.panel:ordered_file_list()
-                if file_list[1] == self.panel.cur_file then
-                  self.panel:set_cur_file(nil)
-                else
-                  self.panel:set_cur_file(self.panel:prev_file())
-                end
-              end
-
-              v.cur_files[ai]:destroy()
-              table.remove(v.cur_files, ai)
-              table.insert(v.cur_files, ai, v.new_files[bi])
-              ai = ai + 1
-              bi = bi + 1
             end
+
+            v.cur_files[ai]:destroy()
+            table.remove(v.cur_files, ai)
+
+          elseif opr == EditToken.INSERT then
+            table.insert(v.cur_files, ai, v.new_files[bi])
+            ai = ai + 1
+            bi = bi + 1
+
+          elseif opr == EditToken.REPLACE then
+            if self.panel.cur_file == v.cur_files[ai] then
+              local file_list = self.panel:ordered_file_list()
+              if file_list[1] == self.panel.cur_file then
+                self.panel:set_cur_file(nil)
+              else
+                self.panel:set_cur_file(self.panel:prev_file())
+              end
+            end
+
+            v.cur_files[ai]:destroy()
+            table.remove(v.cur_files, ai)
+            table.insert(v.cur_files, ai, v.new_files[bi])
+            ai = ai + 1
+            bi = bi + 1
           end
         end
+      end
 
-        perf:lap("updated file list")
-        FileEntry.update_index_stat(self.adapter, index_stat)
-        self.files:update_file_trees()
-        self.panel:update_components()
-        self.panel:render()
-        self.panel:redraw()
-        perf:lap("panel redrawn")
-        self.panel:reconstrain_cursor()
+      perf:lap("updated file list")
 
-        if utils.vec_indexof(self.panel:ordered_file_list(), self.panel.cur_file) == -1 then
-          self.panel:set_cur_file(nil)
-        end
+      self.merge_ctx = next(new_files.conflicting) and self.adapter:get_merge_context() or nil
 
-        -- Set initially selected file
-        if not self.initialized and self.options.selected_file then
-          for _, file in self.files:ipairs() do
-            if file.path == self.options.selected_file then
-              self.panel:set_cur_file(file)
-              break
-            end
+      for _, entry in ipairs(self.files.conflicting) do
+        entry:update_merge_context(self.merge_ctx)
+      end
+
+      FileEntry.update_index_stat(self.adapter, index_stat)
+      self.files:update_file_trees()
+      self.panel:update_components()
+      self.panel:render()
+      self.panel:redraw()
+      perf:lap("panel redrawn")
+      self.panel:reconstrain_cursor()
+
+      if utils.vec_indexof(self.panel:ordered_file_list(), self.panel.cur_file) == -1 then
+        self.panel:set_cur_file(nil)
+      end
+
+      -- Set initially selected file
+      if not self.initialized and self.options.selected_file then
+        for _, file in self.files:ipairs() do
+          if file.path == self.options.selected_file then
+            self.panel:set_cur_file(file)
+            break
           end
         end
-        self:set_file(self.panel.cur_file or self.panel:next_file(), false, not self.initialized)
+      end
+      self:set_file(self.panel.cur_file or self.panel:next_file(), false, not self.initialized)
 
-        if api.nvim_win_is_valid(last_winid) then
-          api.nvim_set_current_win(last_winid)
-        end
+      if api.nvim_win_is_valid(last_winid) then
+        api.nvim_set_current_win(last_winid)
+      end
 
-        self.update_needed = false
-        perf:time()
-        logger.lvl(5).s_debug(perf)
-        logger.s_info(
-          ("[%s] Completed update for %d files successfully (%.3f ms)")
-          :format(self:class():name(), self.files:len(), perf.final_time)
-        )
-        self.emitter:emit("files_updated", self.files)
-        if type(callback) == "function" then
-          callback()
-        end
+      self.update_needed = false
+      perf:time()
+      logger.lvl(5).s_debug(perf)
+      logger.s_info(
+        ("[%s] Completed update for %d files successfully (%.3f ms)")
+        :format(self:class():name(), self.files:len(), perf.final_time)
+      )
+      self.emitter:emit("files_updated", self.files)
+      if type(callback) == "function" then
+        callback()
       end
     end)
   end)
