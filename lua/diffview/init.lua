@@ -105,16 +105,18 @@ function M.init()
   ]])
 end
 
-function M.open(...)
-  local view = lib.diffview_open(utils.tbl_pack(...))
+---@param args string[]
+function M.open(args)
+  local view = lib.diffview_open(args)
   if view then
     view:open()
   end
 end
 
 ---@param range? { [1]: integer, [2]: integer }
-function M.file_history(range, ...)
-  local view = lib.file_history(range, utils.tbl_pack(...))
+---@param args string[]
+function M.file_history(range, args)
+  local view = lib.file_history(range, args)
   if view then
     view:open()
   end
@@ -135,22 +137,12 @@ function M.close(tabpage)
   end
 end
 
----@param arg_lead string
----@param items string[]
----@return string[]
-function M.filter_completion(arg_lead, items)
-  arg_lead, _ = vim.pesc(arg_lead)
-  return vim.tbl_filter(function(item)
-    return item:match(arg_lead)
-  end, items)
-end
-
 function M.completion(_, cmd_line, cur_pos)
-  local ctx = arg_parser.scan_ex_args(cmd_line, cur_pos)
+  local ctx = arg_parser.scan(cmd_line, { cur_pos = cur_pos, allow_ex_range = true })
   local cmd = ctx.args[1]
 
   if cmd and M.completers[cmd] then
-    return M.filter_completion(ctx.arg_lead, M.completers[cmd](ctx))
+    return arg_parser.process_candidates(M.completers[cmd](ctx), ctx)
   end
 end
 
@@ -191,14 +183,14 @@ M.completers = {
 
     if ctx.argidx > ctx.divideridx then
       if adapter then
-        utils.vec_push(candidates, unpack(adapter:path_completion(ctx.arg_lead)))
+        utils.vec_push(candidates, unpack(adapter:path_candidates(ctx.arg_lead)))
       else
         utils.vec_push(candidates, unpack(vim.fn.getcompletion(ctx.arg_lead, "file", 0)))
       end
     elseif adapter then
       if not has_rev_arg and ctx.arg_lead:sub(1, 1) ~= "-" then
         utils.vec_push(candidates, unpack(adapter.comp.open:get_all_names()))
-        utils.vec_push(candidates, unpack(adapter:rev_completion(ctx.arg_lead, {
+        utils.vec_push(candidates, unpack(adapter:rev_candidates(ctx.arg_lead, {
           accept_range = true,
         })))
       else
@@ -221,7 +213,7 @@ M.completers = {
         adapter.comp.file_history:get_completion(ctx.arg_lead)
         or adapter.comp.file_history:get_all_names()
       ))
-      utils.vec_push(candidates, unpack(adapter:path_completion(ctx.arg_lead)))
+      utils.vec_push(candidates, unpack(adapter:path_candidates(ctx.arg_lead)))
     else
       utils.vec_push(candidates, unpack(vim.fn.getcompletion(ctx.arg_lead, "file", 0)))
     end

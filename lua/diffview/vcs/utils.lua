@@ -1,6 +1,5 @@
 local CountDownLatch = require("diffview.control").CountDownLatch
 local FileDict = require("diffview.vcs.file_dict").FileDict
-local FileEntry = require("diffview.scene.file_entry").FileEntry
 local Job = require("plenary.job")
 local RevType = require("diffview.vcs.rev").RevType
 local Semaphore = require("diffview.control").Semaphore
@@ -215,17 +214,6 @@ M.diff_file_list = async.wrap(function(adapter, left, right, path_args, dv_opt, 
   files:update_file_trees()
   callback(nil, files)
 end, 7)
-
-
----@param arg_lead string
----@param items string[]
----@return string[]
-function M.filter_completion(arg_lead, items)
-  arg_lead, _ = vim.pesc(arg_lead)
-  return vim.tbl_filter(function(item)
-    return item:match(arg_lead)
-  end, items)
-end
 
 ---Restore a file to the state it was in, in a given commit / rev. If no commit
 ---is given, unstaged files are restored to the state in index, and staged files

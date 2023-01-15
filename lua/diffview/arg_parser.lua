@@ -5,7 +5,7 @@ local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local M = {}
 
-local short_flag_pat = { "^%-(%a)=?(.*)", "^%+(%a)=?(.*)" }
+local short_flag_pat = { "^[-+](%a)=?(.*)" }
 local long_flag_pat = { "^%-%-(%a[%a%d-]*)=?(.*)", "^%+%+(%a[%a%d-]*)=?(.*)" }
 
 ---@class ArgObject : diffview.Object
@@ -231,42 +231,74 @@ function M.split_ex_range(arg)
 end
 
 ---@class CmdLineContext
----@field args string[] The complete list of arguments.
----@field arg_lead string
----@field argidx integer Index of the current argument.
----@field divideridx integer
----@field range string? Ex command range.
----@field between boolean The current position is between two arguments.
+---@field cmd_line string
+---@field args string[] # The tokenized list of arguments.
+---@field raw_args string[] # The unprocessed list of arguments. Contains syntax characters, such as quotes.
+---@field arg_lead string # The leading part of the current argument.
+---@field lead_quote string? # If present: the quote character used for the current argument.
+---@field cur_pos integer # The cursor position in the command line.
+---@field argidx integer # Index of the current argument.
+---@field divideridx integer # The index of the end-of-options token. (default: math.huge)
+---@field range string? # Ex command range.
+---@field between boolean # The current position is between two arguments.
 
----Scan an EX command string and split it into individual args.
+---@class arg_parser.scan.Opt
+---@field cur_pos integer # The current cursor position in the command line.
+---@field allow_quoted boolean # Everything between a pair of quotes should be treated as  part of a single argument. (default: true)
+---@field allow_ex_range boolean # The command line may contain an EX command range. (default: false)
+
+---Tokenize a command line string.
 ---@param cmd_line string
----@param cur_pos number
+---@param opt? arg_parser.scan.Opt
 ---@return CmdLineContext
-function M.scan_ex_args(cmd_line, cur_pos)
+function M.scan(cmd_line, opt)
+  opt = vim.tbl_extend("keep", opt or {}, {
+    cur_pos = #cmd_line + 1,
+    allow_quoted = true,
+    allow_ex_range = false,
+  }) --[[@as arg_parser.scan.Opt ]]
+
   local args = {}
+  local raw_args = {}
   local arg_lead
   local divideridx = math.huge
   local argidx
   local between = false
-  local arg = ""
+  local cur_quote, lead_quote
+  local arg, raw_arg = "", ""
 
   local h, i = -1, 1
 
   while i <= #cmd_line do
     local char = cmd_line:sub(i, i)
 
-    if not argidx and i > cur_pos then
+    if not argidx and i > opt.cur_pos then
       argidx = #args + 1
       arg_lead = arg
-      if h < cur_pos then between = true end
+      lead_quote = cur_quote
+      if h < opt.cur_pos then between = true end
     end
 
     if char == "\\" then
       arg = arg .. char
+      raw_arg = raw_arg .. char
       if i < #cmd_line then
         i = i + 1
         arg = arg .. cmd_line:sub(i, i)
+        raw_arg = raw_arg .. cmd_line:sub(i, i)
       end
+      h = i
+    elseif cur_quote then
+      if char == cur_quote then
+        cur_quote = nil
+      else
+        arg = arg .. char
+      end
+      raw_arg = raw_arg .. char
+      h = i
+    elseif opt.allow_quoted and (char == [[']] or char == [["]]) then
+      cur_quote = char
+      raw_arg = raw_arg .. char
       h = i
     elseif char:match("%s") then
       if arg ~= "" then
@@ -275,11 +307,16 @@ function M.scan_ex_args(cmd_line, cur_pos)
           divideridx = #args
         end
       end
+      if raw_arg ~= "" then
+        table.insert(raw_args, raw_arg)
+      end
       arg = ""
+      raw_arg = ""
       -- Skip whitespace
       i = i + cmd_line:sub(i, -1):match("^%s+()") - 2
     else
       arg = arg .. char
+      raw_arg = raw_arg .. char
       h = i
     end
 
@@ -288,7 +325,11 @@ function M.scan_ex_args(cmd_line, cur_pos)
 
   if #arg > 0 then
     table.insert(args, arg)
-    if not arg_lead then arg_lead = arg end
+    table.insert(raw_args, raw_arg)
+    if not arg_lead then
+      arg_lead = arg
+      lead_quote = cur_quote
+    end
 
     if arg == "--" and cmd_line:sub(#cmd_line, #cmd_line) ~= "-" then
       divideridx = #args
@@ -305,17 +346,26 @@ function M.scan_ex_args(cmd_line, cur_pos)
   local range
 
   if #args > 0 then
-    range, args[1] = M.split_ex_range(args[1])
+    if opt.allow_ex_range then
+      range, args[1] = M.split_ex_range(args[1])
+      _, raw_args[1] = M.split_ex_range(raw_args[1])
+    end
+
     if args[1] == "" then
       table.remove(args, 1)
+      table.remove(raw_args, 1)
       argidx = math.max(argidx - 1, 1)
       divideridx = math.max(divideridx - 1, 1)
     end
   end
 
   return {
+    cmd_line = cmd_line,
     args = args,
+    raw_args = raw_args,
     arg_lead = arg_lead or "",
+    lead_quote = lead_quote,
+    cur_pos = opt.cur_pos,
     argidx = argidx,
     divideridx = divideridx,
     range = range ~= "" and range or nil,
@@ -323,92 +373,48 @@ function M.scan_ex_args(cmd_line, cur_pos)
   }
 end
 
----Scan a shell-like string and split it into individual args. This scanner
----understands quoted args.
----@param cmd_line string
----@param cur_pos number
----@return CmdLineContext
-function M.scan_sh_args(cmd_line, cur_pos)
-  local args = {}
-  local arg_lead
-  local divideridx = math.huge
-  local argidx
-  local between = false
-  local cur_quote
-  local arg = ""
+---Filter completion candidates.
+---@param arg_lead string
+---@param candidates string[]
+---@return string[]
+function M.filter_candidates(arg_lead, candidates)
+  arg_lead, _ = vim.pesc(arg_lead)
 
-  local h, i = -1, 1
+  return vim.tbl_filter(function(item)
+    return item:match(arg_lead)
+  end, candidates)
+end
 
-  while i <= #cmd_line do
-    local char = cmd_line:sub(i, i)
+---Process completion candidates.
+---@param candidates string[]
+---@param ctx CmdLineContext
+---@param input_cmp boolean? Completion for |input()|.
+---@return string[]
+function M.process_candidates(candidates, ctx, input_cmp)
+  if not candidates then return {} end
 
-    if not argidx and i > cur_pos then
-      argidx = #args + 1
-      arg_lead = arg
-      if h < cur_pos then between = true end
-    end
+  local cmd_lead = ""
+  local ex_lead = (ctx.lead_quote or "") .. ctx.arg_lead
 
-    if char == "\\" then
-      if i < #cmd_line then
-        i = i + 1
-        arg = arg .. cmd_line:sub(i, i)
-      end
-      h = i
-    elseif cur_quote then
-      if char == cur_quote then
-        cur_quote = nil
-      else
-        arg = arg .. char
-      end
-      h = i
-    elseif char == [[']] or char == [["]] then
-      cur_quote = char
-      h = i
-    elseif char:match("%s") then
-      if arg ~= "" then
-        table.insert(args, arg)
-        if arg == "--" and i - 1 < #cmd_line then
-          divideridx = #args
-        end
-      end
-      arg = ""
-      -- Skip whitespace
-      i = i + cmd_line:sub(i, -1):match("^%s+()") - 2
-    else
-      arg = arg .. char
-      h = i
-    end
-
-    i = i + 1
+  if ctx.arg_lead and ctx.arg_lead:find("[^\\]%s") then
+    ex_lead = (ctx.lead_quote or "") .. ctx.arg_lead:match(".*[^\\]%s(.*)")
   end
 
-  if cur_quote then
-    error("The given command line contains a non-terminated string!")
+  if input_cmp then
+    cmd_lead = ctx.cmd_line:sub(1, ctx.cur_pos - #ex_lead)
   end
 
-  if #arg > 0 then
-    table.insert(args, arg)
-    if not arg_lead then arg_lead = arg end
-
-    if arg == "--" and cmd_line:sub(#cmd_line, #cmd_line) ~= "-" then
-      divideridx = #args
+  local ret = vim.tbl_map(function(v)
+    if v:match("^" .. vim.pesc(ctx.arg_lead)) then
+      return cmd_lead .. ex_lead .. v:sub(#ctx.arg_lead + 1)
+    elseif input_cmp then
+      return cmd_lead .. v
     end
-  end
 
-  if not argidx then
-    argidx = #args
-    if cmd_line:sub(#cmd_line, #cmd_line):match("%s") then
-      argidx = argidx + 1
-    end
-  end
+    return (ctx.lead_quote or "") .. v
+  end, candidates)
 
-  return {
-    args = args,
-    arg_lead = arg_lead or "",
-    argidx = argidx,
-    divideridx = divideridx,
-    between = between,
-  }
+  return M.filter_candidates(cmd_lead .. ex_lead, ret)
 end
 
 function M.ambiguous_bool(value, default, truthy, falsy)

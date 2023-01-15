@@ -68,15 +68,10 @@ function FHOptionPanel:init(parent)
 
     elseif self.flags.options[option_name] then
       local o = self.flags.options[option_name]
-      local prompt = utils.str_template(o.prompt_fmt, {
-        label = o.prompt_label and o.prompt_label .. " " or "",
-        flag_name = o[2] .. " ",
-      })
-      prompt = prompt:sub(1, -2)
 
       if o.select then
         vim.ui.select(o.select, {
-          prompt = prompt,
+          prompt = o:render_prompt(),
           format_item = function(item)
             return item == "" and "<unset>" or item
           end,
@@ -92,28 +87,23 @@ function FHOptionPanel:init(parent)
       else
         local completion = type(o.completion) == "function" and o.completion(self) or o.completion
 
-        utils.input(prompt, {
+        utils.input(o:render_prompt(), {
           default = o:render_default(cur_value),
-          completion = completion,
+          completion = type(completion) == "function" and function(_, cmd_line, cur_pos)
+            ---@cast completion fun(ctx: CmdLineContext): string[]
+            local ctx = arg_parser.scan(cmd_line, { cur_pos = cur_pos })
+            return arg_parser.process_candidates(completion(ctx), ctx, true)
+          end or completion,
           callback = function(response)
             if response ~= "__INPUT_CANCELLED__" then
-              local values
-
-              if response == nil then
-                values = { "" }
-              else
-                local ok, ctx = pcall(arg_parser.scan_sh_args, response, 1)
-                if not ok then
-                  utils.err(ctx.args, true)
-                  return
-                else
-                  values = ctx.args
-                end
-              end
+              local values = response == nil and { "" } or arg_parser.scan(response).args
 
               if o.transform then
-                values = o.transform(values)
-              else
+                values = o:transform(values)
+              end
+
+              if not o.expect_list then
+                ---@cast values string
                 values = values[1]
               end
 
@@ -178,11 +168,12 @@ function FHOptionPanel:setup_buffer()
     vim.keymap.set(mapping[1], mapping[2], mapping[3], opt)
   end
 
-  for group, _ in pairs(self.flags) do
-    for option_name, v in pairs(self.flags[group]) do
+  for _, group in pairs(self.flags) do
+    ---@cast group FlagOption[]
+    for option_name, v in pairs(group) do
       vim.keymap.set(
         "n",
-        v[1],
+        v.keymap,
         function()
           self.emitter:emit("set_option", option_name)
         end,
@@ -196,10 +187,10 @@ function FHOptionPanel:update_components()
   local switch_schema = {}
   local option_schema = {}
   for _, option in ipairs(self.flags.switches) do
-    table.insert(switch_schema, { name = "switch", context = { option.key, option } })
+    table.insert(switch_schema, { name = "switch", context = { option = option, }, })
   end
   for _, option in ipairs(self.flags.options) do
-    table.insert(option_schema, { name = "option", context = { option.key, option } })
+    table.insert(option_schema, { name = "option", context = { option = option }, })
   end
 
   ---@type CompStruct
@@ -218,7 +209,7 @@ function FHOptionPanel:update_components()
 end
 
 ---Get the file entry under the cursor.
----@return LogEntry|FileEntry|nil
+---@return FlagOption?
 function FHOptionPanel:get_item_at_cursor()
   if not (self:is_open() and self:buf_loaded()) then
     return
@@ -229,7 +220,7 @@ function FHOptionPanel:get_item_at_cursor()
 
   local comp = self.components.comp:get_comp_on_line(line)
   if comp and (comp.name == "switch" or comp.name == "option") then
-    return comp.context
+    return comp.context.option
   end
 end
 

@@ -111,9 +111,9 @@ return function(view)
           end
         end
       elseif view.panel.option_panel:is_focused() then
-        local item = view.panel.option_panel:get_item_at_cursor()
-        if item then
-          view.panel.option_panel.emitter:emit("set_option", item[1])
+        local option = view.panel.option_panel:get_item_at_cursor()
+        if option then
+          view.panel.option_panel.emitter:emit("set_option", option.key)
         end
       end
     end,
