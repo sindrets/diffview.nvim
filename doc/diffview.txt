@@ -263,13 +263,36 @@ COMMANDS                                        *diffview-commands*
     Mercurial Options: ~
 
         --rev={rev}
-                Show only commits in the specified revision range.
+                Show only commits for the specified revset {rev}.
+                See `hg help revsets` for the full list of keywords and
+                constructs.
 
         -f, --follow
                 Follow renames (only for single file).
 
         -l{n}, --limit={n}
                 Limit the number of commits.
+
+        -M, --no-merges
+                Do not list merge commits.
+
+        --user={text}
+                Limit the commits to ones with user as specified.
+
+        --keyword={text}
+                Limit commits to ones matching the {text} in the log message.
+
+        --branch={text}
+                Limit commits to a specified branch.
+
+        --bookmark={text}
+                Limit commits to a specified bookmark
+
+        --include={pattern}
+                Include commits touching files as specified in the {pattern}.
+
+        --exclude={pattern}
+                Exclude commits touching files as specified in the {pattern}.
 
                                                 *:DiffviewClose*
 :DiffviewClose          Close the active Diffview.
@@ -317,6 +340,9 @@ hg_cmd                                         *diffview-config-hg_cmd*
         This table forms the first part of all Mercurial commands used
         internally in the plugin. The first element should be the Mercurial
         binary. The subsequent elements are passed as arguments.
+
+        If your Mercurial install bundles the `chg` binary, this can be
+        configured here to have a significant performance boost.
 
 view.x.layout                                   *diffview-config-view.x.layout*
         Type: >
