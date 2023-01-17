@@ -713,6 +713,63 @@ function HgAdapter:rev_to_args(left, right)
   end
 end
 
+function HgAdapter:file_restore(path, kind, commit)
+  local out, code
+  local abs_path = utils.path:join(self.ctx.toplevel, path)
+  local rel_path = utils.path:vim_fnamemodify(abs_path, ":~")
+
+  _, code = self:exec_sync({"cat", "--", path}, self.ctx.toplevel)
+
+  local exists_hg = code == 0
+  local exists_local = utils.path:readable(abs_path)
+
+  local undo
+
+  if not exists_hg then
+    local bn = utils.find_file_buffer(abs_path)
+    if bn then
+      async.util.scheduler()
+      local ok, err = utils.remove_buffer(false, bn)
+      if not ok then
+        utils.err({
+          ("Failed to delete buffer '%d'! Aborting file restoration. Error message:")
+            :format(bn),
+          err
+        }, true)
+        return false
+      end
+    end
+
+    if kind == "working" or kind == "conflicting" then
+      -- File is untracked and has no history: delete it from fs.
+      local ok, err = utils.path:unlink(abs_path)
+      if not ok then
+        utils.err({
+          ("Failed to delete file '%s'! Aborting file restoration. Error message:")
+            :format(abs_path),
+          err
+        }, true)
+        return false
+      end
+    else
+      -- File only exists in index
+      out, code = self:exec_sync(
+        { "rm", "-f", "--", path },
+        self.ctx.toplevel
+      )
+    end
+  else
+    -- File exists in history: revert
+    out, code = self:exec_sync(
+      utils.vec_join("revert", commit or (kind == "staged" and "HEAD" or nil), "--", path),
+      self.ctx.toplevel
+    )
+  end
+
+  return true, undo
+
+end
+
 
 function HgAdapter:get_files_args(args)
   return utils.vec_join(self:args(), "status", "--print0", "--unknown", "--no-status", "--template={path}\\n", args)
