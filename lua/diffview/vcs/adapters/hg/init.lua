@@ -129,6 +129,38 @@ function HgAdapter:get_log_args(args)
   return utils.vec_join("log", "--stat", '--rev', args)
 end
 
+function HgAdapter:get_merge_context()
+  local ret = {}
+
+  local out, code = self:exec_sync({ "debugmergestate", "-Tjson" }, self.ctx.toplevel)
+
+  if code ~= 0 then
+    return {}
+  end
+
+  local data = vim.json.decode(table.concat(out, ""))
+  for _, commit in ipairs(data[1].commits) do
+    if commit.name == "other" then
+      ret.theirs = { hash = commit.node }
+      out, code = self:exec_sync({ "log", "--template={branch}", "--rev", commit.node })
+      if code == 0 then
+        ret.theirs.ref_name = out[1]
+      end
+    elseif commit.name == "local" then
+      ret.ours = { hash = commit.node }
+      out, code = self:exec_sync({ "log", "--template={branch}", "--rev", commit.node })
+      if code == 0 then
+        ret.ours.ref_name = out[1]
+      end
+    end
+  end
+
+  -- Base is ancestorlinknode (per file)
+  ret.base = { hash = "" }
+
+  return ret
+end
+
 function HgAdapter:file_history_options(range, paths, args)
   local default_args = config.get_config().default_args.DiffviewFileHistory
   local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))

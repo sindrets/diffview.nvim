@@ -29,8 +29,16 @@ function HgRev:init(rev_type, revision, track_head)
   self.commit = revision
 end
 
-function HgRev:object_name()
-  return self.commit
+function HgRev:object_name(abbrev_len)
+  if self.commit then
+    if abbrev_len then
+      return self.commit:sub(1, abbrev_len)
+    end
+
+    return self.commit
+  end
+
+  return "UNKNOWN"
 end
 
 function HgRev.to_range(rev_from, rev_to)
