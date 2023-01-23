@@ -157,8 +157,16 @@ function M.goto_file_tab()
   end
 end
 
----Jump to the next merge conflict marker.
-function M.next_conflict()
+---@class diffview.ConflictCount
+---@field total integer
+---@field current integer
+---@field cur_conflict? ConflictRegion
+---@field conflicts ConflictRegion[]
+
+---@param num integer
+---@param use_delta? boolean
+---@return diffview.ConflictCount?
+function M.jumpto_conflict(num, use_delta)
   local view = lib.get_current_view()
 
   if view and view:instanceof(StandardView.__get()) then
@@ -167,13 +175,29 @@ function M.next_conflict()
     local curfile = main.file
 
     if main:is_valid() and curfile:is_valid() then
-      local conflicts, _, cur_idx = vcs_utils.parse_conflicts(
+      local next_idx
+      local conflicts, cur, cur_idx = vcs_utils.parse_conflicts(
         api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false),
         main.id
       )
 
       if #conflicts > 0 then
-        local next_idx = math.min(cur_idx, #conflicts) % #conflicts + 1
+        if not use_delta then
+          next_idx = utils.clamp(num, 1, #conflicts)
+        else
+          local delta = num
+
+          if not cur and delta < 0 and cur_idx <= #conflicts then
+            delta = delta + 1
+          end
+
+          if (delta < 0 and cur_idx < 1) or (delta > 0 and cur_idx > #conflicts) then
+            cur_idx = utils.clamp(cur_idx, 1, #conflicts)
+          end
+
+          next_idx = (cur_idx + delta - 1) % #conflicts + 1
+        end
+
         local next_conflict = conflicts[next_idx]
         local curwin = api.nvim_get_current_win()
 
@@ -183,40 +207,28 @@ function M.next_conflict()
         end)
 
         api.nvim_echo({{ ("Conflict [%d/%d]"):format(next_idx, #conflicts) }}, false, {})
+
+        return {
+          total = #conflicts,
+          current = next_idx,
+          cur_conflict = next_conflict,
+          conflicts = conflicts,
+        }
       end
     end
   end
 end
 
+---Jump to the next merge conflict marker.
+---@return diffview.ConflictCount?
+function M.next_conflict()
+  return M.jumpto_conflict(1, true)
+end
+
 ---Jump to the previous merge conflict marker.
+---@return diffview.ConflictCount?
 function M.prev_conflict()
-  local view = lib.get_current_view()
-
-  if view and view:instanceof(StandardView.__get()) then
-    ---@cast view StandardView
-    local main = view.cur_layout:get_main_win()
-    local curfile = main.file
-
-    if main:is_valid() and curfile:is_valid() then
-      local conflicts, _, cur_idx = vcs_utils.parse_conflicts(
-        api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false),
-        main.id
-      )
-
-      if #conflicts > 0 then
-        local prev_idx = (math.max(cur_idx, 1) - 2) % #conflicts + 1
-        local prev_conflict = conflicts[prev_idx]
-        local curwin = api.nvim_get_current_win()
-
-        api.nvim_win_call(main.id, function()
-          api.nvim_win_set_cursor(main.id, { prev_conflict.first, 0 })
-          if curwin ~= main.id then view.cur_layout:sync_scroll() end
-        end)
-
-        api.nvim_echo({{ ("Conflict [%d/%d]"):format(prev_idx, #conflicts) }}, false, {})
-      end
-    end
-  end
+  return M.jumpto_conflict(-1, true)
 end
 
 ---Execute `cmd` for each target window in the current view. If no targets

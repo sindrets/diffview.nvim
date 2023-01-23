@@ -859,6 +859,23 @@ goto_file_tab                                   *diffview-actions-goto_file_tab*
         |diffview-file-inference| for details on how the file target is
         determined.
 
+jumpto_conflict({num}, {use_delta})             *diffview-actions-jumpto_conflict*
+        Contexts: `diff_view`, `file_panel`
+
+        Jump to a conflict marker in the current file.
+
+        Parameters: ~
+            {num} (integer)
+                The 1-based index of the conflict to jump to.
+            {use_delta} (boolean)
+                If true: treat {num} like a relative offset from the current
+                cursor position. I.e. `1` would jump one conflict forward, `-2`
+                would jump 2 conflicts backwards.
+
+        Return: ~
+            If the current file contains any conflicts, the action returns a
+            |diffview.ConflictCount| table.
+
 listing_style                                   *diffview-actions-listing_style*
         Contexts: `file_panel`
 
@@ -869,6 +886,10 @@ next_conflict                                   *diffview-actions-next_conflict*
         Contexts: `diff_view`, `file_panel`
 
         Moves the cursor to the next conflict marker in the current file.
+
+        Return: ~
+            If the current file contains any conflicts, the action returns a
+            |diffview.ConflictCount| table.
 
 next_entry                                      *diffview-actions-next_entry*
         Contexts: `view`, `panel`
@@ -901,6 +922,10 @@ prev_conflict                                   *diffview-actions-prev_conflict*
         Contexts: `diff_view`, `file_panel`
 
         Moves the cursor to the previous conflict marker in the current file.
+
+        Return: ~
+            If the current file contains any conflicts, the action returns a
+            |diffview.ConflictCount| table.
 
 prev_entry                                      *diffview-actions-prev_entry*
         Contexts: `view`, `panel`
@@ -1007,6 +1032,7 @@ actions:
 
         • |diffview-actions-focus_entry|
         • |diffview-actions-goto_file_edit|
+        • |diffview-actions-jumpto_conflict|
         • |diffview-actions-view_windo|
 
 USER AUTOCOMMANDS                               *diffview-user-autocmds*
@@ -1257,7 +1283,7 @@ CDiffView                                       *diffview.api.views.diff.diff_vi
 
 FileDict                                        *diffview.git.FileDict*
 
-        Fields:~
+        Fields: ~
             {working} (FileData[])
             {staged}  (FileData[])
             {conflicting} (FileData[])
@@ -1310,7 +1336,7 @@ LogOptions                                      *diffview.git.LogOptions*
 
         Table controlling the options passed to git-log.
 
-        Fields:~
+        Fields: ~
             NOTE: All these options are described in far more detail in the
             man page for git-log. See `:Man git-log(1)` for more information.
 
@@ -1389,5 +1415,20 @@ LogOptions                                      *diffview.git.LogOptions*
                 the specified pattern (extended regular expression) in a
                 file.
 
+ConflictCount                          *diffview.ConflictCount*
+
+        Fields: ~
+            {total} (integer)
+                The total number of conflicts in the current file.
+
+            {current} (integer)
+                The index of the current conflict.
+
+            {cur_conflict} (table?)
+                The current conflict, if the cursor is currently in a conflict
+                region.
+
+            {conflicts} (table[])
+                List of all conflicts in the current file.
 
  vim:tw=78:ts=8:ft=help:norl:
