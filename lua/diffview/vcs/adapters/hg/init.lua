@@ -15,6 +15,7 @@ local CountDownLatch = require("diffview.control").CountDownLatch
 local FileEntry = require("diffview.scene.file_entry").FileEntry
 local Diff2Hor = require("diffview.scene.layouts.diff_2_hor").Diff2Hor
 local LogEntry = require("diffview.vcs.log_entry").LogEntry
+local FlagOption = require("diffview.vcs.flag_option").FlagOption
 local vcs_utils = require("diffview.vcs.utils")
 
 ---@type PathLib
@@ -1071,62 +1072,25 @@ end, 4)
 HgAdapter.flags = {
   ---@type FlagOption[]
   switches = {
-    { '-f', '--follow', 'Follow renames' },
-    { '-M', '--no-merges', 'List no merge changesets' },
+    FlagOption('-f', '--follow', 'Follow renames'),
+    FlagOption('-M', '--no-merges', 'List no merge changesets'),
   },
   ---@type FlagOption[]
   options = {
-    { '=r', '--rev=', 'Revspec', prompt_label = "(Revspec)" },
-    { '=l', '--limit=', 'Limit the number of changesets' },
-    { '=u', '--user=', 'Filter on user' },
-    { '=k', '--keyword=', 'Filter by keyword' },
-    { '=b', '--branch=', 'Filter by branch' },
-    { '=B', '--bookmark=', 'Filter by bookmark' },
-    { '=I', '--include=', 'Include files' },
-    { '=E', '--exclude=', 'Exclude files' },
+    FlagOption('=r', '--rev=', 'Revspec', {prompt_label = "(Revspec)"}),
+    FlagOption('=l', '--limit=', 'Limit the number of changesets'),
+    FlagOption('=u', '--user=', 'Filter on user'),
+    FlagOption('=k', '--keyword=', 'Filter by keyword'),
+    FlagOption('=b', '--branch=', 'Filter by branch'),
+    FlagOption('=B', '--bookmark=', 'Filter by bookmark'),
+    FlagOption('=I', '--include=', 'Include files'),
+    FlagOption('=E', '--exclude=', 'Exclude files'),
   },
 }
 
+-- Add reverse lookups
 for _, list in pairs(HgAdapter.flags) do
   for i, option in ipairs(list) do
-    option = vim.tbl_extend("keep", option, {
-      prompt_fmt = "${label}${flag_name}",
-
-      key = option.key or utils.str_match(option[2], {
-        "^%-%-?([^=]+)=?",
-        "^%+%+?([^=]+)=?",
-      }):gsub("%-", "_"),
-
-      ---@param self FlagOption
-      ---@param value string|string[]
-      render_value = function(self, value)
-        local quoted
-
-        if type(value) == "table" then
-          quoted = table.concat(vim.tbl_map(function(v)
-            return self[2] .. utils.str_quote(v, { only_if_whitespace = true })
-          end, value), " ")
-        else
-          quoted = self[2] .. utils.str_quote(value, { only_if_whitespace = true })
-        end
-
-        return value == "", quoted
-      end,
-
-      ---@param value string|string[]
-      render_default = function(_, value)
-        if value == nil then
-          return ""
-        elseif type(value) == "table" then
-          return table.concat(vim.tbl_map(function(v)
-            v = select(1, v:gsub("\\", "\\\\"))
-            return utils.str_quote(v, { only_if_whitespace = true })
-          end, value), " ")
-        end
-        return utils.str_quote(value, { only_if_whitespace = true })
-      end,
-    })
-
     list[i] = option
     list[option.key] = option
   end
