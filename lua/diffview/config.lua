@@ -248,6 +248,13 @@ M._config = M.defaults
 ---@field path_args string[]
 
 ---@class HgLogOptions
+---@field limit integer
+---@field user string
+---@field no_merges boolean
+---@field rev string
+---@field keyword string
+---@field include string
+---@field exclude string
 
 ---@alias LogOptions GitLogOptions|HgLogOptions
 
@@ -277,6 +284,11 @@ M.log_option_defaults = {
   hg = {
     limit = 256,
     user = nil,
+    no_merges = false,
+    rev = nil,
+    keyword = nil,
+    include = nil,
+    exclude = nil,
   },
 }
 

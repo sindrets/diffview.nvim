@@ -5,6 +5,7 @@ local Commit = require('diffview.vcs.commit').Commit
 
 local M = {}
 
+---@class HgCommit : Commit
 local HgCommit = oop.create_class('HgCommit', Commit)
 
 function HgCommit:init(opt)

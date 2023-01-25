@@ -135,7 +135,7 @@ function HgAdapter:get_merge_context()
   local out, code = self:exec_sync({ "debugmergestate", "-Tjson" }, self.ctx.toplevel)
 
   if code ~= 0 then
-    return {}
+    return {ours = {}, theirs = {}, base = {}}
   end
 
   local data = vim.json.decode(table.concat(out, ""))
@@ -144,13 +144,13 @@ function HgAdapter:get_merge_context()
       ret.theirs = { hash = commit.node }
       out, code = self:exec_sync({ "log", "--template={branch}", "--rev", commit.node })
       if code == 0 then
-        ret.theirs.ref_name = out[1]
+        ret.theirs.ref_names = out[1]
       end
     elseif commit.name == "local" then
       ret.ours = { hash = commit.node }
       out, code = self:exec_sync({ "log", "--template={branch}", "--rev", commit.node })
       if code == 0 then
-        ret.ours.ref_name = out[1]
+        ret.ours.ref_names = out[1]
       end
     end
   end
@@ -173,8 +173,6 @@ function HgAdapter:file_history_options(range, paths, args)
   rel_paths = vim.tbl_map(function(v)
     return v == "." and "." or pl:relative(v, ".")
   end, paths)
-
-  local cwd = cpath or vim.loop.cwd()
 
   local range_arg = argo:get_flag('rev', { no_empty = true })
   if range_arg then
@@ -205,7 +203,6 @@ function HgAdapter:file_history_options(range, paths, args)
     local key, _ = names[1]:gsub("%-", "_")
     local v = argo:get_flag(names, {
       expect_string = type(config.log_option_defaults[self.config_key][key]) ~= "boolean",
-      expect_list = names[1] == "L",
     })
     log_options[key] = v
   end
@@ -228,6 +225,26 @@ function HgAdapter:file_history_options(range, paths, args)
   return log_options
 end
 
+---@class HgAdapter.PreparedLogOpts
+---@field rev_range string
+---@field base Rev
+---@field path_args string[]
+---@field flags string[]
+--
+---@class HgAdapter.FHState
+---@field thread thread
+---@field adapter HgAdapter
+---@field path_args string[]
+---@field log_options HgLogOptions
+---@field prepared_log_opts HgAdapter.PreparedLogOpts
+---@field opt vcs.adapter.FileHistoryWorkerSpec
+---@field single_file boolean
+---@field resume_lock boolean
+---@field cur table
+---@field commit Commit
+---@field entries LogEntry[]
+---@field callback function
+
 local function prepare_fh_options(adapter, log_options, single_file)
   local o = log_options
   local rev_range, base
@@ -246,8 +263,15 @@ local function prepare_fh_options(adapter, log_options, single_file)
     path_args = log_options.path_args,
     flags = utils.vec_join(
       (o.follow and single_file) and { "--follow" } or nil,
+      o.no_merges and { "--no-merges" } or nil,
+      o.rev and { "--rev=" .. o.rev } or nil,
+      o.limit and { "--limit=" .. o.limit } or nil,
       o.user and { "--user=" .. o.user } or nil,
-      o.limit and { "--limit=" .. o.limit } or nil
+      o.keyword and { "--keyword=" .. o.keyword } or nil,
+      o.branch and { "--branch=" .. o.branch } or nil,
+      o.bookmark and { "--bookmark=" .. o.bookmark } or nil,
+      o.include and { "--include=" .. o.include } or nil,
+      o.exclude and { "--exclude=" .. o.exclude } or nil
     ),
   }
 end
@@ -677,7 +701,7 @@ function HgAdapter:diffview_options(args)
   return {left = left, right = right, options = options}
 end
 
-function VCSAdapter:rev_to_pretty_string(left, right)
+function HgAdapter:rev_to_pretty_string(left, right)
   if left.track_head and right.type == RevType.LOCAL then
     return nil
   elseif left.commit and right.type == RevType.LOCAL then
@@ -689,7 +713,11 @@ function VCSAdapter:rev_to_pretty_string(left, right)
 end
 
 function HgAdapter:head_rev()
-  local out, code = self:exec_sync({ "log", "--template={node}", "--limit=1", "--"}, {cwd = self.ctx.toplevel, retry_on_empty = 2})
+  local out, code = self:exec_sync( { "log", "--template={node}", "--limit=1", "--" }, {
+    cwd = self.ctx.toplevel,
+    retry_on_empty = 2,
+  })
+
   if code ~= 0 then
     return
   end
@@ -1110,13 +1138,13 @@ function HgAdapter:is_binary(path, rev)
 end
 
 -- TODO: implement completion
-function HgAdapter:rev_completion(arg_lead, opt)
+function HgAdapter:rev_candidates(arg_lead, opt)
   return { }
 end
 
 function HgAdapter:init_completion()
   self.comp.file_history:put({"--rev", "-r"}, function(_, arg_lead)
-    return self:rev_completion(arg_lead, { accept_range = true })
+    return self:rev_candidates(arg_lead, { accept_range = true })
   end)
 
   self.comp.file_history:put({ "--follow", "-f" })
