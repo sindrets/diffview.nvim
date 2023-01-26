@@ -194,6 +194,23 @@ function M.get_prev_non_view_tabpage()
   end
 end
 
+---@param bufnr integer
+---@return boolean
+function M.is_buf_in_use(bufnr)
+  for _, view in ipairs(M.views) do
+    if view:instanceof(StandardView.__get()) then
+      ---@cast view StandardView
+      for _, file in ipairs(view.cur_entry.layout:files()) do
+        if file:is_valid() and file.bufnr == bufnr then
+          return true
+        end
+      end
+    end
+  end
+
+  return false
+end
+
 function M.update_colors()
   for _, view in ipairs(M.views) do
     if view:instanceof(StandardView.__get()) then

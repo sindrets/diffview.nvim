@@ -5,6 +5,7 @@ local GitRev = lazy.access("diffview.vcs.adapters.git.rev", "GitRev") ---@type G
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local async = lazy.require("plenary.async") ---@module "plenary.async"
 local config = lazy.require("diffview.config") ---@module "diffview.config"
+local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local pl = lazy.access(utils, "path") ---@type PathLib|LazyModule
@@ -107,7 +108,7 @@ function File:destroy(force)
   self.active = false
   self:detach_buffer()
 
-  if force or self.rev.type ~= RevType.LOCAL then
+  if force or self.rev.type ~= RevType.LOCAL and not lib.is_buf_in_use(self.bufnr) then
     File.safe_delete_buf(self.bufnr)
   end
 end
@@ -366,7 +367,11 @@ end
 function File:dispose_buffer()
   if self.bufnr and api.nvim_buf_is_loaded(self.bufnr) then
     self:detach_buffer()
-    File.safe_delete_buf(self.bufnr)
+
+    if not lib.is_buf_in_use(self.bufnr) then
+      File.safe_delete_buf(self.bufnr)
+    end
+
     self.bufnr = nil
   end
 end

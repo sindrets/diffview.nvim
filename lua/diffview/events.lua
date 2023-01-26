@@ -49,7 +49,7 @@ end
 
 ---Subscribe to a given event.
 ---@param event_id any Event identifier.
----@param callback fun(event: Event, ...)
+---@param callback fun(event: Event, ...): boolean?
 function EventEmitter:on(event_id, callback)
   if not self.event_map[event_id] then
     self.event_map[event_id] = {}
@@ -66,7 +66,7 @@ end
 
 ---Subscribe a one-shot listener to a given event.
 ---@param event_id any Event identifier.
----@param callback fun(event: Event, ...)
+---@param callback fun(event: Event, ...): boolean?
 function EventEmitter:once(event_id, callback)
   if not self.event_map[event_id] then
     self.event_map[event_id] = {}
@@ -87,7 +87,7 @@ function EventEmitter:once(event_id, callback)
 end
 
 ---Add a new any-listener, subscribed to all events.
----@param callback fun(event: Event, ...)
+---@param callback fun(event: Event, ...): boolean?
 function EventEmitter:on_any(callback)
   table.insert(self.any_listeners, 1, {
     type = "any",
@@ -99,7 +99,7 @@ function EventEmitter:on_any(callback)
 end
 
 ---Add a new one-shot any-listener, subscribed to all events.
----@param callback fun(event: Event, ...)
+---@param callback fun(event: Event, ...): boolean?
 function EventEmitter:once_any(callback)
   local emitted = false
 
