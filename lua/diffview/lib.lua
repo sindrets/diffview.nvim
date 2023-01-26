@@ -200,7 +200,7 @@ function M.is_buf_in_use(bufnr)
   for _, view in ipairs(M.views) do
     if view:instanceof(StandardView.__get()) then
       ---@cast view StandardView
-      for _, file in ipairs(view.cur_entry.layout:files()) do
+      for _, file in ipairs(view.cur_entry and view.cur_entry.layout:files() or {}) do
         if file:is_valid() and file.bufnr == bufnr then
           return true
         end
