@@ -695,11 +695,9 @@ end
 function HgAdapter:diffview_options(args)
   local default_args = config.get_config().default_args.DiffviewOpen
   local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
-  local rev_args = argo:get_flag({'rev'})
+  local rev_args = argo.args[1]
 
-  local head = self:head_rev()
-  local left = head or HgRev.new_null_tree()
-  local right = HgRev(RevType.LOCAL)
+  local left, right = self:parse_revs(rev_args, {})
 
   local options = {
     show_untracked = true, -- TODO: extract from hg config
@@ -743,12 +741,61 @@ function HgAdapter:rev_to_args(left, right)
     "Can't diff LOCAL against LOCAL!"
   )
   if left.type == RevType.COMMIT and right.type == RevType.COMMIT then
-    return { '--rev="' .. left.commit .. '::' .. right.commit .. '"' }
+    return { '--rev=' .. left.commit .. '::' .. right.commit}
   elseif left.type == RevType.STAGE and right.type == RevType.LOCAL then
     return {}
   else
     return { '--rev=' .. left.commit }
   end
+end
+
+
+---Determine whether a rev arg is a range.
+---@param rev_arg string
+---@return boolean
+function HgAdapter:is_rev_arg_range(rev_arg)
+  return utils.str_match(rev_arg, {
+    "%:",
+    "%:%:",
+  }) ~= nil
+end
+
+---Parse a given rev arg.
+---@param rev_arg string
+---@param opt table
+---@return Rev? left
+---@return Rev? right
+function HgAdapter:parse_revs(rev_arg, opt)
+  ---@type Rev?
+  local left
+  ---@type Rev?
+  local right
+
+  local head = self:head_rev()
+  ---@cast head Rev
+
+  if not rev_arg then
+    left = head or HgRev.new_null_tree()
+    right = HgRev(RevType.LOCAL)
+  else
+    local from, to = rev_arg:match("([^:]*)%:%:?(.*)$")
+
+    if from and from ~= ""  and to and to ~= "" then
+      left = HgRev(RevType.COMMIT, from)
+      right = HgRev(RevType.COMMIT, to)
+    elseif from and from ~= "" then
+      left = HgRev(RevType.COMMIT, from)
+      right = head
+    elseif to and to ~= "" then
+      left = HgRev.new_null_tree()
+      right = HgRev(RevType.COMMIT, to)
+    else
+      utils.err(("Failed to parse rev %s"):format(utils.str_quote(rev_arg)))
+      return
+    end
+  end
+
+  return left, right 
 end
 
 function HgAdapter:file_restore(path, kind, commit)
