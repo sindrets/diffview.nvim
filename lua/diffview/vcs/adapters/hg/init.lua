@@ -140,6 +140,9 @@ function HgAdapter:get_merge_context()
   end
 
   local data = vim.json.decode(table.concat(out, ""))
+
+  ret.base = { hash = "" }
+
   for _, commit in ipairs(data[1].commits) do
     if commit.name == "other" then
       ret.theirs = { hash = commit.node }
@@ -156,8 +159,14 @@ function HgAdapter:get_merge_context()
     end
   end
 
-  -- Base is ancestorlinknode (per file)
-  ret.base = { hash = "" }
+  for _, file in ipairs(data[1].files) do
+    for _, extra in ipairs(file.extras) do
+      if (extra.key == 'ancestorlinknode' and extra.value ~= HgAdapter.Rev.NULL_TREE_SHA) then
+        ret.base.hash = extra.value
+        break
+      end
+    end
+  end
 
   return ret
 end
