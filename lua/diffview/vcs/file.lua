@@ -108,7 +108,7 @@ function File:destroy(force)
   self.active = false
   self:detach_buffer()
 
-  if force or self.rev.type ~= RevType.LOCAL and not lib.is_buf_in_use(self.bufnr) then
+  if force or self.rev.type ~= RevType.LOCAL and not lib.is_buf_in_use(self.bufnr, { self }) then
     File.safe_delete_buf(self.bufnr)
   end
 end
@@ -368,7 +368,7 @@ function File:dispose_buffer()
   if self.bufnr and api.nvim_buf_is_loaded(self.bufnr) then
     self:detach_buffer()
 
-    if not lib.is_buf_in_use(self.bufnr) then
+    if not lib.is_buf_in_use(self.bufnr, { self }) then
       File.safe_delete_buf(self.bufnr)
     end
 
