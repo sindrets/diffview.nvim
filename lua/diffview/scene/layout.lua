@@ -11,6 +11,7 @@ local M = {}
 ---@field windows Window[]
 ---@field emitter EventEmitter
 ---@field pivot_producer fun(): integer?
+---@field name string
 local Layout = oop.create_class("Layout")
 
 function Layout:init(opt)

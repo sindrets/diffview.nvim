@@ -10,7 +10,9 @@ local M = {}
 ---@field b Window
 local Diff2Ver = oop.create_class("Diff2Ver", Diff2)
 
----@class Diff2Hor.init.Opt
+Diff2Ver.name = "diff2_vertical"
+
+---@class Diff2Ver.init.Opt
 ---@field a vcs.File
 ---@field b vcs.File
 ---@field winid_a integer

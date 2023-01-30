@@ -11,6 +11,8 @@ local M = {}
 ---@field c Window
 local Diff3Ver = oop.create_class("Diff3Ver", Diff3)
 
+Diff3Ver.name = "diff3_vertical"
+
 function Diff3Ver:init(opt)
   Diff3Ver:super().init(self, opt)
 end

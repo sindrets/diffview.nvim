@@ -12,6 +12,8 @@ local M = {}
 ---@field d Window
 local Diff4Mixed = oop.create_class("Diff4Mixed", Diff4)
 
+Diff4Mixed.name = "diff4_mixed"
+
 function Diff4Mixed:init(opt)
   Diff4Mixed:super().init(self, opt)
 end

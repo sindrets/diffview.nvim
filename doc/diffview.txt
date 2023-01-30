@@ -577,7 +577,14 @@ hooks                                           *diffview-config-hooks*
                     {view} (`View`)
                         The `View` instance that's about to be left.
 
-            {diff_buf_read} (`fun(bufnr: integer)`)
+            {view_post_layout} (`fun(view: View)`)
+                Emitted after the window layout in a view has been adjusted.
+
+                Callback Parameters: ~
+                    {view} (`View`)
+                        The `View` whose layout was adjusted.
+
+            {diff_buf_read} (`fun(bufnr: integer, ctx: table)`)
                 Emitted after a new diff buffer is ready (the first time it's
                 created and loaded into a window). Diff buffers are all
                 buffers with |diff-mode| enabled. That includes buffers of
@@ -591,8 +598,15 @@ hooks                                           *diffview-config-hooks*
                 Callback Parameters: ~
                     {bufnr} (`integer`)
                         The buffer number of the new buffer.
+                    {ctx} (`table`)
+                        • {symbol} (string)
+                          A symbol that indentifies the window's position in
+                          the layout. These symbols correspond with the
+                          figures under |diffview-config-view.x.layout|.
+                        • {layout_name} (string)
+                          The name of the current layout.
 
-            {diff_buf_win_enter} (`fun(bufnr: integer, winid: integer)`)
+            {diff_buf_win_enter} (`fun(bufnr: integer, winid: integer, ctx: table)`)
                 Emitted after a diff buffer is displayed in a window.
 
                 This is always called with the new buffer as the current
@@ -606,6 +620,13 @@ hooks                                           *diffview-config-hooks*
                     {winid} (`integer`)
                         The window id of window inside which the buffer was
                         displayed.
+                    {ctx} (`table`)
+                        • {symbol} (string)
+                          A symbol that indentifies the window's position in
+                          the layout. These symbols correspond with the
+                          figures under |diffview-config-view.x.layout|.
+                        • {layout_name} (string)
+                          The name of the current layout.
 
         Examples: >
                 hooks = {
@@ -1006,21 +1027,24 @@ unstage_all                                     *diffview-actions-unstage_all*
 
         Unstage all changes.
 
-view_windo({cmd}, [targets])                    *diffview-actions-view_windo*
+view_windo({cmd})                               *diffview-actions-view_windo*
         Contexts: `view`, `panel`
 
-        Execute {cmd} for each target window in the target view. If no targets
-        are given, all windows are targeted. The {cmd} will be called with
-        each target window as the temporary current window (|nvim_win_call()|).
+        Execute {cmd} for each window in the current layout in the current
+        view. The {cmd} will be called with each target window as the
+        temporary current window (|nvim_win_call()|).
 
-        Parameters:~
-            {cmd} (string|function)
+        Parameters: ~
+            {cmd} (`string|fun(layout_name: string, symbol: string)`)
                 The vim cmd to execute, or a lua function.
 
-            [targets] (`{ a: boolean, b: boolean, c: boolean, d: boolean }`)
-                The windows to target. The letters correspond to the window
-                symbols for the current layout as they are illustrated under
-                |diffview-config-view.x.layout|.
+                Callback Parameters: ~
+                    {layout_name} (string)
+                        The name of the current layout.
+                    {symbol} (string)
+                        A symbol that indentifies the window's position in the
+                        layout. These symbols correspond with the figures
+                        under |diffview-config-view.x.layout|.
 
                                                 *diffview-unused-actions*
 Unused actions ~
@@ -1048,6 +1072,10 @@ For information on how to use User autocommands, see |User|.
 `DiffviewViewEnter`     Fires just after entering a view.
 
 `DiffviewViewLeave`     Fires just before leaving a view.
+
+`DiffviewViewPostLayout`
+                      Fires just after the window layout in a view has been
+                      adjusted.
 
 `DiffviewDiffBufRead`   Fires after a new diff buffer is ready (the first time
                       it's created and loaded into a window). Diff buffers are
@@ -1415,7 +1443,7 @@ LogOptions                                      *diffview.git.LogOptions*
                 the specified pattern (extended regular expression) in a
                 file.
 
-ConflictCount                          *diffview.ConflictCount*
+ConflictCount                                   *diffview.ConflictCount*
 
         Fields: ~
             {total} (integer)

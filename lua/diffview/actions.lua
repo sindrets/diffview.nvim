@@ -234,13 +234,12 @@ end
 ---Execute `cmd` for each target window in the current view. If no targets
 ---are given, all windows are targeted.
 ---@param cmd string|function The vim cmd to execute, or a function.
----@param targets? { a: boolean, b: boolean, c: boolean, d: boolean } The windows to target.
 ---@return function action
-function M.view_windo(cmd, targets)
+function M.view_windo(cmd)
   local fun
 
   if type(cmd) == "string" then
-    fun = function() vim.cmd(cmd) end
+    fun = function(_, _) vim.cmd(cmd) end
   else
     fun = cmd
   end
@@ -250,13 +249,14 @@ function M.view_windo(cmd, targets)
 
     if view and view:instanceof(StandardView.__get()) then
       ---@cast view StandardView
-      targets = targets or { a = true, b = true, c = true, d = true }
 
       for _, symbol in ipairs({ "a", "b", "c", "d" }) do
         local win = view.cur_layout[symbol] --[[@as Window? ]]
 
-        if targets[symbol] and win then
-          api.nvim_win_call(win.id, fun)
+        if win then
+          api.nvim_win_call(win.id, function()
+            fun(view.cur_layout.name, symbol)
+          end)
         end
       end
     end

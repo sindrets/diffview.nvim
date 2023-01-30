@@ -8,6 +8,8 @@ local M = {}
 ---@class Diff2Hor : Diff2
 local Diff2Hor = oop.create_class("Diff2Hor", Diff2)
 
+Diff2Hor.name = "diff2_horizontal"
+
 ---@class Diff2Hor.init.Opt
 ---@field a vcs.File
 ---@field b vcs.File

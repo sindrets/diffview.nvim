@@ -107,7 +107,10 @@ function Window:open_file(callback)
       end
 
       api.nvim_win_call(self.id, function()
-        DiffviewGlobal.emitter:emit("diff_buf_win_enter", self.file.bufnr, self.id)
+        DiffviewGlobal.emitter:emit("diff_buf_win_enter", self.file.bufnr, self.id, {
+          symbol = self.file.symbol,
+          layout_name = self.parent.name,
+        })
       end)
 
       if vim.is_callable(callback) then

@@ -90,6 +90,8 @@ function StandardView:post_layout()
       "DiffDelete:DiffviewDiffDelete",
     }
   end
+
+  DiffviewGlobal.emitter:emit("view_post_layout", self)
 end
 
 ---@override

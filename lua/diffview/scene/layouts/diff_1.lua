@@ -22,6 +22,8 @@ local Diff1 = oop.create_class("Diff1", Layout)
 ---@field b vcs.File
 ---@field winid_b integer
 
+Diff1.name = "diff1_plain"
+
 ---@param opt Diff1.init.Opt
 function Diff1:init(opt)
   Diff1:super().init(self)
