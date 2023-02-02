@@ -793,8 +793,13 @@ function HgAdapter:parse_revs(rev_arg, opt)
       left = HgRev.new_null_tree()
       right = HgRev(RevType.COMMIT, to)
     else
-      utils.err(("Failed to parse rev %s"):format(utils.str_quote(rev_arg)))
-      return
+      local _, code, stderr = self:exec_sync({"log", "--rev=" .. rev_arg}, selc.ctx.toplevel)
+      if code ~= 0 then
+        utils.err(("Failed to parse rev %s"):format(utils.str_quote(rev_arg)))
+        return
+      end
+      -- Revset parsed correctly
+      return rev_arg, nil
     end
   end
 
