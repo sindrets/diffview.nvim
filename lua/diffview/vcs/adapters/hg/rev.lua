@@ -29,6 +29,10 @@ function HgRev:init(rev_type, revision, track_head)
   self.commit = revision
 end
 
+function HgRev:new_null_tree()
+  return HgRev(RevType.COMMIT, HgRev.NULL_TREE_SHA)
+end
+
 function HgRev:object_name(abbrev_len)
   if self.commit then
     if abbrev_len then
