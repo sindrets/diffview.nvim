@@ -698,6 +698,9 @@ function HgAdapter:diffview_options(args)
   local rev_args = argo.args[1]
 
   local left, right = self:parse_revs(rev_args, {})
+  if not (left and right) then
+    return
+  end
 
   local options = {
     show_untracked = true, -- TODO: extract from hg config
@@ -778,7 +781,7 @@ function HgAdapter:parse_revs(rev_arg, opt)
     left = head or HgRev.new_null_tree()
     right = HgRev(RevType.LOCAL)
   else
-    local from, to = rev_arg:match("([^:]*)%:%:?(.*)$")
+    local from, to = rev_arg:match("([^:]*)%:?%:?(.*)$")
 
     if from and from ~= ""  and to and to ~= "" then
       left = HgRev(RevType.COMMIT, from)
