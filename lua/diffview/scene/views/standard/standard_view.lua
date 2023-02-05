@@ -208,6 +208,7 @@ function StandardView:use_entry(entry)
     else
       self:use_layout(entry.layout)
       self.cur_layout.emitter = entry.layout.emitter
+      self.cur_layout:use_entry(entry)
     end
 
     self.cur_layout:create()
