@@ -33,7 +33,7 @@ function M.get_adapter(opt)
     if not err then
       -- Create a new adapter instance. Store the resolved path args and the
       -- cpath in the adapter context.
-      return nil, adapter.create(toplevel, path_args, opt.cmd_ctx.cpath)
+      return adapter.create(toplevel, path_args, opt.cmd_ctx.cpath)
     end
   end
 

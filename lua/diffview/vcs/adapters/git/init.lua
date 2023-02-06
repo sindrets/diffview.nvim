@@ -25,6 +25,7 @@ local api = vim.api
 local M = {}
 
 ---@class GitAdapter : VCSAdapter
+---@operator call : GitAdapter
 local GitAdapter = oop.create_class("GitAdapter", VCSAdapter)
 
 GitAdapter.Rev = GitRev
@@ -139,13 +140,29 @@ end
 ---@param toplevel string
 ---@param path_args string[]
 ---@param cpath string?
+---@return string? err
 ---@return GitAdapter
 function M.create(toplevel, path_args, cpath)
-  return GitAdapter({
+  local err
+  local adapter = GitAdapter({
     toplevel = toplevel,
     path_args = path_args,
     cpath = cpath,
   })
+
+  if not adapter.ctx.toplevel then
+    err = "Could not find the top-level of the repository!"
+  elseif not pl:is_dir(adapter.ctx.toplevel) then
+    err = "The top-level is not a readable directory: " .. adapter.ctx.toplevel
+  end
+
+  if not adapter.ctx.dir then
+    err = "Could not find the Git directory!"
+  elseif not pl:is_dir(adapter.ctx.dir) then
+    err = "The Git directory is not readable: " .. adapter.ctx.dir
+  end
+
+  return err, adapter
 end
 
 ---@param opt vcs.adapter.VCSAdapter.Opt
