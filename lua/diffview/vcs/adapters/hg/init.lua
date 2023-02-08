@@ -713,11 +713,9 @@ function HgAdapter:diffview_options(args)
 end
 
 function HgAdapter:rev_to_pretty_string(left, right)
-  if left.track_head and right.type == RevType.LOCAL then
-    return nil
-  elseif left.commit and right.type == RevType.LOCAL then
-    return left:abbrev()
-  elseif left.commit and right.commit then
+  if left.type == RevType.CUSTOM then
+    return left.commit
+  elseif right and right.commit then
     return left:abbrev() .. "::" .. right:abbrev()
   end
   return nil
@@ -781,7 +779,7 @@ function HgAdapter:parse_revs(rev_arg, opt)
     left = head or HgRev.new_null_tree()
     right = HgRev(RevType.LOCAL)
   else
-    local from, to = rev_arg:match("([^:]*)%:?%:?(.*)$")
+    local from, to = rev_arg:match("([^:]*)%:%:?(.*)$")
 
     if from and from ~= ""  and to and to ~= "" then
       left = HgRev(RevType.COMMIT, from)
@@ -793,13 +791,20 @@ function HgAdapter:parse_revs(rev_arg, opt)
       left = HgRev.new_null_tree()
       right = HgRev(RevType.COMMIT, to)
     else
-      local _, code, stderr = self:exec_sync({"log", "--rev=" .. rev_arg}, selc.ctx.toplevel)
-      if code ~= 0 then
-        utils.err(("Failed to parse rev %s"):format(utils.str_quote(rev_arg)))
+      local node, code, stderr = self:exec_sync({"log", "--limit=1", "--template={node}",  "--rev=" .. rev_arg}, self.ctx.toplevel)
+      if code ~= 0 and node then
+        utils.err(("Failed to parse rev %s: %s"):format(utils.str_quote(rev_arg), stderr))
         return
       end
-      -- Revset parsed correctly
-      return rev_arg, nil
+      left = HgRev(RevType.COMMIT, node[1])
+
+      node, code, stderr = self:exec_sync({"log", "--limit=1", "--template={node}",  "--rev=reverse(" .. rev_arg .. ")"}, self.ctx.toplevel)
+      if code ~= 0  and node then
+        utils.err(("Failed to parse rev %s: %s"):format(utils.str_quote(rev_arg), stderr))
+        return
+      end
+
+      right = HgRev(RevType.COMMIT, node[1])
     end
   end
 
@@ -938,6 +943,7 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
   local namestat_out = namestat_job:result()
   local mergestate_out = mergestate_job:result()
 
+
   local data = {}
   local conflict_map = {}
   local file_info = {}
@@ -945,20 +951,24 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
   -- Last line in numstat is a summary and should not be used
   table.remove(numstat_out, -1)
 
-  for i, s in ipairs(namestat_out) do
+  local numstat_info = {}
+  for _, s in ipairs(numstat_out) do
+      local name, changes, diffstats = s:match("(%s*)|%s+(%d+)%s+([+-]+)")
+      if changes and diffstats then
+        local _, adds = diffstats:gsub("+", "")
+
+        numstat_info[name] = {
+          additions = tonumber(adds),
+          deletions = tonumber(changes) - tonumber(adds),
+        }
+      end
+  end
+
+  for _, s in ipairs(namestat_out) do
     local status = s:sub(1, 1):gsub("%s", " ")
     local name = vim.trim(s:match("[%a%s]%s*(.*)"))
 
-    local stats = {}
-    local changes, diffstats = numstat_out[i]:match(".*|%s+(%d+)%s+([+-]+)")
-    if changes and diffstats then
-      local _, adds = diffstats:gsub("+", "")
-
-      stats = {
-        additions = tonumber(adds),
-        deletions = tonumber(changes) - tonumber(adds),
-      }
-    end
+    local stats = numstat_info[name] or {}
 
     if not (kind == "staged") then
       file_info[name] = {
