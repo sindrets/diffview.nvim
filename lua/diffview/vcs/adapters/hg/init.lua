@@ -805,6 +805,10 @@ function HgAdapter:parse_revs(rev_arg, opt)
       end
 
       right = HgRev(RevType.COMMIT, node[1])
+      -- If we refer to a single revision, show diff with working directory
+      if node[1] == left.commit then
+        right = HgRev(RevType.LOCAL )
+      end
     end
   end
 

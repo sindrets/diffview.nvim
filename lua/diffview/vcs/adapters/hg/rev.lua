@@ -46,10 +46,12 @@ function HgRev:object_name(abbrev_len)
 end
 
 function HgRev.to_range(rev_from, rev_to)
-  if rev_to then
-    return rev_from .. "::" .. rev_to
+  if rev_from and rev_to then
+    return rev_from.commit .. "::" .. rev_to.commit
+  elseif rev_to then
+    return "::" .. rev_to.commit
   end
-  return rev_from
+  return rev_from.commit .. "::"
 end
 
 M.HgRev = HgRev
