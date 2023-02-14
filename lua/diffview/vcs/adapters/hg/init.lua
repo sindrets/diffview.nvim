@@ -1181,7 +1181,38 @@ end
 
 -- TODO: implement completion
 function HgAdapter:rev_candidates(arg_lead, opt)
-  return { }
+  opt = vim.tbl_extend("keep", opt or {}, { accept_range = false }) --[[@as RevCompletionSpec ]]
+  logger.lvl(1).debug("[completion] Revision candidates requested")
+
+  local branches = self:exec_sync(
+    { "branches", "--template={branch}\n" },
+    { cwd = self.ctx.toplevel, silent = true }
+  )
+
+  local heads = self:exec_sync(
+    { "heads", "--template={node|short}\n" },
+    { cwd = self.ctx.toplevel, silent = true }
+  )
+
+  local ret = utils.vec_join(heads, branches)
+
+  if opt.accept_range then
+    local _, range_end = utils.str_match(arg_lead, {
+      "^(%:%:?)()$",
+      "^(%:%:?)()[^:]",
+      "[^:](%:%:?)()$",
+      "[^:](%:%:?)()[^:]",
+    })
+
+    if range_end then
+      local range_lead = arg_lead:sub(1, range_end - 1)
+      ret = vim.tbl_map(function(v)
+        return range_lead .. v
+      end, ret)
+    end
+  end
+
+  return ret
 end
 
 function HgAdapter:init_completion()
