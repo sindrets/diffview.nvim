@@ -953,11 +953,11 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
   local file_info = {}
 
   -- Last line in numstat is a summary and should not be used
-  table.remove(numstat_out, -1)
+  table.remove(numstat_out, #numstat_out)
 
   local numstat_info = {}
   for _, s in ipairs(numstat_out) do
-      local name, changes, diffstats = s:match("(%s*)|%s+(%d+)%s+([+-]+)")
+      local name, changes, diffstats = s:match("%s*([^|]*)%s+|%s+(%d+)%s+([+-]+)")
       if changes and diffstats then
         local _, adds = diffstats:gsub("+", "")
 
@@ -969,17 +969,19 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
   end
 
   for _, s in ipairs(namestat_out) do
-    local status = s:sub(1, 1):gsub("%s", " ")
-    local name = vim.trim(s:match("[%a%s]%s*(.*)"))
+    if s ~= " " then
+      local status = s:sub(1, 1):gsub("%s", " ")
+      local name = vim.trim(s:match("[%a%s]%s*(.*)"))
 
-    local stats = numstat_info[name] or {}
+      local stats = numstat_info[name] or {}
 
-    if not (kind == "staged") then
-      file_info[name] = {
-        status = status,
-        name = name,
-        stats = stats,
-      }
+      if not (kind == "staged") then
+        file_info[name] = {
+          status = status,
+          name = name,
+          stats = stats,
+        }
+      end
     end
   end
 
