@@ -94,15 +94,29 @@ function M.find_toplevel(top_indicators)
       local rel_path = pl:relative(v, ".")
       return utils.str_quote(rel_path == "" and "." or rel_path)
     end, top_indicators) --[[@as vector ]], ", "))
-  ), nil
+  ), ""
 end
 
+---@param toplevel string
+---@param path_args string[]
+---@param cpath string?
+---@return string? err
+---@return HgAdapter
 function M.create(toplevel, path_args, cpath)
-  return HgAdapter({
+  local err
+  local adapter = HgAdapter({
     toplevel = toplevel,
     path_args = path_args,
     cpath = cpath,
   })
+
+  if not adapter.ctx.toplevel then
+    err = "Could not file top-level of the repository!"
+  elseif not pl:is_dir(adapter.ctx.toplevel) then
+    err = "The top-level is not a readable directory: " .. adapter.ctx.toplevel
+  end
+
+  return err, adapter
 end
 
 function HgAdapter:init(opt)
