@@ -727,8 +727,10 @@ function HgAdapter:diffview_options(args)
 end
 
 function HgAdapter:rev_to_pretty_string(left, right)
-  if left.type == RevType.CUSTOM then
-    return left.commit
+  if left.track_head and right.type == RevType.LOCAL then
+    return nil
+  elseif left.commit and right.type == RevType.LOCAL then
+    return left:abbrev()
   elseif right and right.commit then
     return left:abbrev() .. "::" .. right:abbrev()
   end

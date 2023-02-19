@@ -29,7 +29,7 @@ function HgRev:init(rev_type, revision, track_head)
   self.commit = revision
 end
 
-function HgRev:new_null_tree()
+function HgRev.new_null_tree()
   return HgRev(RevType.COMMIT, HgRev.NULL_TREE_SHA)
 end
 

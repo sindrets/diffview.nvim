@@ -17,6 +17,7 @@ local debounce = lazy.require("diffview.debounce") ---@module "diffview.debounce
 local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local vcs_utils = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
+local GitAdapter = lazy.access("diffview.vcs.adapters.git", "GitAdapter") ---@type GitAdapter|LazyModule
 
 local api = vim.api
 local M = {}
@@ -125,7 +126,7 @@ function DiffView:post_open()
     name = ("diffview://%s/log/%d/%s"):format(self.adapter.ctx.dir, self.tabpage, "commit_log"),
   })
 
-  if config.get_config().watch_index then
+  if config.get_config().watch_index and self.adapter:instanceof(GitAdapter.__get()) then
     self.watcher = vim.loop.new_fs_poll()
     ---@diagnostic disable-next-line: unused-local
     self.watcher:start(self.adapter.ctx.dir .. "/index", 1000, function(err, prev, cur)
