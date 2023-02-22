@@ -33,7 +33,7 @@ return function(view)
       local log_options = view.panel:get_log_options()
       local cur = view.panel:cur_file()
 
-      if log_options.L[1] and bufnr == cur.layout:get_main_win().file.bufnr then
+      if log_options.L and log_options.L[1] and bufnr == cur.layout:get_main_win().file.bufnr then
         for _, value in ipairs(log_options.L) do
           local l1, lpath = value:match("^(%d+),.*:(.*)")
 

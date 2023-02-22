@@ -38,6 +38,7 @@ M.defaults = {
   diff_binaries = false,
   enhanced_diff_hl = false,
   git_cmd = { "git" },
+  hg_cmd = { "hg" },
   use_icons = true,
   show_help_hints = true,
   watch_index = true,
@@ -247,6 +248,13 @@ M._config = M.defaults
 ---@field path_args string[]
 
 ---@class HgLogOptions
+---@field limit integer
+---@field user string
+---@field no_merges boolean
+---@field rev string
+---@field keyword string
+---@field include string
+---@field exclude string
 
 ---@alias LogOptions GitLogOptions|HgLogOptions
 
@@ -273,7 +281,15 @@ M.log_option_defaults = {
     path_args = {},
   },
   ---@type HgLogOptions
-  hg = {},
+  hg = {
+    limit = 256,
+    user = nil,
+    no_merges = false,
+    rev = nil,
+    keyword = nil,
+    include = nil,
+    exclude = nil,
+  },
 }
 
 ---@return DiffviewConfig

@@ -329,7 +329,7 @@ VCSAdapter.show = async.wrap(function(self, path, rev, callback)
     cwd = self.ctx.toplevel,
     ---@type Job
     on_exit = async.void(function(j)
-      local context = "vcs.utils.show()"
+      local context = "VCSAdapter.show()"
       utils.handle_job(j, {
         fail_on_empty = true,
         context = context,

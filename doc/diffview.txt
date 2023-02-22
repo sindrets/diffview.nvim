@@ -179,75 +179,120 @@ COMMANDS                                        *diffview-commands*
             :'<,'>DiffviewFileHistory
 <
 
-    Options: ~
+    What options are available will be determined by what type of repository
+    you're targeting. You will find the available options for the supported
+    VCS tools below. The command completion will do it's best to suggest the
+    appropriate options.
+
+    Git Options: ~
         --base={git-rev}
-                        Specify a base git rev from which the right side of
-                        the diff will be created. Use the special value
-                        `LOCAL` to use the local version of the file.
+                Specify a base git rev from which the right side of the diff
+                will be created. Use the special value `LOCAL` to use the
+                local version of the file.
 
         --range={git-rev}
-                        Show only commits in the specified revision range.
+                Show only commits in the specified revision range.
 
-        -C{path}        Run as if git was started in {path} instead of the
-                        current working directory.
+        -C{path}
+                Run as if git was started in {path} instead of the current
+                working directory.
 
         NOTE: All following options are described in far more detail in the
         man page for git-log. See `:Man git-log(1)` for more information.
 
-        --follow        Follow renames (only for single file).
+        --follow
+                Follow renames (only for single file).
 
-        --first-parent  Follow only the first parent upon seeing a merge
-                        commit.
+        --first-parent
+                Follow only the first parent upon seeing a merge commit.
 
-        --show-pulls    Show merge commits that are not TREESAME to its first
-                        parent, but are to a later parent.
+        --show-pulls
+                Show merge commits that are not TREESAME to its first parent,
+                but are to a later parent.
 
-        --reflog        Include all reachable objects mentioned by reflogs.
+        --reflog
+                Include all reachable objects mentioned by reflogs.
 
-        --all           Include all refs.
+        --all   Include all refs.
 
-        --merges        List only merge commits.
+        --merges
+                List only merge commits.
 
-        --no-merges     List no merge commits.
+        --no-merges
+                List no merge commits.
 
-        --reverse       List commits in reverse order.
+        --reverse
+                List commits in reverse order.
 
         -n{n}, --max-count={n}
-                        Limit the number of commits.
+                Limit the number of commits.
 
         -L{start},{end}:{file}, -L:{funcname}:{file}
-                        Trace the evolution of the line range given by
-                        {start},{end}, or by the function name regex
-                        {funcname}, within the {file}. You can specify this
-                        option more than once.
+                Trace the evolution of the line range given by {start},{end},
+                or by the function name regex {funcname}, within the {file}.
+                You can specify this option more than once.
 
         --diff-merges={value}
-                        Determines how merge commits are treated. {value} can
-                        be one of:
-                            • `off`
-                            • `on`
-                            • `first-parent`
-                            • `separate`
-                            • `combined`
-                            • `dense-combined`
-                            • `remerge`
+                Determines how merge commits are treated. {value} can
+                be one of:
+                    • `off`
+                    • `on`
+                    • `first-parent`
+                    • `separate`
+                    • `combined`
+                    • `dense-combined`
+                    • `remerge`
 
         --author={pattern}
-                        Limit the commits output to ones with author/committer
-                        header lines that match the specified {pattern}
-                        (regular expression).
+                Limit the commits output to ones with author/committer header
+                lines that match the specified {pattern} (regular expression).
 
         --grep={pattern}
-                        Limit the commits output to ones with log message that
-                        matches the specified {pattern} (regular expression).
+                Limit the commits output to ones with log message that matches
+                the specified {pattern} (regular expression).
 
-        -G{pattern}     Look for differences whose patch text contains
-                        added/removed lines that match {pattern} (extended
-                        regular expression).
+        -G{pattern}
+                Look for differences whose patch text contains added/removed
+                lines that match {pattern} (extended regular expression).
 
-        -S{pattern}     Look for differences that change the number of
-                        occurences of the specified {pattern} (extended
-                        regular expression) in a file.
+        -S{pattern}
+                Look for differences that change the number of occurences of
+                the specified {pattern} (extended regular expression) in a
+                file.
+
+    Mercurial Options: ~
+
+        --rev={rev}
+                Show only commits for the specified revset {rev}.
+                See `hg help revsets` for the full list of keywords and
+                constructs.
+
+        -f, --follow
+                Follow renames (only for single file).
+
+        -l{n}, --limit={n}
+                Limit the number of commits.
+
+        -M, --no-merges
+                Do not list merge commits.
+
+        --user={text}
+                Limit the commits to ones with user as specified.
+
+        --keyword={text}
+                Limit commits to ones matching the {text} in the log message.
+
+        --branch={text}
+                Limit commits to a specified branch.
+
+        --bookmark={text}
+                Limit commits to a specified bookmark
+
+        --include={pattern}
+                Include commits touching files as specified in the {pattern}.
+
+        --exclude={pattern}
+                Exclude commits touching files as specified in the {pattern}.
 
                                                 *:DiffviewClose*
 :DiffviewClose          Close the active Diffview.
@@ -285,9 +330,19 @@ enhanced_diff_hl                                *diffview-config-enhanced_diff_h
 git_cmd                                         *diffview-config-git_cmd*
         Type: `string[]`, Default: `{ "git" }`
 
-        This table forms the first part of all git commands used internally in
-        the plugin. The first element should be the git binary. The subsequent
+        This table forms the first part of all Git commands used internally in
+        the plugin. The first element should be the Git binary. The subsequent
         elements are passed as arguments.
+
+hg_cmd                                         *diffview-config-hg_cmd*
+        Type: `string[]`, Default: `{ "hg" }`
+
+        This table forms the first part of all Mercurial commands used
+        internally in the plugin. The first element should be the Mercurial
+        binary. The subsequent elements are passed as arguments.
+
+        If your Mercurial install bundles the `chg` binary, this can be
+        configured here to have a significant performance boost.
 
 view.x.layout                                   *diffview-config-view.x.layout*
         Type: >
