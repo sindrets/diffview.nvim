@@ -40,7 +40,7 @@ function M.diffview_open(args)
 
   ---@cast adapter -?
 
-  local opts = adapter:diffview_options(args)
+  local opts = adapter:diffview_options(argo)
 
   if opts == nil then
     return
@@ -90,7 +90,7 @@ function M.file_history(range, args)
 
   ---@cast adapter -?
 
-  local log_options = adapter:file_history_options(range, adapter.ctx.path_args, args)
+  local log_options = adapter:file_history_options(range, adapter.ctx.path_args, argo)
 
   if log_options == nil then
     return

@@ -191,9 +191,9 @@ end
 
 ---@param range? { [1]: integer, [2]: integer }
 ---@param paths string[]
----@param args string[]
+---@param argo ArgObject
 ---@return string[] # Options to show file history
-function VCSAdapter:file_history_options(range, paths, args)
+function VCSAdapter:file_history_options(range, paths, argo)
   oop.abstract_stub()
 end
 
@@ -267,9 +267,9 @@ function VCSAdapter:reset_files(paths)
   oop.abstract_stub()
 end
 
----@param args string[]
+---@param argo ArgObject
 ---@return {left: string, right: string, options: string[]}
-function VCSAdapter:diffview_options(args)
+function VCSAdapter:diffview_options(argo)
   oop.abstract_stub()
 end
 

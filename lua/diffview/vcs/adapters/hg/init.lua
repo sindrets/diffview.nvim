@@ -1,6 +1,5 @@
 local oop = require('diffview.oop')
 local VCSAdapter = require('diffview.vcs.adapter').VCSAdapter
-local arg_parser = require('diffview.arg_parser')
 local utils = require('diffview.utils')
 local lazy = require('diffview.lazy')
 local config = require('diffview.config')
@@ -34,7 +33,7 @@ function M.get_repo_paths(path_args, cpath)
   local top_indicators = {}
 
   for _, path_arg in ipairs(path_args) do
-    for _, path in ipairs(pl:vim_expand(path_arg, false, true)) do
+    for _, path in ipairs(pl:vim_expand(path_arg, false, true) --[[@as string[] ]]) do
       path = pl:readlink(path) or path
       table.insert(paths, path)
     end
@@ -185,43 +184,41 @@ function HgAdapter:get_merge_context()
   return ret
 end
 
-function HgAdapter:file_history_options(range, paths, args)
-  local default_args = config.get_config().default_args.DiffviewFileHistory
-  local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
-  local rel_paths
-
-  local cpath = argo:get_flag("C", { no_empty = true, expand = true })
+---@param range? { [1]: integer, [2]: integer }
+---@param paths string[]
+---@param argo ArgObject
+function HgAdapter:file_history_options(range, paths, argo)
   local cfile = pl:vim_expand("%")
   cfile = pl:readlink(cfile) or cfile
 
-  rel_paths = vim.tbl_map(function(v)
+  local rel_paths = vim.tbl_map(function(v)
     return v == "." and "." or pl:relative(v, ".")
-  end, paths)
+  end, paths) --[[@as string[] ]]
 
   local range_arg = argo:get_flag('rev', { no_empty = true })
-  if range_arg then
-    -- TODO: check if range is valid
-  end
+  -- if range_arg then
+  --   -- TODO: check if range is valid
+  -- end
 
   if range then
-    utils.err(
-      "Line ranges are not supported for hg!"
-    )
+    utils.err("Line ranges are not supported for hg!")
     return
   end
 
   local log_flag_names = {
     { "rev", "r" },
     { "follow", "f" },
-    { "no-merges", "M" },
     { "limit", "l" },
+    { "no-merges", "M" },
     { "user", "u" },
     { "keyword", "k" },
+    { "branch" },
+    { "bookmark" },
     { "include", "I" },
     { "exclude", "X" },
   }
 
-  ---@type LogOptions
+  ---@type HgLogOptions
   local log_options = { rev_range = range_arg }
   for _, names in ipairs(log_flag_names) do
     local key, _ = names[1]:gsub("%-", "_")
@@ -254,10 +251,9 @@ end
 ---@field base Rev
 ---@field path_args string[]
 ---@field flags string[]
---
+
 ---@class HgAdapter.FHState
 ---@field thread thread
----@field adapter HgAdapter
 ---@field path_args string[]
 ---@field log_options HgLogOptions
 ---@field prepared_log_opts HgAdapter.PreparedLogOpts
@@ -267,9 +263,13 @@ end
 ---@field cur table
 ---@field commit Commit
 ---@field entries LogEntry[]
+---@field old_path string?
 ---@field callback function
 
-local function prepare_fh_options(adapter, log_options, single_file)
+---@param log_options HgLogOptions
+---@param single_file boolean
+---@return HgAdapter.PreparedLogOpts
+function HgAdapter:prepare_fh_options(log_options, single_file)
   local o = log_options
   local rev_range, base
 
@@ -277,19 +277,19 @@ local function prepare_fh_options(adapter, log_options, single_file)
     rev_range = log_options.rev
   end
 
-  if log_options.base then
-    -- TODO
-  end
+  -- if log_options.base then
+  --   -- TODO
+  -- end
 
   return {
     rev_range = rev_range,
     base = base,
     path_args = log_options.path_args,
     flags = utils.vec_join(
-      (o.follow and single_file) and { "--follow" } or nil,
-      o.no_merges and { "--no-merges" } or nil,
       o.rev and { "--rev=" .. o.rev } or nil,
+      (o.follow and single_file) and { "--follow" } or nil,
       o.limit and { "--limit=" .. o.limit } or nil,
+      o.no_merges and { "--no-merges" } or nil,
       o.user and { "--user=" .. o.user } or nil,
       o.keyword and { "--keyword=" .. o.keyword } or nil,
       o.branch and { "--branch=" .. o.branch } or nil,
@@ -300,31 +300,31 @@ local function prepare_fh_options(adapter, log_options, single_file)
   }
 end
 
----@param log_opt LogOptions
+---@param log_opt HgLogOptions
 ---@return boolean ok, string description
 function HgAdapter:file_history_dry_run(log_opt)
   local single_file = self:is_single_file(log_opt.path_args)
-  local log_options = config.get_log_options(single_file, log_opt, self.config_key)
+  local log_options = config.get_log_options(single_file, log_opt, self.config_key) --[[@as HgLogOptions ]]
 
   local options = vim.tbl_map(function(v)
     return vim.fn.shellescape(v)
-  end, prepare_fh_options(self, log_options, single_file).flags) -- [[@as vector]]
+  end, self:prepare_fh_options(log_options, single_file).flags) --[[@as vector ]]
 
   local description = utils.vec_join(
     ("Top-level path: '%s'"):format(utils.path:vim_fnamemodify(self.ctx.toplevel, ":~")),
-    log_options.rev_range and ("Revision range: '%s'"):format(log_options.rev_range) or nil,
+    log_options.rev and ("Revision range: '%s'"):format(log_options.rev) or nil,
     ("Flags: %s"):format(table.concat(options, " "))
   )
 
-  log_options = utils.tbl_clone(log_options) --[[@as LogOptions ]]
+  log_options = utils.tbl_clone(log_options) --[[@as HgLogOptions ]]
   log_options.limit = 1
   -- TODO
-  options = prepare_fh_options(self, log_options, single_file).flags
+  options = self:prepare_fh_options(log_options, single_file).flags
 
   local context = "HgAdapter.file_history_dry_run()"
   local cmd = utils.vec_join(
     "log",
-    log_options.rev_range and "--rev=" .. log_options.rev_range or nil,
+    log_options.rev and "--rev=" .. log_options.rev or nil,
     options,
     log_options.path_args
   )
@@ -349,7 +349,7 @@ end
 local function structure_fh_data(namestat_data, numstat_data)
   local right_hash, left_hash, merge_hash = unpack(utils.str_split(namestat_data[1]))
   local time, time_offset = namestat_data[3]:match('(%d+.%d*)([-+]?%d*)')
- 
+
   return {
     left_hash = left_hash ~= "" and left_hash or nil,
     right_hash = right_hash,
@@ -366,9 +366,10 @@ local function structure_fh_data(namestat_data, numstat_data)
 end
 
 
+---@param self HgAdapter
 ---@param state HgAdapter.FHState
 ---@param callback fun(status: JobStatus, data?: table, msg?: string[])
-local incremental_fh_data = async.void(function(state, callback)
+HgAdapter.incremental_fh_data = async.void(function(self, state, callback)
   local raw = {}
   local namestat_job, numstat_job, shutdown
 
@@ -429,9 +430,9 @@ local incremental_fh_data = async.void(function(state, callback)
   local rev_range = state.prepared_log_opts.rev_range and '--rev=' .. state.prepared_log_opts.rev_range or nil
 
   namestat_job = Job:new({
-    command = state.adapter:bin(),
+    command = self:bin(),
     args = utils.vec_join(
-      state.adapter:args(),
+      self:args(),
       "log",
       rev_range,
       '--template=\\x00\n{node} {p1.node} {ifeq(p2.rev, -1 ,\"\", \"{p2.node}\")}\n{author|person}\n{date}\n{date|age}\n  {separate(", ", tags, topics)}\n  {desc|firstline}\n',
@@ -439,15 +440,15 @@ local incremental_fh_data = async.void(function(state, callback)
       "--",
       state.path_args
     ),
-    cwd = state.adapter.ctx.toplevel,
+    cwd = self.ctx.toplevel,
     on_stdout = on_stdout,
     on_exit = on_exit,
   })
 
   numstat_job = Job:new({
-    command = state.adapter:bin(),
+    command = self:bin(),
     args = utils.vec_join(
-      state.adapter:args(),
+      self:args(),
       "log",
       rev_range,
       "--template=\\x00\n",
@@ -456,7 +457,7 @@ local incremental_fh_data = async.void(function(state, callback)
       "--",
       state.path_args
     ),
-    cwd = state.adapter.ctx.toplevel,
+    cwd = self.ctx.toplevel,
     on_stdout = on_stdout,
     on_exit = on_exit,
   })
@@ -467,7 +468,7 @@ local incremental_fh_data = async.void(function(state, callback)
   latch:await()
 
   local debug_opt = {
-    context = "HgAdapter>incremental_fh_data()",
+    context = "HgAdapter:incremental_fh_data()",
     func = "s_info",
     no_stdout = true,
   }
@@ -486,32 +487,33 @@ local incremental_fh_data = async.void(function(state, callback)
   end
 end)
 
-local function parse_fh_data(state)
+---@param state HgAdapter.FHState
+function HgAdapter:parse_fh_data(state)
   local cur = state.cur
 
   if cur.merge_hash and cur.numstat[1] and #cur.numstat ~= #cur.namestat then
     local job
     local job_spec = {
-      command = state.adapter:bin(),
+      command = self:bin(),
       args = utils.vec_join(
-        state.adapter:args(),
+        self:args(),
         "status",
         "--change",
         cur.right_hash,
         "--",
         state.old_path or state.path_args
       ),
-      cwd = state.adapter.ctx.toplevel,
+      cwd = self.ctx.toplevel,
       on_exit = function(j)
         if j.code == 0 then
           cur.namestat = j:result()
         end
-        state.adapter:handle_co(state.thread, coroutine.resume(state.thread))
+        self:handle_co(state.thread, coroutine.resume(state.thread))
       end,
     }
 
     local max_retries = 2
-    local context = "HgAdapter.file_history_worker()"
+    local context = "HgAdapter:parse_fh_data()"
     state.resume_lock = true
 
     for i = 0, max_retries do
@@ -573,7 +575,7 @@ local function parse_fh_data(state)
     end
 
     table.insert(files, FileEntry.with_layout(state.opt.default_layout or Diff2Hor, {
-      adapter = state.adapter,
+      adapter = self,
       path = name,
       oldpath = oldname,
       status = status,
@@ -613,6 +615,11 @@ function HgAdapter:is_single_file(path_args, lflags)
   return true
 end
 
+---@param thread thread
+---@param log_opt ConfigLogOptions
+---@param opt vcs.adapter.FileHistoryWorkerSpec
+---@param co_state table
+---@param callback function
 function HgAdapter:file_history_worker(thread, log_opt, opt, co_state, callback)
   ---@type LogEntry[]
   local entries = {}
@@ -623,19 +630,19 @@ function HgAdapter:file_history_worker(thread, log_opt, opt, co_state, callback)
 
   local single_file = self:is_single_file(log_opt.single_file.path_args, {})
 
-  ---@type LogOptions
+  ---@type HgLogOptions
   local log_options = config.get_log_options(
     single_file,
     single_file and log_opt.single_file or log_opt.multi_file,
     "hg"
   )
 
+  ---@type HgAdapter.FHState
   local state = {
     thread = thread,
-    adapter = self,
     path_args = log_opt.single_file.path_args,
     log_options = log_options,
-    prepared_log_opts = prepare_fh_options(self, log_options, single_file),
+    prepared_log_opts = self:prepare_fh_options(log_options, single_file),
     opt = opt,
     callback = callback,
     entries = entries,
@@ -661,7 +668,7 @@ function HgAdapter:file_history_worker(thread, log_opt, opt, co_state, callback)
     end
   end
 
-  incremental_fh_data(state, data_callback)
+  self:incremental_fh_data(state, data_callback)
 
   while true do
     if not vim.tbl_contains({ JobStatus.SUCCESS, JobStatus.ERROR, JobStatus.KILLED }, last_status)
@@ -691,7 +698,7 @@ function HgAdapter:file_history_worker(thread, log_opt, opt, co_state, callback)
       subject = state.cur.subject,
     })
 
-    local ok, status = parse_fh_data(state)
+    local ok, status = self:parse_fh_data(state)
 
     if not ok then
       if status == JobStatus.FATAL then
@@ -706,9 +713,8 @@ function HgAdapter:file_history_worker(thread, log_opt, opt, co_state, callback)
   callback(entries, JobStatus.SUCCESS)
 end
 
-function HgAdapter:diffview_options(args)
-  local default_args = config.get_config().default_args.DiffviewOpen
-  local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
+---@param argo ArgObject
+function HgAdapter:diffview_options(argo)
   local rev_args = argo.args[1]
 
   local left, right = self:parse_revs(rev_args, {})
@@ -828,18 +834,16 @@ function HgAdapter:parse_revs(rev_arg, opt)
     end
   end
 
-  return left, right 
+  return left, right
 end
 
 function HgAdapter:file_restore(path, kind, commit)
-  local out, code
+  local _, code
   local abs_path = utils.path:join(self.ctx.toplevel, path)
-  local rel_path = utils.path:vim_fnamemodify(abs_path, ":~")
 
   _, code = self:exec_sync({"cat", "--", path}, self.ctx.toplevel)
 
   local exists_hg = code == 0
-  local exists_local = utils.path:readable(abs_path)
 
   local undo
 
@@ -871,14 +875,14 @@ function HgAdapter:file_restore(path, kind, commit)
       end
     else
       -- File only exists in index
-      out, code = self:exec_sync(
+      _, code = self:exec_sync(
         { "rm", "-f", "--", path },
         self.ctx.toplevel
       )
     end
   else
     -- File exists in history: revert
-    out, code = self:exec_sync(
+    _, code = self:exec_sync(
       utils.vec_join("revert", commit or (kind == "staged" and "HEAD" or nil), "--", path),
       self.ctx.toplevel
     )
@@ -1194,7 +1198,7 @@ end
 
 function HgAdapter:is_binary(path, rev)
   -- TODO
-  return false 
+  return false
 end
 
 -- TODO: implement completion

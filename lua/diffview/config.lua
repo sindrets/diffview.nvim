@@ -248,13 +248,17 @@ M._config = M.defaults
 ---@field path_args string[]
 
 ---@class HgLogOptions
+---@field follow string
 ---@field limit integer
 ---@field user string
 ---@field no_merges boolean
 ---@field rev string
 ---@field keyword string
+---@field branch string
+---@field bookmark string
 ---@field include string
 ---@field exclude string
+---@field path_args string[]
 
 ---@alias LogOptions GitLogOptions|HgLogOptions
 
