@@ -33,6 +33,8 @@ Diffviews are automatically updated:
 
 Updates are not run unless the current tabpage is a Diffview.
 
+------------------------------------------------------------------------------
+
 COMMANDS                                        *diffview-commands*
 
                                                 *:DiffviewOpen*
@@ -539,14 +541,13 @@ win_config                                      *diffview-config-win_config*
             -- Split window, aligned to the bottom of the first window in
             -- the current tabpage:
             win_config = function()
-              local c = {
+              return {
                 type = "split",
                 position = "bottom",
-                relative = "win",
                 height = 14,
+                relative = "win",
+                win = vim.api.nvim_tabpage_list_wins(0)[1],
               }
-              c.win = vim.api.nvim_tabpage_list_wins(0)[1]
-              return c
             end
 
             -- Floating window, centered in the editor:
@@ -759,6 +760,7 @@ keymaps                                         *diffview-config-keymaps*
           { "x", "gf", false },
         }
 <
+------------------------------------------------------------------------------
 
                                                 *diffview-actions*
 Actions ~
@@ -1114,6 +1116,8 @@ actions:
         • |diffview-actions-jumpto_conflict|
         • |diffview-actions-view_windo|
 
+==============================================================================
+
 USER AUTOCOMMANDS                               *diffview-user-autocmds*
 
 For information on how to use User autocommands, see |User|.
@@ -1149,6 +1153,8 @@ For information on how to use User autocommands, see |User|.
                       buffer and the correct diff window as the current window
                       such that |:setlocal| will apply settings to the
                       relevant buffer / window.
+
+==============================================================================
 
 MAPS                                            *diffview-maps*
 

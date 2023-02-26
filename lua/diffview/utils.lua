@@ -18,6 +18,7 @@ local api = vim.api
 local M = {}
 
 ---@class vector<T> : { [integer]: T }
+---@alias falsy false|nil
 
 local mapping_callbacks = {}
 local path_sep = package.config:sub(1, 1)

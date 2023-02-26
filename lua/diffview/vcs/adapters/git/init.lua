@@ -64,7 +64,7 @@ function M.get_repo_paths(path_args, cpath)
   local top_indicators = {}
 
   for _, path_arg in ipairs(path_args) do
-    for _, path in ipairs(pl:vim_expand(path_arg, false, true)) do
+    for _, path in ipairs(pl:vim_expand(path_arg, false, true) --[[@as string[] ]]) do
       local magic, pattern = M.pathspec_split(path)
       pattern = pl:readlink(pattern) or pattern
       table.insert(paths, magic .. pattern)
