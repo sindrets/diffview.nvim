@@ -30,9 +30,19 @@ local GitAdapter = oop.create_class("GitAdapter", VCSAdapter)
 
 GitAdapter.Rev = GitRev
 GitAdapter.config_key = "git"
+GitAdapter.bootstrap = {
+  done = false,
+  ok = false,
+  version = {},
+  target_version = {
+    major = 2,
+    minor = 31,
+    patch = 0,
+  }
+}
 
 ---@return string, string
-function M.pathspec_split(pathspec)
+function GitAdapter.pathspec_split(pathspec)
   local magic = utils.str_match(pathspec, {
     "^:[/!^]+:?",
     "^:%b()",
@@ -42,30 +52,73 @@ function M.pathspec_split(pathspec)
   return magic or "", pattern or ""
 end
 
-function M.pathspec_expand(toplevel, cwd, pathspec)
-  local magic, pattern = M.pathspec_split(pathspec)
+function GitAdapter.pathspec_expand(toplevel, cwd, pathspec)
+  local magic, pattern = GitAdapter.pathspec_split(pathspec)
   if not utils.path:is_abs(pattern) then
     pattern = utils.path:join(utils.path:relative(cwd, toplevel), pattern)
   end
   return magic .. utils.path:convert(pattern)
 end
 
-function M.pathspec_modify(pathspec, mods)
-  local magic, pattern = M.pathspec_split(pathspec)
+function GitAdapter.pathspec_modify(pathspec, mods)
+  local magic, pattern = GitAdapter.pathspec_split(pathspec)
   return magic .. utils.path:vim_fnamemodify(pattern, mods)
+end
+
+function GitAdapter.run_bootstrap()
+  local git_cmd = config.get_config().git_cmd
+  local bs = GitAdapter.bootstrap
+  bs.done = true
+
+  local function err(msg)
+    if msg then
+      bs.err = msg
+      logger.error("[GitAdapter] " .. bs.err)
+    end
+  end
+
+  if vim.fn.executable(git_cmd[1]) ~= 1 then
+    return err(("Configured `git_cmd` is not executable: '%s'"):format(git_cmd[1]))
+  end
+
+  local out = utils.system_list(vim.tbl_flatten({ git_cmd, "version" }))
+  bs.version_string = out[1] and out[1]:match("git version (%S+)") or nil
+
+  if not bs.version_string then
+    return err("Could not get Git version!")
+  end
+
+  -- Parse version string
+  local v, target = bs.version, bs.target_version
+  bs.target_version_string = ("%d.%d.%d"):format(target.major, target.minor, target.patch)
+  local parts = vim.split(bs.version_string, "%.")
+  v.major = tonumber(parts[1])
+  v.minor = tonumber(parts[2])
+  v.patch = tonumber(parts[3]) or 0
+
+  if not (v.major > target.major or v.minor > target.minor or v.patch >= target.patch) then
+    return err(string.format(
+      "Git version is outdated! Some functionality might not work as expected, "
+        .. "or not at all! Current: %s, wanted: %s",
+      bs.version_string,
+      bs.target_version_string
+    ))
+  end
+
+  bs.ok = true
 end
 
 ---@param path_args string[] # Raw path args
 ---@param cpath string? # Cwd path given by the `-C` flag option
 ---@return string[] path_args # Resolved path args
 ---@return string[] top_indicators # Top-level indicators
-function M.get_repo_paths(path_args, cpath)
+function GitAdapter.get_repo_paths(path_args, cpath)
   local paths = {}
   local top_indicators = {}
 
   for _, path_arg in ipairs(path_args) do
     for _, path in ipairs(pl:vim_expand(path_arg, false, true) --[[@as string[] ]]) do
-      local magic, pattern = M.pathspec_split(path)
+      local magic, pattern = GitAdapter.pathspec_split(path)
       pattern = pl:readlink(pattern) or pattern
       table.insert(paths, magic .. pattern)
     end
@@ -75,7 +128,7 @@ function M.get_repo_paths(path_args, cpath)
   cfile = pl:readlink(cfile) or cfile
 
   for _, path in ipairs(paths) do
-    if M.pathspec_split(path) == "" then
+    if GitAdapter.pathspec_split(path) == "" then
       table.insert(top_indicators, pl:absolute(path, cpath))
       break
     end
@@ -113,7 +166,7 @@ end
 ---@param top_indicators string[] A list of paths that might indicate what working tree we are in.
 ---@return string? err
 ---@return string toplevel # as an absolute path
-function M.find_toplevel(top_indicators)
+function GitAdapter.find_toplevel(top_indicators)
   local toplevel
   for _, p in ipairs(top_indicators) do
     if not pl:is_dir(p) then
@@ -142,7 +195,7 @@ end
 ---@param cpath string?
 ---@return string? err
 ---@return GitAdapter
-function M.create(toplevel, path_args, cpath)
+function GitAdapter.create(toplevel, path_args, cpath)
   local err
   local adapter = GitAdapter({
     toplevel = toplevel,
@@ -170,71 +223,17 @@ function GitAdapter:init(opt)
   opt = opt or {}
   GitAdapter:super().init(self, opt)
 
-  self.bootstrap.target_version = {
-    major = 2,
-    minor = 31,
-    patch = 0,
-  }
-
   local cwd = opt.cpath or vim.loop.cwd()
 
   self.ctx = {
     toplevel = opt.toplevel,
     dir = self:get_dir(opt.toplevel),
     path_args = vim.tbl_map(function(pathspec)
-      return M.pathspec_expand(opt.toplevel, cwd, pathspec)
+      return GitAdapter.pathspec_expand(opt.toplevel, cwd, pathspec)
     end, opt.path_args or {}) --[[@as string[] ]]
   }
 
   self:init_completion()
-end
-
-function GitAdapter:run_bootstrap()
-  local msg
-  self.bootstrap.done = true
-
-  local out, code = utils.system_list(vim.tbl_flatten({ config.get_config().git_cmd, "version" }))
-  if code ~= 0 or not out[1] then
-    msg = "Could not run `git_cmd`!"
-    logger.error(msg)
-    utils.err(msg)
-    return
-  end
-
-  self.bootstrap.version_string = out[1]:match("git version (%S+)")
-
-  if not self.bootstrap.version_string then
-    msg = "Could not get git version!"
-    logger.error(msg)
-    utils.err(msg)
-    return
-  end
-
-  -- Parse git version
-  local v, target = self.bootstrap.version, self.bootstrap.target_version
-  self.bootstrap.target_version_string = ("%d.%d.%d"):format(target.major, target.minor, target.patch)
-  local parts = vim.split(self.bootstrap.version_string, "%.")
-  v.major = tonumber(parts[1])
-  v.minor = tonumber(parts[2])
-  v.patch = tonumber(parts[3]) or 0
-
-  local vs = ("%08d%08d%08d"):format(v.major, v.minor, v.patch)
-  local ts = ("%08d%08d%08d"):format(target.major, target.minor, target.patch)
-
-  if vs < ts then
-    msg = (
-      "Git version is outdated! Some functionality might not work as expected, "
-      .. "or not at all! Target: %s, current: %s"
-    ):format(
-      self.bootstrap.target_version_string,
-      self.bootstrap.version_string
-    )
-    logger.error(msg)
-    utils.err(msg)
-    return
-  end
-
-  self.bootstrap.ok = true
 end
 
 function GitAdapter:get_command()
@@ -1713,7 +1712,7 @@ GitAdapter.flags = {
       completion = function(_)
         ---@param ctx CmdLineContext
         return function(ctx)
-          return M.line_trace_candidates(ctx.arg_lead)
+          return GitAdapter.line_trace_candidates(ctx.arg_lead)
         end
       end,
     }),
@@ -1772,7 +1771,7 @@ end
 -- Completion
 
 function GitAdapter:path_candidates(arg_lead)
-  local magic, pattern = M.pathspec_split(arg_lead)
+  local magic, pattern = GitAdapter.pathspec_split(arg_lead)
 
   return vim.tbl_map(function(v)
     return magic .. v
@@ -1833,7 +1832,7 @@ end
 ---Completion for the git-log `-L` flag.
 ---@param arg_lead string
 ---@return string[]?
-function M.line_trace_candidates(arg_lead)
+function GitAdapter.line_trace_candidates(arg_lead)
   local range_end = arg_lead:match(".*:()")
 
   if not range_end then
@@ -1879,7 +1878,7 @@ function GitAdapter:init_completion()
   self.comp.file_history:put({ "--reverse" })
   self.comp.file_history:put({ "--max-count", "-n" }, {})
   self.comp.file_history:put({ "-L" }, function (_, arg_lead)
-    return M.line_trace_candidates(arg_lead)
+    return GitAdapter.line_trace_candidates(arg_lead)
   end)
   self.comp.file_history:put({ "--diff-merges" }, {
     "off",

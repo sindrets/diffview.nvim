@@ -27,8 +27,62 @@ local HgAdapter = oop.create_class('HgAdapter', VCSAdapter)
 
 HgAdapter.Rev = HgRev
 HgAdapter.config_key = "hg"
+HgAdapter.bootstrap = {
+  done = false,
+  ok = false,
+  version = {},
+  -- TODO(zegervdv): Determine appropriate target version
+  target_version = {
+    major = 0,
+    minor = 0,
+    patch = 0,
+  }
+}
 
-function M.get_repo_paths(path_args, cpath)
+function HgAdapter.run_bootstrap()
+  local hg_cmd = config.get_config().hg_cmd
+  local bs = HgAdapter.bootstrap
+  bs.done = true
+
+  local function err(msg)
+    if msg then
+      bs.err = msg
+      logger.error("[HgAdapter] " .. bs.err)
+    end
+  end
+
+  if vim.fn.executable(hg_cmd[1]) ~= 1 then
+    return err(("Configured `hg_cmd` is not executable: '%s'"):format(hg_cmd[1]))
+  end
+
+  local out = utils.system_list(vim.tbl_flatten({ hg_cmd, "version" }))
+  bs.version_string = out[1] and out[1]:match("Mercurial .*%(version (%S+)%)") or nil
+
+  if not bs.version_string then
+    return err("Could not get Mercurial version!")
+  end
+
+  -- Parse version string
+  local v, target = bs.version, bs.target_version
+  bs.target_version_string = ("%d.%d.%d"):format(target.major, target.minor, target.patch)
+  local parts = vim.split(bs.version_string, "%.")
+  v.major = tonumber(parts[1])
+  v.minor = tonumber(parts[2])
+  v.patch = tonumber(parts[3]) or 0
+
+  if not (v.major > target.major or v.minor > target.minor or v.patch >= target.patch) then
+    return err(string.format(
+      "Mercurial version is outdated! Some functionality might not work as expected, "
+        .. "or not at all! Current: %s, wanted: %s",
+      bs.version_string,
+      bs.target_version_string
+    ))
+  end
+
+  bs.ok = true
+end
+
+function HgAdapter.get_repo_paths(path_args, cpath)
   local paths = {}
   local top_indicators = {}
 
@@ -71,7 +125,7 @@ local function get_toplevel(path)
   return out[1] and vim.trim(out[1])
 end
 
-function M.find_toplevel(top_indicators)
+function HgAdapter.find_toplevel(top_indicators)
   local toplevel
 
   for _, p in ipairs(top_indicators) do
@@ -101,7 +155,7 @@ end
 ---@param cpath string?
 ---@return string? err
 ---@return HgAdapter
-function M.create(toplevel, path_args, cpath)
+function HgAdapter.create(toplevel, path_args, cpath)
   local err
   local adapter = HgAdapter({
     toplevel = toplevel,
