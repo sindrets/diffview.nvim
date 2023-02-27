@@ -1194,8 +1194,8 @@ tabpage.
                                                 *diffview-maps-select_prev_entry*
 <S-Tab>                 Open the diff for the previous file.
 
-                                                *diffview-maps-goto_file*
-gf                      Open the local version of the file in a new split in a
+                                                *diffview-maps-goto_file_edit*
+gf                      Open the local version of the file in a
                         different tabpage. This will target your previous
                         (last accessed) tabpage first. If you have no
                         non-diffview tabpages open, the file will open in a
