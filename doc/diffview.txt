@@ -503,7 +503,7 @@ win_config                                      *diffview-config-win_config*
                 `"left"|"right"`.
 
             {height} (integer)
-                The width of the window (in character cells). If `type` is
+                The height of the window (in character cells). If `type` is
                 `"split"` then this is only applicable when `position` is
                 `"top"|"bottom"`.
 
