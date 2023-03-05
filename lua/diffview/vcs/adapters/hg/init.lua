@@ -224,13 +224,13 @@ function HgAdapter:get_merge_context()
   for _, commit in ipairs(data[1].commits) do
     if commit.name == "other" then
       ret.theirs = { hash = commit.node }
-      out, code = self:exec_sync({ "log", "--template={branch}", "--rev", commit.node })
+      out, code = self:exec_sync({ "log", "--template={branch}", "--rev", commit.node }, self.ctx.toplevel)
       if code == 0 then
         ret.theirs.ref_names = out[1]
       end
     elseif commit.name == "local" then
       ret.ours = { hash = commit.node }
-      out, code = self:exec_sync({ "log", "--template={branch}", "--rev", commit.node })
+      out, code = self:exec_sync({ "log", "--template={branch}", "--rev", commit.node }, self.ctx.toplevel)
       if code == 0 then
         ret.ours.ref_names = out[1]
       end
