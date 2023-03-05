@@ -93,10 +93,21 @@ function GitAdapter.run_bootstrap()
   bs.target_version_string = ("%d.%d.%d"):format(target.major, target.minor, target.patch)
   local parts = vim.split(bs.version_string, "%.")
   v.major = tonumber(parts[1])
-  v.minor = tonumber(parts[2])
+  v.minor = tonumber(parts[2]) or 0
   v.patch = tonumber(parts[3]) or 0
 
-  if not (v.major > target.major or v.minor > target.minor or v.patch >= target.patch) then
+  local version_ok = (function()
+    if v.major < target.major then
+      return false
+    elseif v.minor < target.minor then
+      return false
+    elseif v.patch < target.patch then
+      return false
+    end
+    return true
+  end)()
+
+  if not version_ok then
     return err(string.format(
       "Git version is outdated! Some functionality might not work as expected, "
         .. "or not at all! Current: %s, wanted: %s",
