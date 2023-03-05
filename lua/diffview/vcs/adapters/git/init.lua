@@ -284,7 +284,7 @@ end
 function GitAdapter:get_merge_context()
   local their_head
 
-  for _, name in ipairs({ "MERGE_HEAD", "REBASE_HEAD", "REVERT_HEAD" }) do
+  for _, name in ipairs({ "MERGE_HEAD", "REBASE_HEAD", "REVERT_HEAD", "CHERRY_PICK_HEAD" }) do
     if pl:readable(pl:join(self.ctx.dir, name)) then
       their_head = name
       break
