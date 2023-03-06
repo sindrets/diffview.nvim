@@ -336,7 +336,7 @@ git_cmd                                         *diffview-config-git_cmd*
         the plugin. The first element should be the Git binary. The subsequent
         elements are passed as arguments.
 
-hg_cmd                                         *diffview-config-hg_cmd*
+hg_cmd                                          *diffview-config-hg_cmd*
         Type: `string[]`, Default: `{ "hg" }`
 
         This table forms the first part of all Mercurial commands used
@@ -844,10 +844,14 @@ close                                           *diffview-actions-close*
         Close the subject of the context.
 
 close_all_folds                                 *diffview-actions-close_all_folds*
-        Contexts: `file_history_panel`
+        Contexts: `file_panel`, `file_history_panel`
 
-        If the FileHistoryView is showing history for multiple files: close
-        all the folds in the panel.
+        Collapse all folds in the context.
+
+close_fold                                      *diffview-actions-close_fold*
+        Contexts: `file_panel`, `file_history_panel`
+
+        Collapse the fold of the subject.
 
 conflict_choose({version})                      *diffview-actions-conflict_choose*
         Contexts: `merge_tool`
@@ -975,16 +979,20 @@ next_entry                                      *diffview-actions-next_entry*
         Bring the cursor in the subject panel to the next entry.
 
 open_all_folds                                  *diffview-actions-open_all_folds*
-        Contexts: `file_history_panel`
+        Contexts: `file_panel`, `file_history_panel`
 
-        If the FileHistoryView is showing history for multiple files: open
-        all the folds in the panel.
+        Expand all folds in the context.
 
 open_commit_log                                 *diffview-actions-open_commit_log*
         Contexts: `view`, `file_panel`, `file_history_panel`
 
         Open a panel showing the full commit description of the subject's
         target commit range.
+
+open_fold                                       *diffview-actions-open_fold*
+        Contexts: `file_panel`, `file_history_panel`
+
+        Expand the fold of the subject.
 
 open_in_diffview                                *diffview-actions-open_in_diffview*
         Contexts: `file_history_view`, `file_history_panel`
@@ -1073,6 +1081,11 @@ toggle_flatten_dirs                             *diffview-actions-toggle_flatten
 
         Toggle whether or not to flatten empty subdirectories in the file tree
         listing style.
+
+toggle_fold                                     *diffview-actions-toggle_fold*
+        Contexts: `file_panel`, `file_history_panel`
+
+        Collapse / expand the fold of the subject.
 
 toggle_stage_entry                              *diffview-actions-toggle_stage_entry*
         Contexts: `diff_view`, `file_panel`

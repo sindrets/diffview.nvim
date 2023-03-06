@@ -165,6 +165,21 @@ return function(view)
         view.panel:redraw()
       end
     end,
+    open_fold = function()
+      if view.panel.single_file or not view.panel:is_focused() then return end
+      local entry = view.panel:get_log_entry_at_cursor()
+      if entry then view.panel:set_entry_fold(entry, true) end
+    end,
+    close_fold = function()
+      if view.panel.single_file or not view.panel:is_focused() then return end
+      local entry = view.panel:get_log_entry_at_cursor()
+      if entry then view.panel:set_entry_fold(entry, false) end
+    end,
+    toggle_fold = function()
+      if view.panel.single_file or not view.panel:is_focused() then return end
+      local entry = view.panel:get_log_entry_at_cursor()
+      if entry then view.panel:toggle_entry_fold(entry) end
+    end,
     close = function()
       if view.panel.option_panel:is_focused() then
         view.panel.option_panel:close()

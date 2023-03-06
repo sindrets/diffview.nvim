@@ -370,18 +370,27 @@ function FilePanel:reconstrain_cursor()
   })
 end
 
+---@param item DirData|any
+---@param open boolean
 function FilePanel:set_item_fold(item, open)
-  if open == item.collapsed then
+  if type(item.collapsed) == "boolean" and open == item.collapsed then
     item.collapsed = not open
     self:render()
     self:redraw()
+
+    if item.collapsed then
+      self.components.comp:deep_some(function(comp, _, _)
+        if comp.context == item then
+          utils.set_cursor(self.winid, comp.lstart + 1)
+          return true
+        end
+      end)
+    end
   end
 end
 
 function FilePanel:toggle_item_fold(item)
-  item.collapsed = not item.collapsed
-  self:render()
-  self:redraw()
+  self:set_item_fold(item, item.collapsed)
 end
 
 function FilePanel:render()

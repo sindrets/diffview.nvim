@@ -508,20 +508,29 @@ function FileHistoryPanel:highlight_next_file()
   utils.update_win(self.winid)
 end
 
+---@param entry LogEntry
+---@param open boolean
 function FileHistoryPanel:set_entry_fold(entry, open)
   if not self.single_file and open == entry.folded then
     entry.folded = not open
     self:render()
     self:redraw()
+
+    if entry.folded then
+      -- Set the cursor at the top of the log entry
+      self.components.log.entries.comp:some(function(comp, _, _)
+        if comp.context == entry then
+          utils.set_cursor(self.winid, comp.lstart + 1)
+          return true
+        end
+      end)
+    end
   end
 end
 
+---@param entry LogEntry
 function FileHistoryPanel:toggle_entry_fold(entry)
-  if not self.single_file then
-    entry.folded = not entry.folded
-    self:render()
-    self:redraw()
-  end
+  self:set_entry_fold(entry, entry.folded)
 end
 
 function FileHistoryPanel:render()
