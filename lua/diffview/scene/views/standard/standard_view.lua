@@ -45,7 +45,7 @@ function StandardView:init(opt)
     diff4 = { a = {}, b = {}, c = {}, d = {} },
   }
 
-  self.emitter:on("post_layout", utils.wrap_call(self.post_layout, self))
+  self.emitter:on("post_layout", utils.bind(self.post_layout, self))
 end
 
 ---@override

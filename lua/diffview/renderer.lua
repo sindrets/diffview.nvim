@@ -199,6 +199,7 @@ function RenderComponent:destroy()
   self.components = nil
 end
 
+---@param line integer
 ---@return RenderComponent?
 function RenderComponent:get_comp_on_line(line)
   line = line - 1
@@ -222,7 +223,7 @@ function RenderComponent:get_comp_on_line(line)
   return recurse(self)
 end
 
----@param callback function(comp: RenderComponent, i: integer, parent: RenderComponent)
+---@param callback fun(comp: RenderComponent, i: integer, parent: RenderComponent): boolean?
 function RenderComponent:some(callback)
   for i, child in ipairs(self.components) do
     if callback(child, i, self) then
@@ -231,6 +232,7 @@ function RenderComponent:some(callback)
   end
 end
 
+---@param callback fun(comp: RenderComponent, i: integer, parent: RenderComponent): boolean?
 function RenderComponent:deep_some(callback)
   local function wrap(comp, i, parent)
     if callback(comp, i, parent) then
@@ -373,7 +375,7 @@ function M.destroy_comp_struct(schema)
   end
 end
 
----Create a function to enable easily contraining the cursor to a given list of
+---Create a function to enable easily constraining the cursor to a given list of
 ---components.
 ---@param components RenderComponent[]
 function M.create_cursor_constraint(components)

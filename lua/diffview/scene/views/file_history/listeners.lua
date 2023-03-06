@@ -93,7 +93,7 @@ return function(view)
             if view.panel.single_file then
               view:set_file(item.files[1], false)
             else
-              view.panel:toggle_entry_fold(item)
+              view.panel:toggle_entry_fold(item --[[@as LogEntry ]])
             end
           else
             view:set_file(item, false)
@@ -114,7 +114,7 @@ return function(view)
             if view.panel.single_file then
               view:set_file(item.files[1], true)
             else
-              view.panel:toggle_entry_fold(item)
+              view.panel:toggle_entry_fold(item --[[@as LogEntry ]])
             end
           else
             view:set_file(item, true)

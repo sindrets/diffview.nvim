@@ -602,9 +602,6 @@ function M.tbl_clone(t)
 end
 
 function M.tbl_deep_clone(t)
-  if not t then
-    return
-  end
   local clone = {}
 
   for k, v in pairs(t) do
@@ -688,6 +685,44 @@ function M.tbl_deep_union_extend(t, ...)
   end
 
   return res
+end
+
+function M.tbl_merge(t, ...)
+  local ret = M.tbl_clone(t)
+
+  for _, theirs in ipairs({...}) do
+    for k, v in pairs(theirs) do
+      if type(k) == "number" and k % 1 == 0 then
+        table.insert(ret, v)
+      else
+        ret[k] = v
+      end
+    end
+  end
+
+  return ret
+end
+
+function M.tbl_deep_merge(t, ...)
+  local ret = {}
+
+  for _, theirs in ipairs({ t, ... }) do
+    for k, v in pairs(theirs) do
+      if type(v) == "table" then
+        if type(ret[k]) == "table" then
+          ret[k] = M.tbl_deep_merge(ret[k], v)
+        else
+          ret[k] = M.tbl_deep_clone(v)
+        end
+      elseif type(k) == "number" and k % 1 == 0 then
+        table.insert(ret, v)
+      else
+        ret[k] = v
+      end
+    end
+  end
+
+  return ret
 end
 
 ---Perform a map and also filter out index values that would become `nil`.
@@ -1286,12 +1321,12 @@ end
 
 ---@param func function
 ---@param ... any
----@return function
-function M.wrap_call(func, ...)
+---@return fun(...): unknown
+function M.bind(func, ...)
   local args = M.tbl_pack(...)
 
-  return function()
-    func(M.tbl_unpack(args))
+  return function(...)
+    return func(M.tbl_unpack(args), ...)
   end
 end
 

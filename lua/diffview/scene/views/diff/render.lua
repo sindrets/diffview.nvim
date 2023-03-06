@@ -73,11 +73,20 @@ local function render_file_tree_recurse(depth, comp)
     render_file(comp, false, depth)
     return
   end
-  if comp.name ~= "wrapper" then return end
+
+  if comp.name ~= "directory" then return end
+
+  -- Directory component structure:
+  -- {
+  --   name = "directory",
+  --   context = <DirData>,
+  --   { name = "dir_name" },
+  --   { name = "items", ...<files> },
+  -- }
 
   local dir = comp.components[1]
-  ---@type table
-  local ctx = dir.context
+  local items = comp.components[2]
+  local ctx = comp.context --[[@as DirData ]]
 
   dir:add_text(
     get_dir_status_text(ctx, conf.file_panel.tree_options) .. " ",
@@ -97,8 +106,8 @@ local function render_file_tree_recurse(depth, comp)
   dir:ln()
 
   if not ctx.collapsed then
-    for i = 2, #comp.components do
-      render_file_tree_recurse(depth + 1, comp.components[i])
+    for _, item in ipairs(items.components) do
+      render_file_tree_recurse(depth + 1, item)
     end
   end
 end
