@@ -464,5 +464,6 @@ git object database, and a command is echoed that shows how to undo the change.
   diff-mode?**
   - A: Change your `:h 'fillchars'`:
     - (vimscript): `set fillchars+=diff:╱`
+    - (Lua): `vim.opt.fillchars:append { diff = "╱" }`
   - Note: whether or not the diagonal lines will line up nicely will depend on
     your terminal emulator. The terminal used in the screenshots is Kitty.
