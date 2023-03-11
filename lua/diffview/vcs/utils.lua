@@ -267,18 +267,19 @@ function M.parse_conflicts(lines, winid)
   end
 
   local function handle(data)
-    local first = math.huge
-    local last = -1
-
-    first = math.min(data.ours.first or math.huge, first)
-    first = math.min(data.base.first or math.huge, first)
-    first = math.min(data.theirs.first or math.huge, first)
+    local first = math.min(
+     data.ours.first or math.huge,
+     data.base.first or math.huge,
+     data.theirs.first or math.huge
+    )
 
     if first == math.huge then return end
 
-    last = math.max(data.ours.last or -1, -1)
-    last = math.max(data.base.last or -1, -1)
-    last = math.max(data.theirs.last or -1, -1)
+    local last = math.max(
+      data.ours.last or -1,
+      data.base.last or -1,
+      data.theirs.last or -1
+    )
 
     if last == -1 then return end
 
