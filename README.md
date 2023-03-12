@@ -22,6 +22,8 @@ for any git rev.
 
 ## Installation
 
+[![LuaRocks](https://img.shields.io/luarocks/v/sindrets/diffview.nvim?logo=lua&color=purple)](https://luarocks.org/modules/sindrets/diffview.nvim)
+
 Install the plugin with your package manager of choice.
 
 ```vim
