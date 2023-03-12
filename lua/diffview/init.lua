@@ -5,6 +5,7 @@ end
 local hl = require("diffview.hl")
 local lazy = require("diffview.lazy")
 
+local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
 local arg_parser = lazy.require("diffview.arg_parser") ---@module "diffview.arg_parser"
 local config = lazy.require("diffview.config") ---@module "diffview.config"
 local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
@@ -73,6 +74,18 @@ function M.init()
     pattern = "FugitiveChanged",
     callback = function(_)
       M.emit("refresh_files")
+    end,
+  })
+  au("User", {
+    group = M.augroup,
+    pattern = "GitSignsUpdate",
+    callback = function()
+      local view = lib.get_current_view()
+
+      if view and view:instanceof(StandardView.__get()) then
+        ---@cast view StandardView
+        view.cur_layout:gs_update_folds()
+      end
     end,
   })
 

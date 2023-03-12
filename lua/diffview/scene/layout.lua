@@ -8,6 +8,7 @@ local api = vim.api
 local M = {}
 
 ---@class Layout : diffview.Object
+---@field parent FileEntry
 ---@field windows Window[]
 ---@field emitter EventEmitter
 ---@field pivot_producer fun(): integer?
@@ -16,6 +17,7 @@ local Layout = oop.create_class("Layout")
 
 function Layout:init(opt)
   opt = opt or {}
+  self.parent = opt.parent
   self.windows = opt.windows or {}
   self.emitter = opt.emitter or EventEmitter()
 
@@ -321,6 +323,8 @@ function Layout:sync_scroll()
     end)
   end
 end
+
+function Layout:gs_update_folds() end
 
 M.Layout = Layout
 return M

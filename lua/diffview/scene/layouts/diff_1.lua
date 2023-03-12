@@ -1,5 +1,5 @@
-local lazy = require("diffview.lazy")
 local Layout = require("diffview.scene.layout").Layout
+local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
 local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3") ---@type Diff3|LazyModule

@@ -123,6 +123,7 @@ function FileEntry:convert_layout(target_layout)
   end
 
   self.layout = target_layout({
+    parent = self,
     a = utils.tbl_access(self.layout, "a.file") or create_file(self.revs.a, "a"),
     b = utils.tbl_access(self.layout, "b.file") or create_file(self.revs.b, "b"),
     c = utils.tbl_access(self.layout, "c.file") or create_file(self.revs.c, "c"),
@@ -243,7 +244,7 @@ function FileEntry.with_layout(layout_class, opt)
     }) --[[@as vcs.File ]]
   end
 
-  return FileEntry({
+  local entry = FileEntry({
     adapter = opt.adapter,
     path = opt.path,
     oldpath = opt.oldpath,
@@ -252,13 +253,17 @@ function FileEntry.with_layout(layout_class, opt)
     kind = opt.kind,
     commit = opt.commit,
     revs = opt.revs,
-    layout = layout_class({
-      a = create_file(opt.revs.a, "a"),
-      b = create_file(opt.revs.b, "b"),
-      c = create_file(opt.revs.c, "c"),
-      d = create_file(opt.revs.d, "d"),
-    }),
   })
+
+  entry.layout = layout_class({
+    parent = entry,
+    a = create_file(opt.revs.a, "a"),
+    b = create_file(opt.revs.b, "b"),
+    c = create_file(opt.revs.c, "c"),
+    d = create_file(opt.revs.d, "d"),
+  })
+
+  return entry
 end
 
 M.FileEntry = FileEntry
