@@ -48,7 +48,7 @@ function M.check()
     end
   end
 
-  health.report_start("Checking external dependencies")
+  health.report_start("Checking VCS tools")
 
   ;(function()
     if missing_essential then
@@ -56,6 +56,9 @@ function M.check()
       return
     end
 
+    health.report_info("The plugin requires at least one of the supported VCS tools to be valid.")
+
+    local has_valid_adapter = false
     local adapter_kinds = {
       { class = require("diffview.vcs.adapters.git").GitAdapter, name = "Git" },
       { class = require("diffview.vcs.adapters.hg").HgAdapter, name = "Mercurial" },
@@ -71,9 +74,14 @@ function M.check()
 
       if bs.ok then
         health.report_ok(("%s is up-to-date. (%s)"):format(kind.name, bs.version_string))
+        has_valid_adapter = true
       else
-        health.report_error(bs.err or (kind.name .. ": Unknown error"))
+        health.report_warn(bs.err or (kind.name .. ": Unknown error"))
       end
+    end
+
+    if not has_valid_adapter then
+      health.report_error("No valid VCS tool was found!")
     end
   end)()
 end
