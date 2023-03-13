@@ -41,15 +41,17 @@ return function(view)
         end
       end
     end,
-    diff_buf_read = function(_)
-      utils.set_cursor(0, 1, 0)
+    file_open_new = function(_, entry)
+      api.nvim_win_call(view.cur_layout:get_main_win().id, function()
+        utils.set_cursor(0, 1, 0)
 
-      if view.cur_layout:get_main_win().id == api.nvim_get_current_win() then
         if view.cur_entry and view.cur_entry.kind == "conflicting" then
           actions.next_conflict()
           vim.cmd("norm! zz")
         end
-      end
+      end)
+
+      view.cur_layout:sync_scroll()
     end,
     ---@diagnostic disable-next-line: unused-local
     files_updated = function(_, files)

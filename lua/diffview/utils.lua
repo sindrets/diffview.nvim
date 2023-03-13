@@ -631,7 +631,7 @@ end
 
 ---Try property access.
 ---@param t table
----@param table_path string|string[] Either a `.` separated string of table keys, or a list.
+---@param table_path string|any[] Either a `.` separated string of table keys, or a list.
 ---@return any?
 function M.tbl_access(t, table_path)
   local keys = type(table_path) == "table"
@@ -748,9 +748,11 @@ end
 
 ---Set a value in a table, creating all missing intermediate tables in the
 ---table path.
+---@generic T
 ---@param t table
----@param table_path string|string[] Either a `.` separated string of table keys, or a list.
----@param value any
+---@param table_path string|any[] Either a `.` separated string of table keys, or a list.
+---@param value T
+---@return T
 function M.tbl_set(t, table_path, value)
   local keys = type(table_path) == "table"
       and table_path
@@ -769,19 +771,26 @@ function M.tbl_set(t, table_path, value)
   end
 
   cur[keys[#keys]] = value
+
+  return value
 end
 
----Ensure that the table path is a table in `t`.
+---Ensure that the table path is a table in `t`. Also returns the table.
 ---@param t table
----@param table_path string|string[] Either a `.` separated string of table keys, or a list.
+---@param table_path string|any[] Either a `.` separated string of table keys, or a list.
+---@return table
 function M.tbl_ensure(t, table_path)
   local keys = type(table_path) == "table"
       and table_path
       or vim.split(table_path, ".", { plain = true })
 
-  if not M.tbl_access(t, keys) then
-    M.tbl_set(t, keys, {})
+  local ret = M.tbl_access(t, keys)
+  if not ret then
+    ret = {}
+    M.tbl_set(t, keys, ret)
   end
+
+  return ret
 end
 
 ---Create a shallow copy of a portion of a vector. Negative numbers indexes
@@ -1319,8 +1328,9 @@ function M.temp_win(bufnr, enter)
   })
 end
 
+---Create a copy of `func` bound to the given arguments.
 ---@param func function
----@param ... any
+---@param ... any Arguments to prepend to arguments provided to the bound function when invoking `func`.
 ---@return fun(...): unknown
 function M.bind(func, ...)
   local args = M.tbl_pack(...)

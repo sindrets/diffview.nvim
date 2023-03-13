@@ -93,7 +93,28 @@ function FileHistoryView:_set_file(file)
   self.nulled = false
 
   file.layout.emitter:once("files_opened", function()
+    local log_options = self.panel:get_log_options()
+
+    if log_options.L and next(log_options.L) then
+      local log_entry = self.panel.cur_item[1]
+      local diff = log_entry:get_diff(file.path)
+
+      if diff then
+        file:update_patch_folds(diff)
+
+        for _, win in ipairs(self.cur_layout.windows) do
+          win:use_winopts({ foldmethod = "manual" })
+          win:apply_custom_folds()
+        end
+      end
+    end
+
     self.emitter:emit("file_open_post", file, cur_entry)
+
+    if not self.cur_entry.opened then
+      self.cur_entry.opened = true
+      DiffviewGlobal.emitter:emit("file_open_new", file)
+    end
   end)
 
   self:use_entry(file)

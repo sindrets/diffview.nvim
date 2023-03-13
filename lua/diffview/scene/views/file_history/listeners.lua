@@ -27,33 +27,9 @@ return function(view)
         end
       end
     end,
-    diff_buf_read = function(_, bufnr)
-      -- Set the cursor at the beginning of the -L range if possible.
-
-      local log_options = view.panel:get_log_options()
-      local cur = view.panel:cur_file()
-
-      if log_options.L and log_options.L[1] and bufnr == cur.layout:get_main_win().file.bufnr then
-        for _, value in ipairs(log_options.L) do
-          local l1, lpath = value:match("^(%d+),.*:(.*)")
-
-          if l1 then
-            l1 = tonumber(l1)
-            lpath = utils.path:chain(lpath)
-                :normalize({ cwd = view.adapter.ctx.toplevel, absolute = true })
-                :relative(view.adapter.ctx.toplevel)
-                :get()
-
-            if lpath == cur.path then
-              utils.set_cursor(0, l1, 0)
-              vim.cmd("norm! zt")
-              break
-            end
-          end
-        end
-      else
-        utils.set_cursor(0, 1, 0)
-      end
+    file_open_new = function(_, entry)
+      utils.set_cursor(view.cur_layout:get_main_win().id, 1, 0)
+      view.cur_layout:sync_scroll()
     end,
     open_in_diffview = function()
       local file = view:infer_cur_file()

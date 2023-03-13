@@ -35,6 +35,7 @@ local M = {}
 ---@field ready boolean
 ---@field winbar string?
 ---@field winopts WindowOptions
+---@field custom_folds? { [1]: integer, [2]: integer }[]
 local File = oop.create_class("vcs.File")
 
 ---@type table<integer, vcs.File.AttachState>

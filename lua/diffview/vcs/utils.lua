@@ -267,6 +267,8 @@ local DIFF_SIMILARITY = [[^similarity index (%d+)%%]]
 local DIFF_INDEX = [[^index (%x-)%.%.(%x-) (%d+)]]
 local DIFF_PATH_OLD = [[^%-%-%- a/(.*)]]
 local DIFF_PATH_NEW = [[^%+%+%+ b/(.*)]]
+local DIFF_PATH_OLD_NULL = [[^%-%-%- (/dev/null)]]
+local DIFF_PATH_NEW_NULL = [[^%+%+%+ (/dev/null)]]
 local DIFF_HUNK_HEADER = [[^@@+ %-(%d+),(%d+) %+(%d+),(%d+) @@+]]
 
 ---@class diff.Hunk
@@ -385,11 +387,14 @@ local function parse_file_diff(scanner)
 
   -- Paths
   local path_old = scanner:peek_line():match(DIFF_PATH_OLD)
+      or scanner:peek_line():match(DIFF_PATH_OLD_NULL)
+
   if path_old then
     if not ret.path_old then
       ret.path_old = path_old
-      scanner:skip_line()
-      ret.path_new = scanner:next_line():match(DIFF_PATH_NEW)
+      scanner:skip_line(2)
+      ret.path_new = scanner:cur_line():match(DIFF_PATH_NEW)
+          or scanner:cur_line():match(DIFF_PATH_NEW_NULL)
     else
       scanner:skip_line(2)
     end
