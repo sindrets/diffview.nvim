@@ -17,6 +17,7 @@ local M = {}
 ---@field ref_names string
 ---@field subject string
 ---@field body string
+---@field diff? diff.FileEntry[]
 local Commit = oop.create_class("Commit")
 
 function Commit:init(opt)
@@ -27,6 +28,7 @@ function Commit:init(opt)
   self.ref_names = opt.ref_names ~= "" and opt.ref_names or nil
   self.subject = opt.subject
   self.body = opt.body
+  self.diff = opt.diff
 end
 
 ---@diagnostic disable: unused-local, missing-return
