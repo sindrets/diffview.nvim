@@ -264,11 +264,9 @@ index 008beab..66116dc 100644
 
 local DIFF_HEADER = [[^diff %-%-git ]]
 local DIFF_SIMILARITY = [[^similarity index (%d+)%%]]
-local DIFF_INDEX = [[^index (%x-)%.%.(%x-) (%d+)]]
-local DIFF_PATH_OLD = [[^%-%-%- a/(.*)]]
-local DIFF_PATH_NEW = [[^%+%+%+ b/(.*)]]
-local DIFF_PATH_OLD_NULL = [[^%-%-%- (/dev/null)]]
-local DIFF_PATH_NEW_NULL = [[^%+%+%+ (/dev/null)]]
+local DIFF_INDEX = { [[^index (%x-)%.%.(%x-) (%d+)]], [[^index (%x-)%.%.(%x-)]] }
+local DIFF_PATH_OLD = { [[^%-%-%- a/(.*)]], [[^%-%-%- (/dev/null)]] }
+local DIFF_PATH_NEW = { [[^%+%+%+ b/(.*)]], [[^%+%+%+ (/dev/null)]] }
 local DIFF_HUNK_HEADER = [[^@@+ %-(%d+),(%d+) %+(%d+),(%d+) @@+]]
 
 ---@class diff.Hunk
@@ -338,11 +336,16 @@ end
 ---@class diff.FileEntry
 ---@field renamed boolean
 ---@field similarity? integer
+---@field dissimilarity? integer
 ---@field index_old? integer
 ---@field index_new? integer
 ---@field mode? integer
----@field path_old string
----@field path_new string
+---@field old_mode? integer
+---@field new_mode? integer
+---@field deleted_file_mode? integer
+---@field new_file_mode? integer
+---@field path_old? string
+---@field path_new? string
 ---@field hunks diff.Hunk[]
 
 ---@param scanner Scanner
@@ -353,50 +356,111 @@ local function parse_file_diff(scanner)
 
   -- The current line will here be the diff header
 
-  -- Renames
-  local similarity = (scanner:peek_line() or ""):match(DIFF_SIMILARITY)
-  if similarity then
-    ret.renamed = true
-    ret.similarity = tonumber(similarity) or -1
-    scanner:skip_line()
-    ret.path_old = scanner:next_line():match("^rename from (.*)")
-    ret.path_new = scanner:next_line():match("^rename to (.*)")
-  end
+  -- Extended git diff headers
+  while scanner:peek_line() and
+    not utils.str_match(scanner:peek_line() or "", { DIFF_HEADER, DIFF_HUNK_HEADER })
+  do
+    -- Extended header lines:
+    -- old mode <mode>
+    -- new mode <mode>
+    -- deleted file mode <mode>
+    -- new file mode <mode>
+    -- copy from <path>
+    -- copy to <path>
+    -- rename from <path>
+    -- rename to <path>
+    -- similarity index <number>
+    -- dissimilarity index <number>
+    -- index <hash>..<hash> <mode>
+    --
+    -- Note: Combined diffs have even more variations
 
-  -- Index
-  local index_old, index_new, mode = (scanner:peek_line() or ""):match(DIFF_INDEX)
-  if index_old then
-    ret.index_old = index_old
-    ret.index_new = index_new
-    ret.mode = mode
-    scanner:next_line()
-  end
+    local last_line_idx = scanner:cur_line_idx()
 
-  -- TODO: Handle all the extended header lines
-  -- old mode <mode>
-  -- new mode <mode>
-  -- deleted file mode <mode>
-  -- new file mode <mode>
-  -- copy from <path>
-  -- copy to <path>
-  -- rename from <path>
-  -- rename to <path>
-  -- similarity index <number>
-  -- dissimilarity index <number>
-  -- index <hash>..<hash> <mode>
+    -- Similarity
+    local similarity = (scanner:peek_line() or ""):match(DIFF_SIMILARITY)
+    if similarity then
+      ret.similarity = tonumber(similarity) or -1
+      scanner:next_line()
+    end
 
-  -- Paths
-  local path_old = scanner:peek_line():match(DIFF_PATH_OLD)
-      or scanner:peek_line():match(DIFF_PATH_OLD_NULL)
+    -- Dissimilarity
+    local dissimilarity = (scanner:peek_line() or ""):match([[^dissimilarity index (%d+)%%]])
+    if dissimilarity then
+      ret.dissimilarity = tonumber(dissimilarity) or -1
+      scanner:next_line()
+    end
 
-  if path_old then
-    if not ret.path_old then
-      ret.path_old = path_old
-      scanner:skip_line(2)
-      ret.path_new = scanner:cur_line():match(DIFF_PATH_NEW)
-          or scanner:cur_line():match(DIFF_PATH_NEW_NULL)
-    else
-      scanner:skip_line(2)
+    -- Renames
+    local rename_from = (scanner:peek_line() or ""):match([[^rename from (.*)]])
+    if rename_from then
+      ret.renamed = true
+      ret.path_old = rename_from
+      scanner:skip_line()
+      ret.path_new = (scanner:next_line() or ""):match([[^rename to (.*)]])
+    end
+
+    -- Copies
+    local copy_from = (scanner:peek_line() or ""):match([[^copy from (.*)]])
+    if copy_from then
+      ret.path_old = copy_from
+      scanner:skip_line()
+      ret.path_new = (scanner:next_line() or ""):match([[^copy to (.*)]])
+    end
+
+    -- Old mode
+    local old_mode = (scanner:peek_line() or ""):match([[^old mode (%d+)]])
+    if old_mode then
+      ret.old_mode = old_mode
+      scanner:next_line()
+    end
+
+    -- New mode
+    local new_mode = (scanner:peek_line() or ""):match([[^new mode (%d+)]])
+    if new_mode then
+      ret.new_mode = new_mode
+      scanner:next_line()
+    end
+
+    -- Deleted file
+    local deleted_file_mode = (scanner:peek_line() or ""):match([[^deleted file mode (%d+)]])
+    if deleted_file_mode then
+      ret.old_file_mode = deleted_file_mode
+      scanner:next_line()
+    end
+
+    -- New file
+    local new_file_mode = (scanner:peek_line() or ""):match([[^new file mode (%d+)]])
+    if new_file_mode then
+      ret.new_file_mode = new_file_mode
+      scanner:next_line()
+    end
+
+    -- Index
+    local index_old, index_new, mode = utils.str_match(scanner:peek_line() or "", DIFF_INDEX)
+    if index_old then
+      ret.index_old = index_old
+      ret.index_new = index_new
+      ret.mode = mode
+      scanner:next_line()
+    end
+
+    -- Paths
+    local path_old = utils.str_match(scanner:peek_line() or "", DIFF_PATH_OLD)
+    if path_old then
+      if not ret.path_old then
+        ret.path_old = path_old ~= "/dev/null" and path_old or nil
+        scanner:skip_line()
+        local path_new = utils.str_match(scanner:next_line() or "", DIFF_PATH_NEW)
+        ret.path_new = path_new ~= "/dev/null" and path_new or nil
+      else
+        scanner:skip_line(2)
+      end
+    end
+
+    if last_line_idx == scanner:cur_line_idx() then
+      -- Non-git patches don't have the extended header lines
+      break
     end
   end
 

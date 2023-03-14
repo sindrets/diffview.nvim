@@ -28,6 +28,10 @@ function Scanner:cur_line()
   return self.lines[self.line_idx]
 end
 
+function Scanner:cur_line_idx()
+  return self.line_idx
+end
+
 ---Advance the scanner to the next line.
 ---@return string?
 function Scanner:next_line()

@@ -95,7 +95,10 @@ function FileHistoryView:_set_file(file)
   file.layout.emitter:once("files_opened", function()
     local log_options = self.panel:get_log_options()
 
-    if log_options.L and next(log_options.L) then
+    -- For line tracing diffs: create custom folds derived from the diff patch
+    -- hunks. Should not be used with custom `++base` as then we won't know
+    -- where to create the custom folds in the base file.
+    if log_options.L and next(log_options.L) and not log_options.base then
       local log_entry = self.panel.cur_item[1]
       local diff = log_entry:get_diff(file.path)
 

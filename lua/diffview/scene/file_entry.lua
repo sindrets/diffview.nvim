@@ -207,6 +207,7 @@ function FileEntry:update_merge_context(ctx)
   end
 end
 
+---Derive custom folds from the hunks in a diff patch.
 ---@param diff diff.FileEntry
 function FileEntry:update_patch_folds(diff)
   if not self.layout:instanceof(Diff2.__get()) then return end
@@ -227,22 +228,36 @@ function FileEntry:update_patch_folds(diff)
     local first_old, last_old, first_new, last_new
 
     if hunk then
-      first_old = hunk.old_row - 1
+      first_old = hunk.old_row
       last_old = first_old + hunk.old_size - 1
-      first_new = hunk.new_row - 1
+      first_new = hunk.new_row
       last_new = first_new + hunk.new_size - 1
     else
-      first_old = lcount_a
-      first_new = lcount_b
+      first_old = lcount_a + 1
+      first_new = lcount_b + 1
     end
 
     if first_old - prev_last_old > 1 then
-      table.insert(folds.a, { prev_last_old, first_old })
+      local prev_fold = folds.a[#folds.a]
+
+      if prev_fold and (prev_last_old + 1) - prev_fold[2] == 1 then
+        -- This fold is right next to the previous: merge the folds
+        prev_fold[2] = first_old - 1
+      else
+        table.insert(folds.a, { prev_last_old + 1, first_old - 1 })
+      end
       -- print("old:", folds.a[#folds.a][1], folds.a[#folds.a][2])
     end
 
     if first_new - prev_last_new > 1 then
-      table.insert(folds.b, { prev_last_new, first_new })
+      local prev_fold = folds.b[#folds.b]
+
+      if prev_fold and (prev_last_new + 1) - prev_fold[2] == 1 then
+        -- This fold is right next to the previous: merge the folds
+        prev_fold[2] = first_new - 1
+      else
+        table.insert(folds.b, { prev_last_new + 1, first_new - 1 })
+      end
       -- print("new:", folds.b[#folds.b][1], folds.b[#folds.b][2])
     end
 
