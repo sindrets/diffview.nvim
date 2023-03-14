@@ -132,6 +132,11 @@ M.defaults = {
       { "n", "<leader>cb", actions.conflict_choose("base"),    { desc = "Choose the BASE version of a conflict" } },
       { "n", "<leader>ca", actions.conflict_choose("all"),     { desc = "Choose all the versions of a conflict" } },
       { "n", "dx",         actions.conflict_choose("none"),    { desc = "Delete the conflict region" } },
+      { "n", "<leader>cO",    actions.conflict_choose_all("ours"),    { desc = "Choose the OURS version of a conflict for the whole file" } },
+      { "n", "<leader>cT",    actions.conflict_choose_all("theirs"),  { desc = "Choose the THEIRS version of a conflict for the whole file" } },
+      { "n", "<leader>cB",    actions.conflict_choose_all("base"),    { desc = "Choose the BASE version of a conflict for the whole file" } },
+      { "n", "<leader>cA",    actions.conflict_choose_all("all"),     { desc = "Choose all the versions of a conflict for the whole file" } },
+      { "n", "dX",            actions.conflict_choose_all("none"),    { desc = "Delete the conflict region for the whole file" } },
     },
     diff1 = {
       -- Mappings in single window diff layouts
@@ -190,11 +195,6 @@ M.defaults = {
       { "n", "[x",            actions.prev_conflict,        { desc = "Go to the previous conflict" } },
       { "n", "]x",            actions.next_conflict,        { desc = "Go to the next conflict" } },
       { "n", "g?",            actions.help("file_panel"),   { desc = "Open the help panel" } },
-      { "n", "<leader>co",    actions.conflict_choose_file("ours"),    { desc = "Choose the OURS version of a conflict" } },
-      { "n", "<leader>ct",    actions.conflict_choose_file("theirs"),  { desc = "Choose the THEIRS version of a conflict" } },
-      { "n", "<leader>cb",    actions.conflict_choose_file("base"),    { desc = "Choose the BASE version of a conflict" } },
-      { "n", "<leader>ca",    actions.conflict_choose_file("all"),     { desc = "Choose all the versions of a conflict" } },
-      { "n", "dx",            actions.conflict_choose_file("none"),    { desc = "Delete the conflict region" } },
     },
     file_history_panel = {
       { "n", "g!",            actions.options,                     { desc = "Open the option panel" } },

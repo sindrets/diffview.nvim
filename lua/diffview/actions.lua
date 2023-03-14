@@ -337,7 +337,7 @@ local function diff_copy_target(kind)
 end
 
 ---@param target "ours"|"theirs"|"base"|"all"|"none"
-function M.conflict_choose_file(target)
+function M.conflict_choose_all(target)
   return function()
     local view = lib.get_current_view()
 
@@ -353,22 +353,16 @@ function M.conflict_choose_file(target)
           main.id
         )
 
-        if conflicts then
+        if next(conflicts) then
           local content
-          local drift_lines = 0
+          local offset = 0
+          local first
+          local last
           for _, cur in pairs(conflicts) do
 
-            print("cur: "..vim.inspect(cur))
-
-            -- add drift of line numbers
-            cur.first = cur.first + drift_lines
-            cur.last = cur.last + drift_lines
-            cur.ours.first = cur.ours.first + drift_lines
-            cur.ours.last = cur.ours.last + drift_lines
-            cur.theirs.first = cur.theirs.first + drift_lines
-            cur.theirs.last = cur.theirs.last + drift_lines
-
-            print("cur with drift: "..vim.inspect(cur))
+            -- add offset to line numbers
+            first = cur.first + offset
+            last = cur.last + offset
 
             if target == "ours" then content = cur.ours.content
             elseif target == "theirs" then content = cur.theirs.content
@@ -381,16 +375,9 @@ function M.conflict_choose_file(target)
               )
             end
 
-            api.nvim_buf_set_lines(curfile.bufnr, cur.first - 1, cur.last, false, content or {})
-
-            utils.set_cursor(main.id, unpack({
-              (content and #content or 0) + cur.first - 1,
-              content and content[1] and #content[#content] or 0
-            }))
-
-            local lines_count = 0
-            for _ in pairs(content or {}) do lines_count = lines_count + 1 end
-            drift_lines = lines_count - (cur.last - cur.first + 1)
+            content = content or {}
+            api.nvim_buf_set_lines(curfile.bufnr, first - 1, last, false, content)
+            offset = offset + (#content - (last - first) - 1)
           end
         end
       end
@@ -403,16 +390,14 @@ function M.conflict_choose(target)
   return function()
     local view = lib.get_current_view()
 
-    -- print("is diffview: " .. view.panel.cur_file.)
     if view and view:instanceof(StandardView.__get()) then
       ---@cast view StandardView
       local main = view.cur_layout:get_main_win()
       local curfile = main.file
 
       if main:is_valid() and curfile:is_valid() then
-        local lines = api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false)
         local _, cur = vcs_utils.parse_conflicts(
-          lines,
+          api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false),
           main.id
         )
 
