@@ -42,31 +42,47 @@ local VCSAdapter = oop.create_class("VCSAdapter")
 
 VCSAdapter.Rev = Rev
 VCSAdapter.config_key = nil
+VCSAdapter.bootstrap = {
+  done = false,
+  ok = false,
+  version = {},
+}
+
+function VCSAdapter.run_bootstrap()
+  VCSAdapter.bootstrap.done = true
+  VCSAdapter.bootstrap.ok = false
+end
+
+---@diagnostic disable: unused-local, missing-return
+
+---@abstract
+---@param path_args string[] # Raw path args
+---@param cpath string? # Cwd path given by the `-C` flag option
+---@return string[] path_args # Resolved path args
+---@return string[] top_indicators # Top-level indicators
+function VCSAdapter.get_repo_paths(path_args, cpath) oop.abstract_stub() end
+
+---Try to find the top-level of a working tree by using the given indicative
+---paths.
+---@abstract
+---@param top_indicators string[] A list of paths that might indicate what working tree we are in.
+---@return string? err
+---@return string toplevel # Absolute path
+function VCSAdapter.find_toplevel(top_indicators) oop.abstract_stub() end
+
+---@diagnostic enable: unused-local, missing-return
 
 ---@class vcs.adapter.VCSAdapter.Opt
 ---@field cpath string? # CWD path
 ---@field toplevel string # VCS toplevel path
 ---@field path_args string[] # Extra path arguments
 
----@param opt vcs.adapter.VCSAdapter.Opt
-function VCSAdapter:init(opt)
-  self.bootstrap = {
-    done = false,
-    ok = false,
-    version = {},
-    version_string = "",
-  }
+function VCSAdapter:init()
   self.ctx = {}
-
   self.comp = {
     file_history = arg_parser.FlagValueMap(),
     open = arg_parser.FlagValueMap(),
   }
-end
-
-function VCSAdapter:run_bootstrap()
-  self.bootstrap.done = true
-  self.bootstrap.ok = true
 end
 
 ---@diagnostic disable: unused-local, missing-return
@@ -134,14 +150,19 @@ end
 ---@overload fun(self: VCSAdapter, args: string[], cwd: string?)
 ---@overload fun(self: VCSAdapter, args: string[], opt: utils.system_list.Opt?)
 function VCSAdapter:exec_sync(args, cwd_or_opt)
-  if not self.bootstrap.done then
-    self:run_bootstrap()
+  if not self:class().bootstrap.done then self:class().run_bootstrap() end
+
+  local cmd = vim.tbl_flatten({ self:get_command(), args })
+
+  if not self:class().bootstrap.ok then
+    logger.error(
+      ("[VCSAdapter] Can't exec adapter command because bootstrap failed! Cmd: %s")
+      :format(table.concat(cmd, " "))
+    )
+    return
   end
 
-  return utils.system_list(
-    vim.tbl_flatten({ self:get_command(), args }),
-    cwd_or_opt
-  )
+  return utils.system_list(cmd, cwd_or_opt)
 end
 
 
@@ -191,9 +212,9 @@ end
 
 ---@param range? { [1]: integer, [2]: integer }
 ---@param paths string[]
----@param args string[]
+---@param argo ArgObject
 ---@return string[] # Options to show file history
-function VCSAdapter:file_history_options(range, paths, args)
+function VCSAdapter:file_history_options(range, paths, argo)
   oop.abstract_stub()
 end
 
@@ -267,9 +288,9 @@ function VCSAdapter:reset_files(paths)
   oop.abstract_stub()
 end
 
----@param args string[]
+---@param argo ArgObject
 ---@return {left: string, right: string, options: string[]}
-function VCSAdapter:diffview_options(args)
+function VCSAdapter:diffview_options(argo)
   oop.abstract_stub()
 end
 
@@ -329,7 +350,7 @@ VCSAdapter.show = async.wrap(function(self, path, rev, callback)
     cwd = self.ctx.toplevel,
     ---@type Job
     on_exit = async.void(function(j)
-      local context = "vcs.utils.show()"
+      local context = "VCSAdapter.show()"
       utils.handle_job(j, {
         fail_on_empty = true,
         context = context,

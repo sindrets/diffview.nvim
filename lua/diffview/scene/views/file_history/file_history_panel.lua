@@ -322,19 +322,17 @@ function FileHistoryPanel:find_entry(file)
   end
 end
 
----Get the file entry under the cursor.
----@return LogEntry|FileEntry|nil
+---Get the log or file entry under the cursor.
+---@return (LogEntry|FileEntry)?
 function FileHistoryPanel:get_item_at_cursor()
-  if not (self:is_open() and self:buf_loaded()) then
-    return
-  end
+  if not self:is_open() and self:buf_loaded() then return end
 
   local cursor = api.nvim_win_get_cursor(self.winid)
   local line = cursor[1]
   local comp = self.components.comp:get_comp_on_line(line)
 
   if comp and (comp.name == "commit" or comp.name == "files") then
-    local entry = comp.parent.context
+    local entry = comp.parent.context --[[@as table ]]
 
     if comp.name == "files" then
       return entry.files[line - comp.lstart]
@@ -342,6 +340,19 @@ function FileHistoryPanel:get_item_at_cursor()
 
     return entry
   end
+end
+
+---Get the parent log entry of the item under the cursor.
+---@return LogEntry?
+function FileHistoryPanel:get_log_entry_at_cursor()
+  local item = self:get_item_at_cursor()
+  if not item then return end
+
+  if item:instanceof(LogEntry.__get()) then
+    return item --[[@as LogEntry ]]
+  end
+
+  return self:find_entry(item --[[@as FileEntry ]])
 end
 
 function FileHistoryPanel:set_cur_item(new_item)
@@ -497,20 +508,29 @@ function FileHistoryPanel:highlight_next_file()
   utils.update_win(self.winid)
 end
 
+---@param entry LogEntry
+---@param open boolean
 function FileHistoryPanel:set_entry_fold(entry, open)
   if not self.single_file and open == entry.folded then
     entry.folded = not open
     self:render()
     self:redraw()
+
+    if entry.folded then
+      -- Set the cursor at the top of the log entry
+      self.components.log.entries.comp:some(function(comp, _, _)
+        if comp.context == entry then
+          utils.set_cursor(self.winid, comp.lstart + 1)
+          return true
+        end
+      end)
+    end
   end
 end
 
+---@param entry LogEntry
 function FileHistoryPanel:toggle_entry_fold(entry)
-  if not self.single_file then
-    entry.folded = not entry.folded
-    self:render()
-    self:redraw()
-  end
+  self:set_entry_fold(entry, entry.folded)
 end
 
 function FileHistoryPanel:render()

@@ -33,7 +33,7 @@ return function(view)
       local log_options = view.panel:get_log_options()
       local cur = view.panel:cur_file()
 
-      if log_options.L[1] and bufnr == cur.layout:get_main_win().file.bufnr then
+      if log_options.L and log_options.L[1] and bufnr == cur.layout:get_main_win().file.bufnr then
         for _, value in ipairs(log_options.L) do
           local l1, lpath = value:match("^(%d+),.*:(.*)")
 
@@ -56,32 +56,21 @@ return function(view)
       end
     end,
     open_in_diffview = function()
-      if view.panel:is_focused() then
-        local item = view.panel:get_item_at_cursor()
-        if item then
-          local file
+      local file = view:infer_cur_file()
 
-          if item.files then
-            file = item.files[1]
-          else
-            file = item --[[@as FileEntry ]]
-          end
+      if file then
+        local layout = file.layout --[[@as Diff2 ]]
 
-          if file then
-            local layout = file.layout --[[@as Diff2 ]]
+        local new_view = DiffView({
+          adapter = view.adapter,
+          rev_arg = view.adapter:rev_to_pretty_string(layout.a.file.rev, layout.b.file.rev),
+          left = layout.a.file.rev,
+          right = layout.b.file.rev,
+          options = { selected_file = file.absolute_path },
+        })
 
-            local new_view = DiffView({
-              adapter = view.adapter,
-              rev_arg = view.adapter:rev_to_pretty_string(layout.a.file.rev, layout.b.file.rev),
-              left = layout.a.file.rev,
-              right = layout.b.file.rev,
-              options = {},
-            }) --[[@as DiffView ]]
-
-            lib.add_view(new_view)
-            new_view:open()
-          end
-        end
+        lib.add_view(new_view)
+        new_view:open()
       end
     end,
     select_next_entry = function()
@@ -104,7 +93,7 @@ return function(view)
             if view.panel.single_file then
               view:set_file(item.files[1], false)
             else
-              view.panel:toggle_entry_fold(item)
+              view.panel:toggle_entry_fold(item --[[@as LogEntry ]])
             end
           else
             view:set_file(item, false)
@@ -125,7 +114,7 @@ return function(view)
             if view.panel.single_file then
               view:set_file(item.files[1], true)
             else
-              view.panel:toggle_entry_fold(item)
+              view.panel:toggle_entry_fold(item --[[@as LogEntry ]])
             end
           else
             view:set_file(item, true)
@@ -175,6 +164,21 @@ return function(view)
         view.panel:render()
         view.panel:redraw()
       end
+    end,
+    open_fold = function()
+      if view.panel.single_file or not view.panel:is_focused() then return end
+      local entry = view.panel:get_log_entry_at_cursor()
+      if entry then view.panel:set_entry_fold(entry, true) end
+    end,
+    close_fold = function()
+      if view.panel.single_file or not view.panel:is_focused() then return end
+      local entry = view.panel:get_log_entry_at_cursor()
+      if entry then view.panel:set_entry_fold(entry, false) end
+    end,
+    toggle_fold = function()
+      if view.panel.single_file or not view.panel:is_focused() then return end
+      local entry = view.panel:get_log_entry_at_cursor()
+      if entry then view.panel:toggle_entry_fold(entry) end
     end,
     close = function()
       if view.panel.option_panel:is_focused() then

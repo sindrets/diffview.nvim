@@ -11,6 +11,8 @@ local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local api = vim.api
 local M = {}
 
+local HAS_NVIM_0_8 = vim.fn.has("nvim-0.8") == 1
+
 ---@class Window : diffview.Object
 ---@field id integer
 ---@field file vcs.File
@@ -63,11 +65,7 @@ function Window:is_focused()
   return self:is_valid() and api.nvim_get_current_win() == self.id
 end
 
-function Window:pre_open()
-  if vim.fn.has("nvim-0.8") == 1 then
-    vim.wo[self.id].winbar = nil
-  end
-end
+function Window:pre_open() end
 
 ---@param callback fun(file: vcs.File)
 function Window:load_file(callback)
@@ -131,7 +129,7 @@ end
 
 ---@return boolean
 function Window:show_winbar_info()
-  if self.file and self.file.winbar and vim.fn.has("nvim-0.8") == 1 then
+  if self.file and self.file.winbar and HAS_NVIM_0_8 then
     local conf = config.get_config()
     local view = lib.get_current_view()
 
@@ -196,6 +194,11 @@ function Window:_restore_winopts()
     utils.no_win_event_call(function()
       local winid = utils.temp_win(self.file.bufnr)
       utils.set_local(winid, Window.winopt_store[self.file.bufnr])
+
+      if HAS_NVIM_0_8 then
+        vim.wo[winid].winbar = nil
+      end
+
       api.nvim_win_close(winid, true)
     end)
   end

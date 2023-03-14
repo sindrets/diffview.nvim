@@ -161,6 +161,7 @@ require("diffview").setup({
   diff_binaries = false,    -- Show diffs for binaries
   enhanced_diff_hl = false, -- See ':h diffview-config-enhanced_diff_hl'
   git_cmd = { "git" },      -- The git executable followed by default args.
+  hg_cmd = { "hg" },        -- The hg executable followed by default args.
   use_icons = true,         -- Requires nvim-web-devicons
   show_help_hints = true,   -- Show hints for how to open the help panel
   watch_index = true,       -- Update views and index buffers when the git index changes.
@@ -251,7 +252,7 @@ require("diffview").setup({
       -- tabpage is a Diffview.
       { "n", "<tab>",      actions.select_next_entry,          { desc = "Open the diff for the next file" } },
       { "n", "<s-tab>",    actions.select_prev_entry,          { desc = "Open the diff for the previous file" } },
-      { "n", "gf",         actions.goto_file,                  { desc = "Open the file in a new split in the previous tabpage" } },
+      { "n", "gf",         actions.goto_file_edit,             { desc = "Open the file in the previous tabpage" } },
       { "n", "<C-w><C-f>", actions.goto_file_split,            { desc = "Open the file in a new split" } },
       { "n", "<C-w>gf",    actions.goto_file_tab,              { desc = "Open the file in a new tabpage" } },
       { "n", "<leader>e",  actions.focus_files,                { desc = "Bring focus to the file panel" } },
@@ -303,7 +304,7 @@ require("diffview").setup({
       { "n", "<c-f>",         actions.scroll_view(0.25),    { desc = "Scroll the view down" } },
       { "n", "<tab>",         actions.select_next_entry,    { desc = "Open the diff for the next file" } },
       { "n", "<s-tab>",       actions.select_prev_entry,    { desc = "Open the diff for the previous file" } },
-      { "n", "gf",            actions.goto_file,            { desc = "Open the file in a new split in the previous tabpage" } },
+      { "n", "gf",            actions.goto_file_edit,       { desc = "Open the file in the previous tabpage" } },
       { "n", "<C-w><C-f>",    actions.goto_file_split,      { desc = "Open the file in a new split" } },
       { "n", "<C-w>gf",       actions.goto_file_tab,        { desc = "Open the file in a new tabpage" } },
       { "n", "i",             actions.listing_style,        { desc = "Toggle between 'list' and 'tree' views" } },
@@ -334,7 +335,7 @@ require("diffview").setup({
       { "n", "<c-f>",         actions.scroll_view(0.25),           { desc = "Scroll the view down" } },
       { "n", "<tab>",         actions.select_next_entry,           { desc = "Open the diff for the next file" } },
       { "n", "<s-tab>",       actions.select_prev_entry,           { desc = "Open the diff for the previous file" } },
-      { "n", "gf",            actions.goto_file,                   { desc = "Open the file in a new split in the previous tabpage" } },
+      { "n", "gf",            actions.goto_file_edit,              { desc = "Open the file in the previous tabpage" } },
       { "n", "<C-w><C-f>",    actions.goto_file_split,             { desc = "Open the file in a new split" } },
       { "n", "<C-w>gf",       actions.goto_file_tab,               { desc = "Open the file in a new tabpage" } },
       { "n", "<leader>e",     actions.focus_files,                 { desc = "Bring focus to the file panel" } },
@@ -463,5 +464,6 @@ git object database, and a command is echoed that shows how to undo the change.
   diff-mode?**
   - A: Change your `:h 'fillchars'`:
     - (vimscript): `set fillchars+=diff:╱`
+    - (Lua): `vim.opt.fillchars:append { diff = "╱" }`
   - Note: whether or not the diagonal lines will line up nicely will depend on
     your terminal emulator. The terminal used in the screenshots is Kitty.

@@ -247,5 +247,65 @@ return function(view)
     refresh_files = function()
       view:update_files()
     end,
+    open_all_folds = function()
+      if not view.panel:is_focused() or view.panel.listing_style ~= "tree" then return end
+
+      for _, file_set in ipairs({
+        view.panel.components.conflicting.files,
+        view.panel.components.working.files,
+        view.panel.components.staged.files,
+      }) do
+        file_set.comp:deep_some(function(comp, _, _)
+          if comp.name == "directory" then
+            (comp.context --[[@as DirData ]]).collapsed = false
+          end
+        end)
+      end
+
+      view.panel:render()
+      view.panel:redraw()
+    end,
+    close_all_folds = function()
+      if not view.panel:is_focused() or view.panel.listing_style ~= "tree" then return end
+
+      for _, file_set in ipairs({
+        view.panel.components.conflicting.files,
+        view.panel.components.working.files,
+        view.panel.components.staged.files,
+      }) do
+        file_set.comp:deep_some(function(comp, _, _)
+          if comp.name == "directory" then
+            (comp.context --[[@as DirData ]]).collapsed = true
+          end
+        end)
+      end
+
+      view.panel:render()
+      view.panel:redraw()
+    end,
+    open_fold = function()
+      if not view.panel:is_focused() then return end
+      local dir = view.panel:get_dir_at_cursor()
+      if dir then view.panel:set_item_fold(dir, true) end
+    end,
+    close_fold = function()
+      if not view.panel:is_focused() then return end
+      local dir, comp = view.panel:get_dir_at_cursor()
+      if dir and comp then
+        if not dir.collapsed then
+          view.panel:set_item_fold(dir, false)
+        else
+          local dir_parent = utils.tbl_access(comp, "parent.parent")
+          if dir_parent and dir_parent.name == "directory" then
+            view.panel:set_item_fold(dir_parent.context, false)
+          end
+        end
+      end
+    end,
+    toggle_fold = function()
+      if not view.panel:is_focused() then return end
+      local dir = view.panel:get_dir_at_cursor()
+      if dir then view.panel:toggle_item_fold(dir) end
+    end,
   }
 end

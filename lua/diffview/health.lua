@@ -1,5 +1,4 @@
 local health = vim.health or require("health")
-local config = require("diffview.config")
 
 local M = {}
 
@@ -34,6 +33,8 @@ function M.check()
 
   health.report_start("Checking plugin dependencies")
 
+  local missing_essential = false
+
   for _, plugin in ipairs(M.plugin_deps) do
     if lualib_available(plugin.name) then
       health.report_ok(plugin.name .. " installed.")
@@ -41,56 +42,46 @@ function M.check()
       if plugin.optional then
         health.report_warn(("Optional dependency '%s' not found."):format(plugin.name))
       else
+        missing_essential = true
         health.report_error(("Dependency '%s' not found!"):format(plugin.name))
       end
     end
   end
 
-  health.report_start("Checking external dependencies")
+  health.report_start("Checking VCS tools")
 
-  -- Git
   ;(function()
-    local conf = config.get_config()
-    local out, code = system_list(vim.tbl_flatten({ conf.git_cmd, "version" }))
-
-    if code ~= 0 or not out[1] then
-      health.report_error(
-        "Configured git command is not executable: " .. table.concat(conf.git_cmd, " "
-      ))
-      return
-    else
-      health.report_ok("Git found.")
-    end
-
-    local version_string = out[1]:match("git version (%S+)")
-
-    if not version_string then
-      health.report_error("Could not determine git version!")
+    if missing_essential then
+      health.report_warn("Cannot perform checks on external dependencies without all essential plugin dependencies installed!")
       return
     end
 
-    local current = {}
-    local target = {
-      major = 2,
-      minor = 31,
-      patch = 0,
+    health.report_info("The plugin requires at least one of the supported VCS tools to be valid.")
+
+    local has_valid_adapter = false
+    local adapter_kinds = {
+      { class = require("diffview.vcs.adapters.git").GitAdapter, name = "Git" },
+      { class = require("diffview.vcs.adapters.hg").HgAdapter, name = "Mercurial" },
     }
-    local target_version_string = ("%d.%d.%d"):format(target.major, target.minor, target.patch)
-    local parts = vim.split(version_string, "%.")
-    current.major = tonumber(parts[1])
-    current.minor = tonumber(parts[2])
-    current.patch = tonumber(parts[3]) or 0
 
-    local cs = ("%08d%08d%08d"):format(current.major, current.minor, current.patch)
-    local ts = ("%08d%08d%08d"):format(target.major, target.minor, target.patch)
+    for _, kind in ipairs(adapter_kinds) do
+      local bs = kind.class.bootstrap
+      if not bs.done then kind.class.run_bootstrap() end
 
-    if cs < ts then
-      health.report_error(("Git version is outdated! Wanted: %s, current: %s"):format(
-        target_version_string,
-        version_string
-      ))
-    else
-      health.report_ok("Git is up-to-date.")
+      if bs.version_string then
+        health.report_ok(("%s found."):format(kind.name))
+      end
+
+      if bs.ok then
+        health.report_ok(("%s is up-to-date. (%s)"):format(kind.name, bs.version_string))
+        has_valid_adapter = true
+      else
+        health.report_warn(bs.err or (kind.name .. ": Unknown error"))
+      end
+    end
+
+    if not has_valid_adapter then
+      health.report_error("No valid VCS tool was found!")
     end
   end)()
 end

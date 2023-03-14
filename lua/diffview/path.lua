@@ -446,8 +446,9 @@ end
 
 ---@param path string
 ---@param nosuf? boolean
+---@param list falsy
 ---@return string
----@overload fun(self: PathLib, path: string, nosuf: boolean, list: boolean): string[]
+---@overload fun(self: PathLib, path: string, nosuf: boolean, list: true): string[]
 function PathLib:vim_expand(path, nosuf, list)
   if list then
     return vim.tbl_map(function(v)

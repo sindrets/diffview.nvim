@@ -559,6 +559,7 @@ end
 local action_names = {
   "close",
   "close_all_folds",
+  "close_fold",
   "copy_hash",
   "focus_entry",
   "focus_files",
@@ -566,6 +567,7 @@ local action_names = {
   "next_entry",
   "open_all_folds",
   "open_commit_log",
+  "open_fold",
   "open_in_diffview",
   "options",
   "prev_entry",
@@ -577,6 +579,7 @@ local action_names = {
   "stage_all",
   "toggle_files",
   "toggle_flatten_dirs",
+  "toggle_fold",
   "toggle_stage_entry",
   "unstage_all",
 }

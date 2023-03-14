@@ -45,7 +45,7 @@ function StandardView:init(opt)
     diff4 = { a = {}, b = {}, c = {}, d = {} },
   }
 
-  self.emitter:on("post_layout", utils.wrap_call(self.post_layout, self))
+  self.emitter:on("post_layout", utils.bind(self.post_layout, self))
 end
 
 ---@override
@@ -208,6 +208,7 @@ function StandardView:use_entry(entry)
     else
       self:use_layout(entry.layout)
       self.cur_layout.emitter = entry.layout.emitter
+      self.cur_layout:use_entry(entry)
     end
 
     self.cur_layout:create()

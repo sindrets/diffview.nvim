@@ -18,11 +18,11 @@ local M = {}
 local FileTree = oop.create_class("FileTree", Model)
 
 ---FileTree constructor
----@param files FileEntry[]|nil
+---@param files FileEntry[]?
 function FileTree:init(files)
   self.root = Node("__ROOT__")
 
-  for _, file in ipairs(files) do
+  for _, file in ipairs(files or {}) do
     self:add_file_entry(file)
   end
 end
@@ -127,14 +127,17 @@ function FileTree:create_comp_schema(data)
       end
     end
 
+    local items = { name = "items" }
     local struct = {
-      name = "wrapper",
-      { name = "directory", context = dir_data },
+      name = "directory",
+      context = dir_data,
+      { name = "dir_name" },
+      items,
     }
     parent[#parent + 1] = struct
 
     for _, child in ipairs(node.children) do
-      recurse(struct, child)
+      recurse(items, child)
     end
   end
 

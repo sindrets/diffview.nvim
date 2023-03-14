@@ -71,7 +71,7 @@ function Node:is_root()
   return not self.parent
 end
 
----@param callback fun(node: Node, i: integer, parent: Node): boolean
+---@param callback fun(node: Node, i: integer, parent: Node): boolean?
 function Node:some(callback)
   for i, child in ipairs(self.children) do
     if callback(child, i, self) then
@@ -80,7 +80,7 @@ function Node:some(callback)
   end
 end
 
----@param callback fun(node: Node, i: integer, parent: Node): boolean
+---@param callback fun(node: Node, i: integer, parent: Node): boolean?
 function Node:deep_some(callback)
   local function wrap(node, i, parent)
     if callback(node, i, parent) then
