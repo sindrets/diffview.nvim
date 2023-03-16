@@ -380,5 +380,6 @@ function M.parse_conflicts(lines, winid)
   return ret, cur_conflict, cur_idx or 0
 end
 
+
 M.JobStatus = JobStatus
 return M
