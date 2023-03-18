@@ -478,6 +478,9 @@ GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
     command = self:bin(),
     args = utils.vec_join(
       self:args(),
+      "-P",
+      "-c",
+      "gc.auto=0",
       "log",
       rev_range,
       "--pretty=format:%x00%n%H %P%n%an%n%ad%n%ar%n  %D%n  %s",
@@ -496,6 +499,9 @@ GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
     command = self:bin(),
     args = utils.vec_join(
       self:args(),
+      "-P",
+      "-c",
+      "gc.auto=0",
       "log",
       rev_range,
       "--pretty=format:%x00",
@@ -595,6 +601,8 @@ GitAdapter.incremental_line_trace_data = async.void(function(self, state, callba
     args = utils.vec_join(
       self:args(),
       "-P",
+      "-c",
+      "gc.auto=0",
       "log",
       rev_range,
       "--color=never",
@@ -872,6 +880,9 @@ function GitAdapter:parse_fh_data(state)
       command = self:bin(),
       args = utils.vec_join(
         self:args(),
+        "-P",
+        "-c",
+        "gc.auto=0",
         "show",
         "--format=",
         "--diff-merges=first-parent",
