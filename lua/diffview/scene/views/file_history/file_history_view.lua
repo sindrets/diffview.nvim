@@ -102,7 +102,7 @@ function FileHistoryView:_set_file(file)
       local log_entry = self.panel.cur_item[1]
       local diff = log_entry:get_diff(file.path)
 
-      if diff then
+      if diff and not file:has_patch_folds() then
         file:update_patch_folds(diff)
 
         for _, win in ipairs(self.cur_layout.windows) do

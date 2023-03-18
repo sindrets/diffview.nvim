@@ -269,7 +269,7 @@ function Window:use_winopts(opts)
 end
 
 function Window:apply_custom_folds()
-  if self.file.custom_folds and next(self.file.custom_folds)
+  if self.file.custom_folds
     and not self:is_nulled()
     and vim.wo[self.id].foldmethod == "manual"
   then

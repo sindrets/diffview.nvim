@@ -214,8 +214,8 @@ function FileEntry:update_patch_folds(diff)
 
   local layout = self.layout --[[@as Diff2 ]]
   local folds = {
-    a = utils.tbl_set(layout.a.file, { "custom_folds" }, {}),
-    b = utils.tbl_set(layout.b.file, { "custom_folds" }, {}),
+    a = utils.tbl_set(layout.a.file, { "custom_folds" }, { type = "diff_patch" }),
+    b = utils.tbl_set(layout.b.file, { "custom_folds" }, { type = "diff_patch" }),
   }
 
   local lcount_a = api.nvim_buf_line_count(layout.a.file.bufnr)
@@ -264,6 +264,18 @@ function FileEntry:update_patch_folds(diff)
     prev_last_old = last_old
     prev_last_new = last_new
   end
+end
+
+---Check if the entry has custom diff patch folds.
+---@return boolean
+function FileEntry:has_patch_folds()
+  for _, file in ipairs(self.layout:files()) do
+    if not file.custom_folds or file.custom_folds.type ~= "diff_patch" then
+      return false
+    end
+  end
+
+  return true
 end
 
 ---@static

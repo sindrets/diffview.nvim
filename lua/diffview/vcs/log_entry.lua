@@ -73,7 +73,7 @@ function LogEntry:get_diff(path)
   if not self.commit.diff then return nil end
 
   for _, diff_entry in ipairs(self.commit.diff) do
-    if diff_entry.path_new == path then
+    if path == (diff_entry.path_new or diff_entry.path_old) then
       return diff_entry
     end
   end

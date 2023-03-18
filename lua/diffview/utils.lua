@@ -1182,6 +1182,36 @@ function M.win_find_buf(bufid, tabpage)
   return result
 end
 
+---Get the height of the content currently in a window's view, diregarding
+---virtual / filler lines.
+---@param winid integer
+---@return integer
+function M.win_content_height(winid)
+  if winid == 0 then winid = api.nvim_get_current_win() end
+  ---@diagnostic disable-next-line: redundant-parameter
+  local topline = vim.fn.line("w0", winid)
+  ---@diagnostic disable-next-line: redundant-parameter
+  local botline = vim.fn.line("w$", winid)
+  local cur = topline
+  local ret = 0
+
+  api.nvim_win_call(winid, function()
+    while cur <= botline do
+      local fold_end = vim.fn.foldclosedend(cur)
+
+      if fold_end > -1 then
+        cur = fold_end + 1
+      else
+        cur = cur + 1
+      end
+
+      ret = ret + 1
+    end
+  end)
+
+  return ret
+end
+
 ---Set the (1,0)-indexed cursor position without having to worry about
 ---out-of-bounds coordinates. The line number is clamped to the number of lines
 ---in the target buffer.
