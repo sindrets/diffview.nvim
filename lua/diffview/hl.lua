@@ -351,7 +351,7 @@ end
 
 local git_status_hl_map = {
   ["A"] = "DiffviewStatusAdded",
-  ["?"] = "DiffviewStatusAdded",
+  ["?"] = "DiffviewStatusUntracked",
   ["M"] = "DiffviewStatusModified",
   ["R"] = "DiffviewStatusRenamed",
   ["C"] = "DiffviewStatusCopied",
