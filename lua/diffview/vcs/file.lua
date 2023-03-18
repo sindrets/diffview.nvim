@@ -15,6 +15,10 @@ local M = {}
 
 ---@alias git.FileDataProducer fun(kind: vcs.FileKind, path: string, pos: "left"|"right"): string[]
 
+---@class CustomFolds
+---@field type string
+---@field [integer] { [1]: integer, [2]: integer }
+
 ---@class vcs.File : diffview.Object
 ---@field adapter GitAdapter
 ---@field path string
@@ -35,6 +39,7 @@ local M = {}
 ---@field ready boolean
 ---@field winbar string?
 ---@field winopts WindowOptions
+---@field custom_folds? CustomFolds
 local File = oop.create_class("vcs.File")
 
 ---@type table<integer, vcs.File.AttachState>

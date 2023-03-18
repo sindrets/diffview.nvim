@@ -184,6 +184,11 @@ function DiffView:_set_file(file)
 
   file.layout.emitter:once("files_opened", function()
     self.emitter:emit("file_open_post", file, cur_entry)
+
+    if not self.cur_entry.opened then
+      self.cur_entry.opened = true
+      DiffviewGlobal.emitter:emit("file_open_new", file)
+    end
   end)
 
   self:use_entry(file)

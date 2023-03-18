@@ -386,11 +386,11 @@ function GitAdapter:prepare_fh_options(log_options, single_file)
   }
 end
 
-local function structure_fh_data(namestat_data, numstat_data)
+local function structure_fh_data(namestat_data, numstat_data, keep_diff)
   local right_hash, left_hash, merge_hash = unpack(utils.str_split(namestat_data[1]))
   local time, time_offset = unpack(utils.str_split(namestat_data[3]))
 
-  return {
+  local ret = {
     left_hash = left_hash ~= "" and left_hash or nil,
     right_hash = right_hash,
     merge_hash = merge_hash,
@@ -403,6 +403,12 @@ local function structure_fh_data(namestat_data, numstat_data)
     namestat = utils.vec_slice(namestat_data, 7),
     numstat = numstat_data,
   }
+
+  if keep_diff then
+    ret.diff = vcs_utils.parse_diff(namestat_data)
+  end
+
+  return ret
 end
 
 ---@param self GitAdapter
@@ -554,7 +560,7 @@ GitAdapter.incremental_line_trace_data = async.void(function(self, state, callba
         if not shutdown then
           shutdown = callback(
             JobStatus.PROGRESS,
-            structure_fh_data(raw[trace_state.idx])
+            structure_fh_data(raw[trace_state.idx], nil, true)
           )
 
           if shutdown then
@@ -1070,6 +1076,7 @@ function GitAdapter:file_history_worker(thread, log_opt, opt, co_state, callback
       rel_date = state.cur.rel_date,
       ref_names = state.cur.ref_names,
       subject = state.cur.subject,
+      diff = state.cur.diff,
     })
 
     local ok, status

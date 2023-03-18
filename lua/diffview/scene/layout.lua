@@ -307,12 +307,15 @@ function Layout:sync_scroll()
     if lcount > max then target, max = win, lcount end
   end
 
+  local main_win = self:get_main_win()
+  local cursor = api.nvim_win_get_cursor(main_win.id)
+
   for _, win in ipairs(self.windows) do
     api.nvim_win_call(win.id, function()
       if win == target then
         -- Scroll to trigger the scrollbind and sync the windows. This works more
         -- consistently than calling `:syncbind`.
-        vim.cmd([[exe "norm! \<c-e>\<c-y>"]])
+        vim.cmd("norm! " .. api.nvim_replace_termcodes("<c-e><c-y>", true, true, true))
       end
 
       if win.id ~= curwin then
@@ -320,6 +323,9 @@ function Layout:sync_scroll()
       end
     end)
   end
+
+  -- Cursor will sometimes move +- the value of 'scrolloff'
+  api.nvim_win_set_cursor(target.id, cursor)
 end
 
 M.Layout = Layout

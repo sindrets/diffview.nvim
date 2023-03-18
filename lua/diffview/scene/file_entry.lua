@@ -1,6 +1,7 @@
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
+local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2") ---@type Diff2|LazyModule
 local File = lazy.access("diffview.vcs.file", "File") ---@type vcs.File|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
@@ -38,6 +39,7 @@ local fstat_cache = {}
 ---@field commit Commit|nil
 ---@field merge_ctx vcs.MergeContext?
 ---@field active boolean
+---@field opened boolean
 local FileEntry = oop.create_class("FileEntry")
 
 ---@class FileEntry.init.Opt
@@ -70,6 +72,7 @@ function FileEntry:init(opt)
   self.commit = opt.commit
   self.merge_ctx = opt.merge_ctx
   self.active = false
+  self.opened = false
 end
 
 function FileEntry:destroy()
@@ -202,6 +205,77 @@ function FileEntry:update_merge_context(ctx)
       ctx.base.ref_names and ("(" .. ctx.base.ref_names .. ")") or ""
     )
   end
+end
+
+---Derive custom folds from the hunks in a diff patch.
+---@param diff diff.FileEntry
+function FileEntry:update_patch_folds(diff)
+  if not self.layout:instanceof(Diff2.__get()) then return end
+
+  local layout = self.layout --[[@as Diff2 ]]
+  local folds = {
+    a = utils.tbl_set(layout.a.file, { "custom_folds" }, { type = "diff_patch" }),
+    b = utils.tbl_set(layout.b.file, { "custom_folds" }, { type = "diff_patch" }),
+  }
+
+  local lcount_a = api.nvim_buf_line_count(layout.a.file.bufnr)
+  local lcount_b = api.nvim_buf_line_count(layout.b.file.bufnr)
+
+  local prev_last_old, prev_last_new = 0, 0
+
+  for i = 1, #diff.hunks + 1 do
+    local hunk = diff.hunks[i]
+    local first_old, last_old, first_new, last_new
+
+    if hunk then
+      first_old = hunk.old_row
+      last_old = first_old + hunk.old_size - 1
+      first_new = hunk.new_row
+      last_new = first_new + hunk.new_size - 1
+    else
+      first_old = lcount_a + 1
+      first_new = lcount_b + 1
+    end
+
+    if first_old - prev_last_old > 1 then
+      local prev_fold = folds.a[#folds.a]
+
+      if prev_fold and (prev_last_old + 1) - prev_fold[2] == 1 then
+        -- This fold is right next to the previous: merge the folds
+        prev_fold[2] = first_old - 1
+      else
+        table.insert(folds.a, { prev_last_old + 1, first_old - 1 })
+      end
+      -- print("old:", folds.a[#folds.a][1], folds.a[#folds.a][2])
+    end
+
+    if first_new - prev_last_new > 1 then
+      local prev_fold = folds.b[#folds.b]
+
+      if prev_fold and (prev_last_new + 1) - prev_fold[2] == 1 then
+        -- This fold is right next to the previous: merge the folds
+        prev_fold[2] = first_new - 1
+      else
+        table.insert(folds.b, { prev_last_new + 1, first_new - 1 })
+      end
+      -- print("new:", folds.b[#folds.b][1], folds.b[#folds.b][2])
+    end
+
+    prev_last_old = last_old
+    prev_last_new = last_new
+  end
+end
+
+---Check if the entry has custom diff patch folds.
+---@return boolean
+function FileEntry:has_patch_folds()
+  for _, file in ipairs(self.layout:files()) do
+    if not file.custom_folds or file.custom_folds.type ~= "diff_patch" then
+      return false
+    end
+  end
+
+  return true
 end
 
 ---@static

@@ -1,6 +1,7 @@
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
+local EventEmitter = lazy.access("diffview.events", "EventEmitter") ---@type EventEmitter|LazyModule
 local File = lazy.access("diffview.vcs.file", "File") ---@type vcs.File|LazyModule
 local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView") ---@type FileHistoryView|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
@@ -9,6 +10,8 @@ local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
+local fmt = string.format
+
 local M = {}
 
 local HAS_NVIM_0_8 = vim.fn.has("nvim-0.8") == 1
@@ -17,6 +20,7 @@ local HAS_NVIM_0_8 = vim.fn.has("nvim-0.8") == 1
 ---@field id integer
 ---@field file vcs.File
 ---@field parent Layout
+---@field emitter EventEmitter
 local Window = oop.create_class("Window")
 
 Window.winopt_store = {}
@@ -31,6 +35,9 @@ function Window:init(opt)
   self.id = opt.id
   self.file = opt.file
   self.parent = opt.parent
+  self.emitter = EventEmitter()
+
+  self.emitter:on("post_open", utils.bind(self.post_open, self))
 end
 
 function Window:destroy()
@@ -45,6 +52,14 @@ end
 ---@return boolean
 function Window:is_valid()
   return self.id and api.nvim_win_is_valid(self.id)
+end
+
+---@return boolean
+function Window:is_file_open()
+  return self:is_valid()
+    and self.file
+    and self.file:is_valid()
+    and api.nvim_win_get_buf(self.id) == self.file.bufnr
 end
 
 ---@param force? boolean
@@ -65,7 +80,9 @@ function Window:is_focused()
   return self:is_valid() and api.nvim_get_current_win() == self.id
 end
 
-function Window:pre_open() end
+function Window:post_open()
+  self:apply_custom_folds()
+end
 
 ---@param callback fun(file: vcs.File)
 function Window:load_file(callback)
@@ -93,7 +110,12 @@ function Window:open_file(callback)
         self:_save_winopts()
       end
 
-      self:apply_file_winopts()
+      if self:is_nulled() then
+        self:apply_null_winopts()
+      else
+        self:apply_file_winopts()
+      end
+
       self.file:attach_buffer(false, {
         keymaps = config.get_layout_keymaps(self.parent),
         disable_diagnostics = self.file.kind == "conflicting"
@@ -103,6 +125,8 @@ function Window:open_file(callback)
       if self:show_winbar_info() then
         vim.wo[self.id].winbar = self.file.winbar
       end
+
+      self.emitter:emit("post_open")
 
       api.nvim_win_call(self.id, function()
         DiffviewGlobal.emitter:emit("diff_buf_win_enter", self.file.bufnr, self.id, {
@@ -117,7 +141,7 @@ function Window:open_file(callback)
       end
     end
 
-    self:pre_open()
+    self.emitter:emit("pre_open")
 
     if self.file:is_valid() then
       on_load()
@@ -147,9 +171,13 @@ function Window:show_winbar_info()
   return false
 end
 
+function Window:is_nulled()
+  return self:is_valid() and api.nvim_win_get_buf(self.id) == File.NULL_FILE.bufnr
+end
+
 function Window:open_null()
   if self:is_valid() then
-    self:pre_open()
+    self.emitter:emit("pre_open")
     File.load_null_buffer(self.id)
   end
 end
@@ -214,6 +242,45 @@ end
 function Window:apply_null_winopts()
   if File.NULL_FILE.winopts then
     utils.set_local(self.id, File.NULL_FILE.winopts)
+  end
+end
+
+---Use the given map of local options. These options are saved and restored
+---when the file gets unloaded.
+---@param opts WindowOptions
+function Window:use_winopts(opts)
+  if not self:is_file_open() then
+    self.emitter:once("post_open", utils.bind(self.use_winopts, self, opts))
+    return
+  end
+
+  local opt_store = utils.tbl_ensure(Window.winopt_store, { self.file.bufnr })
+
+  api.nvim_win_call(self.id, function()
+    for option, v in pairs(opts) do
+      if opt_store[option] == nil then
+        opt_store[option] = vim.o[option]
+      end
+
+      self.file.winopts[option] = v
+      utils.set_local(self.id, { [option] = v })
+    end
+  end)
+end
+
+function Window:apply_custom_folds()
+  if self.file.custom_folds
+    and not self:is_nulled()
+    and vim.wo[self.id].foldmethod == "manual"
+  then
+    api.nvim_win_call(self.id, function()
+      pcall(vim.cmd, "norm! zE") -- Delete all folds in the window
+
+      for _, fold in ipairs(self.file.custom_folds) do
+        vim.cmd(fmt("%d,%dfold", fold[1], fold[2]))
+        -- print(fmt("%d,%dfold", fold[1], fold[2]))
+      end
+    end)
   end
 end
 
