@@ -467,3 +467,7 @@ git object database, and a command is echoed that shows how to undo the change.
     - (Lua): `vim.opt.fillchars:append { diff = "╱" }`
   - Note: whether or not the diagonal lines will line up nicely will depend on
     your terminal emulator. The terminal used in the screenshots is Kitty.
+- **Q: How do I jump to next diff (not next conflict)?**
+  - A: Use `[c` and `]c`
+  - `:h jumpto-diffs`
+  - more [context](https://github.com/sindrets/diffview.nvim/issues/111#issuecomment-1019902985)
