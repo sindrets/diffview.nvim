@@ -866,6 +866,18 @@ conflict_choose({version})                      *diffview-actions-conflict_choos
                 See |diffview-conflict-versions| to tell what versions of the
                 file these names correspond with.
 
+conflict_choose_all({version})              *diffview-actions-conflict_choose_all*
+        Contexts: `merge_tool`, `file_panel`
+
+        Replace all merge conflicts in the current file at once. Choosing `'none'`
+        deletes all the conflict region entirely. Choosing `'all'` effectively
+        deletes only the conflict markers and leaves all the content.
+
+        Parameters: ~
+            {version} `'ours'|'theirs'|'base'|'all'|'none'`
+                See |diffview-conflict-versions| to tell what versions of the
+                file these names correspond with.
+
                                                 *diffview-conflict-example*
         Example conflict region annotated with the version names: >
 
