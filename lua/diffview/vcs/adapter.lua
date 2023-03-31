@@ -205,7 +205,7 @@ end
 ---@field theirs { hash: string, ref_names: string? }
 ---@field base { hash: string, ref_names: string? }
 
----@return vcs.MergeContext
+---@return vcs.MergeContext?
 function VCSAdapter:get_merge_context()
   oop.abstract_stub()
 end

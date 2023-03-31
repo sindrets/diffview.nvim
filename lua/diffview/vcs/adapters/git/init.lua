@@ -280,7 +280,7 @@ function GitAdapter:verify_rev_arg(rev_arg)
   return code == 0 and (out[2] ~= nil or out[1] and out[1] ~= ""), out
 end
 
----@return vcs.MergeContext
+---@return vcs.MergeContext?
 function GitAdapter:get_merge_context()
   local their_head
 
@@ -291,18 +291,23 @@ function GitAdapter:get_merge_context()
     end
   end
 
-  assert(their_head)
+  if not their_head then
+    -- We were unable to find THEIR head. Merge could be a result of an applied
+    -- stash (or something else?). Either way, we can't proceed.
+    return
+  end
+
   local ret = {}
   local out, code = self:exec_sync({ "show", "-s", "--pretty=format:%H%n%D", "HEAD", "--" }, self.ctx.toplevel)
 
-  ret.ours = code ~= 0 and {} or  {
+  ret.ours = code ~= 0 and {} or {
     hash = out[1],
     ref_names = out[2],
   }
 
   out, code = self:exec_sync({ "show", "-s", "--pretty=format:%H%n%D", their_head, "--" }, self.ctx.toplevel)
 
-  ret.theirs = code ~= 0 and {} or  {
+  ret.theirs = code ~= 0 and {} or {
     hash = out[1],
     rev_names = out[2],
   }

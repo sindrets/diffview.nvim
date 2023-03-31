@@ -418,8 +418,10 @@ DiffView.update_files = debounce.debounce_trailing(100, true, vim.schedule_wrap(
 
       self.merge_ctx = next(new_files.conflicting) and self.adapter:get_merge_context() or nil
 
-      for _, entry in ipairs(self.files.conflicting) do
-        entry:update_merge_context(self.merge_ctx)
+      if self.merge_ctx then
+        for _, entry in ipairs(self.files.conflicting) do
+          entry:update_merge_context(self.merge_ctx)
+        end
       end
 
       FileEntry.update_index_stat(self.adapter, index_stat)
