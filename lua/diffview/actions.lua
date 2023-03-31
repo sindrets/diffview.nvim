@@ -341,8 +341,7 @@ function M.conflict_choose_all(target)
   return function()
     local view = lib.get_current_view()
 
-    if view and view:instanceof(StandardView.__get()) then
-      ---@cast view StandardView
+    local resolve_conflicts = function ()
       local main = view.cur_layout:get_main_win()
       local curfile = main.file
 
@@ -379,8 +378,45 @@ function M.conflict_choose_all(target)
             api.nvim_buf_set_lines(curfile.bufnr, first - 1, last, false, content)
             offset = offset + (#content - (last - first) - 1)
           end
+
+          print("Set cursor to " .. first)
+          utils.set_cursor(main.id, unpack({
+            (content and #content or 0) + first - 1,
+            content and content[1] and #content[#content] or 0
+          }))
         end
       end
+    end
+
+    if (view and view:instanceof(DiffView.__get())) then
+      ---@cast view DiffView
+
+      if view.panel:is_focused() then
+        local item = view:infer_cur_file(false) ---@cast item -DirData
+        if not item then return end
+
+        if item.active then
+          -- The entry is already open and the action can proceed like normal
+          resolve_conflicts()
+        else
+          -- The entry is not open
+
+          view.emitter:once("file_open_post", function(e, ...)
+            -- When this callback is invoked, the entry is ready and the action can
+            -- proceed like normal
+            resolve_conflicts()
+          end)
+
+          -- Open the entry
+          view:set_file(item)
+        end
+      end
+    end
+
+    if view and view:instanceof(StandardView.__get()) then
+      ---@cast view StandardView
+
+      resolve_conflicts()
     end
   end
 end
