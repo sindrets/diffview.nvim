@@ -198,12 +198,16 @@ end
 ---@param ignore? vcs.File[]
 ---@return boolean
 function M.is_buf_in_use(bufnr, ignore)
+  local ignore_map = ignore and utils.vec_slice(ignore) or {}
+  vim.tbl_add_reverse_lookup(ignore_map)
+
   for _, view in ipairs(M.views) do
     if view:instanceof(StandardView.__get()) then
       ---@cast view StandardView
+
       for _, file in ipairs(view.cur_entry and view.cur_entry.layout:files() or {}) do
         if file:is_valid() and file.bufnr == bufnr then
-          if not (ignore and vim.tbl_contains(ignore, file)) then
+          if not ignore_map[file] then
             return true
           end
         end
