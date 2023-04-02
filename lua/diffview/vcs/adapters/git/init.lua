@@ -1481,13 +1481,33 @@ function GitAdapter:add_files(paths)
   return code == 0
 end
 
----Check if status for untracked files is disabled for a given git repo.
+---Check whether untracked files should be listed.
+---@param opt? VCSAdapter.show_untracked.Opt
 ---@return boolean
-function GitAdapter:show_untracked()
+function GitAdapter:show_untracked(opt)
+  opt = opt or {}
+
+  if opt.revs then
+    -- Never show untracked files when comparing against anything other than
+    -- the index
+    if not (opt.revs.left.type == RevType.STAGE and opt.revs.right.type == RevType.LOCAL) then
+      return false
+    end
+  end
+
+  -- Check the user provided flag options
+  if opt.dv_opt then
+    if type(opt.dv_opt.show_untracked) == "boolean" and not opt.dv_opt.show_untracked then
+      return false
+    end
+  end
+
+  -- Fall back to checking git config
   local out = self:exec_sync(
     { "config", "status.showUntrackedFiles" },
     { cwd = self.ctx.toplevel, silent = true }
   )
+
   return vim.trim(out[1] or "") ~= "no"
 end
 
