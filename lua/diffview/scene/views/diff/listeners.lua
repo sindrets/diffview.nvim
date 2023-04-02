@@ -103,14 +103,16 @@ return function(view)
       end
     end,
     open_commit_log = function()
-      local range = view.adapter.Rev.to_range(view.left, view.right)
-
-      if not range or view.left:is_head(view.adapter) then
+      if view.left.type == RevType.STAGE and view.right.type == RevType.LOCAL then
         utils.info("Changes not commited yet. No log available for these changes.")
         return
       end
 
-      view.commit_log_panel:update(range)
+      local range = view.adapter.Rev.to_range(view.left, view.right)
+
+      if range then
+        view.commit_log_panel:update(range)
+      end
     end,
     toggle_stage_entry = function()
       if not (view.left.type == RevType.STAGE and view.right.type == RevType.LOCAL) then
