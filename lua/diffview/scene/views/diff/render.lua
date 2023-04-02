@@ -164,33 +164,37 @@ return function(panel)
     comp:ln()
 
     render_files(panel.listing_style, panel.components.conflicting.files.comp)
+    panel.components.conflicting.margin.comp:add_line()
   end
 
-  comp = panel.components.working.title.comp
+  local has_other_files = #panel.files.conflicting > 0 or #panel.files.staged > 0
 
-  if #panel.files.conflicting > 0 then comp:add_line() end
+  -- Don't show the 'Changes' section if it's empty and we have other visible
+  -- sections.
+  if #panel.files.working > 0 or not has_other_files then
+    comp = panel.components.working.title.comp
+    comp:add_text("Changes ", "DiffviewFilePanelTitle")
+    comp:add_text("(" .. #panel.files.working .. ")", "DiffviewFilePanelCounter")
+    comp:ln()
 
-  comp:add_text("Changes ", "DiffviewFilePanelTitle")
-  comp:add_text("(" .. #panel.files.working .. ")", "DiffviewFilePanelCounter")
-  comp:ln()
-
-  render_files(panel.listing_style, panel.components.working.files.comp)
+    render_files(panel.listing_style, panel.components.working.files.comp)
+    panel.components.working.margin.comp:add_line()
+  end
 
   if #panel.files.staged > 0 then
     comp = panel.components.staged.title.comp
-    comp:add_line()
     comp:add_text("Staged changes ", "DiffviewFilePanelTitle")
     comp:add_text("(" .. #panel.files.staged .. ")", "DiffviewFilePanelCounter")
     comp:ln()
 
     render_files(panel.listing_style, panel.components.staged.files.comp)
+    panel.components.staged.margin.comp:add_line()
   end
 
   if panel.rev_pretty_name or (panel.path_args and #panel.path_args > 0) then
     local extra_info = utils.vec_join({ panel.rev_pretty_name }, panel.path_args or {})
 
     comp = panel.components.info.title.comp
-    comp:add_line()
     comp:add_line("Showing changes for:", "DiffviewFilePanelTitle")
 
     comp = panel.components.info.entries.comp
