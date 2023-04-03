@@ -467,3 +467,6 @@ git object database, and a command is echoed that shows how to undo the change.
     - (Lua): `vim.opt.fillchars:append { diff = "╱" }`
   - Note: whether or not the diagonal lines will line up nicely will depend on
     your terminal emulator. The terminal used in the screenshots is Kitty.
+- **Q: How do I jump between hunks in the diff?**
+  - A: Use `[c` and `]c`
+  - `:h jumpto-diffs`
