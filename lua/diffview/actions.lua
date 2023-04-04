@@ -338,57 +338,58 @@ local function diff_copy_target(kind)
   end
 end
 
+---@param view DiffView|StandardView
+---@param target "ours"|"theirs"|"base"|"all"|"none"
+local function resolve_all_conflicts(view, target)
+  local main = view.cur_layout:get_main_win()
+  local curfile = main.file
+
+  if main:is_valid() and curfile:is_valid() then
+    local lines = api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false)
+    local conflicts = vcs_utils.parse_conflicts(
+      lines,
+      main.id
+    )
+
+    if next(conflicts) then
+      local content
+      local offset = 0
+      local first
+      local last
+      for _, cur in pairs(conflicts) do
+
+        -- add offset to line numbers
+        first = cur.first + offset
+        last = cur.last + offset
+
+        if target == "ours" then content = cur.ours.content
+        elseif target == "theirs" then content = cur.theirs.content
+        elseif target == "base" then content = cur.base.content
+        elseif target == "all" then
+          content = utils.vec_join(
+            cur.ours.content,
+            cur.base.content,
+            cur.theirs.content
+          )
+        end
+
+        content = content or {}
+        api.nvim_buf_set_lines(curfile.bufnr, first - 1, last, false, content)
+        offset = offset + (#content - (last - first) - 1)
+      end
+
+      utils.set_cursor(main.id, unpack({
+        (content and #content or 0) + first - 1,
+        content and content[1] and #content[#content] or 0
+      }))
+    end
+  end
+end
+
 ---@param target "ours"|"theirs"|"base"|"all"|"none"
 function M.conflict_choose_all(target)
   return function()
-    local view = lib.get_current_view()
-
-    local resolve_conflicts = function ()
-      local main = view.cur_layout:get_main_win()
-      local curfile = main.file
-
-      if main:is_valid() and curfile:is_valid() then
-        local lines = api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false)
-        local conflicts = vcs_utils.parse_conflicts(
-          lines,
-          main.id
-        )
-
-        if next(conflicts) then
-          local content
-          local offset = 0
-          local first
-          local last
-          for _, cur in pairs(conflicts) do
-
-            -- add offset to line numbers
-            first = cur.first + offset
-            last = cur.last + offset
-
-            if target == "ours" then content = cur.ours.content
-            elseif target == "theirs" then content = cur.theirs.content
-            elseif target == "base" then content = cur.base.content
-            elseif target == "all" then
-              content = utils.vec_join(
-                cur.ours.content,
-                cur.base.content,
-                cur.theirs.content
-              )
-            end
-
-            content = content or {}
-            api.nvim_buf_set_lines(curfile.bufnr, first - 1, last, false, content)
-            offset = offset + (#content - (last - first) - 1)
-          end
-
-          print("Set cursor to " .. first)
-          utils.set_cursor(main.id, unpack({
-            (content and #content or 0) + first - 1,
-            content and content[1] and #content[#content] or 0
-          }))
-        end
-      end
-    end
+    local view = lib.get_current_view() --[[@as DiffView|StandardView ]]
 
     if (view and view:instanceof(DiffView.__get())) then
       ---@cast view DiffView
@@ -399,14 +400,13 @@ function M.conflict_choose_all(target)
 
         if item.active then
           -- The entry is already open and the action can proceed like normal
-          resolve_conflicts()
+          resolve_all_conflicts(view, target)
         else
           -- The entry is not open
-
-          view.emitter:once("file_open_post", function(e, ...)
+          view.emitter:once("file_open_post", function()
             -- When this callback is invoked, the entry is ready and the action can
             -- proceed like normal
-            resolve_conflicts()
+            resolve_all_conflicts(view, target)
           end)
 
           -- Open the entry
@@ -418,7 +418,7 @@ function M.conflict_choose_all(target)
     if view and view:instanceof(StandardView.__get()) then
       ---@cast view StandardView
 
-      resolve_conflicts()
+      resolve_all_conflicts(view, target)
     end
   end
 end
