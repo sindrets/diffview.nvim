@@ -356,20 +356,20 @@ local function resolve_all_conflicts(view, target)
       local offset = 0
       local first
       local last
-      for _, cur in pairs(conflicts) do
+      for _, cur_conflict in pairs(conflicts) do
 
         -- add offset to line numbers
-        first = cur.first + offset
-        last = cur.last + offset
+        first = cur_conflict.first + offset
+        last = cur_conflict.last + offset
 
-        if target == "ours" then content = cur.ours.content
-        elseif target == "theirs" then content = cur.theirs.content
-        elseif target == "base" then content = cur.base.content
+        if target == "ours" then content = cur_conflict.ours.content
+        elseif target == "theirs" then content = cur_conflict.theirs.content
+        elseif target == "base" then content = cur_conflict.base.content
         elseif target == "all" then
           content = utils.vec_join(
-            cur.ours.content,
-            cur.base.content,
-            cur.theirs.content
+            cur_conflict.ours.content,
+            cur_conflict.base.content,
+            cur_conflict.theirs.content
           )
         end
 
