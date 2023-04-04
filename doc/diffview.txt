@@ -237,6 +237,19 @@ COMMANDS                                        *diffview-commands*
         --reverse
                 List commits in reverse order.
 
+        --cherry-pick
+                Omit commits that introduce the same change as another commit
+                on the "other side" when the set of commits are limited with
+                symmetric difference.
+
+        --left-only
+                List only the commits on the left side of a symmetric
+                difference.
+
+        --right-only
+                List only the commits on the right side of a symmetric
+                difference.
+
         -n{n}, --max-count={n}
                 Limit the number of commits.
 
@@ -1490,6 +1503,19 @@ LogOptions                                      *diffview.git.LogOptions*
 
             {reverse} (boolean)
                 List commits in reverse order.
+
+            {cherry_pick} (boolean)
+                Omit commits that introduce the same change as another commit
+                on the "other side" when the set of commits are limited with
+                symmetric difference.
+
+            {left_only} (boolean)
+                List only the commits on the left side of a symmetric
+                difference.
+
+            {right_only} (boolean)
+                List only the commits on the right side of a symmetric
+                difference.
 
             {max_count} (integer)
                 Limit the number of commits.

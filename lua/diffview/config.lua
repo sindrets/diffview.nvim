@@ -249,6 +249,9 @@ M._config = M.defaults
 ---@field merges boolean
 ---@field no_merges boolean
 ---@field reverse boolean
+---@field cherry_pick boolean
+---@field left_only boolean
+---@field right_only boolean
 ---@field max_count integer
 ---@field L string[]
 ---@field author string
@@ -286,6 +289,9 @@ M.log_option_defaults = {
     merges = false,
     no_merges = false,
     reverse = false,
+    cherry_pick = false,
+    left_only = false,
+    right_only = false,
     rev_range = nil,
     base = nil,
     max_count = 256,

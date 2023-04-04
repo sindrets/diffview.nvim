@@ -381,6 +381,9 @@ function GitAdapter:prepare_fh_options(log_options, single_file)
       o.merges and { "--merges" } or nil,
       o.no_merges and { "--no-merges" } or nil,
       o.reverse and { "--reverse" } or nil,
+      o.cherry_pick and { "--cherry-pick" } or nil,
+      o.left_only and { "--left-only" } or nil,
+      o.right_only and { "--right-only" } or nil,
       o.max_count and { "-n" .. o.max_count } or nil,
       o.diff_merges and { "--diff-merges=" .. o.diff_merges } or nil,
       o.author and { "-E", "--author=" .. o.author } or nil,
@@ -750,6 +753,9 @@ function GitAdapter:file_history_options(range, paths, argo)
     { "merges" },
     { "no-merges" },
     { "reverse" },
+    { "cherry-pick" },
+    { "left-only" },
+    { "right-only" },
     { "max-count", "n" },
     { "L" },
     { "diff-merges" },
@@ -1733,6 +1739,9 @@ GitAdapter.flags = {
     FlagOption("-m", "--merges", "List only merge commits"),
     FlagOption("-n", "--no-merges", "List no merge commits"),
     FlagOption("-r", "--reverse", "List commits in reverse order"),
+    FlagOption("-cp", "--cherry-pick", "Omit commits that introduce the same change as another"),
+    FlagOption("-lo", "--left-only", "List only the commits on the left side of a symmetric diff"),
+    FlagOption("-ro", "--right-only", "List only the commits on the right side of a symmetric diff"),
   },
   ---@type FlagOption[]
   options = {
@@ -1930,6 +1939,9 @@ function GitAdapter:init_completion()
   self.comp.file_history:put({ "--merges" })
   self.comp.file_history:put({ "--no-merges" })
   self.comp.file_history:put({ "--reverse" })
+  self.comp.file_history:put({ "--cherry-pick" })
+  self.comp.file_history:put({ "--left-only" })
+  self.comp.file_history:put({ "--right-only" })
   self.comp.file_history:put({ "--max-count", "-n" }, {})
   self.comp.file_history:put({ "-L" }, function (_, arg_lead)
     return GitAdapter.line_trace_candidates(arg_lead)
