@@ -57,7 +57,7 @@ COMMANDS                                        *diffview-commands*
         `-C` flag is not defined, the git top-level is determined from the
         current buffer when possible. Otherwise it's determined from the cwd.
         Examples:
->
+>vim
             :DiffviewOpen
             :DiffviewOpen HEAD~2
             :DiffviewOpen HEAD~4..HEAD~2
@@ -179,7 +179,7 @@ COMMANDS                                        *diffview-commands*
         file history view.
 
         Examples:
->
+>vim
             :DiffviewFileHistory
             :DiffviewFileHistory %
             :DiffviewFileHistory path/to/some/file.txt
@@ -541,7 +541,8 @@ win_config                                      *diffview-config-win_config*
             listed here because they are already documented under
             |nvim_open_win()|.
 
-        Examples: >
+        Examples: >lua
+
             -- Split window, aligned to the right side of the editor:
             win_config = {
               type = "split",
@@ -598,7 +599,7 @@ default_args                                    *diffview-config-default_args*
         prepended to the arg-list for the commands specified by the table
         keys.
 
-        Examples: >
+        Examples: >lua
                 default_args = {
                   DiffviewOpen = { "--untracked-files=no", "--imply-local" },
                   DiffviewFileHistory = { "--base=LOCAL" },
@@ -695,7 +696,7 @@ hooks                                           *diffview-config-hooks*
                         • {layout_name} (string)
                           The name of the current layout.
 
-        Examples: >
+        Examples: >lua
                 hooks = {
                   diff_buf_read = function(bufnr)
                     -- Change local options in diff buffers
@@ -721,7 +722,7 @@ keymaps                                         *diffview-config-keymaps*
         normal mode mapping. These mappings all use the |:map-arguments|
         `silent`, `nowait`, and `noremap`. The implementation uses
         |vim.keymap.set()|, so the {rhs} can be either a vim command in the
-        form of a string, or it can be a lua function: >
+        form of a string, or it can be a lua function: >lua
 
         view = {
           -- Vim command:
@@ -735,7 +736,7 @@ keymaps                                         *diffview-config-keymaps*
         index values as list-like tables containing the arguments for
         |vim.keymap.set()|. This way you can also change all the
         |:map-arguments| with the only exception being the `buffer` field, as
-        this will be overridden with the target buffer number: >
+        this will be overridden with the target buffer number: >lua
 
         view = {
           -- Normal and visual mode mapping to vim command:
@@ -746,7 +747,7 @@ keymaps                                         *diffview-config-keymaps*
 <
 
         Setting a mapping's `desc` field to `"diffview_ignore"` will hide the
-        mapping from the help panel: >
+        mapping from the help panel: >lua
 
         view = {
           -- Ignore mapping in the help panel
@@ -754,7 +755,7 @@ keymaps                                         *diffview-config-keymaps*
         }
 <
 
-        To disable all the default mappings simply set: >
+        To disable all the default mappings simply set: >lua
 
         keymaps = {
           disable_defaults = true,
@@ -762,7 +763,7 @@ keymaps                                         *diffview-config-keymaps*
 <
 
         To disable any single mapping without disabling them all, set its
-        {rhs} to `false`: >
+        {rhs} to `false`: >lua
 
         view = {
           -- Disable the default normal mode mapping for `<tab>`:
@@ -777,7 +778,7 @@ keymaps                                         *diffview-config-keymaps*
 Actions ~
 
         Actions are key-mappable functions. You can access an action through
-        the config module: >
+        the config module: >lua
 
                 require("diffview.config").actions.{action_name}
 <
