@@ -33,6 +33,17 @@ Diffviews are automatically updated:
 
 Updates are not run unless the current tabpage is a Diffview.
 
+NOTE: Familiarize yourself with |diff-mode|. This plugin assumes you're
+familiar with all the features already provided by nvim's builtin diff-mode.
+These features include:
+
+        • Jumping between hunks (|jumpto-diffs|).
+        • Applying the changes of a diff hunk from any of the diffed buffers
+          (|copy-diffs|).
+        • And more...
+
+Visit the help page for more info.
+
 ------------------------------------------------------------------------------
 
 COMMANDS                                        *diffview-commands*

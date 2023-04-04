@@ -147,6 +147,20 @@ Examples:
 - `:DiffviewFileHistory --range=feat/example-branch`
 - `:'<,'>DiffviewFileHistory`
 
+### Familiarize Yourself With `:h diff-mode`
+
+| :information_source: This plugin assumes you're familiar with all the features already provided by nvim's builtin diff-mode |
+|:-----------------------------------------|
+
+These features include:
+
+- Jumping between hunks (`:h jumpto-diffs`).
+- Applying the changes of a diff hunk from any of the diffed buffers
+  (`:h copy-diffs`).
+- And more...
+
+Visit the help page for more info.
+
 ## Configuration
 
 <p>
@@ -470,3 +484,5 @@ git object database, and a command is echoed that shows how to undo the change.
 - **Q: How do I jump between hunks in the diff?**
   - A: Use `[c` and `]c`
   - `:h jumpto-diffs`
+
+<!-- vim: set tw=80 -->
