@@ -162,6 +162,16 @@ These features include:
 
 Visit the help page for more info.
 
+---
+
+<br>
+
+#### :information_source: Additionally check out [USAGE](USAGE.md) for examples of some more specific use-cases
+
+<br>
+
+---
+
 ## Configuration
 
 <p>
