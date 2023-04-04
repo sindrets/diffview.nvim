@@ -15,10 +15,11 @@ for any git rev.
 
 ## Requirements
 
-- Git ≥ 2.31.0
+- Git ≥ 2.31.0 (for Git support)
+- Mercurial (for Mercurial support)
 - Neovim ≥ 0.7.0
 - [plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
-- [nvim-web-devicons](https://github.com/kyazdani42/nvim-web-devicons) (optional) For file icons
+- [nvim-web-devicons](https://github.com/nvim-tree/nvim-web-devicons) (optional) For file icons
 
 ## Installation
 
