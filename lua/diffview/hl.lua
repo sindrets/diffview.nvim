@@ -21,7 +21,7 @@ local M = {}
 ---@field cterm      hl.HiValue<string>
 ---@field blend      hl.HiValue<integer>
 ---@field default    hl.HiValue<boolean> Only set values if the hl group is cleared.
----@field unlink     boolean Remove links.
+---@field link       string|-1
 ---@field explicit   boolean All undefined fields will be cleared from the hl group.
 
 ---@class hl.HiLinkSpec
@@ -31,12 +31,12 @@ local M = {}
 
 ---@class hl.HlData
 ---@field link string|integer
----@field foreground integer Foreground color integer
----@field background integer Background color integer
----@field special integer Special color integer
----@field fg string Foreground color hex string
----@field bg string Bakground color hex string
----@field sp string Special color hex string
+---@field fg integer Foreground color integer
+---@field bg integer Background color integer
+---@field sp integer Special color integer
+---@field x_fg string Foreground color hex string
+---@field x_bg string Bakground color hex string
+---@field x_sp string Special color hex string
 ---@field bold boolean
 ---@field italic boolean
 ---@field underline boolean
@@ -48,17 +48,21 @@ local M = {}
 ---@field standout boolean
 ---@field reverse boolean
 ---@field blend integer
+---@field default boolean
 
 ---@alias hl.HlAttrValue integer|boolean
 
+local HAS_NVIM_0_8 = vim.fn.has("nvim-0.8") == 1
+local HAS_NVIM_0_9 = vim.fn.has("nvim-0.9") == 1
+
 ---@enum HlAttribute
 M.HlAttribute = {
-  foreground = 1,
-  background = 2,
-  special = 3,
-  fg = 4,
-  bg = 5,
-  sp = 6,
+  fg = 1,
+  bg = 2,
+  sp = 3,
+  x_fg = 4,
+  x_bg = 5,
+  x_sp = 6,
   bold = 7,
   italic = 8,
   underline = 9,
@@ -86,7 +90,7 @@ local style_attrs = {
 }
 
 -- NOTE: Some atrtibutes have been renamed in v0.8.0
-if vim.fn.has("nvim-0.8") == 1 then
+if HAS_NVIM_0_8 then
   M.HlAttribute.underdashed = M.HlAttribute.underdash
   M.HlAttribute.underdash = nil
 
@@ -121,19 +125,34 @@ function M.get_hl(name, no_trans)
   local hl
 
   if no_trans then
-    hl = api.nvim__get_hl_defs(0)[name]
+    if HAS_NVIM_0_9 then
+      hl = api.nvim_get_hl(0, { name = name, link = true })
+    else
+      hl = api.nvim__get_hl_defs(0)[name]
+    end
   else
     local id = api.nvim_get_hl_id_by_name(name)
 
     if id then
-      hl = api.nvim_get_hl_by_id(id, true)
+      if HAS_NVIM_0_9 then
+        hl = api.nvim_get_hl(0, { id = id, link = false })
+      else
+        hl = api.nvim_get_hl_by_id(id, true)
+      end
     end
   end
 
   if hl then
-    if hl.foreground then hl.fg = string.format("#%06x", hl.foreground) end
-    if hl.background then hl.bg = string.format("#%06x", hl.background) end
-    if hl.special then hl.sp = string.format("#%06x", hl.special) end
+    if not HAS_NVIM_0_9 then
+      -- Handle renames
+      if hl.foreground then hl.fg = hl.foreground; hl.foreground = nil end
+      if hl.background then hl.bg = hl.background; hl.background = nil end
+      if hl.special then hl.sp = hl.special; hl.special = nil end
+    end
+
+    if hl.fg then hl.x_fg = string.format("#%06x", hl.fg) end
+    if hl.bg then hl.x_bg = string.format("#%06x", hl.bg) end
+    if hl.sp then hl.x_sp = string.format("#%06x", hl.sp) end
 
     return hl
   end
@@ -163,7 +182,7 @@ function M.get_fg(groups, no_trans)
   if type(groups) ~= "table" then groups = { groups } end
 
   for _, group in ipairs(groups) do
-    local v = M.get_hl_attr(group, hlattr.fg, no_trans) --[[@as string? ]]
+    local v = M.get_hl_attr(group, hlattr.x_fg, no_trans) --[[@as string? ]]
 
     if v then return v end
   end
@@ -179,7 +198,7 @@ function M.get_bg(groups, no_trans)
   if type(groups) ~= "table" then groups = { groups } end
 
   for _, group in ipairs(groups) do
-    local v = M.get_hl_attr(group, hlattr.bg, no_trans) --[[@as string? ]]
+    local v = M.get_hl_attr(group, hlattr.x_bg, no_trans) --[[@as string? ]]
 
     if v then return v end
   end
@@ -213,10 +232,10 @@ end
 
 ---@param spec hl.HiSpec
 ---@return hl.HlData
-function M.hi_spec_to_data(spec)
+function M.hi_spec_to_def_map(spec)
   ---@type hl.HlData
   local res = {}
-  local fields = { "fg", "bg", "sp", "ctermfg", "ctermbg", "cterm", "default" }
+  local fields = { "fg", "bg", "sp", "ctermfg", "ctermbg", "default", "link" }
 
   for _, field in ipairs(fields) do
     res[field] = spec[field]
@@ -239,20 +258,14 @@ function M.hi(groups, opt)
   if type(groups) ~= "table" then groups = { groups } end
 
   for _, group in ipairs(groups) do
-    local def_spec = M.hi_spec_to_data(opt)
+    local def_spec
 
-    if not opt.explicit then
-      def_spec = vim.tbl_extend("force", M.get_hl(group, true) or {}, def_spec) --[[@as hl.HlData ]]
-      def_spec[true] = nil
-      def_spec[false] = nil
-      def_spec.link = nil
-      def_spec.foreground = nil
-      def_spec.background = nil
-      def_spec.special = nil
-    end
-
-    if opt.unlink then
-      def_spec.link = -1
+    if opt.explicit then
+      def_spec = M.hi_spec_to_def_map(opt)
+    else
+      def_spec = M.hi_spec_to_def_map(
+        vim.tbl_extend("force", M.get_hl(group, true) or {}, opt)
+      )
     end
 
     for k, v in pairs(def_spec) do
@@ -261,7 +274,25 @@ function M.hi(groups, opt)
       end
     end
 
-    api.nvim_set_hl(0, group, def_spec)
+    if not HAS_NVIM_0_9 and def_spec.link then
+      -- Pre 0.9 `nvim_set_hl()` could not set other attributes in combination
+      -- with `link`. Furthermore, setting non-link attributes would clear the
+      -- link, but this does *not* happen if you set the other attributes first
+      -- (???). However, if the value of `link` is `-1`, the group will be
+      -- cleared regardless (?????).
+      local link = def_spec.link
+      def_spec.link = nil
+
+      if not def_spec.default then
+        api.nvim_set_hl(0, group, def_spec)
+      end
+
+      if link ~= -1 then
+        api.nvim_set_hl(0, group, { link = link, default = def_spec.default })
+      end
+    else
+      api.nvim_set_hl(0, group, def_spec)
+    end
   end
 end
 
@@ -282,13 +313,18 @@ function M.hi_link(from, to, opt)
 
   for _, f in ipairs(from) do
     if opt.clear then
-      api.nvim_set_hl(0, f, {})
-    end
+      if not HAS_NVIM_0_9 then
+        -- Pre 0.9 `nvim_set_hl()` did not clear other attributes when `link` was set.
+        api.nvim_set_hl(0, f, {})
+      end
 
-    api.nvim_set_hl(0, f, {
-      default = opt.default,
-      link = to,
-    })
+      api.nvim_set_hl(0, f, { default = opt.default, link = to })
+
+    else
+      -- When `clear` is not set; use our `hi()` function such that other
+      -- attributes are not affected.
+      M.hi(f, { default = opt.default, link = to })
+    end
   end
 end
 
@@ -351,7 +387,7 @@ end
 
 local git_status_hl_map = {
   ["A"] = "DiffviewStatusAdded",
-  ["?"] = "DiffviewStatusAdded",
+  ["?"] = "DiffviewStatusUntracked",
   ["M"] = "DiffviewStatusModified",
   ["R"] = "DiffviewStatusRenamed",
   ["C"] = "DiffviewStatusCopied",

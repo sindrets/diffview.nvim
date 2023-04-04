@@ -29,6 +29,8 @@ local M = setmetatable({}, {
   end
 })
 
+M.compat = {}
+
 ---@return FileEntry?
 ---@return integer[]? cursor
 local function prepare_goto_file()
@@ -273,7 +275,7 @@ function M.scroll_view(distance)
     scroll_cmd = ([[exe "norm! %d%s"]]):format(distance, scroll_opr)
   else
     scroll_cmd = ([[exe "norm! " . float2nr(winheight(0) * %f) . "%s"]])
-        :format(distance, scroll_opr)
+        :format(math.abs(distance), scroll_opr)
   end
 
   return function()
@@ -285,9 +287,9 @@ function M.scroll_view(distance)
       local target
 
       for _, win in ipairs(view.cur_layout.windows) do
-        local c = api.nvim_buf_line_count(api.nvim_win_get_buf(win.id))
-        if c > max then
-          max = c
+        local height = utils.win_content_height(win.id)
+        if height > max then
+          max = height
           target = win.id
         end
       end
@@ -574,6 +576,53 @@ function M.help(keymap_groups)
       local help_panel = HelpPanel(view, keymap_groups) --[[@as HelpPanel ]]
       help_panel:focus()
     end
+  end
+end
+
+do
+  M.compat.fold_cmds = {}
+
+  -- For file entries that use custom folds with `foldmethod=manual` we need to
+  -- replicate fold commands in all diff windows, as folds are only
+  -- synchronized between diff windows when `foldmethod=diff`.
+  local function compat_fold(fold_cmd)
+    return function()
+      if vim.wo.foldmethod ~= "manual" then
+        local ok, msg = pcall(vim.cmd, "norm! " .. fold_cmd)
+        if not ok and msg then
+          api.nvim_err_writeln(msg)
+        end
+        return
+      end
+
+      local view = lib.get_current_view()
+
+      if view and view:instanceof(StandardView.__get()) then
+        ---@cast view StandardView
+        local err
+
+        for _, win in ipairs(view.cur_layout.windows) do
+          api.nvim_win_call(win.id, function()
+            local ok, msg = pcall(vim.cmd, "norm! " .. fold_cmd)
+            if not ok then err = msg end
+          end)
+        end
+
+        if err then api.nvim_err_writeln(err) end
+      end
+    end
+  end
+
+  for _, fold_cmd in ipairs({
+    "za", "zA", "ze", "zE", "zo", "zc", "zO", "zC", "zr", "zm", "zR", "zM",
+    "zv", "zx", "zX", "zn", "zN", "zi",
+  }) do
+    table.insert(M.compat.fold_cmds, {
+      "n",
+      fold_cmd,
+      compat_fold(fold_cmd),
+      { desc = "diffview_ignore" },
+    })
   end
 end
 

@@ -137,6 +137,7 @@ M.defaults = {
       { "n", "<leader>cB",    actions.conflict_choose_all("base"),    { desc = "Choose the BASE version of a conflict for the whole file" } },
       { "n", "<leader>cA",    actions.conflict_choose_all("all"),     { desc = "Choose all the versions of a conflict for the whole file" } },
       { "n", "dX",            actions.conflict_choose_all("none"),    { desc = "Delete the conflict region for the whole file" } },
+      unpack(actions.compat.fold_cmds),
     },
     diff1 = {
       -- Mappings in single window diff layouts

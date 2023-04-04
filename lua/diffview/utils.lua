@@ -631,7 +631,7 @@ end
 
 ---Try property access.
 ---@param t table
----@param table_path string|string[] Either a `.` separated string of table keys, or a list.
+---@param table_path string|any[] Either a `.` separated string of table keys, or a list.
 ---@return any?
 function M.tbl_access(t, table_path)
   local keys = type(table_path) == "table"
@@ -748,9 +748,11 @@ end
 
 ---Set a value in a table, creating all missing intermediate tables in the
 ---table path.
+---@generic T
 ---@param t table
----@param table_path string|string[] Either a `.` separated string of table keys, or a list.
----@param value any
+---@param table_path string|any[] Either a `.` separated string of table keys, or a list.
+---@param value T
+---@return T
 function M.tbl_set(t, table_path, value)
   local keys = type(table_path) == "table"
       and table_path
@@ -769,19 +771,26 @@ function M.tbl_set(t, table_path, value)
   end
 
   cur[keys[#keys]] = value
+
+  return value
 end
 
----Ensure that the table path is a table in `t`.
+---Ensure that the table path is a table in `t`. Also returns the table.
 ---@param t table
----@param table_path string|string[] Either a `.` separated string of table keys, or a list.
+---@param table_path string|any[] Either a `.` separated string of table keys, or a list.
+---@return table
 function M.tbl_ensure(t, table_path)
   local keys = type(table_path) == "table"
       and table_path
       or vim.split(table_path, ".", { plain = true })
 
-  if not M.tbl_access(t, keys) then
-    M.tbl_set(t, keys, {})
+  local ret = M.tbl_access(t, keys)
+  if not ret then
+    ret = {}
+    M.tbl_set(t, keys, ret)
   end
+
+  return ret
 end
 
 ---Create a shallow copy of a portion of a vector. Negative numbers indexes
@@ -1173,6 +1182,36 @@ function M.win_find_buf(bufid, tabpage)
   return result
 end
 
+---Get the height of the content currently in a window's view, diregarding
+---virtual / filler lines.
+---@param winid integer
+---@return integer
+function M.win_content_height(winid)
+  if winid == 0 then winid = api.nvim_get_current_win() end
+  ---@diagnostic disable-next-line: redundant-parameter
+  local topline = vim.fn.line("w0", winid)
+  ---@diagnostic disable-next-line: redundant-parameter
+  local botline = vim.fn.line("w$", winid)
+  local cur = topline
+  local ret = 0
+
+  api.nvim_win_call(winid, function()
+    while cur <= botline do
+      local fold_end = vim.fn.foldclosedend(cur)
+
+      if fold_end > -1 then
+        cur = fold_end + 1
+      else
+        cur = cur + 1
+      end
+
+      ret = ret + 1
+    end
+  end)
+
+  return ret
+end
+
 ---Set the (1,0)-indexed cursor position without having to worry about
 ---out-of-bounds coordinates. The line number is clamped to the number of lines
 ---in the target buffer.
@@ -1319,8 +1358,9 @@ function M.temp_win(bufnr, enter)
   })
 end
 
+---Create a copy of `func` bound to the given arguments.
 ---@param func function
----@param ... any
+---@param ... any Arguments to prepend to arguments provided to the bound function when invoking `func`.
 ---@return fun(...): unknown
 function M.bind(func, ...)
   local args = M.tbl_pack(...)
