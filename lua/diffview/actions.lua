@@ -382,6 +382,8 @@ local function resolve_all_conflicts(view, target)
         (content and #content or 0) + first - 1,
         content and content[1] and #content[#content] or 0
       }))
+
+      view.cur_layout:sync_scroll()
     end
   end
 end
