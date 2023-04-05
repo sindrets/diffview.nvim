@@ -349,9 +349,12 @@ EXAMPLE CONFIGURATION WITH DEFAULT SETTINGS: |diffview.defaults|
 enhanced_diff_hl                                *diffview-config-enhanced_diff_hl*
         Type: `boolean`, Default: `false`
 
-        Enable/disable enhanced diff highlighting. When enabled, |hl-DiffAdd|
-        in the left diff buffer will be highlighted as |hl-DiffDelete|, and
-        the delete fill-chars will be highlighted more subtly.
+        Enable/disable enhanced diff highlighting. In `diff2*` layouts this
+        will highlight the delete fill-chars more subtly, and show
+        |hl-DiffAdd| in the old state buffer, as |hl-DiffDelete|. This makes
+        the highlighting more inline with how 2-way diffs are displayed in
+        other diff tools. As - in a 2-way diff - an "addition" in the old
+        state actually represents a deletion.
 
 git_cmd                                         *diffview-config-git_cmd*
         Type: `string[]`, Default: `{ "git" }`
