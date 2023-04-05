@@ -405,11 +405,7 @@ function M.conflict_choose_all(target)
           resolve_all_conflicts(view, target)
         else
           -- The entry is not open
-          view.emitter:once("file_open_post", function()
-            -- When this callback is invoked, the entry is ready and the action can
-            -- proceed like normal
-            resolve_all_conflicts(view, target)
-          end)
+          view.emitter:once("file_open_post", utils.bind(resolve_all_conflicts, view, target))
 
           -- Open the entry
           view:set_file(item)
