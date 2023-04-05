@@ -1,23 +1,14 @@
 local lazy = require("diffview.lazy")
 
----@type Diff1|LazyModule
-local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1")
----@type Diff2|LazyModule
-local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2")
----@type Diff3|LazyModule
-local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3")
----@type Diff4|LazyModule
-local Diff4 = lazy.access("diffview.scene.layouts.diff_3", "Diff4")
----@type Panel|LazyModule
-local Panel = lazy.access("diffview.ui.panel", "Panel")
----@type View|LazyModule
-local View = lazy.access("diffview.scene.view", "View")
----@module "diffview.config"
-local config = lazy.require("diffview.config")
----@module "diffview.oop"
-local oop = lazy.require("diffview.oop")
----@module "diffview.utils"
-local utils = lazy.require("diffview.utils")
+local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1") ---@type Diff1|LazyModule
+local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2") ---@type Diff2|LazyModule
+local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3") ---@type Diff3|LazyModule
+local Diff4 = lazy.access("diffview.scene.layouts.diff_3", "Diff4") ---@type Diff4|LazyModule
+local Panel = lazy.access("diffview.ui.panel", "Panel") ---@type Panel|LazyModule
+local View = lazy.access("diffview.scene.view", "View") ---@type View|LazyModule
+local config = lazy.require("diffview.config") ---@module "diffview.config"
+local oop = lazy.require("diffview.oop") ---@module "diffview.oop"
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
 local M = {}
@@ -132,67 +123,26 @@ end
 
 ---@param entry FileEntry
 function StandardView:use_entry(entry)
+  local layout_key
+
   if entry.layout:instanceof(Diff1.__get()) then
-    local layout = entry.layout --[[@as Diff1 ]]
-    layout.b.file.winopts = vim.tbl_extend(
-      "force",
-      layout.b.file.winopts,
-      self.winopts.diff1.b or {}
-    )
-
+    layout_key = "diff1"
   elseif entry.layout:instanceof(Diff2.__get()) then
-    local layout = entry.layout --[[@as Diff2 ]]
-    layout.a.file.winopts = vim.tbl_extend(
-      "force",
-      layout.a.file.winopts,
-      self.winopts.diff2.a or {}
-    )
-    layout.b.file.winopts = vim.tbl_extend(
-      "force",
-      layout.b.file.winopts,
-      self.winopts.diff2.b or {}
-    )
-
+    layout_key = "diff2"
   elseif entry.layout:instanceof(Diff3.__get()) then
-    local layout = entry.layout --[[@as Diff3 ]]
-    layout.a.file.winopts = vim.tbl_extend(
-      "force",
-      layout.a.file.winopts,
-      self.winopts.diff3.a or {}
-    )
-    layout.b.file.winopts = vim.tbl_extend(
-      "force",
-      layout.b.file.winopts,
-      self.winopts.diff3.b or {}
-    )
-    layout.c.file.winopts = vim.tbl_extend(
-      "force",
-      layout.c.file.winopts,
-      self.winopts.diff3.c or {}
-    )
-
+    layout_key = "diff3"
   elseif entry.layout:instanceof(Diff4.__get()) then
-    local layout = entry.layout --[[@as Diff4 ]]
-    layout.a.file.winopts = vim.tbl_extend(
-      "force",
-      layout.a.file.winopts,
-      self.winopts.diff4.a or {}
-    )
-    layout.b.file.winopts = vim.tbl_extend(
-      "force",
-      layout.b.file.winopts,
-      self.winopts.diff4.b or {}
-    )
-    layout.c.file.winopts = vim.tbl_extend(
-      "force",
-      layout.c.file.winopts,
-      self.winopts.diff4.c or {}
-    )
-    layout.d.file.winopts = vim.tbl_extend(
-      "force",
-      layout.d.file.winopts,
-      self.winopts.diff4.d or {}
-    )
+    layout_key = "diff4"
+  end
+
+  for _, sym in ipairs({ "a", "b", "c", "d" }) do
+    if entry.layout[sym] then
+      entry.layout[sym].file.winopts = vim.tbl_extend(
+        "force",
+        entry.layout[sym].file.winopts,
+        self.winopts[layout_key][sym] or {}
+      )
+    end
   end
 
   local old_layout = self.cur_layout
