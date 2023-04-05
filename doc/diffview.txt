@@ -1052,15 +1052,25 @@ refresh_files                                   *diffview-actions-refresh_files*
         Update stats and entries in the file list.
 
 restore_entry                                   *diffview-actions-restore_entry*
-        Contexts: `diff_view`, `file_panel`
+        Contexts: `view`, `panel`
 
-        Revert the selected file entry to the state from the left side of the
-        diff. This only works if the right side of the diff is showing the
-        local state of the file. A command is echoed that shows how to undo
-        the change. Check |:messages| to see it again.
+        For `diff_view`:
 
-        NOTE: "Restoring" an untracked file will delete it from disk. It still
-        gets backed up in the local git database, so it is reversible.
+            Revert the selected file entry to the state from the left side of
+            the diff. This only works if the right side of the diff is showing
+            the local state of the file.
+
+            NOTE: "Restoring" an untracked file will delete it from disk. It
+            still gets backed up in the local git database, so it is
+            reversible.
+
+        For `file_history_view`:
+
+            Revert the selected file to the state it was in, in the selected
+            entry's commit.
+
+        NOTE: A command is echoed that shows how to undo the change. Check
+        |:messages| to see it again.
 
 scroll_view({distance})                         *diffview-actions-scroll_view*
         Contexts: `panel`

@@ -205,26 +205,31 @@ return function(view)
       view.emitter:emit(EventName.FILES_STAGED, view)
     end,
     restore_entry = async.void(function()
-      local commit
-      if not (view.right.type == RevType.LOCAL) then
+      if view.right.type ~= RevType.LOCAL then
         utils.err("The right side of the diff is not local! Aborting file restoration.")
         return
       end
-      if not (view.left.type == RevType.STAGE) then
+
+      local commit
+
+      if view.left.type ~= RevType.STAGE then
         commit = view.left.commit
       end
+
       local file = view:infer_cur_file()
-      if file then
-        local bufid = utils.find_file_buffer(file.path)
-        if bufid and vim.bo[bufid].modified then
-          utils.err("The file is open with unsaved changes! Aborting file restoration.")
-          return
-        end
-        vcs_utils.restore_file(view.adapter, file.path, file.kind, commit, function()
-          async.util.scheduler()
-          view:update_files()
-        end)
+      if not file then return end
+
+      local bufid = utils.find_file_buffer(file.path)
+
+      if bufid and vim.bo[bufid].modified then
+        utils.err("The file is open with unsaved changes! Aborting file restoration.")
+        return
       end
+
+      vcs_utils.restore_file(view.adapter, file.path, file.kind, commit, function()
+        async.util.scheduler()
+        view:update_files()
+      end)
     end),
     listing_style = function()
       if view.panel.listing_style == "list" then

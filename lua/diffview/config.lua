@@ -197,6 +197,7 @@ M.defaults = {
       { "n", "<C-A-d>",       actions.open_in_diffview,            { desc = "Open the entry under the cursor in a diffview" } },
       { "n", "y",             actions.copy_hash,                   { desc = "Copy the commit hash of the entry under the cursor" } },
       { "n", "L",             actions.open_commit_log,             { desc = "Show commit details" } },
+      { "n", "X",             actions.restore_entry,               { desc = "Restore file to the state from the selected entry" } },
       { "n", "zo",            actions.open_fold,                   { desc = "Expand fold" } },
       { "n", "zc",            actions.close_fold,                  { desc = "Collapse fold" } },
       { "n", "h",             actions.close_fold,                  { desc = "Collapse fold" } },

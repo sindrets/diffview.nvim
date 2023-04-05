@@ -221,7 +221,7 @@ end, 7)
 ---@param adapter VCSAdapter
 ---@param path string
 ---@param kind vcs.FileKind
----@param commit string
+---@param commit? string
 M.restore_file = async.wrap(function(adapter, path, kind, commit, callback)
   local ok, undo = adapter:file_restore(path, kind, commit)
 
