@@ -410,6 +410,8 @@ function M.conflict_choose_all(target)
           -- Open the entry
           view:set_file(item)
         end
+      else
+        resolve_all_conflicts(view, target)
       end
     end
 
