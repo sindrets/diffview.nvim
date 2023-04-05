@@ -338,7 +338,7 @@ local function diff_copy_target(kind)
   end
 end
 
----@param view DiffView|StandardView
+---@param view DiffView
 ---@param target "ours"|"theirs"|"base"|"all"|"none"
 local function resolve_all_conflicts(view, target)
   local main = view.cur_layout:get_main_win()
@@ -391,7 +391,7 @@ end
 ---@param target "ours"|"theirs"|"base"|"all"|"none"
 function M.conflict_choose_all(target)
   return function()
-    local view = lib.get_current_view() --[[@as DiffView|StandardView ]]
+    local view = lib.get_current_view() --[[@as DiffView ]]
 
     if (view and view:instanceof(DiffView.__get())) then
       ---@cast view DiffView
@@ -413,12 +413,6 @@ function M.conflict_choose_all(target)
       else
         resolve_all_conflicts(view, target)
       end
-    end
-
-    if view and view:instanceof(StandardView.__get()) then
-      ---@cast view StandardView
-
-      resolve_all_conflicts(view, target)
     end
   end
 end
