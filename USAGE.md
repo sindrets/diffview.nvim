@@ -62,8 +62,8 @@ this, you can use `:DiffviewFileHistory`:
 Here we are again using a symmetric difference range. However, symdiff ranges
 have different behavior between `git-diff` and `git-log`. Whereas in `git-diff`
 it compares against the merge-base, here it will select only the commits that
-exist in *either* `origin/main` *or* in `HEAD`, but not in both (in other words,
-it's actually performing a symmetric difference here).
+are reachable from *either* `origin/main` *or* `HEAD`, but not from both (in
+other words, it's actually performing a symmetric difference here).
 
 We then use the cherry-pick option `--right-only` to limit the commits to only
 those on the right side of the symmetric difference. Finally `--no-merges`
