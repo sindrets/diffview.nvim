@@ -207,6 +207,7 @@ M.defaults = {
       { "n", "<C-A-d>",       actions.open_in_diffview,            { desc = "Open the entry under the cursor in a diffview" } },
       { "n", "y",             actions.copy_hash,                   { desc = "Copy the commit hash of the entry under the cursor" } },
       { "n", "L",             actions.open_commit_log,             { desc = "Show commit details" } },
+      { "n", "X",             actions.restore_entry,               { desc = "Restore file to the state from the selected entry" } },
       { "n", "zo",            actions.open_fold,                   { desc = "Expand fold" } },
       { "n", "zc",            actions.close_fold,                  { desc = "Collapse fold" } },
       { "n", "h",             actions.close_fold,                  { desc = "Collapse fold" } },
@@ -259,6 +260,9 @@ M._config = M.defaults
 ---@field merges boolean
 ---@field no_merges boolean
 ---@field reverse boolean
+---@field cherry_pick boolean
+---@field left_only boolean
+---@field right_only boolean
 ---@field max_count integer
 ---@field L string[]
 ---@field author string
@@ -296,6 +300,9 @@ M.log_option_defaults = {
     merges = false,
     no_merges = false,
     reverse = false,
+    cherry_pick = false,
+    left_only = false,
+    right_only = false,
     rev_range = nil,
     base = nil,
     max_count = 256,

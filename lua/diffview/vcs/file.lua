@@ -89,20 +89,29 @@ function File:init(opt)
 
   -- Set winbar info
   if self.rev then
-    local winbar
+    local winbar, label
 
     if self.rev.type == RevType.LOCAL then
       winbar = " WORKING TREE - ${path}"
     elseif self.rev.type == RevType.COMMIT then
       winbar = " ${object_path}"
     elseif self.rev.type == RevType.STAGE then
-      winbar = " INDEX - ${object_path}"
+      if self.kind == "conflicting" then
+        label = ({
+          [1] = "(Common ancestor) ",
+          [2] = "(Current changes) ",
+          [3] = "(Incoming changes) ",
+        })[self.rev.stage] or ""
+      end
+
+      winbar = " INDEX ${label}- ${object_path}"
     end
 
     if winbar then
       self.winbar = utils.str_template(winbar, {
         path = self.path,
         object_path = self.rev:object_name(10) .. ":" .. self.path,
+        label = label or "",
       })
     end
   end

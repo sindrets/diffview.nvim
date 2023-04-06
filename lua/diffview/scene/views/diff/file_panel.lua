@@ -150,16 +150,19 @@ function FilePanel:update_components()
       name = "conflicting",
       { name = "title" },
       conflicting_files,
+      { name = "margin" },
     },
     {
       name = "working",
       { name = "title" },
       working_files,
+      { name = "margin" },
     },
     {
       name = "staged",
       { name = "title" },
       staged_files,
+      { name = "margin" },
     },
     {
       name = "info",

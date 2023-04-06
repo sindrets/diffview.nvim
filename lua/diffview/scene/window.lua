@@ -243,6 +243,11 @@ function Window:apply_null_winopts()
   if File.NULL_FILE.winopts then
     utils.set_local(self.id, File.NULL_FILE.winopts)
   end
+
+  local file_winhl = utils.tbl_access(self, "file.winopts.winhl")
+  if file_winhl then
+    utils.set_local(self.id, { winhl = file_winhl })
+  end
 end
 
 ---Use the given map of local options. These options are saved and restored

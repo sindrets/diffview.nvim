@@ -280,7 +280,7 @@ function GitAdapter:verify_rev_arg(rev_arg)
   return code == 0 and (out[2] ~= nil or out[1] and out[1] ~= ""), out
 end
 
----@return vcs.MergeContext
+---@return vcs.MergeContext?
 function GitAdapter:get_merge_context()
   local their_head
 
@@ -291,18 +291,23 @@ function GitAdapter:get_merge_context()
     end
   end
 
-  assert(their_head)
+  if not their_head then
+    -- We were unable to find THEIR head. Merge could be a result of an applied
+    -- stash (or something else?). Either way, we can't proceed.
+    return
+  end
+
   local ret = {}
   local out, code = self:exec_sync({ "show", "-s", "--pretty=format:%H%n%D", "HEAD", "--" }, self.ctx.toplevel)
 
-  ret.ours = code ~= 0 and {} or  {
+  ret.ours = code ~= 0 and {} or {
     hash = out[1],
     ref_names = out[2],
   }
 
   out, code = self:exec_sync({ "show", "-s", "--pretty=format:%H%n%D", their_head, "--" }, self.ctx.toplevel)
 
-  ret.theirs = code ~= 0 and {} or  {
+  ret.theirs = code ~= 0 and {} or {
     hash = out[1],
     rev_names = out[2],
   }
@@ -376,6 +381,9 @@ function GitAdapter:prepare_fh_options(log_options, single_file)
       o.merges and { "--merges" } or nil,
       o.no_merges and { "--no-merges" } or nil,
       o.reverse and { "--reverse" } or nil,
+      o.cherry_pick and { "--cherry-pick" } or nil,
+      o.left_only and { "--left-only" } or nil,
+      o.right_only and { "--right-only" } or nil,
       o.max_count and { "-n" .. o.max_count } or nil,
       o.diff_merges and { "--diff-merges=" .. o.diff_merges } or nil,
       o.author and { "-E", "--author=" .. o.author } or nil,
@@ -745,6 +753,9 @@ function GitAdapter:file_history_options(range, paths, argo)
     { "merges" },
     { "no-merges" },
     { "reverse" },
+    { "cherry-pick" },
+    { "left-only" },
+    { "right-only" },
     { "max-count", "n" },
     { "L" },
     { "diff-merges" },
@@ -1476,13 +1487,33 @@ function GitAdapter:add_files(paths)
   return code == 0
 end
 
----Check if status for untracked files is disabled for a given git repo.
+---Check whether untracked files should be listed.
+---@param opt? VCSAdapter.show_untracked.Opt
 ---@return boolean
-function GitAdapter:show_untracked()
+function GitAdapter:show_untracked(opt)
+  opt = opt or {}
+
+  if opt.revs then
+    -- Never show untracked files when comparing against anything other than
+    -- the index
+    if not (opt.revs.left.type == RevType.STAGE and opt.revs.right.type == RevType.LOCAL) then
+      return false
+    end
+  end
+
+  -- Check the user provided flag options
+  if opt.dv_opt then
+    if type(opt.dv_opt.show_untracked) == "boolean" and not opt.dv_opt.show_untracked then
+      return false
+    end
+  end
+
+  -- Fall back to checking git config
   local out = self:exec_sync(
     { "config", "status.showUntrackedFiles" },
     { cwd = self.ctx.toplevel, silent = true }
   )
+
   return vim.trim(out[1] or "") ~= "no"
 end
 
@@ -1708,6 +1739,9 @@ GitAdapter.flags = {
     FlagOption("-m", "--merges", "List only merge commits"),
     FlagOption("-n", "--no-merges", "List no merge commits"),
     FlagOption("-r", "--reverse", "List commits in reverse order"),
+    FlagOption("-cp", "--cherry-pick", "Omit commits that introduce the same change as another"),
+    FlagOption("-lo", "--left-only", "List only the commits on the left side of a symmetric diff"),
+    FlagOption("-ro", "--right-only", "List only the commits on the right side of a symmetric diff"),
   },
   ---@type FlagOption[]
   options = {
@@ -1905,6 +1939,9 @@ function GitAdapter:init_completion()
   self.comp.file_history:put({ "--merges" })
   self.comp.file_history:put({ "--no-merges" })
   self.comp.file_history:put({ "--reverse" })
+  self.comp.file_history:put({ "--cherry-pick" })
+  self.comp.file_history:put({ "--left-only" })
+  self.comp.file_history:put({ "--right-only" })
   self.comp.file_history:put({ "--max-count", "-n" }, {})
   self.comp.file_history:put({ "-L" }, function (_, arg_lead)
     return GitAdapter.line_trace_candidates(arg_lead)

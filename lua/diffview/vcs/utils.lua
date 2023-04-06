@@ -149,13 +149,11 @@ M.diff_file_list = async.wrap(function(adapter, left, right, path_args, dv_opt, 
 
       files:set_working(tfiles)
       files:set_conflicting(tconflicts)
-      local show_untracked = dv_opt.show_untracked
 
-      if show_untracked == nil then
-        show_untracked = adapter:show_untracked()
-      end
-
-      if not (show_untracked and adapter:has_local(left, right)) then
+      if not adapter:show_untracked({
+        dv_opt = dv_opt,
+        revs = { left = left, right = right },
+      }) then
         latch:count_down()
         return
       end
@@ -223,7 +221,7 @@ end, 7)
 ---@param adapter VCSAdapter
 ---@param path string
 ---@param kind vcs.FileKind
----@param commit string
+---@param commit? string
 M.restore_file = async.wrap(function(adapter, path, kind, commit, callback)
   local ok, undo = adapter:file_restore(path, kind, commit)
 

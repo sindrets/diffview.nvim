@@ -205,7 +205,7 @@ end
 ---@field theirs { hash: string, ref_names: string? }
 ---@field base { hash: string, ref_names: string? }
 
----@return vcs.MergeContext
+---@return vcs.MergeContext?
 function VCSAdapter:get_merge_context()
   oop.abstract_stub()
 end
@@ -294,9 +294,14 @@ function VCSAdapter:diffview_options(argo)
   oop.abstract_stub()
 end
 
----Check if status for untracked files is disabled
+---@class VCSAdapter.show_untracked.Opt
+---@field dv_opt? DiffViewOptions
+---@field revs? { left: Rev, right: Rev }
+
+---Check whether untracked files should be listed.
+---@param opt? VCSAdapter.show_untracked.Opt
 ---@return boolean
-function VCSAdapter:show_untracked()
+function VCSAdapter:show_untracked(opt)
   oop.abstract_stub()
 end
 

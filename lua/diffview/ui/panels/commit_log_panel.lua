@@ -85,6 +85,11 @@ CommitLogPanel.update = async.void(function(self, args)
 
       self.job_out = job:result()
 
+      if not next(self.job_out) then
+        utils.info("No log content available for these changes.")
+        return
+      end
+
       if not self:is_open() then
         self:init_buffer()
       else

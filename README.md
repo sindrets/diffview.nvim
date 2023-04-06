@@ -15,10 +15,11 @@ for any git rev.
 
 ## Requirements
 
-- Git ≥ 2.31.0
+- Git ≥ 2.31.0 (for Git support)
+- Mercurial (for Mercurial support)
 - Neovim ≥ 0.7.0
 - [plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
-- [nvim-web-devicons](https://github.com/kyazdani42/nvim-web-devicons) (optional) For file icons
+- [nvim-web-devicons](https://github.com/nvim-tree/nvim-web-devicons) (optional) For file icons
 
 ## Installation
 
@@ -146,6 +147,30 @@ Examples:
 - `:DiffviewFileHistory --range=origin..HEAD`
 - `:DiffviewFileHistory --range=feat/example-branch`
 - `:'<,'>DiffviewFileHistory`
+
+### Familiarize Yourself With `:h diff-mode`
+
+| :information_source: This plugin assumes you're familiar with all the features already provided by nvim's builtin diff-mode |
+|:-----------------------------------------|
+
+These features include:
+
+- Jumping between hunks (`:h jumpto-diffs`).
+- Applying the changes of a diff hunk from any of the diffed buffers
+  (`:h copy-diffs`).
+- And more...
+
+Visit the help page for more info.
+
+---
+
+<br>
+
+#### :information_source: Additionally check out [USAGE](USAGE.md) for examples of some more specific use-cases
+
+<br>
+
+---
 
 ## Configuration
 
@@ -467,3 +492,8 @@ git object database, and a command is echoed that shows how to undo the change.
     - (Lua): `vim.opt.fillchars:append { diff = "╱" }`
   - Note: whether or not the diagonal lines will line up nicely will depend on
     your terminal emulator. The terminal used in the screenshots is Kitty.
+- **Q: How do I jump between hunks in the diff?**
+  - A: Use `[c` and `]c`
+  - `:h jumpto-diffs`
+
+<!-- vim: set tw=80 -->

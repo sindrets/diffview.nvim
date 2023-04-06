@@ -954,9 +954,15 @@ function HgAdapter:file_restore(path, kind, commit)
   end
 
   return true, undo
-
 end
 
+---Check whether untracked files should be listed.
+---@param opt? VCSAdapter.show_untracked.Opt
+---@return boolean
+function HgAdapter:show_untracked(opt)
+  -- FIXME(zegervdv)
+  return true
+end
 
 function HgAdapter:get_files_args(args)
   return utils.vec_join(self:args(), "status", "--print0", "--unknown", "--no-status", "--template={path}\\n", args)

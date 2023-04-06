@@ -33,6 +33,17 @@ Diffviews are automatically updated:
 
 Updates are not run unless the current tabpage is a Diffview.
 
+NOTE: Familiarize yourself with |diff-mode|. This plugin assumes you're
+familiar with all the features already provided by nvim's builtin diff-mode.
+These features include:
+
+        • Jumping between hunks (|jumpto-diffs|).
+        • Applying the changes of a diff hunk from any of the diffed buffers
+          (|copy-diffs|).
+        • And more...
+
+Visit the help page for more info.
+
 ------------------------------------------------------------------------------
 
 COMMANDS                                        *diffview-commands*
@@ -46,7 +57,7 @@ COMMANDS                                        *diffview-commands*
         `-C` flag is not defined, the git top-level is determined from the
         current buffer when possible. Otherwise it's determined from the cwd.
         Examples:
->
+>vim
             :DiffviewOpen
             :DiffviewOpen HEAD~2
             :DiffviewOpen HEAD~4..HEAD~2
@@ -168,7 +179,7 @@ COMMANDS                                        *diffview-commands*
         file history view.
 
         Examples:
->
+>vim
             :DiffviewFileHistory
             :DiffviewFileHistory %
             :DiffviewFileHistory path/to/some/file.txt
@@ -225,6 +236,19 @@ COMMANDS                                        *diffview-commands*
 
         --reverse
                 List commits in reverse order.
+
+        --cherry-pick
+                Omit commits that introduce the same change as another commit
+                on the "other side" when the set of commits are limited with
+                symmetric difference.
+
+        --left-only
+                List only the commits on the left side of a symmetric
+                difference.
+
+        --right-only
+                List only the commits on the right side of a symmetric
+                difference.
 
         -n{n}, --max-count={n}
                 Limit the number of commits.
@@ -325,9 +349,12 @@ EXAMPLE CONFIGURATION WITH DEFAULT SETTINGS: |diffview.defaults|
 enhanced_diff_hl                                *diffview-config-enhanced_diff_hl*
         Type: `boolean`, Default: `false`
 
-        Enable/disable enhanced diff highlighting. When enabled, |hl-DiffAdd|
-        in the left diff buffer will be highlighted as |hl-DiffDelete|, and
-        the delete fill-chars will be highlighted more subtly.
+        Enable/disable enhanced diff highlighting. In `diff2*` layouts this
+        will highlight the delete fill-chars more subtly, and show
+        |hl-DiffAdd| in the old state buffer, as |hl-DiffDelete|. This makes
+        the highlighting more inline with how 2-way diffs are displayed in
+        other diff tools. As - in a 2-way diff - an "addition" in the old
+        state actually represents a deletion.
 
 git_cmd                                         *diffview-config-git_cmd*
         Type: `string[]`, Default: `{ "git" }`
@@ -530,7 +557,8 @@ win_config                                      *diffview-config-win_config*
             listed here because they are already documented under
             |nvim_open_win()|.
 
-        Examples: >
+        Examples: >lua
+
             -- Split window, aligned to the right side of the editor:
             win_config = {
               type = "split",
@@ -587,7 +615,7 @@ default_args                                    *diffview-config-default_args*
         prepended to the arg-list for the commands specified by the table
         keys.
 
-        Examples: >
+        Examples: >lua
                 default_args = {
                   DiffviewOpen = { "--untracked-files=no", "--imply-local" },
                   DiffviewFileHistory = { "--base=LOCAL" },
@@ -684,7 +712,7 @@ hooks                                           *diffview-config-hooks*
                         • {layout_name} (string)
                           The name of the current layout.
 
-        Examples: >
+        Examples: >lua
                 hooks = {
                   diff_buf_read = function(bufnr)
                     -- Change local options in diff buffers
@@ -710,7 +738,7 @@ keymaps                                         *diffview-config-keymaps*
         normal mode mapping. These mappings all use the |:map-arguments|
         `silent`, `nowait`, and `noremap`. The implementation uses
         |vim.keymap.set()|, so the {rhs} can be either a vim command in the
-        form of a string, or it can be a lua function: >
+        form of a string, or it can be a lua function: >lua
 
         view = {
           -- Vim command:
@@ -724,7 +752,7 @@ keymaps                                         *diffview-config-keymaps*
         index values as list-like tables containing the arguments for
         |vim.keymap.set()|. This way you can also change all the
         |:map-arguments| with the only exception being the `buffer` field, as
-        this will be overridden with the target buffer number: >
+        this will be overridden with the target buffer number: >lua
 
         view = {
           -- Normal and visual mode mapping to vim command:
@@ -735,7 +763,7 @@ keymaps                                         *diffview-config-keymaps*
 <
 
         Setting a mapping's `desc` field to `"diffview_ignore"` will hide the
-        mapping from the help panel: >
+        mapping from the help panel: >lua
 
         view = {
           -- Ignore mapping in the help panel
@@ -743,7 +771,7 @@ keymaps                                         *diffview-config-keymaps*
         }
 <
 
-        To disable all the default mappings simply set: >
+        To disable all the default mappings simply set: >lua
 
         keymaps = {
           disable_defaults = true,
@@ -751,7 +779,7 @@ keymaps                                         *diffview-config-keymaps*
 <
 
         To disable any single mapping without disabling them all, set its
-        {rhs} to `false`: >
+        {rhs} to `false`: >lua
 
         view = {
           -- Disable the default normal mode mapping for `<tab>`:
@@ -766,7 +794,7 @@ keymaps                                         *diffview-config-keymaps*
 Actions ~
 
         Actions are key-mappable functions. You can access an action through
-        the config module: >
+        the config module: >lua
 
                 require("diffview.config").actions.{action_name}
 <
@@ -1036,15 +1064,25 @@ refresh_files                                   *diffview-actions-refresh_files*
         Update stats and entries in the file list.
 
 restore_entry                                   *diffview-actions-restore_entry*
-        Contexts: `diff_view`, `file_panel`
+        Contexts: `view`, `panel`
 
-        Revert the selected file entry to the state from the left side of the
-        diff. This only works if the right side of the diff is showing the
-        local state of the file. A command is echoed that shows how to undo
-        the change. Check |:messages| to see it again.
+        For `diff_view`:
 
-        NOTE: "Restoring" an untracked file will delete it from disk. It still
-        gets backed up in the local git database, so it is reversible.
+            Revert the selected file entry to the state from the left side of
+            the diff. This only works if the right side of the diff is showing
+            the local state of the file.
+
+            NOTE: "Restoring" an untracked file will delete it from disk. It
+            still gets backed up in the local git database, so it is
+            reversible.
+
+        For `file_history_view`:
+
+            Revert the selected file to the state it was in, in the selected
+            entry's commit.
+
+        NOTE: A command is echoed that shows how to undo the change. Check
+        |:messages| to see it again.
 
 scroll_view({distance})                         *diffview-actions-scroll_view*
         Contexts: `panel`
@@ -1490,6 +1528,19 @@ LogOptions                                      *diffview.git.LogOptions*
 
             {reverse} (boolean)
                 List commits in reverse order.
+
+            {cherry_pick} (boolean)
+                Omit commits that introduce the same change as another commit
+                on the "other side" when the set of commits are limited with
+                symmetric difference.
+
+            {left_only} (boolean)
+                List only the commits on the left side of a symmetric
+                difference.
+
+            {right_only} (boolean)
+                List only the commits on the right side of a symmetric
+                difference.
 
             {max_count} (integer)
                 Limit the number of commits.
