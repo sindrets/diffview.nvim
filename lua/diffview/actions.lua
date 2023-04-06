@@ -338,6 +338,81 @@ local function diff_copy_target(kind)
   end
 end
 
+---@param view DiffView
+---@param target "ours"|"theirs"|"base"|"all"|"none"
+local function resolve_all_conflicts(view, target)
+  local main = view.cur_layout:get_main_win()
+  local curfile = main.file
+
+  if main:is_valid() and curfile:is_valid() then
+    local lines = api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false)
+    local conflicts = vcs_utils.parse_conflicts(lines, main.id)
+
+    if next(conflicts) then
+      local content
+      local offset = 0
+      local first, last
+
+      for _, cur_conflict in ipairs(conflicts) do
+        -- add offset to line numbers
+        first = cur_conflict.first + offset
+        last = cur_conflict.last + offset
+
+        if target == "ours" then content = cur_conflict.ours.content
+        elseif target == "theirs" then content = cur_conflict.theirs.content
+        elseif target == "base" then content = cur_conflict.base.content
+        elseif target == "all" then
+          content = utils.vec_join(
+            cur_conflict.ours.content,
+            cur_conflict.base.content,
+            cur_conflict.theirs.content
+          )
+        end
+
+        content = content or {}
+        api.nvim_buf_set_lines(curfile.bufnr, first - 1, last, false, content)
+        offset = offset + (#content - (last - first) - 1)
+      end
+
+      utils.set_cursor(main.id, unpack({
+        (content and #content or 0) + first - 1,
+        content and content[1] and #content[#content] or 0
+      }))
+
+      view.cur_layout:sync_scroll()
+    end
+  end
+end
+
+---@param target "ours"|"theirs"|"base"|"all"|"none"
+function M.conflict_choose_all(target)
+  return function()
+    local view = lib.get_current_view() --[[@as DiffView ]]
+
+    if (view and view:instanceof(DiffView.__get())) then
+      ---@cast view DiffView
+
+      if view.panel:is_focused() then
+        local item = view:infer_cur_file(false) ---@cast item -DirData
+        if not item then return end
+
+        if item.active then
+          -- The entry is already open and the action can proceed like normal
+          resolve_all_conflicts(view, target)
+        else
+          -- The entry is not open
+          view.emitter:once("file_open_post", utils.bind(resolve_all_conflicts, view, target))
+
+          -- Open the entry
+          view:set_file(item)
+        end
+      else
+        resolve_all_conflicts(view, target)
+      end
+    end
+  end
+end
+
 ---@param target "ours"|"theirs"|"base"|"all"|"none"
 function M.conflict_choose(target)
   return function()
