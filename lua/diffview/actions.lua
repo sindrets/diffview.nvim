@@ -346,18 +346,14 @@ local function resolve_all_conflicts(view, target)
 
   if main:is_valid() and curfile:is_valid() then
     local lines = api.nvim_buf_get_lines(curfile.bufnr, 0, -1, false)
-    local conflicts = vcs_utils.parse_conflicts(
-      lines,
-      main.id
-    )
+    local conflicts = vcs_utils.parse_conflicts(lines, main.id)
 
     if next(conflicts) then
       local content
       local offset = 0
-      local first
-      local last
-      for _, cur_conflict in pairs(conflicts) do
+      local first, last
 
+      for _, cur_conflict in ipairs(conflicts) do
         -- add offset to line numbers
         first = cur_conflict.first + offset
         last = cur_conflict.last + offset
