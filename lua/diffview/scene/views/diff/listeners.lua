@@ -104,7 +104,7 @@ return function(view)
     end,
     open_commit_log = function()
       if view.left.type == RevType.STAGE and view.right.type == RevType.LOCAL then
-        utils.info("Changes not commited yet. No log available for these changes.")
+        utils.info("Changes not committed yet. No log available for these changes.")
         return
       end
 
@@ -123,9 +123,9 @@ return function(view)
       if item then
         local success
         if item.kind == "working" or item.kind == "conflicting" then
-          success = view.adapter:add_files({item.path})
+          success = view.adapter:add_files({ item.path })
         elseif item.kind == "staged" then
-          success = view.adapter:reset_files({item.path})
+          success = view.adapter:reset_files({ item.path })
         end
 
         if not success then
@@ -148,7 +148,7 @@ return function(view)
 
           ---@type Node
           local item_node
-          tree.root:deep_some(function (node, _, _)
+          tree.root:deep_some(function(node, _, _)
             if node == item._node then
               item_node = node
               return true
@@ -217,7 +217,9 @@ return function(view)
       end
 
       local file = view:infer_cur_file()
-      if not file then return end
+      if not file then
+        return
+      end
 
       local bufid = utils.find_file_buffer(file.path)
 
@@ -257,7 +259,9 @@ return function(view)
       view:update_files()
     end,
     open_all_folds = function()
-      if not view.panel:is_focused() or view.panel.listing_style ~= "tree" then return end
+      if not view.panel:is_focused() or view.panel.listing_style ~= "tree" then
+        return
+      end
 
       for _, file_set in ipairs({
         view.panel.components.conflicting.files,
@@ -275,7 +279,9 @@ return function(view)
       view.panel:redraw()
     end,
     close_all_folds = function()
-      if not view.panel:is_focused() or view.panel.listing_style ~= "tree" then return end
+      if not view.panel:is_focused() or view.panel.listing_style ~= "tree" then
+        return
+      end
 
       for _, file_set in ipairs({
         view.panel.components.conflicting.files,
@@ -293,12 +299,18 @@ return function(view)
       view.panel:redraw()
     end,
     open_fold = function()
-      if not view.panel:is_focused() then return end
+      if not view.panel:is_focused() then
+        return
+      end
       local dir = view.panel:get_dir_at_cursor()
-      if dir then view.panel:set_item_fold(dir, true) end
+      if dir then
+        view.panel:set_item_fold(dir, true)
+      end
     end,
     close_fold = function()
-      if not view.panel:is_focused() then return end
+      if not view.panel:is_focused() then
+        return
+      end
       local dir, comp = view.panel:get_dir_at_cursor()
       if dir and comp then
         if not dir.collapsed then
@@ -312,9 +324,13 @@ return function(view)
       end
     end,
     toggle_fold = function()
-      if not view.panel:is_focused() then return end
+      if not view.panel:is_focused() then
+        return
+      end
       local dir = view.panel:get_dir_at_cursor()
-      if dir then view.panel:toggle_item_fold(dir) end
+      if dir then
+        view.panel:toggle_item_fold(dir)
+      end
     end,
   }
 end

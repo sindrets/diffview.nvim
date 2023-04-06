@@ -282,7 +282,7 @@ COMMANDS                                        *diffview-commands*
                 lines that match {pattern} (extended regular expression).
 
         -S{pattern}
-                Look for differences that change the number of occurences of
+                Look for differences that change the number of occurrences of
                 the specified {pattern} (extended regular expression) in a
                 file.
 
@@ -684,7 +684,7 @@ hooks                                           *diffview-config-hooks*
                         The buffer number of the new buffer.
                     {ctx} (`table`)
                         • {symbol} (string)
-                          A symbol that indentifies the window's position in
+                          A symbol that identifies the window's position in
                           the layout. These symbols correspond with the
                           figures under |diffview-config-view.x.layout|.
                         • {layout_name} (string)
@@ -706,7 +706,7 @@ hooks                                           *diffview-config-hooks*
                         displayed.
                     {ctx} (`table`)
                         • {symbol} (string)
-                          A symbol that indentifies the window's position in
+                          A symbol that identifies the window's position in
                           the layout. These symbols correspond with the
                           figures under |diffview-config-view.x.layout|.
                         • {layout_name} (string)
@@ -1162,7 +1162,7 @@ view_windo({cmd})                               *diffview-actions-view_windo*
                     {layout_name} (string)
                         The name of the current layout.
                     {symbol} (string)
-                        A symbol that indentifies the window's position in the
+                        A symbol that identifies the window's position in the
                         layout. These symbols correspond with the figures
                         under |diffview-config-view.x.layout|.
 

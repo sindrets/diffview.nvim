@@ -70,7 +70,7 @@ function ArgObject:get_flag(names, opt)
     return v
   end)
 
-  -- If a list isn't expcted: return the last defined value for this flag.
+  -- If a list isn't expected: return the last defined value for this flag.
   return opt.expect_list and values or values[#values]
 end
 
@@ -96,7 +96,7 @@ function FlagValueMap:put(flag_synonyms, producer)
       end
     end
     self.map[flag] = producer or { "true", "false" }
-    self.map[#self.map+1] = flag
+    self.map[#self.map + 1] = flag
   end
 end
 
@@ -155,7 +155,7 @@ function FlagValueMap:get_completion(arg_lead)
   for _, v in ipairs(values) do
     local e_lead, _ = vim.pesc(arg_lead)
     if v:match(e_lead) then
-      items[#items+1] = name_lead .. v
+      items[#items + 1] = name_lead .. v
     end
   end
 
@@ -217,17 +217,17 @@ end
 function M.split_ex_range(arg)
   local idx = arg:match(".*()%A")
   if not idx then
-    return  "", arg
+    return "", arg
   end
 
   local slice = arg:sub(idx or 1)
   idx = slice:match("[^']()%a")
 
   if idx then
-    return  arg:sub(1, (#arg - #slice) + idx - 1), slice:sub(idx)
+    return arg:sub(1, (#arg - #slice) + idx - 1), slice:sub(idx)
   end
 
-  return  arg, ""
+  return arg, ""
 end
 
 ---@class CmdLineContext
@@ -276,7 +276,9 @@ function M.scan(cmd_line, opt)
       argidx = #args + 1
       arg_lead = arg
       lead_quote = cur_quote
-      if h < opt.cur_pos then between = true end
+      if h < opt.cur_pos then
+        between = true
+      end
     end
 
     if char == "\\" then
@@ -391,7 +393,9 @@ end
 ---@param input_cmp boolean? Completion for |input()|.
 ---@return string[]
 function M.process_candidates(candidates, ctx, input_cmp)
-  if not candidates then return {} end
+  if not candidates then
+    return {}
+  end
 
   local cmd_lead = ""
   local ex_lead = (ctx.lead_quote or "") .. ctx.arg_lead
