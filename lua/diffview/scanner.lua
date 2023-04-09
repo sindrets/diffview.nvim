@@ -11,7 +11,7 @@ function Scanner:init(source)
   if type(source) == "table" then
     self.lines = source
   else
-    self.lines = vim.split(source, "\n")
+    self.lines = vim.split(source, "\r?\n")
   end
 
   self.line_idx = 0

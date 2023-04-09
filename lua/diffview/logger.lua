@@ -64,18 +64,16 @@ end
 ---@field no_stderr boolean
 ---@field debug_level integer
 
----@param job Job
+---@param job diffview.Job
 ---@param opt? LogJobSpec
 function logger.log_job(job, opt)
-  ---@cast job Job|{ [string]: any }
-
   opt = opt or {}
 
   if opt.debug_level and DiffviewGlobal.debug_level < opt.debug_level then
     return
   end
 
-  local stdout, stderr = job:result(), job:stderr_result()
+  local stdout, stderr = job.stdout, job.stderr
   local args = vim.tbl_map(function(arg)
     -- Simple shell escape. NOTE: not valid for windows shell.
     return ("'%s'"):format(arg:gsub("'", [['"'"']]))
@@ -94,8 +92,8 @@ function logger.log_job(job, opt)
   log_func(("%s[job-info] Exit code: %s"):format(context, job.code))
   log_func(("%s     [cmd] %s %s"):format(context, job.command, table.concat(args, " ")))
 
-  if job._raw_cwd then
-    log_func(("%s     [cwd] %s"):format(context, job._raw_cwd))
+  if job.cwd then
+    log_func(("%s     [cwd] %s"):format(context, job.cwd))
   end
   if not opt.no_stdout and stdout[1] then
     log_func(context .. "  [stdout] " .. table.concat(stdout, "\n"))

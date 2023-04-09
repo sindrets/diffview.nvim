@@ -1,18 +1,8 @@
 local lazy = require("diffview.lazy")
 
+local Job = lazy.access("diffview.job", "Job") ---@type diffview.Job|LazyModule
 local async = lazy.require("plenary.async") ---@module "plenary.async"
 local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
-
----@module "plenary.job"
-local Job = lazy.require("plenary.job", function(m)
-  -- Ensure plenary's `new` method will use the right metatable when this is
-  -- invoked as a method.
-  local new = m.new
-  function m.new(_, ...)
-    return new(m, ...)
-  end
-  return m
-end)
 
 local api = vim.api
 local M = {}
@@ -106,7 +96,7 @@ end
 ---@return any result Return value
 function M.no_win_event_call(f)
   local last = vim.o.eventignore
-  ---@diagnostic disable-next-line: undefined-field
+  ---@diagnostic disable-next-line: param-type-mismatch
   vim.opt.eventignore:prepend(
     "WinEnter,WinLeave,WinNew,WinClosed,BufWinEnter,BufWinLeave,BufEnter,BufLeave"
   )
@@ -334,15 +324,13 @@ end
 ---@field debug_opt LogJobSpec
 
 ---Handles logging of failed jobs. If the given job hasn't failed, this does nothing.
----@param job Job
+---@param job diffview.Job
 ---@param opt? utils.handle_job.Opt
 function M.handle_job(job, opt)
-  ---@cast job Job|{ [string]: any }
-
   opt = opt or {}
   local empty = false
   if opt.fail_on_empty then
-    local out = job:result()
+    local out = job.stdout
     empty = not (out[2] ~= nil or out[1] and out[1] ~= "")
   end
 
@@ -376,19 +364,18 @@ function M.handle_job(job, opt)
   log_func(msg)
   log_func(("%s   [cmd] %s %s"):format(context, job.command, table.concat(args, " ")))
 
-  if job._raw_cwd then
-    log_func(("%s   [cwd] %s"):format(context, job._raw_cwd))
+  if job.cwd then
+    log_func(("%s   [cwd] %s"):format(context, job.cwd))
   end
 
-  local stderr = job:stderr_result()
-  if #stderr > 0 then
-    log_func(("%s[stderr] %s"):format(context, table.concat(stderr, "\n")))
+  if #job.stderr > 0 then
+    log_func(("%s[stderr] %s"):format(context, table.concat(job.stderr, "\n")))
   end
 end
 
 ---@class utils.system_list.Opt
 ---@field cwd string Working directory of the job.
----@field writer Job|table|string Something that will write to the stdin of this job.
+---@field writer table|string Something that will write to the stdin of this job.
 ---@field silent boolean Supress log output.
 ---@field fail_on_empty boolean Return code 1 if stdout is empty and code is 0.
 ---@field retry_on_empty integer Number of times to retry job if stdout is empty and code is 0. Implies `fail_on_empty`.
@@ -425,7 +412,8 @@ function M.system_list(cmd, cwd_or_opt)
   local command = table.remove(cmd, 1)
   local num_retries = 0
   local max_retries = opt.retry_on_empty or 0
-  local job, stdout, stderr, code, empty
+  local job ---@type diffview.Job
+  local stdout, stderr, code, empty
   local job_spec = {
     command = command,
     args = cmd,
@@ -446,9 +434,8 @@ function M.system_list(cmd, cwd_or_opt)
       num_retries = num_retries + 1
     end
 
-    stderr = {}
-    job = Job:new(job_spec)
-    stdout, code = job:sync()
+    job = Job(job_spec)
+    stdout, code, stderr = job:sync()
     empty = not (stdout[2] ~= nil or stdout[1] and stdout[1] ~= "")
 
     if (code ~= 0 or not empty) then
@@ -525,7 +512,7 @@ function M.set_local(winids, option_map, opt)
         else
           if o.method == "remove" then
             if is_list_like then
-              vim.opt_local[fullname] = cur_value:gsub(",?" .. vim.pesc(value), "")
+              vim.opt_local[fullname] = cur_value:gsub(",?" .. vim.pesc(tostring(value)), "")
             else
               vim.opt_local[fullname]:remove(value)
             end
@@ -636,7 +623,7 @@ end
 function M.tbl_access(t, table_path)
   local keys = type(table_path) == "table"
       and table_path
-      or vim.split(table_path, ".", { plain = true })
+      or vim.split(table_path --[[@as string ]], ".", { plain = true })
 
   local cur = t
 
@@ -756,7 +743,7 @@ end
 function M.tbl_set(t, table_path, value)
   local keys = type(table_path) == "table"
       and table_path
-      or vim.split(table_path, ".", { plain = true })
+      or vim.split(table_path --[[@as string ]], ".", { plain = true })
 
   local cur = t
 
@@ -782,7 +769,7 @@ end
 function M.tbl_ensure(t, table_path)
   local keys = type(table_path) == "table"
       and table_path
-      or vim.split(table_path, ".", { plain = true })
+      or vim.split(table_path --[[@as string ]], ".", { plain = true })
 
   local ret = M.tbl_access(t, keys)
   if not ret then
@@ -1127,6 +1114,7 @@ function M.remove_buffer(force, bn)
   for _, id in ipairs(win_ids) do
     if vim.fn.win_gettype(id) ~= "autocmd" then
       api.nvim_win_call(id, function()
+        ---@diagnostic disable-next-line: param-type-mismatch
         local alt_bufid = vim.fn.bufnr("#")
         if alt_bufid ~= -1 then
           api.nvim_set_current_buf(alt_bufid)
@@ -1363,10 +1351,18 @@ end
 ---@param ... any Arguments to prepend to arguments provided to the bound function when invoking `func`.
 ---@return fun(...): unknown
 function M.bind(func, ...)
-  local args = M.tbl_pack(...)
+  local bound_args = M.tbl_pack(...)
 
   return function(...)
-    return func(M.tbl_unpack(args), ...)
+    -- Construct the call args by combining the bound args with the new args.
+    local args = { M.tbl_unpack(bound_args) }
+    local new_args = M.tbl_pack(...)
+
+    for i = 1, new_args.n do
+      args[bound_args.n + i] = new_args[i]
+    end
+
+    return func(unpack(args, 1, bound_args.n + new_args.n))
   end
 end
 

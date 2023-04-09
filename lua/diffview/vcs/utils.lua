@@ -1,7 +1,7 @@
 local Scanner = require("diffview.scanner")
 local CountDownLatch = require("diffview.control").CountDownLatch
 local FileDict = require("diffview.vcs.file_dict").FileDict
-local Job = require("plenary.job")
+local Job = require("diffview.job").Job
 local RevType = require("diffview.vcs.rev").RevType
 local Semaphore = require("diffview.control").Semaphore
 local async = require("plenary.async")
@@ -21,7 +21,7 @@ local JobStatus = {
   FATAL    = 5,
 }
 
----@type Job[]
+---@type diffview.Job[]
 local sync_jobs = {}
 ---@type Semaphore
 local job_queue_sem = Semaphore.new(1)
@@ -40,9 +40,9 @@ M.resume_sync_queue = async.void(function(job)
   end
 end)
 
----@param job Job
+---@param job diffview.Job
 M.queue_sync_job = async.void(function(job)
-  job:add_on_exit_callback(function()
+  job:on_exit(function()
     M.resume_sync_queue(job)
   end)
 
@@ -56,18 +56,19 @@ M.queue_sync_job = async.void(function(job)
 end)
 
 ---@param max_retries integer
----@vararg Job
+---@param jobs diffview.Job[]
+---@param log_context string
+---@param callback function
 M.ensure_output = async.wrap(function(max_retries, jobs, log_context, callback)
   local num_bad_jobs
   local num_retries = 0
-  local new_jobs = {}
   local context = log_context and ("[%s] "):format(log_context) or ""
 
   for n = 0, max_retries - 1 do
     num_bad_jobs = 0
-    for i, job in ipairs(jobs) do
 
-      if job.code == 0 and #job:result() == 0 then
+    for _, job in ipairs(jobs) do
+      if job.code == 0 and #job.stdout == 0 then
         logger.warn(
           ("%sJob expected output, but returned nothing! Retrying %d more times(s)...")
           :format(context, max_retries - n)
@@ -75,25 +76,17 @@ M.ensure_output = async.wrap(function(max_retries, jobs, log_context, callback)
         logger.log_job(job, { func = logger.warn, context = log_context })
         num_retries = n + 1
 
-        new_jobs[i] = Job:new({
-          command = job.command,
-          args = job.args,
-          cwd = job._raw_cwd,
-          env = job.env,
-        })
-        new_jobs[i]:start()
+        job:start()
+
         if vim.in_fast_event() then
           async.util.scheduler()
         end
-        Job.join(new_jobs[i])
 
-        job._stdout_results = new_jobs[i]._stdout_results
-        job._stderr_results = new_jobs[i]._stderr_results
+        Job.join({ job })
 
-        if new_jobs[i].code ~= 0 then
-          job.code = new_jobs[i].code
-          utils.handle_job(new_jobs[i], { context = log_context })
-        elseif #job._stdout_results == 0 then
+        if job.code ~= 0 then
+          utils.handle_job(job, { context = log_context })
+        elseif #job.stderr == 0 then
           num_bad_jobs = num_bad_jobs + 1
         end
       end

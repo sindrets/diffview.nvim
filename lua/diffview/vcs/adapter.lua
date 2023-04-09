@@ -1,4 +1,4 @@
-local Job = require("plenary.job")
+local Job = require("diffview.job").Job
 local async = require("plenary.async")
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
@@ -349,11 +349,11 @@ end, 5)
 ---@param rev? Rev
 ---@param callback fun(stderr: string[]?, stdout: string[]?)
 VCSAdapter.show = async.wrap(function(self, path, rev, callback)
-  local job = Job:new({
+  local job = Job({
     command = self:bin(),
     args = self:get_show_args(path, rev),
     cwd = self.ctx.toplevel,
-    ---@type Job
+    ---@param j diffview.Job
     on_exit = async.void(function(j)
       local context = "VCSAdapter.show()"
       utils.handle_job(j, {
@@ -363,23 +363,23 @@ VCSAdapter.show = async.wrap(function(self, path, rev, callback)
       })
 
       if j.code ~= 0 then
-        callback(j:stderr_result() or {}, nil)
+        callback(j.stderr or {}, nil)
         return
       end
 
       local out_status
 
-      if #j:result() == 0 then
+      if #j.stdout == 0 then
         async.util.scheduler()
         out_status = vcs_utils.ensure_output(2, { j }, context)
       end
 
       if out_status == JobStatus.ERROR then
-        callback(j:stderr_result() or {}, nil)
+        callback(j.stderr or {}, nil)
         return
       end
 
-      callback(nil, j:result())
+      callback(nil, j.stdout)
     end),
   })
   -- Problem: Running multiple 'show' jobs simultaneously may cause them to fail

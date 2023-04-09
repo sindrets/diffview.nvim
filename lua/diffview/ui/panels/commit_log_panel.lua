@@ -1,4 +1,4 @@
-local Job = require("plenary.job")
+local Job = require("diffview.job").Job
 local Panel = require("diffview.ui.panel").Panel
 local async = require("plenary.async")
 local get_user_config = require("diffview.config").get_config
@@ -72,10 +72,11 @@ CommitLogPanel.update = async.void(function(self, args)
     args = { args }
   end
 
-  Job:new({
+  Job({
     command = self.adapter:bin(),
     args = self.adapter:get_log_args(args or self.args),
     cwd = self.adapter.ctx.toplevel,
+    ---@param job diffview.Job
     on_exit = vim.schedule_wrap(function(job)
       if job.code ~= 0 then
         utils.err("Failed to open log!")
@@ -83,7 +84,7 @@ CommitLogPanel.update = async.void(function(self, args)
         return
       end
 
-      self.job_out = job:result()
+      self.job_out = utils.vec_slice(job.stdout)
 
       if not next(self.job_out) then
         utils.info("No log content available for these changes.")

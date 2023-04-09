@@ -221,7 +221,9 @@ function FileHistoryPanel:update_entries(callback)
     lock = true
 
     vim.schedule(function()
+      if self.shutdown then return end
       c = #entries
+
       if ldt > timeout then
         logger.lvl(10).debug(string.format(
           "[FH_PANEL] Rendering is slower than throttle timeout (%.3f ms). Skipping update.",
