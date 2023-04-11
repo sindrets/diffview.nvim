@@ -418,7 +418,7 @@ local function structure_fh_data(namestat_data, numstat_data)
   return {
     left_hash = left_hash ~= "" and left_hash or nil,
     right_hash = right_hash,
-    merge_hash = merge_hash,
+    merge_hash = merge_hash ~= "" and merge_hash or nil,
     author = namestat_data[2],
     time = tonumber(time),
     time_offset = time_offset,
@@ -500,7 +500,7 @@ HgAdapter.incremental_fh_data = async.void(function(self, state, callback)
       self:args(),
       "log",
       rev_range,
-      '--template=\\x00\n{node} {p1.node} {ifeq(p2.rev, -1 ,\"\", \"{p2.node}\")}\n{author|person}\n{date}\n{date|age}\n  {separate(", ", tags, topics)}\n  {desc|firstline}\n',
+      '--template=\\x00\n{node} {p1.node} {ifeq(p2.rev, -1 ,\"\", \"{p2.node}\")}\n{author|person}\n{date}\n{date|age}\n  {separate(", ", tags, topics)}\n  {desc|firstline}\n{files % "{status} {file}\n"}',
       state.prepared_log_opts.flags,
       "--",
       state.path_args
