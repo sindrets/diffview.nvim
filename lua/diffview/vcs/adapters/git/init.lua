@@ -9,7 +9,7 @@ local LogEntry = require("diffview.vcs.log_entry").LogEntry
 local RevType = require("diffview.vcs.rev").RevType
 local VCSAdapter = require("diffview.vcs.adapter").VCSAdapter
 local arg_parser = require("diffview.arg_parser")
-local async = require("plenary.async")
+local async = require("diffview.async")
 local config = require("diffview.config")
 local lazy = require("diffview.lazy")
 local logger = require("diffview.logger")
@@ -17,9 +17,9 @@ local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local vcs_utils = require("diffview.vcs.utils")
 
----@type PathLib
-local pl = lazy.access(utils, "path")
 local api = vim.api
+local await = async.await
+local pl = lazy.access(utils, "path") ---@type PathLib
 
 local M = {}
 
@@ -53,15 +53,15 @@ end
 
 function GitAdapter.pathspec_expand(toplevel, cwd, pathspec)
   local magic, pattern = GitAdapter.pathspec_split(pathspec)
-  if not utils.path:is_abs(pattern) then
-    pattern = utils.path:join(utils.path:relative(cwd, toplevel), pattern)
+  if not pl:is_abs(pattern) then
+    pattern = pl:join(pl:relative(cwd, toplevel), pattern)
   end
-  return magic .. utils.path:convert(pattern)
+  return magic .. pl:convert(pattern)
 end
 
 function GitAdapter.pathspec_modify(pathspec, mods)
   local magic, pattern = GitAdapter.pathspec_split(pathspec)
-  return magic .. utils.path:vim_fnamemodify(pattern, mods)
+  return magic .. pl:vim_fnamemodify(pattern, mods)
 end
 
 function GitAdapter.run_bootstrap()
@@ -422,7 +422,7 @@ end
 ---@param self GitAdapter
 ---@param state GitAdapter.FHState
 ---@param callback fun(status: JobStatus, data?: table, msg?: string[])
-GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
+GitAdapter.incremental_fh_data = async.wrap(function(self, state, callback)
   local raw = {}
   local namestat_job, numstat_job, shutdown
 
@@ -520,7 +520,7 @@ GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
     buffered_std = false,
   })
 
-  Job.join({ namestat_job, numstat_job })
+  await(Job.join({ namestat_job, numstat_job }))
 
   -- if namestat_state.idx < 257 or numstat_state.idx < 257 then
   --   logger.debug(string.format("--- START NAME_STATUS: %d ---", namestat_state.idx))
@@ -551,7 +551,7 @@ end)
 ---@param self GitAdapter
 ---@param state GitAdapter.FHState
 ---@param callback fun(status: JobStatus, data?: table, msg?: string[])
-GitAdapter.incremental_line_trace_data = async.void(function(self, state, callback)
+GitAdapter.incremental_line_trace_data = async.wrap(function(self, state, callback)
   local raw = {}
   local trace_job, shutdown
 
@@ -616,7 +616,7 @@ GitAdapter.incremental_line_trace_data = async.void(function(self, state, callba
     on_exit = on_exit,
   })
 
-  Job.join({ trace_job })
+  await(trace_job:start())
 
   utils.handle_job(trace_job, {
     debug_opt = {
@@ -652,7 +652,7 @@ function GitAdapter:is_single_file(path_args, lflags)
 
   elseif path_args and self.ctx.toplevel then
     return #path_args == 1
-        and not utils.path:is_dir(path_args[1])
+        and not pl:is_dir(path_args[1])
         and #self:exec_sync({ "ls-files", "--", path_args }, self.ctx.toplevel) < 2
   end
 
@@ -670,7 +670,7 @@ function GitAdapter:file_history_dry_run(log_opt)
   end, self:prepare_fh_options(log_options, single_file).flags) --[[@as vector ]]
 
   local description = utils.vec_join(
-    ("Top-level path: '%s'"):format(utils.path:vim_fnamemodify(self.ctx.toplevel, ":~")),
+    ("Top-level path: '%s'"):format(pl:vim_fnamemodify(self.ctx.toplevel, ":~")),
     log_options.rev_range and ("Revision range: '%s'"):format(log_options.rev_range) or nil,
     ("Flags: %s"):format(table.concat(options, " "))
   )
@@ -893,12 +893,6 @@ function GitAdapter:parse_fh_data(state)
         state.old_path or state.path_args
       ),
       cwd = self.ctx.toplevel,
-      on_exit = function(j)
-        if j.code == 0 then
-          cur.namestat = j.stdout
-        end
-        self:handle_co(state.thread, coroutine.resume(state.thread))
-      end,
     }
 
     local max_retries = 2
@@ -910,8 +904,12 @@ function GitAdapter:parse_fh_data(state)
       -- possibly because we are running multiple git opeartions on the same
       -- repo concurrently. Retrying the job usually solves this.
       job = Job(job_spec)
-      job:start()
-      coroutine.yield()
+      await(job:start())
+
+      if job.code == 0 then
+        cur.namestat = job.stdout
+      end
+
       utils.handle_job(job, { fail_on_empty = true, context = context, log_func = logger.warn })
 
       if #cur.namestat == 0 then
@@ -1340,8 +1338,8 @@ end
 ---@param commit string?
 function GitAdapter:file_restore(path, kind, commit)
   local out, code
-  local abs_path = utils.path:join(self.ctx.toplevel, path)
-  local rel_path = utils.path:vim_fnamemodify(abs_path, ":~")
+  local abs_path = pl:join(self.ctx.toplevel, path)
+  local rel_path = pl:vim_fnamemodify(abs_path, ":~")
 
   -- Check if file exists in history
   _, code = self:exec_sync(
@@ -1349,7 +1347,7 @@ function GitAdapter:file_restore(path, kind, commit)
     self.ctx.toplevel
   )
   local exists_git = code == 0
-  local exists_local = utils.path:readable(abs_path)
+  local exists_local = pl:readable(abs_path)
 
   if exists_local then
     -- Wite file blob into db
@@ -1371,7 +1369,7 @@ function GitAdapter:file_restore(path, kind, commit)
   if not exists_git then
     local bn = utils.find_file_buffer(abs_path)
     if bn then
-      async.util.scheduler()
+      await(async.scheduler())
       local ok, err = utils.remove_buffer(false, bn)
       if not ok then
         utils.err({
@@ -1385,7 +1383,7 @@ function GitAdapter:file_restore(path, kind, commit)
 
     if kind == "working" or kind == "conflicting" then
       -- File is untracked and has no history: delete it from fs.
-      local ok, err = utils.path:unlink(abs_path)
+      local ok, err = await(pl:unlink(abs_path))
       if not ok then
         utils.err({
           ("Failed to delete file '%s'! Aborting file restoration. Error message:")
@@ -1536,11 +1534,13 @@ GitAdapter.tracked_files = async.wrap(function(self, left, right, args, kind, op
     on_exit = on_exit,
   })
 
-  Job.join({ namestat_job, numstat_job })
+  await(Job.join({ namestat_job, numstat_job }))
 
   local out_status
   if not (#namestat_job.stdout == #numstat_job.stdout) then
-    out_status = vcs_utils.ensure_output(2, { namestat_job, numstat_job }, "GitAdapter>tracked_files()")
+    out_status = await(
+      vcs_utils.ensure_output(2, { namestat_job, numstat_job }, "GitAdapter:tracked_files()")
+    )
   end
 
   if out_status == JobStatus.ERROR or not (namestat_job.code == 0 and numstat_job.code == 0) then
@@ -1625,46 +1625,47 @@ GitAdapter.tracked_files = async.wrap(function(self, left, right, args, kind, op
   end
 
   callback(nil, files, conflicts)
-end, 7)
+end)
 
 GitAdapter.untracked_files = async.wrap(function(self, left, right, opt, callback)
-  Job({
+  local j = Job({
     command = self:bin(),
     args = utils.vec_join(self:args(), "ls-files", "--others", "--exclude-standard"),
     cwd = self.ctx.toplevel,
-    ---@param j diffview.Job
-    on_exit = function(j)
-      utils.handle_job(j, {
-        debug_opt = {
-          context = "GitAdapter>untracked_files()",
-          func = "s_debug",
-          debug_level = 1,
-          no_stdout = true,
-        }
-      })
+  })
 
-      if j.code ~= 0 then
-        callback(j.stderr or {}, nil)
-        return
-      end
+  await(j:start())
 
-      local files = {}
-      for _, s in ipairs(j.stdout) do
-        table.insert(files, FileEntry.with_layout(opt.default_layout, {
-          adapter = self,
-          path = s,
-          status = "?",
-          kind = "working",
-          revs = {
-            a = left,
-            b = right,
-          }
-        }))
-      end
-      callback(nil, files)
-    end
-  }):start()
-end, 5)
+  utils.handle_job(j, {
+    debug_opt = {
+      context = "GitAdapter>untracked_files()",
+      func = "s_debug",
+      debug_level = 1,
+      no_stdout = true,
+    }
+  })
+
+  if j.code ~= 0 then
+    callback(j.stderr or {}, nil)
+    return
+  end
+
+  local files = {}
+  for _, s in ipairs(j.stdout) do
+    table.insert(files, FileEntry.with_layout(opt.default_layout, {
+      adapter = self,
+      path = s,
+      status = "?",
+      kind = "working",
+      revs = {
+        a = left,
+        b = right,
+      }
+    }))
+  end
+
+  callback(nil, files)
+end)
 
 ---Convert revs to string representation.
 ---@param left Rev
@@ -1843,7 +1844,7 @@ function GitAdapter:rev_candidates(arg_lead, opt)
   local heads = vim.tbl_filter(
     function(name) return vim.tbl_contains(targets, name) end,
     vim.tbl_map(
-      function(v) return utils.path:basename(v) end,
+      function(v) return pl:basename(v) end,
       vim.fn.glob(self.ctx.dir .. "/*", false, true)
     )
   )

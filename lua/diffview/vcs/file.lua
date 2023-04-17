@@ -1,14 +1,15 @@
+local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
 local GitRev = lazy.access("diffview.vcs.adapters.git.rev", "GitRev") ---@type GitRev|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
-local async = lazy.require("plenary.async") ---@module "plenary.async"
 local config = lazy.require("diffview.config") ---@module "diffview.config"
 local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
-local pl = lazy.access(utils, "path") ---@type PathLib|LazyModule
+local await = async.await
+local pl = lazy.access(utils, "path") ---@type PathLib
 
 local api = vim.api
 local M = {}
@@ -143,7 +144,7 @@ function File:post_buf_created()
   end
 end
 
-function File:_create_local_buffer(callback)
+function File:_create_local_buffer()
   self.bufnr = utils.find_file_buffer(self.absolute_path)
 
   if not self.bufnr then
@@ -164,46 +165,40 @@ function File:_create_local_buffer(callback)
   end
 
   self:post_buf_created()
-  vim.schedule(callback)
-  return self.bufnr
 end
 
-function File:_produce_data(callback)
+---@param self vcs.File
+File._produce_data = async.wrap(function(self, callback)
   if self.get_data and vim.is_callable(self.get_data) then
-    async.run(function()
-      local pos = self.symbol == "a" and "left" or "right"
-      local data = self.get_data(self.kind, self.path, pos)
-      callback(data)
-      ---@diagnostic disable-next-line: param-type-mismatch
-    end, nil)
+    local pos = self.symbol == "a" and "left" or "right"
+    local data = self.get_data(self.kind, self.path, pos)
+    callback(nil, data)
   else
-    self.adapter:show(
-      self.path,
-      self.rev,
-      function(err, result)
-        if err then
-          vim.schedule(function()
-            utils.err(("Failed to create diff buffer: '%s'"):format(
-              api.nvim_buf_get_name(self.bufnr)
-            ))
-          end)
-          return
-        end
+    local err, result = await(self.adapter:show(self.path, self.rev))
 
-        callback(result)
-      end
-    )
+    if err then
+      vim.schedule(function()
+        utils.err(("Failed to create diff buffer: '%s'"):format(
+          api.nvim_buf_get_name(self.bufnr)
+        ))
+      end)
+      callback(err)
+      return
+    end
+
+    callback(nil, result)
   end
-end
+end)
 
+---@param self vcs.File
 ---@param callback function
-function File:create_buffer(callback)
+File.create_buffer = async.wrap(function(self, callback)
   if self == File.NULL_FILE then
-    vim.schedule(callback)
-    return File._get_null_buffer()
+    callback(File._get_null_buffer())
+    return
   elseif self:is_valid() then
-    vim.schedule(callback)
-    return self.bufnr
+    callback(self.bufnr)
+    return
   end
 
   if self.binary == nil and not config.get_config().diff_binaries then
@@ -213,12 +208,14 @@ function File:create_buffer(callback)
   if self.nulled or self.binary then
     self.bufnr = File._get_null_buffer()
     self:post_buf_created()
-    vim.schedule(callback)
-    return self.bufnr
+    callback(self.bufnr)
+    return
   end
 
   if self.rev.type == RevType.LOCAL then
-    return self:_create_local_buffer(callback)
+    self:_create_local_buffer()
+    callback(self.bufnr)
+    return
   end
 
   local context
@@ -235,9 +232,14 @@ function File:create_buffer(callback)
   self.bufnr = utils.find_named_buffer(fullname)
 
   if self.bufnr then
-    vim.schedule(callback)
-    return self.bufnr
+    callback(self.bufnr)
+    return
   end
+
+  -- FIXME: Handle err
+  local err, lines = await(self:_produce_data())
+
+  await(async.scheduler())
 
   self.bufnr = api.nvim_create_buf(false, false)
   local bufopts = vim.deepcopy(File.bufopts)
@@ -264,26 +266,22 @@ function File:create_buffer(callback)
 
   api.nvim_buf_set_name(self.bufnr, fullname)
 
-  self:_produce_data(vim.schedule_wrap(function(lines)
-    if api.nvim_buf_is_valid(self.bufnr) then
-      local last_modifiable = vim.bo[self.bufnr].modifiable
-      local last_modified = vim.bo[self.bufnr].modified
-      vim.bo[self.bufnr].modifiable = true
-      api.nvim_buf_set_lines(self.bufnr, 0, -1, false, lines)
+  if api.nvim_buf_is_valid(self.bufnr) then
+    local last_modifiable = vim.bo[self.bufnr].modifiable
+    local last_modified = vim.bo[self.bufnr].modified
+    vim.bo[self.bufnr].modifiable = true
+    api.nvim_buf_set_lines(self.bufnr, 0, -1, false, lines)
 
-      api.nvim_buf_call(self.bufnr, function()
-        vim.cmd("filetype detect")
-      end)
+    api.nvim_buf_call(self.bufnr, function()
+      vim.cmd("filetype detect")
+    end)
 
-      vim.bo[self.bufnr].modifiable = last_modifiable
-      vim.bo[self.bufnr].modified = last_modified
-      self:post_buf_created()
-      callback()
-    end
-  end))
-
-  return self.bufnr
-end
+    vim.bo[self.bufnr].modifiable = last_modifiable
+    vim.bo[self.bufnr].modified = last_modified
+    self:post_buf_created()
+    callback(self.bufnr)
+  end
+end)
 
 function File:is_valid()
   return self.bufnr and api.nvim_buf_is_valid(self.bufnr)

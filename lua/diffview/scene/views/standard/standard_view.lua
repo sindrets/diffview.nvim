@@ -146,6 +146,7 @@ function StandardView:use_entry(entry)
   end
 
   local old_layout = self.cur_layout
+  self.cur_entry = entry
 
   if entry.layout:class() == self.cur_layout:class() then
     self.cur_layout.emitter = entry.layout.emitter
@@ -168,8 +169,6 @@ function StandardView:use_entry(entry)
       vim.cmd("wincmd =")
     end
   end
-
-  self.cur_entry = entry
 end
 
 M.StandardView = StandardView

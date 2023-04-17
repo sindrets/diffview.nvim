@@ -1,5 +1,5 @@
 local Job = require("diffview.job").Job
-local async = require("plenary.async")
+local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
@@ -10,6 +10,8 @@ local arg_parser = lazy.require("diffview.arg_parser") ---@module "diffview.arg_
 local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local vcs_utils = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
+
+local await = async.await
 
 local M = {}
 
@@ -331,16 +333,16 @@ end
 ---@param callback function
 VCSAdapter.tracked_files = async.wrap(function(self, left, right, args, kind, opt, callback)
   oop.abstract_stub()
-end, 7)
+end)
 
 ---@param self VCSAdapter
 ---@param left Rev
 ---@param right Rev
 ---@param opt vcs.adapter.LayoutOpt
----@param callback function
+---@param callback? function
 VCSAdapter.untracked_files = async.wrap(function(self, left, right, opt, callback)
   oop.abstract_stub()
-end, 5)
+end)
 
 ---@diagnostic enable: unused-local, missing-return
 
@@ -370,8 +372,8 @@ VCSAdapter.show = async.wrap(function(self, path, rev, callback)
       local out_status
 
       if #j.stdout == 0 then
-        async.util.scheduler()
-        out_status = vcs_utils.ensure_output(2, { j }, context)
+        await(async.scheduler())
+        out_status = await(vcs_utils.ensure_output(2, { j }, context))
       end
 
       if out_status == JobStatus.ERROR then
@@ -386,7 +388,7 @@ VCSAdapter.show = async.wrap(function(self, path, rev, callback)
   -- silently.
   -- Solution: queue them and run them one after another.
   vcs_utils.queue_sync_job(job)
-end, 4)
+end)
 
 ---Convert revs to string representation.
 ---@param left Rev

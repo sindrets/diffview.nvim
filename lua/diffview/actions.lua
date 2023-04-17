@@ -19,6 +19,7 @@ local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4") ---@type Dif
 local Diff4Mixed = lazy.access("diffview.scene.layouts.diff_4_mixed", "Diff4Mixed") ---@type Diff4Mixed|LazyModule
 
 local api = vim.api
+local pl = lazy.access(utils, "path") ---@type PathLib
 
 local M = setmetatable({}, {
   __index = function(_, k)
@@ -46,11 +47,11 @@ local function prepare_goto_file()
   if file then
     ---@cast file FileEntry
     -- Ensure file exists
-    if not utils.path:readable(file.absolute_path) then
+    if not pl:readable(file.absolute_path) then
       utils.err(
         string.format(
           "File does not exist on disk: '%s'",
-          utils.path:relative(file.absolute_path, ".")
+          pl:relative(file.absolute_path, ".")
         )
       )
       return

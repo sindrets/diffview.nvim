@@ -1,13 +1,14 @@
+local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 
 local EventName = lazy.access("diffview.events", "EventName") ---@type EventName|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local actions = lazy.require("diffview.actions") ---@module "diffview.actions"
-local async = lazy.require("plenary.async") ---@module "plenary.async"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local vcs_utils = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
 
 local api = vim.api
+local await = async.await
 
 ---@param view DiffView
 return function(view)
@@ -227,7 +228,6 @@ return function(view)
       end
 
       vcs_utils.restore_file(view.adapter, file.path, file.kind, commit, function()
-        async.util.scheduler()
         view:update_files()
       end)
     end),

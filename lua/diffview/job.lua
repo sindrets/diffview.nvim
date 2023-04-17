@@ -1,16 +1,20 @@
+---@diagnostic disable: invisible
 local oop = require("diffview.oop")
-local async = require("plenary.async")
+local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 
 local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
+local await = async.await
 local uv = vim.loop
 
 local M = {}
 
 ---@alias diffview.Job.OnOutCallback fun(err?: string, line: string, j: diffview.Job)
 ---@alias diffview.Job.OnExitCallback fun(j: diffview.Job, code: integer, signal: integer)
+
+---@alias StdioKind "in"|"out"|"err"
 
 ---@class diffview.Job
 ---@operator call: diffview.Job
@@ -34,12 +38,22 @@ local M = {}
 ---@field _started boolean
 local Job = oop.create_class("Job")
 
+local function prepare_env(env)
+  local ret = {}
+
+  for k, v in pairs(env) do
+    table.insert(ret, k .. "=" .. v)
+  end
+
+  return ret
+end
+
 function Job:init(opt)
   self.command = opt.command
   self.args = opt.args
   self.cwd = opt.cwd
   self.writer = opt.writer
-  self.env = opt.env or uv.os_environ()
+  self.env = opt.env and prepare_env(opt.env) or prepare_env(uv.os_environ())
   self.buffered_std = utils.sate(opt.buffered_std, true)
   self.on_stdout_listeners = {}
   self.on_stderr_listeners = {}
@@ -63,6 +77,22 @@ local function try_close(...)
   end
 end
 
+---@param chunks string[]
+---@return string[] lines
+local function process_chunks(chunks)
+  local data = table.concat(chunks)
+
+  if data == "" then
+    return {}
+  end
+
+  local has_eof = data:sub(-1) == "\n"
+  local ret = vim.split(data, "\r?\n")
+  if has_eof then ret[#ret] = nil end
+
+  return ret
+end
+
 ---@private
 ---@param pipe uv_pipe_t
 ---@param out string[]
@@ -83,9 +113,10 @@ end
 ---@private
 ---@param pipe uv_pipe_t
 ---@param out string[]
+---@param line_listeners? diffview.Job.OnOutCallback[]
 ---@param err? string
 ---@param data? string
-function Job:line_reader(pipe, out, err, data)
+function Job:line_reader(pipe, out, line_listeners, err, data)
   local line_buffer
 
   if err then
@@ -93,7 +124,7 @@ function Job:line_reader(pipe, out, err, data)
   end
 
   if data then
-    local has_eol = data[#data] == "\n"
+    local has_eol = data:sub(-1) == "\n"
     local lines = vim.split(data, "\r?\n")
 
     if #lines > 0 then
@@ -108,8 +139,10 @@ function Job:line_reader(pipe, out, err, data)
       else
         out[#out+1] = line
 
-        for _, listener in ipairs(self.on_stdout_listeners) do
-          listener(nil, line, self)
+        if line_listeners then
+          for _, listener in ipairs(line_listeners) do
+            listener(nil, line, self)
+          end
         end
       end
     end
@@ -117,8 +150,10 @@ function Job:line_reader(pipe, out, err, data)
     if line_buffer then
       out[#out+1] = line_buffer
 
-      for _, listener in ipairs(self.on_stdout_listeners) do
-        listener(nil, line_buffer, self)
+      if line_listeners then
+        for _, listener in ipairs(line_listeners) do
+          listener(nil, line_buffer, self)
+        end
       end
     end
 
@@ -129,11 +164,16 @@ end
 ---@private
 ---@param pipe uv_pipe_t
 ---@param out string[]
-function Job:handle_reader(pipe, out)
+---@param kind StdioKind
+function Job:handle_reader(pipe, out, kind)
   if self.buffered_std then
     pipe:read_start(utils.bind(self.buffered_reader, self, pipe, out))
   else
-    pipe:read_start(utils.bind(self.line_reader, self, pipe, out))
+    local listeners = ({
+      out = self.on_stdout_listeners,
+      err = self.on_stderr_listeners,
+    })[kind] or {}
+    pipe:read_start(utils.bind(self.line_reader, self, pipe, out, listeners))
   end
 end
 
@@ -182,7 +222,7 @@ function Job:reset()
 end
 
 ---@param self diffview.Job
-function Job:start()
+Job.start = async.wrap(function(self, callback)
   self:reset()
 
   self.p_out = uv.new_pipe(false)
@@ -218,24 +258,15 @@ function Job:start()
     try_close(self.p_out, self.p_err, self.p_in)
 
     if self.buffered_std then
-      for _, key in ipairs({ "stdout", "stderr" }) do
-        local chunks = self[key]
-
-        local data = table.concat(chunks)
-
-        if data == "" then
-          self[key] = {}
-        else
-          local has_eof = string.sub(data, #data) == "\n"
-          self[key] = vim.split(data, "\r?\n")
-          if has_eof then self[key][#self[key]] = nil end
-        end
-      end
+      self.stdout = process_chunks(self.stdout)
+      self.stderr = process_chunks(self.stderr)
     end
 
     for _, listener in ipairs(self.on_exit_listeners) do
       listener(self, code, signal)
     end
+
+    callback(self, code, signal)
   end)
 
   if not handle then
@@ -246,13 +277,13 @@ function Job:start()
   self.handle = handle
   self.pid = pid
 
-  self:handle_reader(self.p_out, self.stdout)
-  self:handle_reader(self.p_err, self.stderr)
+  self:handle_reader(self.p_out, self.stdout, "out")
+  self:handle_reader(self.p_err, self.stderr, "err")
 
   if self.p_in then
     self:handle_writer(self.p_in, self.writer)
   end
-end
+end)
 
 ---@param duration? integer # Max duration (ms)
 ---@return string[] stdout
@@ -263,10 +294,10 @@ function Job:sync(duration)
     return self.stdout, self.code, self.stderr
   end
 
-  if not self._started then self:start() end
+  if not self:is_started() then self:start() end
 
   if vim.in_fast_event() then
-    async.util.scheduler()
+    await(async.scheduler())
   end
 
   local ok, status = vim.wait(duration or 5000, function()
@@ -303,68 +334,41 @@ function Job:kill(code, signal)
   return 0
 end
 
+---@async
 ---@param jobs diffview.Job[]
 ---@param callback fun()
 Job.join = async.wrap(function(jobs, callback)
   -- Start by ensuring all jobs are running
+  local futures = {}
   for _, job in ipairs(jobs) do
-    if not job:is_done() and not job._started then
-      job:start()
+    if not job:is_done() and not job:is_started() then
+      table.insert(futures, job:start())
     end
   end
 
-  local done_count = 0
-
-  local function exit_cb()
-    done_count = done_count + 1
-    if done_count == #jobs then
-      callback()
-    end
+  for _, future in ipairs(futures) do
+    await(future)
   end
 
-  for _, job in ipairs(jobs) do
-    if job:is_done() then
-      exit_cb()
-    else
-      job:on_exit(exit_cb)
-    end
-  end
-end, 2)
+  callback()
+end)
 
 ---@param jobs diffview.Job[]
 ---@param callback fun()
 Job.chain = async.wrap(function(jobs, callback)
-  local idx = 0
-
-  local function resume()
-    idx = idx + 1
-    local job = jobs[idx]
-
-    if not job then
-      -- We have reached the end of the queue
-      callback()
-    elseif job:is_done() then
-      -- Job is already done: continue
-      resume()
-    else
-      -- Wait for the job to exit
-      job:on_exit(resume)
-
-      if not job._started then
-        job:start()
-      end
-    end
+  for _, job in ipairs(jobs) do
+    await(job:start())
   end
 
-  resume()
-end, 2)
+  callback()
+end)
 
 ---Subscribe to stdout data. Only used if `buffered_std=false`.
 ---@param callback diffview.Job.OnOutCallback
 function Job:on_stdout(callback)
   table.insert(self.on_stdout_listeners, callback)
 
-  if not self._started then
+  if not self:is_started() then
     self.buffered_std = false
   end
 end
@@ -374,7 +378,7 @@ end
 function Job:on_stderr(callback)
   table.insert(self.on_stderr_listeners, callback)
 
-  if not self._started then
+  if not self:is_started() then
     self.buffered_std = false
   end
 end
@@ -386,6 +390,10 @@ end
 
 function Job:is_done()
   return not not (self.handle and self.handle:is_closing())
+end
+
+function Job:is_started()
+  return self._started
 end
 
 M.Job = Job

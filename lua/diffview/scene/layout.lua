@@ -1,3 +1,4 @@
+local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
@@ -5,6 +6,8 @@ local EventEmitter = lazy.access("diffview.events", "EventEmitter") ---@type Eve
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
+local await = async.await
+
 local M = {}
 
 ---@class Layout : diffview.Object
@@ -30,11 +33,11 @@ function Layout:init(opt)
     end)
 
     ---@param other Layout
-    self.emitter:on("create_post", function(_, other)
+    self.emitter:on("create_post", async.sync_void(function(_, other)
       other:open_null()
-      other:open_files()
+      await(other:open_files())
       vim.opt.equalalways = last_equalalways
-    end)
+    end))
   end
 end
 
@@ -159,69 +162,35 @@ function Layout:is_files_loaded()
   return true
 end
 
----@param callback? fun()
-function Layout:open_files(callback)
+---@param self Layout
+---@param callback fun()
+Layout.open_files = async.wrap(function(self, callback)
   if #self:files() < #self.windows then
     self:open_null()
-
-    if vim.is_callable(callback) then
-      ---@cast callback -?
-      callback()
-    end
-
     self.emitter:emit("files_opened")
-
+    callback()
     return
   end
 
-  local load_count = 0
-  local all_loaded = self:is_files_loaded()
-
   vim.cmd("diffoff!")
 
+  if not self:is_files_loaded() then
+    self:open_null()
+
+    -- Wait for all files to be loaded before opening
+    for _, win in ipairs(self.windows) do
+      await(win:load_file())
+    end
+  end
+
   for _, win in ipairs(self.windows) do
-    if not all_loaded then
-      win:open_null()
-    end
-
-    if win.file then
-      if all_loaded then
-        win:open_file()
-      else
-        win:load_file(function()
-          load_count = load_count + 1
-
-          if load_count == #self.windows then
-            ---@diagnostic disable-next-line: redefined-local
-            for _, win in ipairs(self.windows) do
-              win:open_file()
-            end
-
-            self:sync_scroll()
-
-            if vim.is_callable(callback) then
-              ---@cast callback -?
-              callback()
-            end
-
-            self.emitter:emit("files_opened")
-          end
-        end)
-      end
-    end
+    await(win:open_file())
   end
 
-  if all_loaded then
-    self:sync_scroll()
-
-    if vim.is_callable(callback) then
-      ---@cast callback -?
-      callback()
-    end
-
-    self.emitter:emit("files_opened")
-  end
-end
+  self:sync_scroll()
+  self.emitter:emit("files_opened")
+  callback()
+end)
 
 function Layout:open_null()
   for _, win in ipairs(self.windows) do

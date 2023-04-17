@@ -27,7 +27,7 @@ _G.DiffviewGlobal = {
   ---0:     NOTHING
   ---1:     NORMAL
   ---5:     LOADING
-  ---10:    RENDERING
+  ---10:    RENDERING & ASYNC
   debug_level = tonumber(os.getenv("DEBUG_DIFFVIEW")) or 0,
   ---@type EventEmitter
   emitter = require("diffview.events").EventEmitter(),

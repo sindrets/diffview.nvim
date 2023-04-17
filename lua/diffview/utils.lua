@@ -1,22 +1,29 @@
+local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 
 local Job = lazy.access("diffview.job", "Job") ---@type diffview.Job|LazyModule
-local async = lazy.require("plenary.async") ---@module "plenary.async"
 local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 
 local api = vim.api
+local await = async.await
+
 local M = {}
 
 ---@class vector<T> : { [integer]: T }
 ---@alias falsy false|nil
+---@alias truthy true|number|string|table|function|thread|userdata
 
-local mapping_callbacks = {}
 local path_sep = package.config:sub(1, 1)
 
 ---@type PathLib
 M.path = lazy.require("diffview.path", function(module)
   return module.PathLib({ separator = "/" })
 end)
+
+---@return number # Current time (ms)
+function M.now()
+  return vim.loop.hrtime() / 1000000
+end
 
 ---Echo string with multiple lines.
 ---@param msg string|string[]
@@ -392,7 +399,7 @@ end
 ---@overload fun(cmd: string[], opt: utils.system_list.Opt?)
 function M.system_list(cmd, cwd_or_opt)
   if vim.in_fast_event() then
-    async.util.scheduler()
+    await(async.scheduler())
   end
 
   ---@type utils.system_list.Opt
@@ -419,9 +426,6 @@ function M.system_list(cmd, cwd_or_opt)
     args = cmd,
     cwd = opt.cwd,
     writer = opt.writer,
-    on_stderr = function(_, data)
-      table.insert(stderr, data)
-    end,
   }
 
   for i = 0, max_retries do
@@ -607,7 +611,7 @@ function M.tbl_pack(...)
 end
 
 function M.tbl_unpack(t, i, j)
-  return unpack(t, i or 1, j or t.n or #t)
+  return unpack(t, i or 1, j or t.n or table.maxn(t))
 end
 
 function M.tbl_clear(t)
@@ -1412,19 +1416,14 @@ local function split_merge(t, first, last, comparator)
 end
 
 ---Perform a merge sort on a given list.
----@param t any[]
----@param comparator function|nil
+---@generic T
+---@param t T[]
+---@param comparator? (fun(a: T, b: T): boolean)
 function M.merge_sort(t, comparator)
-  if not comparator then
-    comparator = function(a, b)
-      return a < b
-    end
-  end
-
+  comparator = comparator or function(a, b) return a < b end
   split_merge(t, 1, #t, comparator)
 end
 
-M._mapping_callbacks = mapping_callbacks
 M.path_sep = path_sep
 
 return M

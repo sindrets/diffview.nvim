@@ -9,7 +9,7 @@ local LogEntry = require("diffview.vcs.log_entry").LogEntry
 local RevType = require("diffview.vcs.rev").RevType
 local VCSAdapter = require('diffview.vcs.adapter').VCSAdapter
 local arg_parser = require("diffview.arg_parser")
-local async = require("plenary.async")
+local async = require("diffview.async")
 local config = require('diffview.config')
 local lazy = require('diffview.lazy')
 local logger = require('diffview.logger')
@@ -17,8 +17,8 @@ local oop = require('diffview.oop')
 local utils = require('diffview.utils')
 local vcs_utils = require("diffview.vcs.utils")
 
----@type PathLib
-local pl = lazy.access(utils, "path")
+local await = async.await
+local pl = lazy.access(utils, "path") ---@type PathLib
 
 local M = {}
 
@@ -375,7 +375,7 @@ function HgAdapter:file_history_dry_run(log_opt)
   end, self:prepare_fh_options(log_options, single_file).flags) --[[@as vector ]]
 
   local description = utils.vec_join(
-    ("Top-level path: '%s'"):format(utils.path:vim_fnamemodify(self.ctx.toplevel, ":~")),
+    ("Top-level path: '%s'"):format(pl:vim_fnamemodify(self.ctx.toplevel, ":~")),
     log_options.rev and ("Revision range: '%s'"):format(log_options.rev) or nil,
     ("Flags: %s"):format(table.concat(options, " "))
   )
@@ -433,7 +433,7 @@ end
 ---@param self HgAdapter
 ---@param state HgAdapter.FHState
 ---@param callback fun(status: JobStatus, data?: table, msg?: string[])
-HgAdapter.incremental_fh_data = async.void(function(self, state, callback)
+HgAdapter.incremental_fh_data = async.wrap(function(self, state, callback)
   local raw = {}
   local namestat_job, numstat_job, shutdown
 
@@ -518,7 +518,7 @@ HgAdapter.incremental_fh_data = async.void(function(self, state, callback)
     on_exit = on_exit,
   })
 
-  Job.join({ namestat_job, numstat_job })
+  await(Job.join({ namestat_job, numstat_job }))
 
   local debug_opt = {
     context = "HgAdapter:incremental_fh_data()",
@@ -557,12 +557,6 @@ function HgAdapter:parse_fh_data(state)
         state.old_path or state.path_args
       ),
       cwd = self.ctx.toplevel,
-      on_exit = function(j)
-        if j.code == 0 then
-          cur.namestat = j.stdout
-        end
-        self:handle_co(state.thread, coroutine.resume(state.thread))
-      end,
     }
 
     local max_retries = 2
@@ -574,8 +568,12 @@ function HgAdapter:parse_fh_data(state)
       -- possibly because we are running multiple git opeartions on the same
       -- repo concurrently. Retrying the job usually solves this.
       job = Job(job_spec)
-      job:start()
-      coroutine.yield()
+      await(job:start())
+
+      if job.code == 0 then
+        cur.namestat = job.stdout
+      end
+
       utils.handle_job(job, { fail_on_empty = true, context = context, log_func = logger.warn })
 
       if #cur.namestat == 0 then
@@ -662,7 +660,7 @@ end
 function HgAdapter:is_single_file(path_args, lflags)
   if path_args and self.ctx.toplevel then
     return #path_args == 1
-      and not utils.path:is_dir(path_args[1])
+      and not pl:is_dir(path_args[1])
       and #self:exec_sync({ "files", "--", path_args }, self.ctx.toplevel) < 2
   end
   return true
@@ -897,7 +895,7 @@ end
 
 function HgAdapter:file_restore(path, kind, commit)
   local _, code
-  local abs_path = utils.path:join(self.ctx.toplevel, path)
+  local abs_path = pl:join(self.ctx.toplevel, path)
 
   _, code = self:exec_sync({"cat", "--", path}, self.ctx.toplevel)
 
@@ -908,7 +906,7 @@ function HgAdapter:file_restore(path, kind, commit)
   if not exists_hg then
     local bn = utils.find_file_buffer(abs_path)
     if bn then
-      async.util.scheduler()
+      await(async.scheduler())
       local ok, err = utils.remove_buffer(false, bn)
       if not ok then
         utils.err({
@@ -922,7 +920,7 @@ function HgAdapter:file_restore(path, kind, commit)
 
     if kind == "working" or kind == "conflicting" then
       -- File is untracked and has no history: delete it from fs.
-      local ok, err = utils.path:unlink(abs_path)
+      local ok, err = await(pl:unlink(abs_path))
       if not ok then
         utils.err({
           ("Failed to delete file '%s'! Aborting file restoration. Error message:")
@@ -1029,15 +1027,16 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
     on_exit = on_exit,
   })
 
-  Job.join({ namestat_job, mergestate_job, numstat_job })
+  await(Job.join({ namestat_job, mergestate_job, numstat_job }))
 
   local out_status
   if
     not (#namestat_job.stdout == 0 and #numstat_job.stdout == 0)
     and not (#namestat_job.stdout == #numstat_job.stdout - 1)
   then
-    out_status =
+    out_status = await(
       vcs_utils.ensure_output(2, { namestat_job, numstat_job }, "HgAdapter:tracked_files()")
+    )
   end
 
   if out_status == JobStatus.ERROR or not (namestat_job.code == 0 and numstat_job.code == 0 and mergestate_job.code == 0) then
@@ -1149,10 +1148,10 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
   end
 
   callback(nil, files, conflicts)
-end, 7)
+end)
 
 HgAdapter.untracked_files = async.wrap(function(self, left, right, opt, callback)
-  Job({
+  local j = Job({
     command = self:bin(),
     args = utils.vec_join(
       self:args(),
@@ -1163,42 +1162,43 @@ HgAdapter.untracked_files = async.wrap(function(self, left, right, opt, callback
       "--template={path}\\n"
     ),
     cwd = self.ctx.toplevel,
-    ---@param j diffview.Job
-    on_exit = function(j)
-      utils.handle_job(j, {
-        debug_opt = {
-          context = "HgAdapter>untracked_files()",
-          func = "s_debug",
-          debug_level = 1,
-          no_stdout = true,
-        },
+  })
+
+  await(j:start())
+
+  utils.handle_job(j, {
+    debug_opt = {
+      context = "HgAdapter>untracked_files()",
+      func = "s_debug",
+      debug_level = 1,
+      no_stdout = true,
+    },
+  })
+
+  if j.code ~= 0 then
+    callback(j.stderr or {}, nil)
+    return
+  end
+
+  local files = {}
+  for _, s in ipairs(j.stdout) do
+    table.insert(
+      files,
+      FileEntry.with_layout(opt.default_layout, {
+        adapter = self,
+        path = s,
+        status = "?",
+        kind = "working",
+        revs = {
+          a = left,
+          b = right,
+        }
       })
+    )
+  end
 
-      if j.code ~= 0 then
-        callback(j.stderr or {}, nil)
-        return
-      end
-
-      local files = {}
-      for _, s in ipairs(j.stdout) do
-        table.insert(
-          files,
-          FileEntry.with_layout(opt.default_layout, {
-            adapter = self,
-            path = s,
-            status = "?",
-            kind = "working",
-            revs = {
-              a = left,
-              b = right,
-            }
-          })
-        )
-      end
-      callback(nil, files)
-    end,
-  }):start()
-end, 5)
+  callback(nil, files)
+end)
 
 ---@param self HgAdapter
 ---@param path string
@@ -1232,8 +1232,8 @@ HgAdapter.show = async.wrap(function(self, path, rev, callback)
       local out_status
 
       if #j.stdout == 0 then
-        async.util.scheduler()
-        out_status = vcs_utils.ensure_output(2, { j }, context)
+        await(async.scheduler())
+        out_status = await(vcs_utils.ensure_output(2, { j }, context))
       end
 
       if out_status == JobStatus.ERROR then
@@ -1248,7 +1248,7 @@ HgAdapter.show = async.wrap(function(self, path, rev, callback)
   -- silently.
   -- Solution: queue them and run them one after another.
   vcs_utils.queue_sync_job(job)
-end, 4)
+end)
 
 HgAdapter.flags = {
   ---@type FlagOption[]

@@ -175,7 +175,7 @@ end
 function FileHistoryPanel:update_entries(callback)
   perf_update:reset()
   local c = 0
-  local timeout = 64
+  local timeout = 128
   local ldt = 0 -- Last draw time
   local lock = false
   local update, finalizer

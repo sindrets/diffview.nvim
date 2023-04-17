@@ -1,14 +1,13 @@
 local Scanner = require("diffview.scanner")
-local CountDownLatch = require("diffview.control").CountDownLatch
 local FileDict = require("diffview.vcs.file_dict").FileDict
-local Job = require("diffview.job").Job
 local RevType = require("diffview.vcs.rev").RevType
 local Semaphore = require("diffview.control").Semaphore
-local async = require("plenary.async")
+local async = require("diffview.async")
 local logger = require("diffview.logger")
 local utils = require("diffview.utils")
 
 local api = vim.api
+local await = async.await
 
 local M = {}
 
@@ -23,19 +22,18 @@ local JobStatus = {
 
 ---@type diffview.Job[]
 local sync_jobs = {}
----@type Semaphore
-local job_queue_sem = Semaphore.new(1)
+local job_queue_sem = Semaphore(1)
 
----@param job Job
+---@param job diffview.Job
 M.resume_sync_queue = async.void(function(job)
-  local permit = job_queue_sem:acquire()
+  local permit = await(job_queue_sem:acquire()) --[[@as Permit ]]
   local idx = utils.vec_indexof(sync_jobs, job)
   if idx > -1 then
     table.remove(sync_jobs, idx)
   end
   permit:forget()
 
-  if sync_jobs[1] and not sync_jobs[1].handle then
+  if sync_jobs[1] and not sync_jobs[1]:is_started() then
     sync_jobs[1]:start()
   end
 end)
@@ -46,7 +44,7 @@ M.queue_sync_job = async.void(function(job)
     M.resume_sync_queue(job)
   end)
 
-  local permit = job_queue_sem:acquire()
+  local permit = await(job_queue_sem:acquire()) --[[@as Permit ]]
   table.insert(sync_jobs, job)
   permit:forget()
 
@@ -58,8 +56,9 @@ end)
 ---@param max_retries integer
 ---@param jobs diffview.Job[]
 ---@param log_context string
----@param callback function
+---@param callback? function
 M.ensure_output = async.wrap(function(max_retries, jobs, log_context, callback)
+  ---@cast callback -?
   local num_bad_jobs
   local num_retries = 0
   local context = log_context and ("[%s] "):format(log_context) or ""
@@ -76,13 +75,7 @@ M.ensure_output = async.wrap(function(max_retries, jobs, log_context, callback)
         logger.log_job(job, { func = logger.warn, context = log_context })
         num_retries = n + 1
 
-        job:start()
-
-        if vim.in_fast_event() then
-          async.util.scheduler()
-        end
-
-        Job.join({ job })
+        await(job:start())
 
         if job.code ~= 0 then
           utils.handle_job(job, { context = log_context })
@@ -102,7 +95,7 @@ M.ensure_output = async.wrap(function(max_retries, jobs, log_context, callback)
   end
 
   callback(JobStatus.ERROR)
-end, 4)
+end)
 
 ---Get a list of files modified between two revs.
 ---@param adapter VCSAdapter
@@ -117,87 +110,72 @@ end, 4)
 M.diff_file_list = async.wrap(function(adapter, left, right, path_args, dv_opt, opt, callback)
   ---@type FileDict
   local files = FileDict()
-  ---@type CountDownLatch
-  local latch = CountDownLatch(2)
   local rev_args = adapter:rev_to_args(left, right)
   local errors = {}
 
-  adapter:tracked_files(
-    left,
-    right,
-    utils.vec_join(
-      rev_args,
-      "--",
-      path_args
-    ),
-    "working",
-    opt,
-    function (err, tfiles, tconflicts)
-      if err then
-        errors[#errors+1] = err
-        utils.err("Failed to get git status for tracked files!", true)
-        latch:count_down()
-        return
-      end
+  ;(function()
+    local err, tfiles, tconflicts = await(
+      adapter:tracked_files(
+        left,
+        right,
+        utils.vec_join(rev_args, "--", path_args),
+        "working",
+        opt
+      )
+    )
 
-      files:set_working(tfiles)
-      files:set_conflicting(tconflicts)
+    if err then
+      errors[#errors+1] = err
+      utils.err("Failed to get git status for tracked files!", true)
+      return
+    end
 
-      if not adapter:show_untracked({
+    files:set_working(tfiles)
+    files:set_conflicting(tconflicts)
+
+    if not adapter:show_untracked({
         dv_opt = dv_opt,
         revs = { left = left, right = right },
-      }) then
-        latch:count_down()
-        return
-      end
+      })
+    then return end
 
-      ---@diagnostic disable-next-line: redefined-local
-      local err, ufiles = adapter:untracked_files(left, right, opt)
-      if err then
-        errors[#errors+1] = err
-        utils.err("Failed to get git status for untracked files!", true)
-        latch:count_down()
-      else
-        files:set_working(utils.vec_join(files.working, ufiles))
+    ---@diagnostic disable-next-line: redefined-local
+    local err, ufiles = await(adapter:untracked_files(left, right, opt))
 
-        utils.merge_sort(files.working, function(a, b)
-          return a.path:lower() < b.path:lower()
-        end)
-        latch:count_down()
-      end
+    if err then
+      errors[#errors+1] = err
+      utils.err("Failed to get git status for untracked files!", true)
+    else
+      files:set_working(utils.vec_join(files.working, ufiles))
+
+      utils.merge_sort(files.working, function(a, b)
+        return a.path:lower() < b.path:lower()
+      end)
     end
-  )
+  end)()
 
-  if not (left.type == RevType.STAGE and right.type == RevType.LOCAL) then
-    latch:count_down()
-  else
+  if left.type == RevType.STAGE and right.type == RevType.LOCAL then
     local left_rev = adapter:head_rev() or adapter.Rev.new_null_tree()
     local right_rev = adapter.Rev(RevType.STAGE, 0)
-    adapter:tracked_files(
-      left_rev,
-      right_rev,
-      utils.vec_join(
-        "--cached",
-        left_rev.commit,
-        "--",
-        path_args
-      ),
-      "staged",
-      opt,
-      function(err, tfiles)
-        if err then
-          errors[#errors+1] = err
-          utils.err("Failed to get git status for staged files!", true)
-          latch:count_down()
-          return
-        end
-        files:set_staged(tfiles)
-        latch:count_down()
-      end
+    ---@diagnostic disable-next-line: redefined-local
+    local err, tfiles = await(
+      adapter:tracked_files(
+        left_rev,
+        right_rev,
+        utils.vec_join("--cached", left_rev.commit, "--", path_args),
+        "staged",
+        opt
+      )
     )
+
+    if err then
+      errors[#errors+1] = err
+      utils.err("Failed to get git status for staged files!", true)
+    else
+      files:set_staged(tfiles)
+    end
   end
 
-  latch:await()
   if #errors > 0 then
     callback(utils.vec_join(unpack(errors)), nil)
     return
@@ -230,7 +208,7 @@ M.restore_file = async.wrap(function(adapter, path, kind, commit, callback)
   ), true)
 
   callback()
-end, 5)
+end)
 
 --[[
 Standard change:

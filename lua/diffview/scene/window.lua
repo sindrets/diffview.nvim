@@ -1,3 +1,4 @@
+local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
@@ -10,6 +11,7 @@ local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
+local await = async.await
 local fmt = string.format
 
 local M = {}
@@ -84,72 +86,64 @@ function Window:post_open()
   self:apply_custom_folds()
 end
 
+---@param self Window
 ---@param callback fun(file: vcs.File)
-function Window:load_file(callback)
+Window.load_file = async.wrap(function(self, callback)
   assert(self.file)
 
   if self.file.bufnr and api.nvim_buf_is_valid(self.file.bufnr) then
     return callback(self.file)
   end
 
-  self.file:create_buffer(function()
-    callback(self.file)
-  end)
-end
+  local bufnr = await(self.file:create_buffer())
 
----@param callback? fun(file: vcs.File)
-function Window:open_file(callback)
+  callback(bufnr)
+end)
+
+---@param self Window
+Window.open_file = async.void(function(self)
   assert(self.file)
 
-  if self:is_valid() and self.file.active then
-    local function on_load()
-      local conf = config.get_config()
-      api.nvim_win_set_buf(self.id, self.file.bufnr)
+  if not (self:is_valid() and self.file.active) then return end
 
-      if self.file.rev.type == RevType.LOCAL then
-        self:_save_winopts()
-      end
-
-      if self:is_nulled() then
-        self:apply_null_winopts()
-      else
-        self:apply_file_winopts()
-      end
-
-      self.file:attach_buffer(false, {
-        keymaps = config.get_layout_keymaps(self.parent),
-        disable_diagnostics = self.file.kind == "conflicting"
-            and conf.view.merge_tool.disable_diagnostics,
-      })
-
-      if self:show_winbar_info() then
-        vim.wo[self.id].winbar = self.file.winbar
-      end
-
-      self.emitter:emit("post_open")
-
-      api.nvim_win_call(self.id, function()
-        DiffviewGlobal.emitter:emit("diff_buf_win_enter", self.file.bufnr, self.id, {
-          symbol = self.file.symbol,
-          layout_name = self.parent.name,
-        })
-      end)
-
-      if vim.is_callable(callback) then
-        ---@cast callback -?
-        callback(self.file)
-      end
-    end
-
-    self.emitter:emit("pre_open")
-
-    if self.file:is_valid() then
-      on_load()
-    else
-      self:load_file(on_load)
-    end
+  if not self.file:is_valid() then
+    await(self:load_file())
   end
-end
+
+  self.emitter:emit("pre_open")
+
+  local conf = config.get_config()
+  api.nvim_win_set_buf(self.id, self.file.bufnr)
+
+  if self.file.rev.type == RevType.LOCAL then
+    self:_save_winopts()
+  end
+
+  if self:is_nulled() then
+    self:apply_null_winopts()
+  else
+    self:apply_file_winopts()
+  end
+
+  self.file:attach_buffer(false, {
+    keymaps = config.get_layout_keymaps(self.parent),
+    disable_diagnostics = self.file.kind == "conflicting"
+    and conf.view.merge_tool.disable_diagnostics,
+  })
+
+  if self:show_winbar_info() then
+    vim.wo[self.id].winbar = self.file.winbar
+  end
+
+  self.emitter:emit("post_open")
+
+  api.nvim_win_call(self.id, function()
+    DiffviewGlobal.emitter:emit("diff_buf_win_enter", self.file.bufnr, self.id, {
+      symbol = self.file.symbol,
+      layout_name = self.parent.name,
+    })
+  end)
+end)
 
 ---@return boolean
 function Window:show_winbar_info()

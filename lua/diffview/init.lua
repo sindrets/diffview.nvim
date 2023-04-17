@@ -13,6 +13,7 @@ local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local vcs = lazy.require("diffview.vcs") ---@module "diffview.vcs"
 
 local api = vim.api
+local pl = lazy.access(utils, "path") ---@type PathLib
 
 local M = {}
 
@@ -152,12 +153,12 @@ end
 ---Create a temporary adapter to get relevant completions
 ---@return VCSAdapter?
 function M.get_adapter()
-    local cfile = utils.path:vim_expand("%")
+    local cfile = pl:vim_expand("%")
     local top_indicators = utils.vec_join(
       vim.bo.buftype == ""
-          and utils.path:absolute(cfile)
+          and pl:absolute(cfile)
           or nil,
-      utils.path:realpath(".")
+      pl:realpath(".")
     )
 
     local err, adapter = vcs.get_adapter({ top_indicators = top_indicators })

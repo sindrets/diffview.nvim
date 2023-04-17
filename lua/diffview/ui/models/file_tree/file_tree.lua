@@ -3,6 +3,8 @@ local utils = require("diffview.utils")
 local Node = require("diffview.ui.models.file_tree.node").Node
 local Model = require("diffview.ui.model").Model
 
+local pl = utils.path
+
 local M = {}
 
 ---@class DirData
@@ -29,7 +31,7 @@ end
 
 ---@param file FileEntry
 function FileTree:add_file_entry(file)
-  local parts = utils.path:explode(file.path)
+  local parts = pl:explode(file.path)
   local cur_node = self.root
 
   local path = parts[1]
@@ -39,7 +41,7 @@ function FileTree:add_file_entry(file)
     local name = parts[i]
 
     if i > 1 then
-      path = utils.path:join(path, parts[i])
+      path = pl:join(path, parts[i])
     end
 
     if not cur_node.children[name] then
@@ -116,7 +118,7 @@ function FileTree:create_comp_schema(data)
         ---@type DirData
         local subdir_data = node.children[1].data
         dir_data = {
-          name = utils.path:join(dir_data.name, subdir_data.name),
+          name = pl:join(dir_data.name, subdir_data.name),
           path = subdir_data.path,
           kind = subdir_data.kind,
           collapsed = dir_data.collapsed and subdir_data.collapsed,

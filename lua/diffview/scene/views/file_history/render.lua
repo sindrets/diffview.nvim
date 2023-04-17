@@ -6,6 +6,7 @@ local utils = require("diffview.utils")
 
 ---@type PerfTimer
 local perf = PerfTimer("[FileHistoryPanel] Render internal")
+local pl = utils.path
 
 local cache = setmetatable({}, { __mode = "k" })
 
@@ -142,11 +143,11 @@ local function prepare_panel_cache(panel)
   local c = {}
   cache[panel] = c
   c.root_path = panel.state.form == "column"
-      and utils.path:shorten(
-        utils.path:vim_fnamemodify(panel.adapter.ctx.toplevel, ":~"),
+      and pl:shorten(
+        pl:vim_fnamemodify(panel.adapter.ctx.toplevel, ":~"),
         panel:get_config().width - 6
       )
-    or utils.path:vim_fnamemodify(panel.adapter.ctx.toplevel, ":~")
+    or pl:vim_fnamemodify(panel.adapter.ctx.toplevel, ":~")
   c.args = table.concat(panel.log_options.single_file.path_args, " ")
 end
 

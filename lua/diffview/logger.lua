@@ -1,6 +1,7 @@
-local utils = require("diffview.utils")
 local log = require("plenary.log")
 local Mock = require("diffview.mock").Mock
+
+local fmt = string.format
 
 ---@class Logger
 ---@field plugin string
@@ -30,18 +31,57 @@ logger.outfile = string.format(
   logger.plugin
 )
 
--- Add scheduled variants of the different log methods.
-for _, kind in ipairs({ "trace", "debug", "info", "warn", "error", "fatal" }) do
-  logger["s_" .. kind] = vim.schedule_wrap(function(...)
-    local args = vim.tbl_map(function(v)
-      if type(v) == "table" and type(v.__tostring) == "function" then
-        return tostring(v)
+---@return string
+function logger.dstring(object)
+  local tp = type(object)
+
+  if tp == "thread"
+    or tp == "function"
+    or tp == "userdata"
+  then
+    return fmt("<%s %p>", tp, object)
+  elseif tp == "table" then
+    local mt = getmetatable(object)
+
+    if mt and mt.__tostring then
+      return tostring(object)
+    elseif vim.tbl_islist(object) then
+      if #object == 0 then return "[]" end
+      local s = ""
+
+      for i = 1, table.maxn(object) do
+        if i > 1 then s = s .. ", " end
+        s = s .. logger.dstring(object[i])
       end
 
-      return v
-    end, utils.tbl_pack(...))
+      return "[ " .. s .. " ]"
+    end
 
-    logger[kind](utils.tbl_unpack(args))
+    return vim.inspect(object)
+  end
+
+  return tostring(object)
+end
+
+local function dvalues(...)
+  local args = { ... }
+  local ret = {}
+
+  for i = 1, select("#", ...) do
+    ret[i] = logger.dstring(args[i])
+  end
+
+  return ret
+end
+
+-- Add scheduled variants of the different log methods.
+for _, kind in ipairs({ "trace", "debug", "info", "warn", "error", "fatal" }) do
+  local orig_fn = logger[kind]
+  logger[kind] = function(...)
+    orig_fn(unpack(dvalues(...)))
+  end
+  logger["s_" .. kind] = vim.schedule_wrap(function(...)
+    logger[kind](unpack(dvalues(...)))
   end)
 end
 
