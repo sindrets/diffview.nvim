@@ -5,6 +5,8 @@ itself. Calling the object does nothing.
 
 local M = {}
 local mock_mt = {}
+
+---@class Mock
 local Mock = setmetatable({}, mock_mt)
 
 function mock_mt.__index(_, key)

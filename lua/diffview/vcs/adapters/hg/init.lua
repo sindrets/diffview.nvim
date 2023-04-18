@@ -46,7 +46,7 @@ function HgAdapter.run_bootstrap()
   local function err(msg)
     if msg then
       bs.err = msg
-      logger.error("[HgAdapter] " .. bs.err)
+      logger:error("[HgAdapter] " .. bs.err)
     end
   end
 
@@ -404,7 +404,7 @@ function HgAdapter:file_history_dry_run(log_opt)
   local ok = code == 0 and #out > 0
 
   if not ok then
-    logger.lvl(1).s_debug(("[%s] Dry run failed."):format(context))
+    logger:lvl(1):debug(("[%s] Dry run failed."):format(context))
   end
 
   return ok, table.concat(description, ", ")
@@ -466,7 +466,7 @@ HgAdapter.incremental_fh_data = async.wrap(function(self, state, callback)
           )
 
           if shutdown then
-            logger.lvl(1).debug("Killing file history jobs...")
+            logger:lvl(1):debug("Killing file history jobs...")
             namestat_job:kill(64, "sigkill")
             numstat_job:kill(64, "sigkill")
           end
@@ -522,7 +522,7 @@ HgAdapter.incremental_fh_data = async.wrap(function(self, state, callback)
 
   local debug_opt = {
     context = "HgAdapter:incremental_fh_data()",
-    func = "s_info",
+    func = "info",
     no_stdout = true,
   }
   utils.handle_job(namestat_job, { debug_opt = debug_opt })
@@ -578,11 +578,11 @@ function HgAdapter:parse_fh_data(state)
 
       if #cur.namestat == 0 then
         if i < max_retries then
-          logger.warn(("[%s] Retrying %d more time(s)."):format(context, max_retries - i))
+          logger:warn(("[%s] Retrying %d more time(s)."):format(context, max_retries - i))
         end
       else
         if i > 0 then
-          logger.info(("[%s] Retry successful!"):format(context))
+          logger:info(("[%s] Retry successful!"):format(context))
         end
         break
       end
@@ -598,7 +598,7 @@ function HgAdapter:parse_fh_data(state)
     if #cur.namestat == 0 then
       -- Give up: something has been renamed. We can no longer track the
       -- history.
-      logger.warn(("[%s] Giving up."):format(context))
+      logger:warn(("[%s] Giving up."):format(context))
       utils.warn("Displayed history may be incomplete. Check ':DiffviewLog' for details.", true)
       return false
     end
@@ -728,7 +728,7 @@ function HgAdapter:file_history_worker(thread, log_opt, opt, co_state, callback)
     end
 
     if last_status == JobStatus.KILLED then
-      logger.warn("File history processing was killed.")
+      logger:warn("File history processing was killed.")
       return
     elseif last_status == JobStatus.ERROR then
       callback(entries, JobStatus.ERROR, err_msg)
@@ -988,8 +988,8 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
   ---@type FileEntry[]
   local conflicts = {}
   local debug_opt = {
-    context = "HgAdapter>tracked_files()",
-    func = "s_debug",
+    context = "HgAdapter:tracked_files()",
+    func = "debug",
     debug_level = 1,
     no_stdout = true,
   }
@@ -1168,8 +1168,8 @@ HgAdapter.untracked_files = async.wrap(function(self, left, right, opt, callback
 
   utils.handle_job(job, {
     debug_opt = {
-      context = "HgAdapter>untracked_files()",
-      func = "s_debug",
+      context = "HgAdapter:untracked_files()",
+      func = "debug",
       debug_level = 1,
       no_stdout = true,
     },
@@ -1285,7 +1285,7 @@ end
 -- TODO: implement completion
 function HgAdapter:rev_candidates(arg_lead, opt)
   opt = vim.tbl_extend("keep", opt or {}, { accept_range = false }) --[[@as RevCompletionSpec ]]
-  logger.lvl(1).debug("[completion] Revision candidates requested")
+  logger:lvl(1):debug("[completion] Revision candidates requested")
 
   local branches = self:exec_sync(
     { "branches", "--template={branch}\n" },

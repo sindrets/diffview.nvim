@@ -157,7 +157,7 @@ function VCSAdapter:exec_sync(args, cwd_or_opt)
   local cmd = vim.tbl_flatten({ self:get_command(), args })
 
   if not self:class().bootstrap.ok then
-    logger.error(
+    logger:error(
       ("[VCSAdapter] Can't exec adapter command because bootstrap failed! Cmd: %s")
       :format(table.concat(cmd, " "))
     )
@@ -180,7 +180,7 @@ function VCSAdapter:handle_co(thread, ok, result)
       debug.traceback(thread, result, 1)
     )
     utils.err(err_msg, true)
-    logger.s_error(table.concat(err_msg, "\n"))
+    logger:error(table.concat(err_msg, "\n"))
   end
   return ok, result
 end

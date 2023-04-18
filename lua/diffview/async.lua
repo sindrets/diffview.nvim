@@ -136,7 +136,7 @@ function Future:dprint(...)
       t[i] = dstring(args[i])
     end
 
-    logger.debug(table.concat(t, " "))
+    logger:debug(table.concat(t, " "))
   end
 end
 

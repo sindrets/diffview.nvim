@@ -2,12 +2,14 @@ local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
----@module "diffview.utils"
-local utils = lazy.require("diffview.utils")
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
+
+local await = async.await
+local fmt = string.format
+local uv = vim.loop
 
 local M = {}
 
-local uv = vim.loop
 local is_windows = uv.os_uname().version:match("Windows")
 
 ---@class PathLib
@@ -466,13 +468,13 @@ function PathLib:vim_fnamemodify(path, mods)
 end
 
 ---@param path string
----@return table|nil
+---@return table?
 function PathLib:stat(path)
   return uv.fs_stat(path)
 end
 
 ---@param path string
----@return string|nil
+---@return string?
 function PathLib:type(path)
   local p = uv.fs_realpath(path)
 
@@ -502,6 +504,97 @@ function PathLib:readable(path)
 
   return false
 end
+
+---@class PathLib.touch.Opt
+---@field mode? integer
+---@field parents? boolean
+
+---@param self PathLib
+---@param path string
+---@param opt PathLib.touch.Opt
+---@param callback fun(ok: boolean, err: string?)
+PathLib.touch = async.wrap(function(self, path, opt, callback)
+  ---@cast callback -?
+  opt = opt or {}
+  local mode = opt.mode or tonumber("0644", 8)
+
+  path = self:_clean(path)
+  local stat = self:stat(path)
+  local ok, err
+
+  if stat then
+    -- Path exists: just update utime
+    local time = os.time()
+    ok, err = uv.fs_utime(path, time, time)
+    callback(utils.sate(ok, true), err)
+    return
+  end
+
+  if opt.parents then
+    local parent = self:parent(path)
+
+    if parent then
+      await(self:mkdir(self:parent(path), { parents = true }))
+    end
+  end
+
+  local fd
+  fd, err = uv.fs_open(path, "w", mode)
+
+  if not fd then
+    callback(false, err)
+    return
+  end
+
+  ok, err = uv.fs_close(fd)
+  callback(utils.sate(ok, true), err)
+end)
+
+---@class PathLib.mkdir.Opt
+---@field mode? integer
+---@field parents? boolean
+
+---@param self PathLib
+---@param path string
+---@param opt? table
+---@param callback? fun(ok: boolean, err: string?)
+PathLib.mkdir = async.wrap(function(self, path, opt, callback)
+  ---@cast callback -?
+  opt = opt or {}
+  local mode = opt.mode or tonumber("0700", 8)
+  local parts = self:explode(path)
+  local cur_path
+
+  for i, part in ipairs(parts) do
+    cur_path = cur_path and self:join(cur_path, part) or part
+    local stat = self:stat(cur_path)
+
+    if not stat then
+      if not opt.parents and i < #parts then
+        callback(false, fmt("Cannot create directory '%s': No such file or directory", path))
+        return
+      else
+        local ok, err = uv.fs_mkdir(cur_path, mode)
+        if not ok then
+          callback(false, err)
+          return
+        end
+      end
+    else
+      if not opt.parents and i == #parts then
+        callback(false, fmt("Cannot create directory '%s': File exists", cur_path))
+        return
+      end
+
+      if stat.type ~= "directory" then
+        callback(false, fmt("Cannot create directory '%s': Not a directory", cur_path))
+        return
+      end
+    end
+  end
+
+  callback(true)
+end)
 
 ---Delete a name and possibly the file it refers to.
 ---@param self PathLib

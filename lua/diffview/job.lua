@@ -102,7 +102,7 @@ end
 ---@param data? string
 function Job:buffered_reader(pipe, out, err, data)
   if err then
-    logger.error("[Job:buffered_reader()] " .. err)
+    logger:error("[Job:buffered_reader()] " .. err)
   end
 
   if data then
@@ -122,7 +122,7 @@ function Job:line_reader(pipe, out, line_listeners, err, data)
   local line_buffer
 
   if err then
-    logger.error("[Job:line_reader()] " .. err)
+    logger:error("[Job:line_reader()] " .. err)
   end
 
   if data then
@@ -184,7 +184,7 @@ function Job:handle_writer(pipe, data)
     if data:sub(-1) ~= "\n" then data = data .. "\n" end
     pipe:write(data, function(err)
       if err then
-        logger.error("[Job:handle_writer()] " .. err)
+        logger:error("[Job:handle_writer()] " .. err)
       end
 
       try_close(pipe)
@@ -200,7 +200,7 @@ function Job:handle_writer(pipe, data)
       else
         pipe:write(s .. "\n", function(err)
           if err then
-            logger.error("[Job:handle_writer()] " .. err)
+            logger:error("[Job:handle_writer()] " .. err)
           end
 
           try_close(pipe)

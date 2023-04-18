@@ -231,7 +231,7 @@ return {
     end
 
     perf:time()
-    logger.lvl(10).s_debug(perf)
+    logger:lvl(10):debug(perf)
   end,
 
   ---@param panel FHOptionPanel

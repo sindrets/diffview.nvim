@@ -164,7 +164,7 @@ function M.get_adapter()
     local err, adapter = vcs.get_adapter({ top_indicators = top_indicators })
 
     if err then
-      logger.s_warn("[completion] Failed to create adapter: " .. err)
+      logger:warn("[completion] Failed to create adapter: " .. err)
     end
 
     return adapter

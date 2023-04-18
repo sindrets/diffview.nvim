@@ -339,7 +339,7 @@ DiffView.update_files = debounce.debounce_trailing(
 
     if err then
       utils.err("Failed to update files in a diff view!", true)
-      logger.s_error("[DiffView] Failed to update files!")
+      logger:error("[DiffView] Failed to update files!")
       callback(err)
       return
     end
@@ -463,8 +463,8 @@ DiffView.update_files = debounce.debounce_trailing(
 
     self.update_needed = false
     perf:time()
-    logger.lvl(5).s_debug(perf)
-    logger.s_info(
+    logger:lvl(5):debug(perf)
+    logger:info(
       ("[%s] Completed update for %d files successfully (%.3f ms)")
       :format(self:class():name(), self.files:len(), perf.final_time)
     )

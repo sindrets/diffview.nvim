@@ -89,8 +89,7 @@ function M.err(msg, schedule)
   end
   msg = M.vec_slice(msg)
 
-  local log_fn = schedule and logger.s_error or logger.error
-  log_fn(table.concat(msg, "\n"))
+  logger:error(table.concat(msg, "\n"))
 
   msg[1] = "[Diffview.nvim] " .. msg[1]
   M.echo_multiln(msg, "ErrorMsg", schedule)
@@ -143,8 +142,8 @@ function M.pick(index, ...)
 end
 
 ---Get the first non-nil value among the given arguments.
----@param ... unknown
----@return unknown?
+---@param ... any
+---@return any?
 function M.sate(...)
   local args = { ... }
 
@@ -328,7 +327,7 @@ end
 ---@field fail_on_empty boolean Consider the job as failed if the code is 0 and stdout is empty.
 ---@field log_func function|string
 ---@field context string Context for the logger.
----@field debug_opt LogJobSpec
+---@field debug_opt Logger.log_job.Opt
 
 ---Handles logging of failed jobs. If the given job hasn't failed, this does nothing.
 ---@param job diffview.Job
@@ -343,12 +342,12 @@ function M.handle_job(job, opt)
 
   if job.code == 0 and not empty then
     if opt.debug_opt then
-      logger.log_job(job, opt.debug_opt)
+      logger:log_job(job, opt.debug_opt)
     end
     return
   end
 
-  local log_func = logger.s_error
+  local log_func = logger.error
 
   if type(opt.log_func) == "string" then
     log_func = logger[opt.log_func]
@@ -368,15 +367,15 @@ function M.handle_job(job, opt)
     msg = ("%sJob exited with a non-zero exit status! Code: %s"):format(context, job.code)
   end
 
-  log_func(msg)
-  log_func(("%s   [cmd] %s %s"):format(context, job.command, table.concat(args, " ")))
+  log_func(logger, msg)
+  log_func(logger, ("%s   [cmd] %s %s"):format(context, job.command, table.concat(args, " ")))
 
   if job.cwd then
-    log_func(("%s   [cwd] %s"):format(context, job.cwd))
+    log_func(logger, ("%s   [cwd] %s"):format(context, job.cwd))
   end
 
   if #job.stderr > 0 then
-    log_func(("%s[stderr] %s"):format(context, table.concat(job.stderr, "\n")))
+    log_func(logger, ("%s[stderr] %s"):format(context, table.concat(job.stderr, "\n")))
   end
 end
 
@@ -387,7 +386,7 @@ end
 ---@field fail_on_empty boolean Return code 1 if stdout is empty and code is 0.
 ---@field retry_on_empty integer Number of times to retry job if stdout is empty and code is 0. Implies `fail_on_empty`.
 ---@field context string Context for the logger.
----@field debug_opt LogJobSpec
+---@field debug_opt Logger.log_job.Opt
 
 ---Get the output of a system command.
 ---@param cmd string[]
@@ -430,11 +429,11 @@ function M.system_list(cmd, cwd_or_opt)
 
   for i = 0, max_retries do
     if i > 0 then
-      logger.warn(
+      logger:warn(
         ("%sJob expected output, but returned nothing! Retrying %d more time(s)...")
         :format(context, max_retries - i + 1)
       )
-      logger.log_job(job, { func = logger.warn, context = opt.context })
+      logger:log_job(job, { func = logger.warn, context = opt.context })
       num_retries = num_retries + 1
     end
 
@@ -454,7 +453,7 @@ function M.system_list(cmd, cwd_or_opt)
   end
 
   if num_retries > 0 and code == 0 and not empty then
-    logger.info(("%sRetry was successful!"):format(context))
+    logger:info(("%sRetry was successful!"):format(context))
   end
 
   if opt.fail_on_empty and code == 0 and empty then

@@ -225,7 +225,7 @@ function FileHistoryPanel:update_entries(callback)
       c = #entries
 
       if ldt > timeout then
-        logger.lvl(10).debug(string.format(
+        logger:lvl(10):debug(string.format(
           "[FH_PANEL] Rendering is slower than throttle timeout (%.3f ms). Skipping update.",
           ldt
         ))
@@ -252,7 +252,7 @@ function FileHistoryPanel:update_entries(callback)
       if status == JobStatus.SUCCESS then
         update:close()
         perf_update:time()
-        logger.s_info(string.format(
+        logger:info(string.format(
           "[FileHistory] Completed update for %d entries successfully (%.3f ms).",
           #self.entries,
           perf_update.final_time
@@ -539,7 +539,7 @@ function FileHistoryPanel:render()
   perf_render:reset()
   panel_renderer.file_history_panel(self)
   perf_render:time()
-  logger.lvl(10).s_debug(perf_render)
+  logger:lvl(10):debug(perf_render)
 end
 
 ---@return LogOptions

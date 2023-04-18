@@ -394,7 +394,7 @@ function Panel:redraw()
   perf:reset()
   renderer.render(self.bufid, self.render_data)
   perf:time()
-  logger.lvl(10).s_debug(perf)
+  logger:lvl(10):debug(perf)
 end
 
 ---Update components, render and redraw.

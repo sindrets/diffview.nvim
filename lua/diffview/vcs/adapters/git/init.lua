@@ -72,7 +72,7 @@ function GitAdapter.run_bootstrap()
   local function err(msg)
     if msg then
       bs.err = msg
-      logger.error("[GitAdapter] " .. bs.err)
+      logger:error("[GitAdapter] " .. bs.err)
     end
   end
 
@@ -455,7 +455,7 @@ GitAdapter.incremental_fh_data = async.wrap(function(self, state, callback)
           )
 
           if shutdown then
-            logger.lvl(1).debug("Killing file history jobs...")
+            logger:lvl(1):debug("Killing file history jobs...")
             namestat_job:kill(64, "sigkill")
             numstat_job:kill(64, "sigkill")
           end
@@ -523,17 +523,17 @@ GitAdapter.incremental_fh_data = async.wrap(function(self, state, callback)
   await(Job.join({ namestat_job, numstat_job }))
 
   -- if namestat_state.idx < 257 or numstat_state.idx < 257 then
-  --   logger.debug(string.format("--- START NAME_STATUS: %d ---", namestat_state.idx))
-  --   logger.debug(table.concat(namestat_job.stdout, "\n"))
-  --   logger.debug(string.format("--- END NAME_STATUS ---"))
-  --   logger.debug(string.format("--- START NUMSTAT: %d ---", numstat_state.idx))
-  --   logger.debug(table.concat(numstat_job.stdout, "\n"))
-  --   logger.debug(string.format("--- END NUMSTAT ---"))
+  --   logger:debug(string.format("--- START NAME_STATUS: %d ---", namestat_state.idx))
+  --   logger:debug(table.concat(namestat_job.stdout, "\n"))
+  --   logger:debug(string.format("--- END NAME_STATUS ---"))
+  --   logger:debug(string.format("--- START NUMSTAT: %d ---", numstat_state.idx))
+  --   logger:debug(table.concat(numstat_job.stdout, "\n"))
+  --   logger:debug(string.format("--- END NUMSTAT ---"))
   -- end
 
   local debug_opt = {
     context = "GitAdapter:incremental_fh_data()",
-    func = "s_info",
+    func = "info",
     no_stdout = true,
   }
   utils.handle_job(namestat_job, { debug_opt = debug_opt })
@@ -577,7 +577,7 @@ GitAdapter.incremental_line_trace_data = async.wrap(function(self, state, callba
           )
 
           if shutdown then
-            logger.lvl(1).debug("Killing file history jobs...")
+            logger:lvl(1):debug("Killing file history jobs...")
             trace_job:kill(64, "sigkill")
           end
         end
@@ -621,7 +621,7 @@ GitAdapter.incremental_line_trace_data = async.wrap(function(self, state, callba
   utils.handle_job(trace_job, {
     debug_opt = {
       context = "GitAdapter:incremental_line_trace_data()",
-      func = "s_info",
+      func = "info",
       no_stdout = true,
     }
   })
@@ -701,7 +701,7 @@ function GitAdapter:file_history_dry_run(log_opt)
   local ok = code == 0 and #out > 0
 
   if not ok then
-    logger.lvl(1).s_debug(("[%s] Dry run failed."):format(context))
+    logger:lvl(1):debug(("[%s] Dry run failed."):format(context))
   end
 
   return ok, table.concat(description, ", ")
@@ -715,7 +715,7 @@ function GitAdapter:file_history_options(range, paths, argo)
   local cfile = pl:vim_expand("%")
   cfile = pl:readlink(cfile) or cfile
 
-  logger.lvl(1).s_debug(("Found git top-level: %s"):format(utils.str_quote(self.ctx.toplevel)))
+  logger:lvl(1):debug(("Found git top-level: %s"):format(utils.str_quote(self.ctx.toplevel)))
 
   local rel_paths = vim.tbl_map(function(v)
     return v == "." and "." or pl:relative(v, ".")
@@ -730,7 +730,7 @@ function GitAdapter:file_history_options(range, paths, argo)
       return
     end
 
-    logger.lvl(1).s_debug(("Verified range rev: %s"):format(range_arg))
+    logger:lvl(1):debug(("Verified range rev: %s"):format(range_arg))
   end
 
   local log_flag_names = {
@@ -914,11 +914,11 @@ function GitAdapter:parse_fh_data(state)
 
       if #cur.namestat == 0 then
         if i < max_retries then
-          logger.warn(("[%s] Retrying %d more time(s)."):format(context, max_retries - i))
+          logger:warn(("[%s] Retrying %d more time(s)."):format(context, max_retries - i))
         end
       else
         if i > 0 then
-          logger.info(("[%s] Retry successful!"):format(context))
+          logger:info(("[%s] Retry successful!"):format(context))
         end
         break
       end
@@ -934,7 +934,7 @@ function GitAdapter:parse_fh_data(state)
     if #cur.namestat == 0 then
       -- Give up: something has been renamed. We can no longer track the
       -- history.
-      logger.warn(("[%s] Giving up."):format(context))
+      logger:warn(("[%s] Giving up."):format(context))
       utils.warn("Displayed history may be incomplete. Check ':DiffviewLog' for details.", true)
       return false
     end
@@ -1066,7 +1066,7 @@ function GitAdapter:file_history_worker(thread, log_opt, opt, co_state, callback
     end
 
     if last_status == JobStatus.KILLED then
-      logger.warn("File history processing was killed.")
+      logger:warn("File history processing was killed.")
       return
     elseif last_status == JobStatus.ERROR then
       callback(entries, JobStatus.ERROR, err_msg)
@@ -1122,7 +1122,7 @@ function GitAdapter:diffview_options(argo)
     return
   end
 
-  logger.lvl(1).s_debug(("Parsed revs: left = %s, right = %s"):format(left, right))
+  logger:lvl(1):debug(("Parsed revs: left = %s, right = %s"):format(left, right))
 
   ---@type DiffViewOptions
   local options = {
@@ -1511,7 +1511,7 @@ GitAdapter.tracked_files = async.wrap(function(self, left, right, args, kind, op
   local conflicts = {}
   local debug_opt = {
     context = "GitAdapter:tracked_files()",
-    func = "s_debug",
+    func = "debug",
     debug_level = 1,
     no_stdout = true,
   }
@@ -1638,8 +1638,8 @@ GitAdapter.untracked_files = async.wrap(function(self, left, right, opt, callbac
 
   utils.handle_job(job, {
     debug_opt = {
-      context = "GitAdapter>untracked_files()",
-      func = "s_debug",
+      context = "GitAdapter:untracked_files()",
+      func = "debug",
       debug_level = 1,
       no_stdout = true,
     }
@@ -1832,7 +1832,7 @@ end
 ---@param opt? RevCompletionSpec
 function GitAdapter:rev_candidates(arg_lead, opt)
   opt = vim.tbl_extend("keep", opt or {}, { accept_range = false }) --[[@as RevCompletionSpec ]]
-  logger.lvl(1).debug("[completion] Revision candidates requested.")
+  logger:lvl(1):debug("[completion] Revision candidates requested.")
 
   -- stylua: ignore start
   local targets = {

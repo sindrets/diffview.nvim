@@ -68,11 +68,11 @@ M.ensure_output = async.wrap(function(max_retries, jobs, log_context, callback)
 
     for _, job in ipairs(jobs) do
       if job.code == 0 and #job.stdout == 0 then
-        logger.warn(
+        logger:warn(
           ("%sJob expected output, but returned nothing! Retrying %d more times(s)...")
           :format(context, max_retries - n)
         )
-        logger.log_job(job, { func = logger.warn, context = log_context })
+        logger:log_job(job, { func = logger.warn, context = log_context })
         num_retries = n + 1
 
         await(job)
@@ -87,7 +87,7 @@ M.ensure_output = async.wrap(function(max_retries, jobs, log_context, callback)
 
     if num_bad_jobs == 0 then
       if num_retries > 0 then
-        logger.s_info(("%sRetry was successful!"):format(context))
+        logger:info(("%sRetry was successful!"):format(context))
       end
       callback(JobStatus.SUCCESS)
       return
