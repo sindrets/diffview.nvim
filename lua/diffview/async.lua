@@ -280,7 +280,7 @@ function Future:toplevel_await()
   while true do
     ok, status = vim.wait(1000 * 60, function()
       return coroutine.status(self.thread) == "dead"
-    end, 10)
+    end, 1)
 
     -- Respect interrupts
     if status ~= -1 then break end

@@ -616,7 +616,7 @@ GitAdapter.incremental_line_trace_data = async.wrap(function(self, state, callba
     on_exit = on_exit,
   })
 
-  await(trace_job:start())
+  await(trace_job)
 
   utils.handle_job(trace_job, {
     debug_opt = {
@@ -904,7 +904,7 @@ function GitAdapter:parse_fh_data(state)
       -- possibly because we are running multiple git opeartions on the same
       -- repo concurrently. Retrying the job usually solves this.
       job = Job(job_spec)
-      await(job:start())
+      await(job)
 
       if job.code == 0 then
         cur.namestat = job.stdout
@@ -1628,15 +1628,15 @@ GitAdapter.tracked_files = async.wrap(function(self, left, right, args, kind, op
 end)
 
 GitAdapter.untracked_files = async.wrap(function(self, left, right, opt, callback)
-  local j = Job({
+  local job = Job({
     command = self:bin(),
     args = utils.vec_join(self:args(), "ls-files", "--others", "--exclude-standard"),
     cwd = self.ctx.toplevel,
   })
 
-  await(j:start())
+  await(job)
 
-  utils.handle_job(j, {
+  utils.handle_job(job, {
     debug_opt = {
       context = "GitAdapter>untracked_files()",
       func = "s_debug",
@@ -1645,13 +1645,13 @@ GitAdapter.untracked_files = async.wrap(function(self, left, right, opt, callbac
     }
   })
 
-  if j.code ~= 0 then
-    callback(j.stderr or {}, nil)
+  if job.code ~= 0 then
+    callback(job.stderr or {}, nil)
     return
   end
 
   local files = {}
-  for _, s in ipairs(j.stdout) do
+  for _, s in ipairs(job.stdout) do
     table.insert(files, FileEntry.with_layout(opt.default_layout, {
       adapter = self,
       path = s,

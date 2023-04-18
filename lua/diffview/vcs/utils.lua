@@ -75,7 +75,7 @@ M.ensure_output = async.wrap(function(max_retries, jobs, log_context, callback)
         logger.log_job(job, { func = logger.warn, context = log_context })
         num_retries = n + 1
 
-        await(job:start())
+        await(job)
 
         if job.code ~= 0 then
           utils.handle_job(job, { context = log_context })

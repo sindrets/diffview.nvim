@@ -80,7 +80,7 @@ CommitLogPanel.update = async.void(function(self, args)
     cwd = self.adapter.ctx.toplevel,
   })
 
-  await(job:start())
+  await(job)
   await(async.scheduler())
 
   if job.code ~= 0 then

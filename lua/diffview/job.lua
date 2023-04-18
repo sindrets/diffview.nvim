@@ -16,7 +16,7 @@ local M = {}
 
 ---@alias StdioKind "in"|"out"|"err"
 
----@class diffview.Job
+---@class diffview.Job : Waitable
 ---@operator call: diffview.Job
 ---@field command string
 ---@field args string[]
@@ -36,7 +36,8 @@ local M = {}
 ---@field on_stderr_listeners diffview.Job.OnOutCallback[]
 ---@field on_exit_listeners diffview.Job.OnExitCallback[]
 ---@field _started boolean
-local Job = oop.create_class("Job")
+---@field _done boolean
+local Job = oop.create_class("Job", async.Waitable)
 
 local function prepare_env(env)
   local ret = {}
@@ -59,6 +60,7 @@ function Job:init(opt)
   self.on_stderr_listeners = {}
   self.on_exit_listeners = {}
   self._started = false
+  self._done = false
 
   if opt.on_stdout then self:on_stdout(opt.on_stdout) end
   if opt.on_stderr then self:on_stderr(opt.on_stderr) end
@@ -127,10 +129,7 @@ function Job:line_reader(pipe, out, line_listeners, err, data)
     local has_eol = data:sub(-1) == "\n"
     local lines = vim.split(data, "\r?\n")
 
-    if #lines > 0 then
-      lines[1] = (line_buffer or "") .. lines[1]
-    end
-
+    lines[1] = (line_buffer or "") .. lines[1]
     line_buffer = nil
 
     for i, line in ipairs(lines) do
@@ -182,12 +181,16 @@ end
 ---@param data string|string[]
 function Job:handle_writer(pipe, data)
   if type(data) == "string" then
+    if data:sub(-1) ~= "\n" then data = data .. "\n" end
     pipe:write(data, function(err)
-      -- TODO: Handle error
+      if err then
+        logger.error("[Job:handle_writer()] " .. err)
+      end
+
       try_close(pipe)
     end)
 
-  elseif vim.tbl_islist(data) then
+  else
     ---@cast data string[]
     local c = #data
 
@@ -196,7 +199,10 @@ function Job:handle_writer(pipe, data)
         pipe:write(s .. "\n")
       else
         pipe:write(s .. "\n", function(err)
-          -- TODO: Handle error
+          if err then
+            logger.error("[Job:handle_writer()] " .. err)
+          end
+
           try_close(pipe)
         end)
       end
@@ -219,6 +225,7 @@ function Job:reset()
   self.code = nil
   self.signal = nil
   self._started = false
+  self._done = false
 end
 
 ---@param self diffview.Job
@@ -261,6 +268,8 @@ Job.start = async.wrap(function(self, callback)
       self.stdout = process_chunks(self.stdout)
       self.stderr = process_chunks(self.stderr)
     end
+
+    self._done = true
 
     for _, listener in ipairs(self.on_exit_listeners) do
       listener(self, code, signal)
@@ -334,33 +343,41 @@ function Job:kill(code, signal)
   return 0
 end
 
+---@override
+---@param self diffview.Job
+Job.await = async.sync_wrap(function(self, callback)
+  if self:is_done() then
+    callback()
+    return
+  end
+
+  self:on_exit(function() callback() end)
+
+  if not self:is_started() then
+    self:start()
+  end
+end)
+
 ---@async
 ---@param jobs diffview.Job[]
----@param callback fun()
-Job.join = async.wrap(function(jobs, callback)
+Job.join = async.void(function(jobs)
   -- Start by ensuring all jobs are running
-  local futures = {}
   for _, job in ipairs(jobs) do
-    if not job:is_done() and not job:is_started() then
-      table.insert(futures, job:start())
+    if not job:is_started() then
+      job:start()
     end
   end
 
-  for _, future in ipairs(futures) do
-    await(future)
+  for _, job in ipairs(jobs) do
+    await(job)
   end
-
-  callback()
 end)
 
 ---@param jobs diffview.Job[]
----@param callback fun()
-Job.chain = async.wrap(function(jobs, callback)
+Job.chain = async.void(function(jobs)
   for _, job in ipairs(jobs) do
-    await(job:start())
+    await(job)
   end
-
-  callback()
 end)
 
 ---Subscribe to stdout data. Only used if `buffered_std=false`.
@@ -389,7 +406,7 @@ function Job:on_exit(callback)
 end
 
 function Job:is_done()
-  return not not (self.handle and self.handle:is_closing())
+  return self._done
 end
 
 function Job:is_started()
