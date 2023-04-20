@@ -68,6 +68,7 @@ end
 local Semaphore = oop.create_class("Semaphore")
 
 function Semaphore:init(permit_count)
+  assert(permit_count)
   self.initial_count = permit_count
   self.permit_count = permit_count
   self.queue = {}

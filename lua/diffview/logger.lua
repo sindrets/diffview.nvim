@@ -3,6 +3,8 @@ local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
 local Mock = lazy.access("diffview.mock", "Mock") ---@type Mock|LazyModule
+local Semaphore = lazy.access("diffview.control", "Semaphore") ---@type Semaphore|LazyModule
+local loop = lazy.require("diffview.debounce") ---@module "diffview.debounce"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local uv = vim.loop
@@ -16,6 +18,13 @@ local pl = lazy.access(utils, "path") ---@type PathLib
 
 ---@class Logger : diffview.Object
 ---@operator call : Logger
+---@field private plugin string
+---@field private outfile string
+---@field private level integer # Max level. Messages of higher level will be ignored. NOTE: Higher level -> lower severity.
+---@field private msg_buffer string[]
+---@field private msg_sem Semaphore
+---@field private batch_interval integer # Minimum time (ms) between each time batched messages are written to the output file.
+---@field private batch_handle? Closeable
 ---@field trace Logger.LogFunc
 ---@field debug Logger.LogFunc
 ---@field info Logger.LogFunc
@@ -53,10 +62,15 @@ function Logger:init(opt)
   self.plugin = opt.plugin or "diffview"
   self.outfile = opt.outfile or fmt("%s/%s.log", vim.fn.stdpath("cache"), self.plugin)
   self.level = DiffviewGlobal.debug_level > 0 and Logger.log_levels.debug or Logger.log_levels.info
+  self.msg_buffer = {}
+  self.msg_sem = Semaphore(1)
+  self.batch_interval = opt.batch_interval or 3000
 
   await(pl:touch(self.outfile, { parents = true }))
 end
 
+---@param object any
+---@return string
 function Logger.dstring(object)
   local tp = type(object)
 
@@ -88,17 +102,6 @@ function Logger.dstring(object)
   return tostring(object)
 end
 
-function Logger.dvalues(...)
-  local args = { ... }
-  local ret = {}
-
-  for i = 1, select("#", ...) do
-    ret[i] = Logger.dstring(args[i])
-  end
-
-  return ret
-end
-
 ---@param min_level integer
 ---@return Logger
 function Logger:lvl(min_level)
@@ -109,21 +112,66 @@ function Logger:lvl(min_level)
   return Logger.mock
 end
 
----@private
-function Logger:_log(level_name, ...)
-  local args = utils.tbl_pack(...)
-  local info = debug.getinfo(3, "Sl")
-  local lineinfo = info.short_src .. ":" .. info.currentline
+local function dvalues(...)
+  local args = { ... }
+  local ret = {}
 
-  vim.schedule(function()
-    local msg = table.concat(Logger.dvalues(utils.tbl_unpack(args)), " ")
-    local fd, err = uv.fs_open(self.outfile, "a", tonumber("0644", 8))
-    assert(fd, err)
-    local str = fmt("[%-6s%s] %s: %s\n", level_name:upper(), os.date(), lineinfo, msg)
-    uv.fs_write(fd, str)
-    uv.fs_close(fd)
-  end)
+  for i = 1, select("#", ...) do
+    ret[i] = Logger.dstring(args[i])
+  end
+
+  return ret
 end
+
+---@private
+---@param level_name string
+---@param debuginfo? debuginfo
+---@param ... any
+function Logger:_log(level_name, debuginfo, ...)
+  local args = dvalues(...)
+  local info = debuginfo or debug.getinfo(3, "Sl")
+  local lineinfo = info.short_src .. ":" .. info.currentline
+  local millis = (uv.hrtime() / 1000000) % 1000
+  local time = os.date("%T") .. fmt(".%03d", millis)
+  local date = os.date("%F " .. time ..  " %z")
+  local msg = table.concat(args, " ")
+  self:queue_msg(fmt("[%-6s%s] %s: %s\n", level_name:upper(), date, lineinfo, msg))
+end
+
+---@diagnostic disable: invisible
+
+---@private
+---@param self Logger
+---@param msg string
+Logger.queue_msg = async.void(function(self, msg)
+  local permit = await(self.msg_sem:acquire()) --[[@as Permit ]]
+  table.insert(self.msg_buffer, msg)
+  permit:forget()
+
+  if self.batch_handle then return end
+
+  self.batch_handle = loop.set_timeout(
+    async.void(function()
+      ---@diagnostic disable-next-line: redefined-local
+      local permit
+
+      if next(self.msg_buffer) then
+        permit = await(self.msg_sem:acquire()) --[[@as Permit ]]
+
+        local fd, err = uv.fs_open(self.outfile, "a", tonumber("0644", 8))
+        assert(fd, err)
+        uv.fs_write(fd, table.concat(self.msg_buffer))
+        uv.fs_close(fd)
+
+        self.msg_buffer = {}
+      end
+
+      self.batch_handle = nil
+      if permit then permit:forget() end
+    end),
+    self.batch_interval
+  )
+end)
 
 do
   -- Create methods
@@ -131,18 +179,18 @@ do
     ---@param self Logger
     Logger[name] = function(self, ...)
       if self.level < level then return end
-      ---@diagnostic disable-next-line: invisible
-      self:_log(name, ...)
+      self:_log(name, nil, ...)
     end
 
     ---@param self Logger
     Logger["fmt_" .. name] = function(self, formatstring, ...)
       if self.level < level then return end
-      ---@diagnostic disable-next-line: invisible
-      self:_log(name, fmt(formatstring, ...))
+      self:_log(name, nil, fmt(formatstring, ...))
     end
   end
 end
+
+---@diagnostic enable: invisible
 
 ---@class Logger.log_job.Opt
 ---@field func function|string
