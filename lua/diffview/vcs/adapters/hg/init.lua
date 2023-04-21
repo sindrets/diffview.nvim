@@ -32,10 +32,9 @@ HgAdapter.bootstrap = {
   done = false,
   ok = false,
   version = {},
-  -- TODO(zegervdv): Determine appropriate target version
   target_version = {
-    major = 0,
-    minor = 0,
+    major = 5,
+    minor = 4,
     patch = 0,
   }
 }
