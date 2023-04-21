@@ -3,7 +3,7 @@ local lazy = require("diffview.lazy")
 local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1") ---@type Diff1|LazyModule
 local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2") ---@type Diff2|LazyModule
 local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3") ---@type Diff3|LazyModule
-local Diff4 = lazy.access("diffview.scene.layouts.diff_3", "Diff4") ---@type Diff4|LazyModule
+local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4") ---@type Diff4|LazyModule
 local Panel = lazy.access("diffview.ui.panel", "Panel") ---@type Panel|LazyModule
 local View = lazy.access("diffview.scene.view", "View") ---@type View|LazyModule
 local config = lazy.require("diffview.config") ---@module "diffview.config"
@@ -135,15 +135,14 @@ function StandardView:use_entry(entry)
     layout_key = "diff4"
   end
 
-  if layout_key then
-    for _, sym in ipairs({ "a", "b", "c", "d" }) do
-      if entry.layout[sym] then
-        entry.layout[sym].file.winopts = vim.tbl_extend(
-          "force",
-          entry.layout[sym].file.winopts,
-          self.winopts[layout_key][sym] or {}
-        )
-      end
+
+  for _, sym in ipairs({ "a", "b", "c", "d" }) do
+    if entry.layout[sym] then
+      entry.layout[sym].file.winopts = vim.tbl_extend(
+        "force",
+        entry.layout[sym].file.winopts,
+        self.winopts[layout_key][sym] or {}
+      )
     end
   end
 
