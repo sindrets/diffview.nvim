@@ -1,5 +1,6 @@
 local oop = require('diffview.oop')
 local VCSAdapter = require('diffview.vcs.adapter').VCSAdapter
+local arg_parser = require("diffview.arg_parser")
 local utils = require('diffview.utils')
 local lazy = require('diffview.lazy')
 local config = require('diffview.config')
@@ -788,10 +789,15 @@ function HgAdapter:diffview_options(argo)
   end
 
   local options = {
-    show_untracked = true, -- TODO: extract from hg config
+    show_untracked = arg_parser.ambiguous_bool(
+      argo:get_flag({ "u", "untracked-files" }, { plain = true }),
+      nil,
+      { "all", "normal", "true" },
+      { "no", "false" }
+    ),
     selected_file = argo:get_flag("selected-file", { no_empty = true, expand = true })
-      or (vim.bo.buftype == "" and pl:vim_expand("%:p"))
-      or nil,
+        or (vim.bo.buftype == "" and pl:vim_expand("%:p"))
+        or nil,
   }
 
   return {left = left, right = right, options = options}
@@ -960,8 +966,31 @@ end
 ---@param opt? VCSAdapter.show_untracked.Opt
 ---@return boolean
 function HgAdapter:show_untracked(opt)
-  -- FIXME(zegervdv)
-  return true
+  opt = opt or {}
+
+  -- Only show untracked when comparing the working directory
+  if opt.revs then
+    if not (opt.revs.right.type == RevType.LOCAL) then
+      return false
+    end
+  end
+
+  -- Check the user provided flag options
+  if opt.dv_opt then
+    if type(opt.dv_opt.show_untracked) == "boolean" and not opt.dv_opt.show_untracked then
+      return false
+    end
+  end
+
+  -- Fallback to reading custom config option in hgrc
+  --    [diffview.nvim]
+  --    untracked = no
+  local out = self:exec_sync(
+    { "log", "--rev=0", "--template={configbool('diffview.nvim', 'untracked', 'True')}" },
+    { cwd = self.ctx.toplevel, silent = true }
+  )
+
+  return vim.trim(out[1] or "") ~= "False"
 end
 
 function HgAdapter:get_files_args(args)
