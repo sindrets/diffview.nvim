@@ -135,13 +135,15 @@ function StandardView:use_entry(entry)
     layout_key = "diff4"
   end
 
-  for _, sym in ipairs({ "a", "b", "c", "d" }) do
-    if entry.layout[sym] then
-      entry.layout[sym].file.winopts = vim.tbl_extend(
-        "force",
-        entry.layout[sym].file.winopts,
-        self.winopts[layout_key][sym] or {}
-      )
+  if layout_key then
+    for _, sym in ipairs({ "a", "b", "c", "d" }) do
+      if entry.layout[sym] then
+        entry.layout[sym].file.winopts = vim.tbl_extend(
+          "force",
+          entry.layout[sym].file.winopts,
+          self.winopts[layout_key][sym] or {}
+        )
+      end
     end
   end
 
