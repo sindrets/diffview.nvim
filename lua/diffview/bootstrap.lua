@@ -2,6 +2,15 @@ if DiffviewGlobal and DiffviewGlobal.bootstrap_done then
   return DiffviewGlobal.bootstrap_ok
 end
 
+local lazy = require("diffview.lazy")
+
+local EventEmitter = lazy.access("diffview.events", "EventEmitter") ---@type EventEmitter|LazyModule
+local config = lazy.require("diffview.config") ---@module "diffview.config"
+local diffview = lazy.require("diffview") ---@module "diffview"
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
+
+local uv = vim.loop
+
 local function err(msg)
   msg = msg:gsub("'", "''")
   vim.cmd("echohl Error")
@@ -28,18 +37,17 @@ _G.DiffviewGlobal = {
   ---1:     NORMAL
   ---5:     LOADING
   ---10:    RENDERING & ASYNC
-  debug_level = tonumber(os.getenv("DEBUG_DIFFVIEW")) or 0,
-  ---@type EventEmitter
-  emitter = require("diffview.events").EventEmitter(),
+  ---@diagnostic disable-next-line: missing-parameter
+  debug_level = tonumber((uv.os_getenv("DEBUG_DIFFVIEW"))) or 0,
+  emitter = EventEmitter(),
   state = {},
   bootstrap_done = true,
   bootstrap_ok = true,
 }
 
-DiffviewGlobal.emitter:on_any(function(event, args)
-  local utils = require("diffview.utils")
-  require("diffview").nore_emit(event.id, utils.tbl_unpack(args))
-  require("diffview.config").user_emitter:nore_emit(event.id, utils.tbl_unpack(args))
+DiffviewGlobal.emitter:on_any(function(e, args)
+  diffview.nore_emit(e.id, utils.tbl_unpack(args))
+  config.user_emitter:nore_emit(e.id, utils.tbl_unpack(args))
 end)
 
 return true

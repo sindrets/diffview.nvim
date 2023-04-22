@@ -12,6 +12,14 @@ local M = {}
 
 local is_windows = uv.os_uname().version:match("Windows")
 
+local function handle_uv_err(x, err, err_msg)
+  if not x then
+    error(err .. " " .. err_msg, 2)
+  end
+
+  return x
+end
+
 ---@class PathLib
 ---@field sep "/"|"\\"
 ---@field os "unix"|"windows" Determines the type of paths we're dealing with.
@@ -512,21 +520,17 @@ end
 ---@param self PathLib
 ---@param path string
 ---@param opt PathLib.touch.Opt
----@param callback fun(ok: boolean, err: string?)
-PathLib.touch = async.wrap(function(self, path, opt, callback)
-  ---@cast callback -?
+PathLib.touch = async.void(function(self, path, opt)
   opt = opt or {}
   local mode = opt.mode or tonumber("0644", 8)
 
   path = self:_clean(path)
   local stat = self:stat(path)
-  local ok, err
 
   if stat then
     -- Path exists: just update utime
     local time = os.time()
-    ok, err = uv.fs_utime(path, time, time)
-    callback(utils.sate(ok, true), err)
+    handle_uv_err(uv.fs_utime(path, time, time))
     return
   end
 
@@ -538,16 +542,8 @@ PathLib.touch = async.wrap(function(self, path, opt, callback)
     end
   end
 
-  local fd
-  fd, err = uv.fs_open(path, "w", mode)
-
-  if not fd then
-    callback(false, err)
-    return
-  end
-
-  ok, err = uv.fs_close(fd)
-  callback(utils.sate(ok, true), err)
+  local fd = handle_uv_err(uv.fs_open(path, "w", mode))
+  handle_uv_err(uv.fs_close(fd))
 end)
 
 ---@class PathLib.mkdir.Opt
@@ -557,54 +553,44 @@ end)
 ---@param self PathLib
 ---@param path string
 ---@param opt? table
----@param callback? fun(ok: boolean, err: string?)
-PathLib.mkdir = async.wrap(function(self, path, opt, callback)
-  ---@cast callback -?
+PathLib.mkdir = async.void(function(self, path, opt)
   opt = opt or {}
   local mode = opt.mode or tonumber("0700", 8)
-  local parts = self:explode(path)
+  path = self:absolute(path)
+
+  if not opt.parents then
+    handle_uv_err(uv.fs_mkdir(path, mode))
+    return
+  end
+
   local cur_path
 
-  for i, part in ipairs(parts) do
+  for _, part in ipairs(self:explode(path)) do
     cur_path = cur_path and self:join(cur_path, part) or part
     local stat = self:stat(cur_path)
 
     if not stat then
-      if not opt.parents and i < #parts then
-        callback(false, fmt("Cannot create directory '%s': No such file or directory", path))
-        return
-      else
-        local ok, err = uv.fs_mkdir(cur_path, mode)
-        if not ok then
-          callback(false, err)
-          return
-        end
-      end
+      handle_uv_err(uv.fs_mkdir(cur_path, mode))
     else
-      if not opt.parents and i == #parts then
-        callback(false, fmt("Cannot create directory '%s': File exists", cur_path))
-        return
-      end
-
       if stat.type ~= "directory" then
-        callback(false, fmt("Cannot create directory '%s': Not a directory", cur_path))
-        return
+        error(fmt("Cannot create directory '%s': Not a directory", cur_path))
       end
     end
   end
-
-  callback(true)
 end)
 
 ---Delete a name and possibly the file it refers to.
 ---@param self PathLib
 ---@param path string
----@param callback? fun(ok: boolean, err?: string)
+---@param callback? function
 ---@diagnostic disable-next-line: unused-local
 PathLib.unlink = async.wrap(function(self, path, callback)
   ---@cast callback -?
   uv.fs_unlink(path, function(err, ok)
-    callback(not not ok, err)
+    if not ok then
+      error(err)
+    end
+    callback()
   end)
 end)
 

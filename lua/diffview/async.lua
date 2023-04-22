@@ -7,9 +7,6 @@ local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local tbl_pack, tbl_unpack = lazy.access(utils, "tbl_pack"), lazy.access(utils, "tbl_unpack")
 local dstring = lazy.access(logger, "dstring")
-local dprint = lazy.wrap(logger, function(t)
-  return t.lvl(10).debug
-end)
 local fmt = string.format
 
 local DEFAULT_ERROR = "Unkown error."
@@ -24,8 +21,7 @@ M._watching = setmetatable({}, { __mode = "k" })
 ---@type { [thread]: Future }
 M._handles = {}
 
----@class AsyncFunc : function
----@operator call : Future
+---@alias AsyncFunc (fun(...): Future)
 
 ---@alias AsyncKind "callback"|"void"
 
@@ -417,9 +413,22 @@ function M.await(waitable)
   return waitable:await()
 end
 
---
--- VARIOUS ASYNC UTILITIES
---
+---Await the async function `afunc` with the given arguments in protected mode.
+---@param afunc AsyncFunc # The async function.
+---@param ... any # Arguments to be applied to `afunc`.
+---@return boolean ok # `false` if the execution of `afunc` failed.
+---@return any result # Either the first returned value from `afunc` or an error message.
+---@return any ... # Any subsequent values returned from `afunc`.
+function M.pawait(afunc, ...)
+  local args = tbl_pack(...)
+  return pcall(function()
+    return M.await(afunc(tbl_unpack(args)))
+  end)
+end
+
+-- ###############################
+-- ### VARIOUS ASYNC UTILITIES ###
+-- ###############################
 
 local await = M.await
 
@@ -470,10 +479,8 @@ M.join = M.void(function(...)
   end
 
   -- Await all futures
-  for i, future in ipairs(futures) do
-    dprint("waiting", i, future)
+  for _, future in ipairs(futures) do
     await(future)
-    dprint("finished", i, future)
   end
 end)
 
@@ -499,8 +506,8 @@ end)
 ---Async task that resolves after the given `timeout` ms passes.
 ---@param timeout integer # Duration of the timeout (ms)
 M.timeout = M.wrap(function(timeout, callback)
-  local timer = vim.loop.new_timer()
-  assert(timer, "Failed to initialize timer!")
+  local timer = assert(vim.loop.new_timer())
+
   timer:start(
     timeout,
     0,

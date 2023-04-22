@@ -18,7 +18,7 @@ local utils = require("diffview.utils")
 local vcs_utils = require("diffview.vcs.utils")
 
 local api = vim.api
-local await = async.await
+local await, pawait = async.await, async.pawait
 local pl = lazy.access(utils, "path") ---@type PathLib
 
 local M = {}
@@ -422,7 +422,7 @@ end
 ---@param self GitAdapter
 ---@param state GitAdapter.FHState
 ---@param callback fun(status: JobStatus, data?: table, msg?: string[])
-GitAdapter.incremental_fh_data = async.wrap(function(self, state, callback)
+GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
   local raw = {}
   local namestat_job, numstat_job, shutdown
 
@@ -455,7 +455,7 @@ GitAdapter.incremental_fh_data = async.wrap(function(self, state, callback)
           )
 
           if shutdown then
-            logger:lvl(1):debug("Killing file history jobs...")
+            logger:warn("Killing file history jobs...")
             namestat_job:kill(64, "sigkill")
             numstat_job:kill(64, "sigkill")
           end
@@ -1383,7 +1383,7 @@ function GitAdapter:file_restore(path, kind, commit)
 
     if kind == "working" or kind == "conflicting" then
       -- File is untracked and has no history: delete it from fs.
-      local ok, err = await(pl:unlink(abs_path))
+      local ok, err = pawait(pl.unlink, pl, abs_path)
       if not ok then
         utils.err({
           ("Failed to delete file '%s'! Aborting file restoration. Error message:")

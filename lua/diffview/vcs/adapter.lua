@@ -236,7 +236,7 @@ end
 ---@param log_opt ConfigLogOptions
 ---@param opt vcs.adapter.FileHistoryWorkerSpec
 ---@param callback function
----@return fun() finalizer
+---@return Closeable
 function VCSAdapter:file_history(log_opt, opt, callback)
   local thread
 
@@ -250,9 +250,11 @@ function VCSAdapter:file_history(log_opt, opt, callback)
 
   self:handle_co(thread, coroutine.resume(thread))
 
-  return function()
-    co_state.shutdown = true
-  end
+  return {
+    close = function()
+      co_state.shutdown = true
+    end,
+  }
 end
 
 -- Diff View

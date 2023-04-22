@@ -17,7 +17,7 @@ local oop = require('diffview.oop')
 local utils = require('diffview.utils')
 local vcs_utils = require("diffview.vcs.utils")
 
-local await = async.await
+local await, pawait = async.await, async.pawait
 local pl = lazy.access(utils, "path") ---@type PathLib
 
 local M = {}
@@ -920,7 +920,7 @@ function HgAdapter:file_restore(path, kind, commit)
 
     if kind == "working" or kind == "conflicting" then
       -- File is untracked and has no history: delete it from fs.
-      local ok, err = await(pl:unlink(abs_path))
+      local ok, err = pawait(pl.unlink, pl, abs_path)
       if not ok then
         utils.err({
           ("Failed to delete file '%s'! Aborting file restoration. Error message:")

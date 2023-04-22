@@ -7,10 +7,10 @@ local Semaphore = lazy.access("diffview.control", "Semaphore") ---@type Semaphor
 local loop = lazy.require("diffview.debounce") ---@module "diffview.debounce"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
-local uv = vim.loop
-local await = async.await
+local await, pawait = async.await, async.pawait
 local fmt = string.format
 local pl = lazy.access(utils, "path") ---@type PathLib
+local uv = vim.loop
 
 ---@alias Logger.LogFunc fun(self: Logger, ...)
 ---@alias Logger.FmtLogFunc fun(self: Logger, formatstring: string, ...)
@@ -20,6 +20,7 @@ local pl = lazy.access(utils, "path") ---@type PathLib
 ---@operator call : Logger
 ---@field private plugin string
 ---@field private outfile string
+---@field private outfile_status Logger.OutfileStatus
 ---@field private level integer # Max level. Messages of higher level will be ignored. NOTE: Higher level -> lower severity.
 ---@field private msg_buffer string[]
 ---@field private msg_sem Semaphore
@@ -45,15 +46,24 @@ local pl = lazy.access(utils, "path") ---@type PathLib
 ---@field lazy_fatal Logger.LazyLogFunc
 local Logger = oop.create_class("Logger")
 
+---@enum Logger.OutfileStatus
+Logger.OutfileStatus = {
+  UNKNOWN = 1,
+  READY = 2,
+  ERROR = 3,
+}
+vim.tbl_add_reverse_lookup(Logger.OutfileStatus)
+
 ---@enum Logger.LogLevels
-Logger.log_levels = vim.tbl_add_reverse_lookup({
+Logger.LogLevels = {
   fatal = 0,
   error = 1,
   warn = 2,
   info = 3,
   debug = 4,
   trace = 5,
-})
+}
+vim.tbl_add_reverse_lookup(Logger.LogLevels)
 
 Logger.mock = Mock()
 
@@ -61,12 +71,20 @@ function Logger:init(opt)
   opt = opt or {}
   self.plugin = opt.plugin or "diffview"
   self.outfile = opt.outfile or fmt("%s/%s.log", vim.fn.stdpath("cache"), self.plugin)
-  self.level = DiffviewGlobal.debug_level > 0 and Logger.log_levels.debug or Logger.log_levels.info
+  self.outfile_status = Logger.OutfileStatus.UNKNOWN
+  self.level = DiffviewGlobal.debug_level > 0 and Logger.LogLevels.debug or Logger.LogLevels.info
   self.msg_buffer = {}
   self.msg_sem = Semaphore(1)
   self.batch_interval = opt.batch_interval or 3000
+end
 
-  await(pl:touch(self.outfile, { parents = true }))
+---@param num number
+---@param precision number
+---@return number
+local function to_precision(num, precision)
+  if num % 1 == 0 then return num end
+  local pow = math.pow(10, precision)
+  return math.floor(num * pow) / pow
 end
 
 ---@param object any
@@ -79,6 +97,8 @@ function Logger.dstring(object)
     or tp == "userdata"
   then
     return fmt("<%s %p>", tp, object)
+  elseif tp == "number" then
+    return tostring(to_precision(object, 3))
   elseif tp == "table" then
     local mt = getmetatable(object)
 
@@ -134,8 +154,15 @@ function Logger:_log(level_name, debuginfo, ...)
   local millis = (uv.hrtime() / 1000000) % 1000
   local time = os.date("%T") .. fmt(".%03d", millis)
   local date = os.date("%F " .. time ..  " %z")
-  local msg = table.concat(args, " ")
-  self:queue_msg(fmt("[%-6s%s] %s: %s\n", level_name:upper(), date, lineinfo, msg))
+  self:queue_msg(
+    fmt(
+      "[%-6s%s] %s: %s\n",
+      level_name:upper(),
+      date,
+      lineinfo,
+      table.concat(args, " ")
+    )
+  )
 end
 
 ---@diagnostic disable: invisible
@@ -144,6 +171,19 @@ end
 ---@param self Logger
 ---@param msg string
 Logger.queue_msg = async.void(function(self, msg)
+  if self.outfile_status == Logger.OutfileStatus.ERROR then
+    -- We already failed to prepare the log file
+    return
+  elseif self.outfile_status == Logger.OutfileStatus.UNKNOWN then
+    local ok, err = pawait(pl.touch, pl, self.outfile, { parents = true })
+
+    if not ok then
+      error("Failed to prepare log file! Details:\n" .. err)
+    end
+
+    self.outfile_status = Logger.OutfileStatus.READY
+  end
+
   local permit = await(self.msg_sem:acquire()) --[[@as Permit ]]
   table.insert(self.msg_buffer, msg)
   permit:forget()
@@ -175,7 +215,7 @@ end)
 
 do
   -- Create methods
-  for level, name in ipairs(Logger.log_levels) do
+  for level, name in ipairs(Logger.LogLevels --[[@as string[] ]]) do
     ---@param self Logger
     Logger[name] = function(self, ...)
       if self.level < level then return end

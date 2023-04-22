@@ -1,8 +1,7 @@
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
----@module "diffview.utils"
-local utils = lazy.require("diffview.utils")
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local M = {}
 
@@ -11,11 +10,12 @@ local EventName = {
   FILES_STAGED = 1,
 }
 
----@alias ListenerType '"normal"'|'"once"'|'"any"'|'"any_once"'
+---@alias ListenerType "normal"|"once"|"any"|"any_once"
+---@alias ListenerCallback (fun(e: Event, ...): boolean?)
 
 ---@class Listener
 ---@field type ListenerType
----@field callback function The original callback
+---@field callback ListenerCallback The original callback
 ---@field call function
 
 ---@class Event : diffview.Object
@@ -35,6 +35,7 @@ end
 
 
 ---@class EventEmitter : diffview.Object
+---@operator call : EventEmitter
 ---@field event_map table<any, Listener[]> # Registered events mapped to subscribed listeners.
 ---@field any_listeners Listener[] # Listeners subscribed to all events.
 ---@field emit_lock table<any, boolean>
@@ -49,7 +50,7 @@ end
 
 ---Subscribe to a given event.
 ---@param event_id any Event identifier.
----@param callback fun(event: Event, ...): boolean?
+---@param callback ListenerCallback
 function EventEmitter:on(event_id, callback)
   if not self.event_map[event_id] then
     self.event_map[event_id] = {}
@@ -66,7 +67,7 @@ end
 
 ---Subscribe a one-shot listener to a given event.
 ---@param event_id any Event identifier.
----@param callback fun(event: Event, ...): boolean?
+---@param callback ListenerCallback
 function EventEmitter:once(event_id, callback)
   if not self.event_map[event_id] then
     self.event_map[event_id] = {}
@@ -87,7 +88,7 @@ function EventEmitter:once(event_id, callback)
 end
 
 ---Add a new any-listener, subscribed to all events.
----@param callback fun(event: Event, ...): boolean?
+---@param callback ListenerCallback
 function EventEmitter:on_any(callback)
   table.insert(self.any_listeners, 1, {
     type = "any",
@@ -99,7 +100,7 @@ function EventEmitter:on_any(callback)
 end
 
 ---Add a new one-shot any-listener, subscribed to all events.
----@param callback fun(event: Event, ...): boolean?
+---@param callback ListenerCallback
 function EventEmitter:once_any(callback)
   local emitted = false
 

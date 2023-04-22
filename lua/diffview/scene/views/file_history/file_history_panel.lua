@@ -1,6 +1,8 @@
+local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 
 local FHOptionPanel = lazy.access("diffview.scene.views.file_history.option_panel", "FHOptionPanel") ---@type FHOptionPanel|LazyModule
+local JobStatus = lazy.access("diffview.vcs.utils", "JobStatus") ---@type JobStatus|LazyModule
 local LogEntry = lazy.access("diffview.vcs.log_entry", "LogEntry") ---@type LogEntry|LazyModule
 local Panel = lazy.access("diffview.ui.panel", "Panel") ---@type Panel|LazyModule
 local PerfTimer = lazy.access("diffview.perf", "PerfTimer") ---@type PerfTimer|LazyModule
@@ -12,8 +14,9 @@ local panel_renderer = lazy.require("diffview.scene.views.file_history.render") 
 local renderer = lazy.require("diffview.renderer") ---@module "diffview.renderer"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
-local JobStatus = lazy.access('diffview.vcs.utils', 'JobStatus') ---@type JobStatus|LazyModule
 local api = vim.api
+local await = async.await
+
 local M = {}
 
 ---@type PerfTimer
@@ -172,19 +175,25 @@ function FileHistoryPanel:update_components()
   self.constrain_cursor = renderer.create_cursor_constraint({ self.components.log.entries.comp })
 end
 
-function FileHistoryPanel:update_entries(callback)
+---@param self FileHistoryPanel
+---@param callback function
+FileHistoryPanel.update_entries = async.wrap(function(self, callback)
   perf_update:reset()
   local c = 0
   local timeout = 128
   local ldt = 0 -- Last draw time
   local lock = false
-  local update, finalizer
+  local update, handle
 
-  update = debounce.throttle_trailing(timeout, true, function(entries, status, msg)
-    if status == JobStatus.ERROR then
-      self.updating = false
+  update = debounce.throttle_trailing(
+    timeout,
+    true,
+    async.void(function(entries, status, msg)
+      if status == JobStatus.ERROR then
+        self.updating = false
 
-      vim.schedule(function()
+        await(async.scheduler())
+
         utils.err(utils.vec_join(
           ("Updating file history failed! %s"):format(msg and "Error message:" or ""),
           msg
@@ -193,34 +202,33 @@ function FileHistoryPanel:update_entries(callback)
         self:render()
         self:redraw()
         self.option_panel:sync()
-        callback(nil, JobStatus.ERROR, msg)
-      end)
-
-      update:close()
-      return
-
-    elseif status == JobStatus.PROGRESS then
-      if self.shutdown then
-        -- The parent view has closed: shutdown git jobs and clean up.
-        finalizer()
         update:close()
-        vim.schedule(function()
+        callback(nil, JobStatus.ERROR, msg)
+        return
+
+      elseif status == JobStatus.PROGRESS then
+        if self.shutdown then
+          -- The parent view has closed: shutdown git jobs and clean up.
+          handle.close()
+          update:close()
+
           if self.option_panel then
-            self.option_panel:sync()
+            vim.schedule(function() self.option_panel:sync() end)
           end
-        end)
-        callback(nil, JobStatus.KILLED)
-        return
+
+          callback(nil, JobStatus.KILLED)
+          return
+        end
+
+        if #entries <= c or lock then
+          return
+        end
       end
 
-      if #entries <= c or lock then
-        return
-      end
-    end
+      lock = true
 
-    lock = true
+      await(async.scheduler())
 
-    vim.schedule(function()
       if self.shutdown then return end
       c = #entries
 
@@ -259,7 +267,7 @@ function FileHistoryPanel:update_entries(callback)
         ))
       end
 
-      if (was_empty or status == JobStatus.SUCCESS) and type(callback) == "function" then
+      if (was_empty or status == JobStatus.SUCCESS) then
         vim.cmd("redraw")
         self.option_panel:sync()
         callback(entries, status)
@@ -267,7 +275,7 @@ function FileHistoryPanel:update_entries(callback)
 
       lock = false
     end)
-  end)
+  )
 
   for _, entry in ipairs(self.entries) do
     entry:destroy()
@@ -278,14 +286,14 @@ function FileHistoryPanel:update_entries(callback)
   self.entries = {}
   self.updating = true
 
-  finalizer = self.adapter:file_history(
+  handle = self.adapter:file_history(
     self.log_options,
     { default_layout = self.parent.get_default_layout(), },
     update
   )
 
   self:sync()
-end
+end)
 
 function FileHistoryPanel:num_items()
   if self.single_file then
