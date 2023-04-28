@@ -305,9 +305,7 @@ function Job:sync(duration)
 
   if not self:is_started() then self:start() end
 
-  if vim.in_fast_event() then
-    await(async.scheduler())
-  end
+  await(async.scheduler(true))
 
   local ok, status = vim.wait(duration or 5000, function()
     return self:is_done()

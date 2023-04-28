@@ -536,6 +536,19 @@ M.timeout = M.wrap(function(timeout, callback)
 end)
 
 ---Yield until the Neovim API is available.
-M.scheduler = M.wrap(vim.schedule, 1)
+---@param fast_only? boolean # Only schedule if in an |api-fast| event.
+---   When this is `true`, the scheduler will resume immediately unless the
+---   editor is in an |api-fast| event. This means that the API might still be
+---   limited by other locks (i.e. |textlock|).
+M.scheduler = M.wrap(function(fast_only, callback)
+  if (fast_only and not vim.in_fast_event())
+      or not require("diffview.ffi").nvim_is_locked()
+  then
+    callback()
+    return
+  end
+
+  vim.schedule(callback)
+end)
 
 return M

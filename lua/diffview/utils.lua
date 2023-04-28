@@ -397,10 +397,6 @@ end
 ---@overload fun(cmd: string[], cwd: string?)
 ---@overload fun(cmd: string[], opt: utils.system_list.Opt?)
 function M.system_list(cmd, cwd_or_opt)
-  if vim.in_fast_event() then
-    await(async.scheduler())
-  end
-
   ---@type utils.system_list.Opt
   local opt
   if type(cwd_or_opt) == "string" then
