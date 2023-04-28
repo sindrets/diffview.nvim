@@ -7,9 +7,10 @@ local FilePanel = lazy.access("diffview.scene.views.diff.file_panel", "FilePanel
 local Rev = lazy.access("diffview.vcs.adapters.git.rev", "GitRev") ---@type GitRev|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local vcs_utils = lazy.require("diffview.vcs") ---@module "diffview.vcs"
-local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 local oop = lazy.require("diffview.oop") ---@module "diffview.oop"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
+
+local logger = DiffviewGlobal.logger
 
 local M = {}
 

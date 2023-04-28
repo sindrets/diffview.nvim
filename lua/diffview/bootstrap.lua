@@ -5,6 +5,7 @@ end
 local lazy = require("diffview.lazy")
 
 local EventEmitter = lazy.access("diffview.events", "EventEmitter") ---@type EventEmitter|LazyModule
+local Logger = lazy.access("diffview.logger", "Logger") ---@type Logger|LazyModule
 local config = lazy.require("diffview.config") ---@module "diffview.config"
 local diffview = lazy.require("diffview") ---@module "diffview"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
@@ -39,11 +40,13 @@ _G.DiffviewGlobal = {
   ---10:    RENDERING & ASYNC
   ---@diagnostic disable-next-line: missing-parameter
   debug_level = tonumber((uv.os_getenv("DEBUG_DIFFVIEW"))) or 0,
-  emitter = EventEmitter(),
   state = {},
   bootstrap_done = true,
   bootstrap_ok = true,
 }
+
+DiffviewGlobal.logger = Logger()
+DiffviewGlobal.emitter = EventEmitter()
 
 DiffviewGlobal.emitter:on_any(function(e, args)
   diffview.nore_emit(e.id, utils.tbl_unpack(args))

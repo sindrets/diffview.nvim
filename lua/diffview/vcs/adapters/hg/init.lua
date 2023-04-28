@@ -12,12 +12,12 @@ local arg_parser = require("diffview.arg_parser")
 local async = require("diffview.async")
 local config = require('diffview.config')
 local lazy = require('diffview.lazy')
-local logger = require('diffview.logger')
 local oop = require('diffview.oop')
 local utils = require('diffview.utils')
 local vcs_utils = require("diffview.vcs.utils")
 
 local await, pawait = async.await, async.pawait
+local logger = DiffviewGlobal.logger
 local pl = lazy.access(utils, "path") ---@type PathLib
 
 local M = {}

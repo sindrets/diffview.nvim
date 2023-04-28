@@ -7,11 +7,11 @@ local JobStatus = lazy.access("diffview.vcs.utils", "JobStatus") ---@type JobSta
 local Rev = lazy.access("diffview.vcs.rev", "Rev") ---@type Rev|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local arg_parser = lazy.require("diffview.arg_parser") ---@module "diffview.arg_parser"
-local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local vcs_utils = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
 
 local await = async.await
+local logger = DiffviewGlobal.logger
 
 local M = {}
 

@@ -1,10 +1,9 @@
 local PerfTimer = require("diffview.perf").PerfTimer
 local config = require("diffview.config")
 local hl = require("diffview.hl")
-local logger = require("diffview.logger")
 local utils = require("diffview.utils")
 
----@type PerfTimer
+local logger = DiffviewGlobal.logger
 local perf = PerfTimer("[FileHistoryPanel] Render internal")
 local pl = utils.path
 

@@ -3,10 +3,10 @@ local oop = require("diffview.oop")
 local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 
-local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local await = async.await
+local logger = DiffviewGlobal.logger
 local uv = vim.loop
 
 local M = {}

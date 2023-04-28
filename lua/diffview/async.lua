@@ -1,13 +1,7 @@
----@diagnostic disable: invisible
 local oop = require("diffview.oop")
-local lazy = require("diffview.lazy")
 
-local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
-local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
-
-local tbl_pack, tbl_unpack = lazy.access(utils, "tbl_pack"), lazy.access(utils, "tbl_unpack")
-local dstring = lazy.access(logger, "dstring")
 local fmt = string.format
+local uv = vim.loop
 
 local DEFAULT_ERROR = "Unkown error."
 
@@ -24,6 +18,26 @@ M._handles = {}
 ---@alias AsyncFunc (fun(...): Future)
 
 ---@alias AsyncKind "callback"|"void"
+
+local function dstring(object)
+  if not DiffviewGlobal.logger then return "" end
+  dstring = DiffviewGlobal.logger.dstring
+  return dstring(object)
+end
+
+---@param ... any
+---@return table
+local function tbl_pack(...)
+  return { n = select("#", ...), ... }
+end
+
+---@param t table
+---@param i? integer
+---@param j? integer
+---@return any ...
+local function tbl_unpack(t, i, j)
+  return unpack(t, i or 1, j or t.n or table.maxn(t))
+end
 
 ---Returns the current thread or `nil` if it's the main thread.
 ---
@@ -124,15 +138,16 @@ end
 ---@private
 ---@param ... any
 function Future:dprint(...)
+  if not DiffviewGlobal.logger then return end
   if DiffviewGlobal.debug_level >= 10 or M._watching[self] then
-    local args = { fmt("%.2f", utils.now()), self, "::", ... }
+    local args = { uv.hrtime() / 1000000, self, "::", ... }
     local t = {}
 
     for i = 1, table.maxn(args) do
       t[i] = dstring(args[i])
     end
 
-    logger:debug(table.concat(t, " "))
+    DiffviewGlobal.logger:debug(table.concat(t, " "))
   end
 end
 
@@ -307,6 +322,7 @@ end
 ---@param func function
 ---@param opt async._run.Opt
 function M._run(func, opt)
+  ---@diagnostic disable: invisible
   opt = opt or {}
 
   local handle ---@type Future
@@ -370,6 +386,7 @@ function M._run(func, opt)
   handle:step(tbl_unpack(opt.args))
 
   return handle
+  ---@diagnostic enable: invisible
 end
 
 ---Create an async task for a function with no return values.

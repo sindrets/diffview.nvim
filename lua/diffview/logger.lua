@@ -12,20 +12,22 @@ local fmt = string.format
 local pl = lazy.access(utils, "path") ---@type PathLib
 local uv = vim.loop
 
+local M = {}
+
 ---@alias Logger.LogFunc fun(self: Logger, ...)
 ---@alias Logger.FmtLogFunc fun(self: Logger, formatstring: string, ...)
 ---@alias Logger.LazyLogFunc fun(self: Logger, work: (fun(): ...))
 
 ---@class Logger : diffview.Object
 ---@operator call : Logger
----@field private plugin string
----@field private outfile string
 ---@field private outfile_status Logger.OutfileStatus
 ---@field private level integer # Max level. Messages of higher level will be ignored. NOTE: Higher level -> lower severity.
 ---@field private msg_buffer string[]
 ---@field private msg_sem Semaphore
 ---@field private batch_interval integer # Minimum time (ms) between each time batched messages are written to the output file.
 ---@field private batch_handle? Closeable
+---@field plugin string
+---@field outfile string
 ---@field trace Logger.LogFunc
 ---@field debug Logger.LogFunc
 ---@field info Logger.LogFunc
@@ -277,6 +279,6 @@ function Logger:log_job(job, opt)
   end
 end
 
-local logger = Logger()
+M.Logger = Logger
 
-return logger
+return M

@@ -1,12 +1,12 @@
 local EventEmitter = require("diffview.events").EventEmitter
 local File = require("diffview.vcs.file").File
 local PerfTimer = require("diffview.perf").PerfTimer
-local logger = require("diffview.logger")
 local oop = require("diffview.oop")
 local renderer = require("diffview.renderer")
 local utils = require("diffview.utils")
 
 local api = vim.api
+local logger = DiffviewGlobal.logger
 local pl = utils.path
 
 local M = {}

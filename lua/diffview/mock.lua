@@ -6,7 +6,14 @@ itself. Calling the object does nothing.
 local M = {}
 local mock_mt = {}
 
+local function tbl_clone(t)
+  local ret = {}
+  for k, v in pairs(t) do ret[k] = v end
+  return ret
+end
+
 ---@class Mock
+---@operator call : Mock
 local Mock = setmetatable({}, mock_mt)
 
 function mock_mt.__index(_, key)
@@ -14,7 +21,6 @@ function mock_mt.__index(_, key)
 end
 
 function mock_mt.__call(_, internals)
-  local utils = require("diffview.utils")
   local mt = {
     __index = function(self, k)
       if Mock[k] then
@@ -27,7 +33,7 @@ function mock_mt.__call(_, internals)
       return nil
     end,
   }
-  local this = setmetatable(utils.tbl_clone(internals or {}), mt)
+  local this = setmetatable(tbl_clone(internals or {}), mt)
   return this
 end
 

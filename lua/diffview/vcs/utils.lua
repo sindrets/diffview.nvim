@@ -3,11 +3,11 @@ local FileDict = require("diffview.vcs.file_dict").FileDict
 local RevType = require("diffview.vcs.rev").RevType
 local Semaphore = require("diffview.control").Semaphore
 local async = require("diffview.async")
-local logger = require("diffview.logger")
 local utils = require("diffview.utils")
 
 local api = vim.api
 local await = async.await
+local logger = DiffviewGlobal.logger
 
 local M = {}
 
