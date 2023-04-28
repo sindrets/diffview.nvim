@@ -135,7 +135,10 @@ function HelpPanel:update_components()
           end
         end
 
-        return utils.vec_join(v, desc)
+        local ret = utils.tbl_clone(v)
+        ret[5] = desc
+
+        return ret
       end)
 
       if #maps == 0 then goto continue end
