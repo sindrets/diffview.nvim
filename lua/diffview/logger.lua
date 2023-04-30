@@ -14,6 +14,36 @@ local uv = vim.loop
 
 local M = {}
 
+---@class Logger.TimeOfDay
+---@field hours integer
+---@field mins integer
+---@field secs integer
+---@field micros integer
+---@field tz string
+---@field timestamp integer
+
+---Get high resolution time of day
+---@return Logger.TimeOfDay
+local function time_of_day()
+  local secs, micros = uv.gettimeofday()
+  local tzs = os.date("%z") --[[@as string ]]
+
+  local sign = tzs:match("[+-]") == "-" and -1 or 1
+  local tz_h, tz_m = tzs:match("[+-]?(%d%d)(%d%d)")
+  tz_h = tz_h * sign
+  tz_m = tz_m * sign
+
+  local ret = {}
+  ret.hours = math.floor(((secs / (60 * 60)) % 24) + tz_h)
+  ret.mins = math.floor(((secs / 60) % 60) + tz_m)
+  ret.secs = (secs % 60)
+  ret.micros = micros
+  ret.tz = tzs
+  ret.timestamp = secs
+
+  return ret
+end
+
 ---@alias Logger.LogFunc fun(self: Logger, ...)
 ---@alias Logger.FmtLogFunc fun(self: Logger, formatstring: string, ...)
 ---@alias Logger.LazyLogFunc fun(self: Logger, work: (fun(): ...))
@@ -131,6 +161,7 @@ function Logger:lvl(min_level)
     return self
   end
 
+  ---@diagnostic disable-next-line: return-type-mismatch
   return Logger.mock
 end
 
@@ -153,9 +184,17 @@ function Logger:_log(level_name, debuginfo, ...)
   local args = dvalues(...)
   local info = debuginfo or debug.getinfo(3, "Sl")
   local lineinfo = info.short_src .. ":" .. info.currentline
-  local millis = (uv.hrtime() / 1000000) % 1000
-  local time = os.date("%T") .. fmt(".%03d", millis)
-  local date = os.date("%F " .. time ..  " %z")
+  local tod = time_of_day()
+  local date = fmt(
+    "%s %02d:%02d:%02d.%03d %s",
+    os.date("%F"),
+    tod.hours,
+    tod.mins,
+    tod.secs,
+    math.floor(tod.micros / 1000),
+    tod.tz
+  )
+
   self:queue_msg(
     fmt(
       "[%-6s%s] %s: %s\n",

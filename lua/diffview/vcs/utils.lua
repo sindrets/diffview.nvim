@@ -6,7 +6,8 @@ local async = require("diffview.async")
 local utils = require("diffview.utils")
 
 local api = vim.api
-local await = async.await
+local await, pawait = async.await, async.pawait
+local fmt = string.format
 local logger = DiffviewGlobal.logger
 
 local M = {}
@@ -46,11 +47,11 @@ M.queue_sync_job = async.void(function(job)
 
   local permit = await(job_queue_sem:acquire()) --[[@as Permit ]]
   table.insert(sync_jobs, job)
-  permit:forget()
 
   if #sync_jobs == 1 then
     job:start()
   end
+  permit:forget()
 end)
 
 ---@param max_retries integer
@@ -61,16 +62,17 @@ M.ensure_output = async.wrap(function(max_retries, jobs, log_context, callback)
   ---@cast callback -?
   local num_bad_jobs
   local num_retries = 0
-  local context = log_context and ("[%s] "):format(log_context) or ""
+  local context = log_context and fmt("[%s] ", log_context) or ""
 
   for n = 0, max_retries - 1 do
     num_bad_jobs = 0
 
     for _, job in ipairs(jobs) do
       if job.code == 0 and #job.stdout == 0 then
-        logger:warn(
-          ("%sJob expected output, but returned nothing! Retrying %d more times(s)...")
-          :format(context, max_retries - n)
+        logger:fmt_warn(
+          "%sJob expected output, but returned nothing! Retrying %d more times(s)...",
+          context,
+          max_retries - n
         )
         logger:log_job(job, { func = logger.warn, context = log_context })
         num_retries = n + 1
@@ -87,7 +89,7 @@ M.ensure_output = async.wrap(function(max_retries, jobs, log_context, callback)
 
     if num_bad_jobs == 0 then
       if num_retries > 0 then
-        logger:info(("%sRetry was successful!"):format(context))
+        logger:fmt_info("%sRetry was successful!", context)
       end
       callback(JobStatus.SUCCESS)
       return
@@ -202,10 +204,7 @@ M.restore_file = async.wrap(function(adapter, path, kind, commit, callback)
   end
 
   local rev_name = (commit and commit:sub(1, 11)) or (kind == "staged" and "HEAD" or "index")
-  utils.info(("File restored from %s. %s"):format(
-    rev_name,
-    undo and "Undo with " .. undo
-  ), true)
+  utils.info(fmt("File restored from %s. %s", rev_name, undo and "Undo with " .. undo), true)
 
   callback()
 end)
