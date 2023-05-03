@@ -353,43 +353,43 @@ end)
 ---@param rev? Rev
 ---@param callback fun(stderr: string[]?, stdout: string[]?)
 VCSAdapter.show = async.wrap(function(self, path, rev, callback)
-  local job = Job({
+  local job
+  job = Job({
     command = self:bin(),
     args = self:get_show_args(path, rev),
     cwd = self.ctx.toplevel,
-    ---@param j diffview.Job
-    on_exit = async.void(function(j)
+    on_exit = async.void(function()
       local context = "VCSAdapter.show()"
-      utils.handle_job(j, {
+      utils.handle_job(job, {
         fail_on_empty = true,
         context = context,
         debug_opt = { no_stdout = true, context = context },
       })
 
-      if j.code ~= 0 then
-        callback(j.stderr or {}, nil)
+      if job.code ~= 0 then
+        callback(job.stderr or {}, nil)
         return
       end
 
       local out_status
 
-      if #j.stdout == 0 then
+      if #job.stdout == 0 then
         await(async.scheduler())
-        out_status = await(vcs_utils.ensure_output(2, { j }, context))
+        out_status = await(vcs_utils.ensure_output(2, { job }, context))
       end
 
       if out_status == JobStatus.ERROR then
-        callback(j.stderr or {}, nil)
+        callback(job.stderr or {}, nil)
         return
       end
 
-      callback(nil, j.stdout)
+      callback(nil, job.stdout)
     end),
   })
   -- Problem: Running multiple 'show' jobs simultaneously may cause them to fail
   -- silently.
   -- Solution: queue them and run them one after another.
-  vcs_utils.queue_sync_job(job)
+  await(vcs_utils.queue_sync_job(job))
 end)
 
 ---Convert revs to string representation.

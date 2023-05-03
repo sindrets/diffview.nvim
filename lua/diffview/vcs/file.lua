@@ -9,6 +9,7 @@ local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local await = async.await
+local fmt = string.format
 local pl = lazy.access(utils, "path") ---@type PathLib
 
 local api = vim.api
@@ -167,32 +168,32 @@ function File:_create_local_buffer()
   self:post_buf_created()
 end
 
+---@private
 ---@param self vcs.File
-File._produce_data = async.wrap(function(self, callback)
+---@param callback (fun(err?: string[], data?: string[]))
+File.produce_data = async.wrap(function(self, callback)
   if self.get_data and vim.is_callable(self.get_data) then
     local pos = self.symbol == "a" and "left" or "right"
     local data = self.get_data(self.kind, self.path, pos)
     callback(nil, data)
   else
-    local err, result = await(self.adapter:show(self.path, self.rev))
+    local err, data = await(self.adapter:show(self.path, self.rev))
 
     if err then
-      vim.schedule(function()
-        utils.err(("Failed to create diff buffer: '%s'"):format(
-          api.nvim_buf_get_name(self.bufnr)
-        ))
-      end)
       callback(err)
       return
     end
 
-    callback(nil, result)
+    callback(nil, data)
   end
 end)
 
 ---@param self vcs.File
 ---@param callback function
 File.create_buffer = async.wrap(function(self, callback)
+  ---@diagnostic disable: invisible
+  await(async.scheduler())
+
   if self == File.NULL_FILE then
     callback(File._get_null_buffer())
     return
@@ -222,7 +223,7 @@ File.create_buffer = async.wrap(function(self, callback)
   if self.rev.type == RevType.COMMIT then
     context = self.rev:abbrev(11)
   elseif self.rev.type == RevType.STAGE then
-    context = (":%d:"):format(self.rev.stage)
+    context = fmt(":%d:", self.rev.stage)
   elseif self.rev.type == RevType.CUSTOM then
     context = "[custom]"
   end
@@ -236,13 +237,15 @@ File.create_buffer = async.wrap(function(self, callback)
     return
   end
 
-  -- FIXME: Handle err
-  local err, lines = await(self:_produce_data())
-
-  await(async.scheduler())
-
   self.bufnr = api.nvim_create_buf(false, false)
   local bufopts = vim.deepcopy(File.bufopts)
+
+  api.nvim_buf_set_name(self.bufnr, fullname)
+
+  local err, lines = await(self:produce_data())
+  if err then error(table.concat(err, "\n")) end
+
+  await(async.scheduler())
 
   if self.rev.type == RevType.STAGE and self.rev.stage == 0 then
     self.blob_hash = self.adapter:file_blob_hash(self.path)
@@ -264,8 +267,6 @@ File.create_buffer = async.wrap(function(self, callback)
     api.nvim_buf_set_option(self.bufnr, option, value)
   end
 
-  api.nvim_buf_set_name(self.bufnr, fullname)
-
   if api.nvim_buf_is_valid(self.bufnr) then
     local last_modifiable = vim.bo[self.bufnr].modifiable
     local last_modified = vim.bo[self.bufnr].modified
@@ -281,6 +282,7 @@ File.create_buffer = async.wrap(function(self, callback)
     self:post_buf_created()
     callback(self.bufnr)
   end
+  ---@diagnostic enable: invisible
 end)
 
 function File:is_valid()

@@ -11,8 +11,9 @@ local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
-local await = async.await
+local await, pawait = async.await, async.pawait
 local fmt = string.format
+local logger = DiffviewGlobal.logger
 
 local M = {}
 
@@ -87,27 +88,56 @@ function Window:post_open()
 end
 
 ---@param self Window
----@param callback fun(file: vcs.File)
+---@param callback fun(ok: boolean)
 Window.load_file = async.wrap(function(self, callback)
   assert(self.file)
 
   if self.file.bufnr and api.nvim_buf_is_valid(self.file.bufnr) then
-    return callback(self.file)
+    return callback(true)
   end
 
-  local bufnr = await(self.file:create_buffer())
+  local ok, err = pawait(self.file.create_buffer, self.file)
 
-  callback(bufnr)
+  if not ok then
+    logger:error(err)
+    utils.err(fmt("Failed to create diff buffer: '%s:%s'", self.file.rev, self.file.path), true)
+  end
+
+  callback(ok)
 end)
+
+---@private
+function Window:open_fallback()
+  self.emitter:emit("pre_open")
+
+  File.load_null_buffer(self.id)
+  self:apply_null_winopts()
+
+  if self:show_winbar_info() then
+    vim.wo[self.id].winbar = self.file.winbar
+  end
+
+  self.emitter:emit("post_open")
+end
 
 ---@param self Window
 Window.open_file = async.void(function(self)
+  ---@diagnostic disable: invisible
   assert(self.file)
 
   if not (self:is_valid() and self.file.active) then return end
 
   if not self.file:is_valid() then
-    await(self:load_file())
+    local ok = await(self:load_file())
+    await(async.scheduler())
+
+    -- Ensure validity after await
+    if not (self:is_valid() and self.file.active) then return end
+
+    if not ok then
+      self:open_fallback()
+      return
+    end
   end
 
   self.emitter:emit("pre_open")
@@ -143,6 +173,7 @@ Window.open_file = async.void(function(self)
       layout_name = self.parent.name,
     })
   end)
+  ---@diagnostic enable: invisible
 end)
 
 ---@return boolean

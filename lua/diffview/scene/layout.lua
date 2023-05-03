@@ -163,12 +163,10 @@ function Layout:is_files_loaded()
 end
 
 ---@param self Layout
----@param callback fun()
-Layout.open_files = async.wrap(function(self, callback)
+Layout.open_files = async.void(function(self)
   if #self:files() < #self.windows then
     self:open_null()
     self.emitter:emit("files_opened")
-    callback()
     return
   end
 
@@ -183,13 +181,14 @@ Layout.open_files = async.wrap(function(self, callback)
     end
   end
 
+  await(async.scheduler())
+
   for _, win in ipairs(self.windows) do
     await(win:open_file())
   end
 
   self:sync_scroll()
   self.emitter:emit("files_opened")
-  callback()
 end)
 
 function Layout:open_null()

@@ -51,6 +51,7 @@ M.queue_sync_job = async.void(function(job)
   if #sync_jobs == 1 then
     job:start()
   end
+
   permit:forget()
 end)
 
@@ -77,7 +78,9 @@ M.ensure_output = async.wrap(function(max_retries, jobs, log_context, callback)
         logger:log_job(job, { func = logger.warn, context = log_context })
         num_retries = n + 1
 
-        await(job)
+        -- Explicitly call `start()` here in order to ensure that the job is
+        -- reset and restarted properly.
+        await(job:start())
 
         if job.code ~= 0 then
           utils.handle_job(job, { context = log_context })
@@ -94,6 +97,8 @@ M.ensure_output = async.wrap(function(max_retries, jobs, log_context, callback)
       callback(JobStatus.SUCCESS)
       return
     end
+
+    await(async.timeout(1))
   end
 
   callback(JobStatus.ERROR)

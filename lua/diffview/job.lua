@@ -294,7 +294,7 @@ Job.start = async.wrap(function(self, callback)
   end
 end)
 
----@param duration? integer # Max duration (ms)
+---@param duration? integer # Max duration (ms) (default: 30_000)
 ---@return string[] stdout
 ---@return integer code
 ---@return string[] stderr
@@ -305,11 +305,13 @@ function Job:sync(duration)
 
   if not self:is_started() then self:start() end
 
-  await(async.scheduler(true))
+  await(async.scheduler())
 
-  local ok, status = vim.wait(duration or 5000, function()
+  local ok, status = vim.wait(duration or (30 * 1000), function()
     return self:is_done()
-  end, 10)
+  end, 1)
+
+  await(async.scheduler())
 
   if not ok then
     if status == -1 then

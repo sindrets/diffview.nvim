@@ -169,9 +169,11 @@ return function(view)
           view:next_file()
         end
 
-        view:update_files(function()
-          view.panel:highlight_cur_file()
-        end)
+        view:update_files(
+          vim.schedule_wrap(function()
+            view.panel:highlight_cur_file()
+          end)
+        )
         view.emitter:emit(EventName.FILES_STAGED, view)
       end
     end,
