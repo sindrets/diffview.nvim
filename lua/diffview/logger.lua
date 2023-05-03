@@ -22,12 +22,24 @@ local M = {}
 ---@field tz string
 ---@field timestamp integer
 
----Get high resolution time of day
----@return Logger.TimeOfDay
-local function time_of_day()
-  local secs, micros = uv.gettimeofday()
-  local tzs = os.date("%z") --[[@as string ]]
+---@class Logger.Time
+---@field timestamp integer # Unix time stamp
+---@field micros integer # Microsecond offset
 
+---Get high resolution time of day
+---@param time? Logger.Time
+---@return Logger.TimeOfDay
+local function time_of_day(time)
+  local secs, micros
+
+  if time then
+    secs, micros = time.timestamp, (time.micros or 0)
+  else
+    secs, micros = uv.gettimeofday()
+    assert(secs, micros)
+  end
+
+  local tzs = os.date("%z", secs) --[[@as string ]]
   local sign = tzs:match("[+-]") == "-" and -1 or 1
   local tz_h, tz_m = tzs:match("[+-]?(%d%d)(%d%d)")
   tz_h = tz_h * sign
@@ -48,6 +60,11 @@ end
 ---@alias Logger.FmtLogFunc fun(self: Logger, formatstring: string, ...)
 ---@alias Logger.LazyLogFunc fun(self: Logger, work: (fun(): ...))
 
+---@class Logger.Context
+---@field debuginfo debuginfo
+---@field time Logger.Time
+---@field label string
+
 ---@class Logger : diffview.Object
 ---@operator call : Logger
 ---@field private outfile_status Logger.OutfileStatus
@@ -56,6 +73,7 @@ end
 ---@field private msg_sem Semaphore
 ---@field private batch_interval integer # Minimum time (ms) between each time batched messages are written to the output file.
 ---@field private batch_handle? Closeable
+---@field private ctx? Logger.Context
 ---@field plugin string
 ---@field outfile string
 ---@field trace Logger.LogFunc
@@ -88,12 +106,12 @@ vim.tbl_add_reverse_lookup(Logger.OutfileStatus)
 
 ---@enum Logger.LogLevels
 Logger.LogLevels = {
-  fatal = 0,
-  error = 1,
-  warn = 2,
-  info = 3,
-  debug = 4,
-  trace = 5,
+  fatal = 1,
+  error = 2,
+  warn = 3,
+  info = 4,
+  debug = 5,
+  trace = 6,
 }
 vim.tbl_add_reverse_lookup(Logger.LogLevels)
 
@@ -108,6 +126,17 @@ function Logger:init(opt)
   self.msg_buffer = {}
   self.msg_sem = Semaphore(1)
   self.batch_interval = opt.batch_interval or 3000
+end
+
+---@return Logger.Time
+function Logger.time_now()
+  local secs, micros = uv.gettimeofday()
+  assert(secs, micros)
+
+  return {
+    timestamp = secs,
+    micros = micros,
+  }
 end
 
 ---@param num number
@@ -178,16 +207,18 @@ end
 
 ---@private
 ---@param level_name string
----@param debuginfo? debuginfo
 ---@param ... any
-function Logger:_log(level_name, debuginfo, ...)
+function Logger:_log(level_name, ...)
   local args = dvalues(...)
-  local info = debuginfo or debug.getinfo(3, "Sl")
+  local ctx = self.ctx or {}
+
+  local info = ctx.debuginfo or debug.getinfo(3, "Sl")
   local lineinfo = info.short_src .. ":" .. info.currentline
-  local tod = time_of_day()
+  local time = ctx.time or Logger.time_now()
+  local tod = time_of_day(time)
   local date = fmt(
     "%s %02d:%02d:%02d.%03d %s",
-    os.date("%F"),
+    os.date("%F", time.timestamp),
     tod.hours,
     tod.mins,
     tod.secs,
@@ -197,10 +228,11 @@ function Logger:_log(level_name, debuginfo, ...)
 
   self:queue_msg(
     fmt(
-      "[%-6s%s] %s: %s\n",
+      "[%-6s%s] %s: %s%s\n",
       level_name:upper(),
       date,
       lineinfo,
+      ctx.label and fmt("[%s] ", ctx.label) or "",
       table.concat(args, " ")
     )
   )
@@ -254,19 +286,28 @@ Logger.queue_msg = async.void(function(self, msg)
   )
 end)
 
+---@param ctx Logger.Context
+function Logger:set_context(ctx)
+  self.ctx = ctx
+end
+
+function Logger:clear_context()
+  self.ctx = nil
+end
+
 do
   -- Create methods
   for level, name in ipairs(Logger.LogLevels --[[@as string[] ]]) do
     ---@param self Logger
     Logger[name] = function(self, ...)
       if self.level < level then return end
-      self:_log(name, nil, ...)
+      self:_log(name, ...)
     end
 
     ---@param self Logger
     Logger["fmt_" .. name] = function(self, formatstring, ...)
       if self.level < level then return end
-      self:_log(name, nil, fmt(formatstring, ...))
+      self:_log(name, fmt(formatstring, ...))
     end
   end
 end
@@ -289,33 +330,39 @@ function Logger:log_job(job, opt)
     return
   end
 
+  self:set_context({
+    debuginfo = debug.getinfo(3, "Sl"),
+    time = Logger.time_now(),
+    label = opt.context,
+  })
+
   local args = vim.tbl_map(function(arg)
     -- Simple shell escape. NOTE: not valid for windows shell.
-    return ("'%s'"):format(arg:gsub("'", [['"'"']]))
+    return fmt("'%s'", arg:gsub("'", [['"'"']]))
   end, job.args) --[[@as vector ]]
 
   local log_func = self.debug
-  local context = opt.context and ("[%s] "):format(opt.context) or ""
 
   if type(opt.func) == "string" then
     log_func = self[opt.func]
   elseif type(opt.func) == "function" then
-    ---@diagnostic disable-next-line: cast-local-type
-    log_func = opt.func
+    log_func = opt.func --[[@as function ]]
   end
 
-  log_func(self, ("%s[job-info] Exit code: %s"):format(context, job.code))
-  log_func(self, ("%s     [cmd] %s %s"):format(context, job.command, table.concat(args, " ")))
+  log_func(self, fmt("[job-info] Exit code: %s", job.code))
+  log_func(self, fmt("     [cmd] %s %s", job.command, table.concat(args, " ")))
 
   if job.cwd then
-    log_func(self, ("%s     [cwd] %s"):format(context, job.cwd))
+    log_func(self, fmt("     [cwd] %s", job.cwd))
   end
   if not opt.no_stdout and job.stdout[1] then
-    log_func(self, context .. "  [stdout] " .. table.concat(job.stdout, "\n"))
+    log_func(self, "  [stdout] " .. table.concat(job.stdout, "\n"))
   end
   if not opt.no_stderr and job.stderr[1] then
-    log_func(self, context .. "  [stderr] " .. table.concat(job.stderr, "\n"))
+    log_func(self, "  [stderr] " .. table.concat(job.stderr, "\n"))
   end
+
+  self:clear_context()
 end
 
 M.Logger = Logger
