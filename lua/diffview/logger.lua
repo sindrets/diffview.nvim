@@ -69,7 +69,7 @@ end
 ---@operator call : Logger
 ---@field private outfile_status Logger.OutfileStatus
 ---@field private level integer # Max level. Messages of higher level will be ignored. NOTE: Higher level -> lower severity.
----@field private msg_buffer string[]
+---@field private msg_buffer (string|function)[]
 ---@field private msg_sem Semaphore
 ---@field private batch_interval integer # Minimum time (ms) between each time batched messages are written to the output file.
 ---@field private batch_handle? Closeable
@@ -183,23 +183,14 @@ function Logger.dstring(object)
   return tostring(object)
 end
 
----@param min_level integer
----@return Logger
-function Logger:lvl(min_level)
-  if DiffviewGlobal.debug_level >= min_level then
-    return self
-  end
-
-  ---@diagnostic disable-next-line: return-type-mismatch
-  return Logger.mock
-end
+local dstring = Logger.dstring
 
 local function dvalues(...)
   local args = { ... }
   local ret = {}
 
   for i = 1, select("#", ...) do
-    ret[i] = Logger.dstring(args[i])
+    ret[i] = dstring(args[i])
   end
 
   return ret
@@ -207,11 +198,11 @@ end
 
 ---@private
 ---@param level_name string
+---@param lazy_eval boolean
+---@param x function|any
 ---@param ... any
-function Logger:_log(level_name, ...)
-  local args = dvalues(...)
+function Logger:_log(level_name, lazy_eval, x, ...)
   local ctx = self.ctx or {}
-
   local info = ctx.debuginfo or debug.getinfo(3, "Sl")
   local lineinfo = info.short_src .. ":" .. info.currentline
   local time = ctx.time or Logger.time_now()
@@ -226,16 +217,29 @@ function Logger:_log(level_name, ...)
     tod.tz
   )
 
-  self:queue_msg(
-    fmt(
-      "[%-6s%s] %s: %s%s\n",
-      level_name:upper(),
-      date,
-      lineinfo,
-      ctx.label and fmt("[%s] ", ctx.label) or "",
-      table.concat(args, " ")
+  if lazy_eval then
+    self:queue_msg(function()
+      return fmt(
+        "[%-6s%s] %s: %s%s\n",
+        level_name:upper(),
+        date,
+        lineinfo,
+        ctx.label and fmt("[%s] ", ctx.label) or "",
+        dstring(x())
+      )
+    end)
+  else
+    self:queue_msg(
+      fmt(
+        "[%-6s%s] %s: %s%s\n",
+        level_name:upper(),
+        date,
+        lineinfo,
+        ctx.label and fmt("[%s] ", ctx.label) or "",
+        table.concat(dvalues(x, ...), " ")
+      )
     )
-  )
+  end
 end
 
 ---@diagnostic disable: invisible
@@ -265,11 +269,18 @@ Logger.queue_msg = async.void(function(self, msg)
 
   self.batch_handle = loop.set_timeout(
     async.void(function()
-      ---@diagnostic disable-next-line: redefined-local
-      local permit
+      ---@diagnostic disable-next-line: cast-local-type
+      permit = nil
 
       if next(self.msg_buffer) then
         permit = await(self.msg_sem:acquire()) --[[@as Permit ]]
+
+        -- Eval lazy messages
+        for i = 1, #self.msg_buffer do
+          if type(self.msg_buffer[i]) == "function" then
+            self.msg_buffer[i] = self.msg_buffer[i]()
+          end
+        end
 
         local fd, err = uv.fs_open(self.outfile, "a", tonumber("0644", 8))
         assert(fd, err)
@@ -286,6 +297,16 @@ Logger.queue_msg = async.void(function(self, msg)
   )
 end)
 
+---@param min_level integer
+---@return Logger
+function Logger:lvl(min_level)
+  if DiffviewGlobal.debug_level >= min_level then
+    return self
+  end
+
+  return Logger.mock --[[@as Logger ]]
+end
+
 ---@param ctx Logger.Context
 function Logger:set_context(ctx)
   self.ctx = ctx
@@ -301,13 +322,19 @@ do
     ---@param self Logger
     Logger[name] = function(self, ...)
       if self.level < level then return end
-      self:_log(name, ...)
+      self:_log(name, false, ...)
     end
 
     ---@param self Logger
     Logger["fmt_" .. name] = function(self, formatstring, ...)
       if self.level < level then return end
-      self:_log(name, fmt(formatstring, ...))
+      self:_log(name, false, fmt(formatstring, ...))
+    end
+
+    ---@param self Logger
+    Logger["lazy_" .. name] = function(self, func)
+      if self.level < level then return end
+      self:_log(name, true, func)
     end
   end
 end
