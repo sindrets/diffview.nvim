@@ -323,140 +323,46 @@ function M.str_quote(s, opt)
   end
 end
 
----@class utils.handle_job.Opt
----@field fail_on_empty boolean Consider the job as failed if the code is 0 and stdout is empty.
----@field log_func function|string
----@field context string Context for the logger.
----@field debug_opt Logger.log_job.Opt
-
----Handles logging of failed jobs. If the given job hasn't failed, this does nothing.
----@param job diffview.Job
----@param opt? utils.handle_job.Opt
-function M.handle_job(job, opt)
-  opt = opt or {}
-  local empty = false
-  if opt.fail_on_empty then
-    local out = job.stdout
-    empty = not (out[2] ~= nil or out[1] and out[1] ~= "")
-  end
-
-  if job.code == 0 and not empty then
-    if opt.debug_opt then
-      logger:log_job(job, opt.debug_opt)
-    end
-    return
-  end
-
-  local log_func = logger.error
-
-  if type(opt.log_func) == "string" then
-    log_func = logger[opt.log_func]
-  elseif type(opt.log_func) == "function" then
-    log_func = opt.log_func --[[@as function ]]
-  end
-
-  local args = vim.tbl_map(function(arg)
-    return ("'%s'"):format(arg:gsub("'", [['"'"']]))
-  end, job.args) --[[@as string[] ]]
-
-  local msg
-  local context = opt.context and ("[%s] "):format(opt.context) or ""
-  if empty and job.code == 0 then
-    msg = ("%sJob expected output, but returned nothing! Code: %s"):format(context, job.code)
-  else
-    msg = ("%sJob exited with a non-zero exit status! Code: %s"):format(context, job.code)
-  end
-
-  log_func(logger, msg)
-  log_func(logger, ("%s   [cmd] %s %s"):format(context, job.command, table.concat(args, " ")))
-
-  if job.cwd then
-    log_func(logger, ("%s   [cwd] %s"):format(context, job.cwd))
-  end
-
-  if #job.stderr > 0 then
-    log_func(logger, ("%s[stderr] %s"):format(context, table.concat(job.stderr, "\n")))
-  end
-end
-
----@class utils.system_list.Opt
+---@class utils.job.Opt
 ---@field cwd string Working directory of the job.
----@field writer table|string Something that will write to the stdin of this job.
+---@field writer string|string[] Something that will write to the stdin of this job.
 ---@field silent boolean Supress log output.
----@field fail_on_empty boolean Return code 1 if stdout is empty and code is 0.
----@field retry_on_empty integer Number of times to retry job if stdout is empty and code is 0. Implies `fail_on_empty`.
----@field context string Context for the logger.
----@field debug_opt Logger.log_job.Opt
+---@field fail_on_empty boolean Return code 1 if stdout is empty.
+---@field retry integer Number of times the job will be retried if it fails.
+---@field log_opt Logger.log_job.Opt
 
----Get the output of a system command.
 ---@param cmd string[]
----@param cwd_or_opt? string|utils.system_list.Opt
----@return string[] stdout
----@return integer code
----@return string[] stderr
----@overload fun(cmd: string[], cwd: string?)
----@overload fun(cmd: string[], opt: utils.system_list.Opt?)
-function M.system_list(cmd, cwd_or_opt)
-  ---@type utils.system_list.Opt
+---@param cwd_or_opt? string|utils.job.Opt
+function M.job(cmd, cwd_or_opt)
   local opt
+
   if type(cwd_or_opt) == "string" then
     opt = { cwd = cwd_or_opt }
   else
     opt = cwd_or_opt or {}
   end
 
-  opt.fail_on_empty = vim.F.if_nil(opt.fail_on_empty, (opt.retry_on_empty or 0) > 0)
-  opt.context = opt.context or "system_list()"
-  local context = ("[%s] "):format(opt.context)
-  ---@diagnostic disable-next-line: redefined-local
-  local logger = opt.silent and logger.mock or logger
-
-  local command = table.remove(cmd, 1)
-  local num_retries = 0
-  local max_retries = opt.retry_on_empty or 0
-  local job ---@type diffview.Job
-  local stdout, stderr, code, empty
-  local job_spec = {
-    command = command,
-    args = cmd,
+  local job = Job({
+    command = cmd[1],
+    args = M.vec_slice(cmd, 2),
     cwd = opt.cwd,
+    retry = opt.retry,
+    fail_condition = opt.fail_on_empty and Job.FAIL_CONDITIONS.on_empty or nil,
     writer = opt.writer,
-  }
+    log_opt = vim.tbl_extend("keep", opt.log_opt or {}, {
+      silent = opt.silent,
+      debuginfo = debug.getinfo(2, "Sl"),
+    }),
+  })
 
-  for i = 0, max_retries do
-    if i > 0 then
-      logger:warn(
-        ("%sJob expected output, but returned nothing! Retrying %d more time(s)...")
-        :format(context, max_retries - i + 1)
-      )
-      logger:log_job(job, { func = logger.warn, context = opt.context })
-      num_retries = num_retries + 1
-    end
+  local ok = job:sync()
+  local code = job.code
 
-    job = Job(job_spec)
-    stdout, code, stderr = job:sync()
-    empty = not (stdout[2] ~= nil or stdout[1] and stdout[1] ~= "")
-
-    if (code ~= 0 or not empty) then
-      break
-    end
+  if not ok then
+    if opt.fail_on_empty then code = 1 end
   end
 
-  if opt.debug_opt then
-    M.handle_job(job, { fail_on_empty = opt.fail_on_empty, debug_opt = opt.debug_opt })
-  elseif not opt.silent then
-    M.handle_job(job, { fail_on_empty = opt.fail_on_empty, context = opt.context })
-  end
-
-  if num_retries > 0 and code == 0 and not empty then
-    logger:info(("%sRetry was successful!"):format(context))
-  end
-
-  if opt.fail_on_empty and code == 0 and empty then
-    code = 1
-  end
-
-  return stdout, code, stderr
+  return job.stdout, code, job.stderr
 end
 
 ---Map of options that accept comma separated, list-like values, but don't work

@@ -145,12 +145,12 @@ end
 
 ---Execute a VCS command synchronously.
 ---@param args string[]
----@param cwd_or_opt? string|utils.system_list.Opt
+---@param cwd_or_opt? string|utils.job.Opt
 ---@return string[] stdout
 ---@return integer code
 ---@return string[] stderr
----@overload fun(self: VCSAdapter, args: string[], cwd: string?)
----@overload fun(self: VCSAdapter, args: string[], opt: utils.system_list.Opt?)
+---@overload fun(self: VCSAdapter, args: string[], cwd?: string)
+---@overload fun(self: VCSAdapter, args: string[], opt?: utils.job.Opt)
 function VCSAdapter:exec_sync(args, cwd_or_opt)
   if not self:class().bootstrap.done then self:class().run_bootstrap() end
 
@@ -164,7 +164,7 @@ function VCSAdapter:exec_sync(args, cwd_or_opt)
     return
   end
 
-  return utils.system_list(cmd, cwd_or_opt)
+  return utils.job(cmd, cwd_or_opt)
 end
 
 
@@ -358,28 +358,12 @@ VCSAdapter.show = async.wrap(function(self, path, rev, callback)
     command = self:bin(),
     args = self:get_show_args(path, rev),
     cwd = self.ctx.toplevel,
-    on_exit = async.void(function()
-      local context = "VCSAdapter.show()"
-      utils.handle_job(job, {
-        fail_on_empty = true,
-        context = context,
-        debug_opt = { no_stdout = true, context = context },
-      })
-
-      if job.code ~= 0 then
-        callback(job.stderr or {}, nil)
-        return
-      end
-
-      local out_status
-
-      if #job.stdout == 0 then
-        await(async.scheduler())
-        out_status = await(vcs_utils.ensure_output(2, { job }, context))
-      end
-
-      if out_status == JobStatus.ERROR then
-        callback(job.stderr or {}, nil)
+    retry = 2,
+    fail_condition = Job.FAIL_CONDITIONS.on_empty,
+    log_opt = { label = "VCSAdapter:show()" },
+    on_exit = async.void(function(_, ok, err)
+      if not ok or job.code ~= 0 then
+        callback(utils.vec_join(err, job.stderr), nil)
         return
       end
 

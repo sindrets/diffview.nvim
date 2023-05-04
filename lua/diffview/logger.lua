@@ -343,24 +343,27 @@ end
 
 ---@class Logger.log_job.Opt
 ---@field func function|string
----@field context string
+---@field label string
 ---@field no_stdout boolean
 ---@field no_stderr boolean
+---@field silent boolean
 ---@field debug_level integer
+---@field debuginfo debuginfo
 
 ---@param job diffview.Job
 ---@param opt? Logger.log_job.Opt
 function Logger:log_job(job, opt)
   opt = opt or {}
 
+  if opt.silent then return end
   if opt.debug_level and DiffviewGlobal.debug_level < opt.debug_level then
     return
   end
 
   self:set_context({
-    debuginfo = debug.getinfo(3, "Sl"),
+    debuginfo = opt.debuginfo or debug.getinfo(2, "Sl"),
     time = Logger.time_now(),
-    label = opt.context,
+    label = opt.label,
   })
 
   local args = vim.tbl_map(function(arg)

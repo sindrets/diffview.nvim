@@ -80,12 +80,11 @@ CommitLogPanel.update = async.void(function(self, args)
     cwd = self.adapter.ctx.toplevel,
   })
 
-  await(job)
+  local ok = await(job)
   await(async.scheduler())
 
-  if job.code ~= 0 then
+  if not ok then
     utils.err("Failed to open log!")
-    utils.handle_job(job)
     return
   end
 

@@ -6,13 +6,15 @@ local lazy = require("diffview.lazy")
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local await = async.await
+local fmt = string.format
 local logger = DiffviewGlobal.logger
 local uv = vim.loop
 
 local M = {}
 
 ---@alias diffview.Job.OnOutCallback fun(err?: string, line: string, j: diffview.Job)
----@alias diffview.Job.OnExitCallback fun(j: diffview.Job, code: integer, signal: integer)
+---@alias diffview.Job.OnExitCallback fun(j: diffview.Job, success: boolean, err?: string)
+---@alias diffview.Job.FailCondition fun(j: diffview.Job): boolean, string
 
 ---@alias StdioKind "in"|"out"|"err"
 
@@ -21,7 +23,11 @@ local M = {}
 ---@field command string
 ---@field args string[]
 ---@field cwd string
+---@field retry integer
+---@field is_failed diffview.Job.FailCondition
+---@field log_opt Logger.log_job.Opt
 ---@field writer string|string[]
+---@field env string[]
 ---@field stdout string[]
 ---@field stderr string[]
 ---@field handle uv_process_t
@@ -37,6 +43,7 @@ local M = {}
 ---@field on_exit_listeners diffview.Job.OnExitCallback[]
 ---@field _started boolean
 ---@field _done boolean
+---@field _retry_count integer
 local Job = oop.create_class("Job", async.Waitable)
 
 local function prepare_env(env)
@@ -49,18 +56,52 @@ local function prepare_env(env)
   return ret
 end
 
+Job.FAIL_CONDITIONS = {
+  ---Fail on all non-zero exit codes.
+  non_zero = function(j)
+    return j.code ~= 0, fmt("Job exited with a non-zero exit code: %d", j.code)
+  end,
+  ---Fail if there's no data in stdout.
+  on_empty = function(j)
+    local msg = fmt("Job expected output, but returned nothing! Code: %d", j.code)
+    if #j.stdout == 1 then return j.stdout[1] == "", msg end
+    return #j.stdout == 0, msg
+  end,
+}
+
 function Job:init(opt)
   self.command = opt.command
   self.args = opt.args
   self.cwd = opt.cwd
-  self.writer = opt.writer
   self.env = opt.env and prepare_env(opt.env) or prepare_env(uv.os_environ())
+  self.retry = opt.retry or 0
+  self.writer = opt.writer
   self.buffered_std = utils.sate(opt.buffered_std, true)
   self.on_stdout_listeners = {}
   self.on_stderr_listeners = {}
   self.on_exit_listeners = {}
   self._started = false
   self._done = false
+  self._retry_count = 0
+
+  self.log_opt = vim.tbl_extend("keep", opt.log_opt or {}, {
+    func = "debug",
+    no_stdout = true,
+    debuginfo = debug.getinfo(3, "Sl"),
+  })
+
+  if opt.fail_condition then
+    if type(opt.fail_condition) == "string" then
+      self.is_failed = Job.FAIL_CONDITIONS[opt.fail_condition]
+      assert(self.is_failed, fmt("Unknown fail condition: '%s'", opt.fail_condition))
+    elseif type(opt.fail_condition) == "function" then
+      self.is_failed = opt.fail_condition
+    else
+      error("Invalid fail condition: " .. vim.inspect(opt.fail_condition))
+    end
+  else
+    self.is_failed = Job.FAIL_CONDITIONS.non_zero
+  end
 
   if opt.on_stdout then self:on_stdout(opt.on_stdout) end
   if opt.on_stderr then self:on_stderr(opt.on_stderr) end
@@ -229,6 +270,7 @@ function Job:reset()
 end
 
 ---@param self diffview.Job
+---@param callback fun(success: boolean, err?: string)
 Job.start = async.wrap(function(self, callback)
   self:reset()
 
@@ -269,13 +311,41 @@ Job.start = async.wrap(function(self, callback)
       self.stderr = process_chunks(self.stderr)
     end
 
+    ---@type boolean, string?
+    local ok, err = self:is_success()
+
+    if not ok then
+      if not self.log_opt.silent then
+        logger:error(err)
+        logger:log_job(self, { func = "error", no_stdout = true })
+      end
+
+      if self.retry > 0 then
+        if self._retry_count < self.retry then
+          self:do_retry(callback)
+          return
+        else
+          logger:error("All retries failed!")
+        end
+      end
+    else
+      if self._retry_count > 0 then
+        logger:info("Retry was successful!")
+      end
+
+      if not self.log_opt.silent then
+        logger:log_job(self, self.log_opt)
+      end
+    end
+
+    self._retry_count = 0
     self._done = true
 
     for _, listener in ipairs(self.on_exit_listeners) do
-      listener(self, code, signal)
+      listener(self, ok, err)
     end
 
-    callback(self, code, signal)
+    callback(ok, err)
   end)
 
   if not handle then
@@ -294,13 +364,22 @@ Job.start = async.wrap(function(self, callback)
   end
 end)
 
+---@private
+---@param self diffview.Job
+---@param callback function
+Job.do_retry = async.void(function(self, callback)
+  self._retry_count = self._retry_count + 1
+  logger:fmt_warn("(%d/%d) Retrying job...", self._retry_count, self.retry)
+  await(async.timeout(1))
+  self:start(callback)
+end)
+
 ---@param duration? integer # Max duration (ms) (default: 30_000)
----@return string[] stdout
----@return integer code
----@return string[] stderr
+---@return boolean success
+---@return string? err
 function Job:sync(duration)
   if self:is_done() then
-    return self.stdout, self.code, self.stderr
+    return self:is_success()
   end
 
   if not self:is_started() then self:start() end
@@ -320,10 +399,10 @@ function Job:sync(duration)
       error("Synchronous job got interrupted!")
     end
 
-    return {}, 1, {}
+    return false, "Unexpected state"
   end
 
-  return self.stdout, self.code, self.stderr
+  return self:is_success()
 end
 
 ---@param code integer
@@ -345,22 +424,23 @@ end
 
 ---@override
 ---@param self diffview.Job
+---@param callback fun(success: boolean, err?: string)
 Job.await = async.sync_wrap(function(self, callback)
   if self:is_done() then
-    callback()
+    callback(self:is_success())
     return
   end
 
-  self:on_exit(function() callback() end)
+  self:on_exit(function(_, ...) callback(...) end)
 
   if not self:is_started() then
     self:start()
   end
 end)
 
----@async
 ---@param jobs diffview.Job[]
-Job.join = async.void(function(jobs)
+---@param callback fun(success: boolean, errors?: string[])
+Job.join = async.wrap(function(jobs, callback)
   -- Start by ensuring all jobs are running
   for _, job in ipairs(jobs) do
     if not job:is_started() then
@@ -368,9 +448,18 @@ Job.join = async.void(function(jobs)
     end
   end
 
+  local success, errors = true, {}
+
   for _, job in ipairs(jobs) do
     await(job)
+    local ok, err = job:is_success()
+    if not ok then
+      success = false
+      errors[#errors + 1] = err
+    end
   end
+
+  callback(success, not success and errors or nil)
 end)
 
 ---@param jobs diffview.Job[]
@@ -403,6 +492,14 @@ end
 ---@param callback diffview.Job.OnExitCallback
 function Job:on_exit(callback)
   table.insert(self.on_exit_listeners, callback)
+end
+
+---@return boolean success
+---@return string? err
+function Job:is_success()
+  local failed, err = self:is_failed()
+  if failed then return false, err end
+  return true
 end
 
 function Job:is_done()

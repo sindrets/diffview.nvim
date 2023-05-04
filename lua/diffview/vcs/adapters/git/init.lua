@@ -18,6 +18,7 @@ local vcs_utils = require("diffview.vcs.utils")
 
 local api = vim.api
 local await, pawait = async.await, async.pawait
+local fmt = string.format
 local logger = DiffviewGlobal.logger
 local pl = lazy.access(utils, "path") ---@type PathLib
 
@@ -80,7 +81,7 @@ function GitAdapter.run_bootstrap()
     return err(("Configured `git_cmd` is not executable: '%s'"):format(git_cmd[1]))
   end
 
-  local out = utils.system_list(vim.tbl_flatten({ git_cmd, "version" }))
+  local out = utils.job(vim.tbl_flatten({ git_cmd, "version" }))
   bs.version_string = out[1] and out[1]:match("git version (%S+)") or nil
 
   if not bs.version_string then
@@ -161,7 +162,7 @@ end
 ---@param path string
 ---@return string?
 local function get_toplevel(path)
-  local out, code = utils.system_list(vim.tbl_flatten({
+  local out, code = utils.job(vim.tbl_flatten({
     config.get_config().git_cmd,
     { "rev-parse", "--path-format=absolute", "--show-toplevel" },
   }), path)
@@ -274,7 +275,7 @@ end
 ---@return boolean ok, string[] output
 function GitAdapter:verify_rev_arg(rev_arg)
   local out, code = self:exec_sync({ "rev-parse", "--revs-only", rev_arg }, {
-    context = "GitAdapter.verify_rev_arg()",
+    log_opt = { label = "GitAdapter:verify_rev_arg()" },
     cwd = self.ctx.toplevel,
   })
   return code == 0 and (out[2] ~= nil or out[1] and out[1] ~= ""), out
@@ -468,13 +469,15 @@ GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
     end
   end
 
-  local function on_exit(j, code)
-    if code == 0 then
-      on_stdout(nil, "\0", j)
-    end
+  local function on_exit(j, ok)
+    if ok and j.code == 0 then on_stdout(nil, "\0", j) end
   end
 
   local rev_range = state.prepared_log_opts.rev_range
+  local log_opt = {
+    label = "GitAdapter:incremental_fh_data()",
+    func = "info",
+  }
 
   namestat_job = Job({
     command = self:bin(),
@@ -493,6 +496,7 @@ GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
       state.path_args
     ),
     cwd = self.ctx.toplevel,
+    log_opt = log_opt,
     on_stdout = on_stdout,
     on_exit = on_exit,
     buffered_std = false,
@@ -515,33 +519,17 @@ GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
       state.path_args
     ),
     cwd = self.ctx.toplevel,
+    log_opt = log_opt,
     on_stdout = on_stdout,
     on_exit = on_exit,
     buffered_std = false,
   })
 
-  await(Job.join({ namestat_job, numstat_job }))
-
-  -- if namestat_state.idx < 257 or numstat_state.idx < 257 then
-  --   logger:debug(string.format("--- START NAME_STATUS: %d ---", namestat_state.idx))
-  --   logger:debug(table.concat(namestat_job.stdout, "\n"))
-  --   logger:debug(string.format("--- END NAME_STATUS ---"))
-  --   logger:debug(string.format("--- START NUMSTAT: %d ---", numstat_state.idx))
-  --   logger:debug(table.concat(numstat_job.stdout, "\n"))
-  --   logger:debug(string.format("--- END NUMSTAT ---"))
-  -- end
-
-  local debug_opt = {
-    context = "GitAdapter:incremental_fh_data()",
-    func = "info",
-    no_stdout = true,
-  }
-  utils.handle_job(namestat_job, { debug_opt = debug_opt })
-  utils.handle_job(numstat_job, { debug_opt = debug_opt })
+  local ok = await(Job.join({ namestat_job, numstat_job }))
 
   if shutdown then
     callback(JobStatus.KILLED)
-  elseif namestat_job.code ~= 0 or numstat_job.code ~= 0 then
+  elseif not ok then
     callback(JobStatus.ERROR, nil, utils.vec_join(namestat_job.stderr, numstat_job.stderr))
   else
     callback(JobStatus.SUCCESS)
@@ -589,8 +577,8 @@ GitAdapter.incremental_line_trace_data = async.wrap(function(self, state, callba
     end
   end
 
-  local function on_exit(_, code)
-    if code == 0 then on_stdout(nil, "\0") end
+  local function on_exit(j, ok)
+    if ok and j.code == 0 then on_stdout(nil, "\0") end
   end
 
   local rev_range = state.prepared_log_opts.rev_range
@@ -612,23 +600,19 @@ GitAdapter.incremental_line_trace_data = async.wrap(function(self, state, callba
       "--"
     ),
     cwd = self.ctx.toplevel,
+    log_opt = {
+      label = "GitAdapter:incremental_line_trace_data()",
+      func = "info",
+    },
     on_stdout = on_stdout,
     on_exit = on_exit,
   })
 
-  await(trace_job)
-
-  utils.handle_job(trace_job, {
-    debug_opt = {
-      context = "GitAdapter:incremental_line_trace_data()",
-      func = "info",
-      no_stdout = true,
-    }
-  })
+  local ok = await(trace_job)
 
   if shutdown then
     callback(JobStatus.KILLED)
-  elseif trace_job.code ~= 0 then
+  elseif not ok then
     callback(JobStatus.ERROR, nil, trace_job.stderr)
   else
     callback(JobStatus.SUCCESS)
@@ -679,7 +663,7 @@ function GitAdapter:file_history_dry_run(log_opt)
   log_options.max_count = 1
   options = self:prepare_fh_options(log_options, single_file).flags
 
-  local context = "GitAdapter.file_history_dry_run()"
+  local context = "GitAdapter:file_history_dry_run()"
   local cmd
 
   if #log_options.L > 0 then
@@ -692,16 +676,13 @@ function GitAdapter:file_history_dry_run(log_opt)
 
   local out, code = self:exec_sync(cmd, {
     cwd = self.ctx.toplevel,
-    debug_opt = {
-      context = context,
-      no_stdout = true,
-    },
+    log_opt = { label = context },
   })
 
   local ok = code == 0 and #out > 0
 
   if not ok then
-    logger:lvl(1):debug(("[%s] Dry run failed."):format(context))
+    logger:fmt_debug("[%s] Dry run failed.", context)
   end
 
   return ok, table.concat(description, ", ")
@@ -875,8 +856,7 @@ function GitAdapter:parse_fh_data(state)
   -- show' to get file statuses for merge commits. And merges do not always
   -- have changes.
   if cur.merge_hash and cur.numstat[1] and #cur.numstat ~= #cur.namestat then
-    local job
-    local job_spec = {
+    local job = Job({
       command = self:bin(),
       args = utils.vec_join(
         self:args(),
@@ -893,35 +873,20 @@ function GitAdapter:parse_fh_data(state)
         state.old_path or state.path_args
       ),
       cwd = self.ctx.toplevel,
-    }
+      retry = 2,
+      fail_condition = Job.FAIL_CONDITIONS.on_empty,
+      log_opt = { label = "GitAdapter:parse_fh_data()" },
+    })
 
-    local max_retries = 2
-    local context = "GitAdapter:parse_fh_data()"
     state.resume_lock = true
 
-    for i = 0, max_retries do
-      -- Git sometimes fails this job silently (exit code 0). Not sure why,
-      -- possibly because we are running multiple git opeartions on the same
-      -- repo concurrently. Retrying the job usually solves this.
-      job = Job(job_spec)
-      await(job)
+    -- Git sometimes fails this job silently (exit code 0). Not sure why,
+    -- possibly because we are running multiple git opeartions on the same
+    -- repo concurrently. Retrying the job usually solves this.
+    await(job)
 
-      if job.code == 0 then
-        cur.namestat = job.stdout
-      end
-
-      utils.handle_job(job, { fail_on_empty = true, context = context, log_func = logger.warn })
-
-      if #cur.namestat == 0 then
-        if i < max_retries then
-          logger:warn(("[%s] Retrying %d more time(s)."):format(context, max_retries - i))
-        end
-      else
-        if i > 0 then
-          logger:info(("[%s] Retry successful!"):format(context))
-        end
-        break
-      end
+    if job.code == 0 then
+      cur.namestat = job.stdout
     end
 
     state.resume_lock = false
@@ -934,7 +899,7 @@ function GitAdapter:parse_fh_data(state)
     if #cur.namestat == 0 then
       -- Give up: something has been renamed. We can no longer track the
       -- history.
-      logger:warn(("[%s] Giving up."):format(context))
+      logger:warn(fmt("[%s] Giving up.", job.log_opt.label))
       utils.warn("Displayed history may be incomplete. Check ':DiffviewLog' for details.", true)
       return false
     end
@@ -1144,7 +1109,7 @@ end
 function GitAdapter:head_rev()
   local out, code = self:exec_sync(
     { "rev-parse", "HEAD", "--" },
-    { cwd = self.ctx.toplevel, retry_on_empty = 2 }
+    { cwd = self.ctx.toplevel, retry = 2, fail_on_empty = true }
   )
 
   if code ~= 0 then
@@ -1166,7 +1131,8 @@ function GitAdapter:file_blob_hash(path, rev_arg)
     ("%s:%s"):format(rev_arg or "", path)
   }, {
     cwd = self.ctx.toplevel,
-    retry_on_empty = 2,
+    retry = 2,
+    fail_on_empty = true,
   })
 
   if code ~= 0 then return end
@@ -1509,41 +1475,26 @@ GitAdapter.tracked_files = async.wrap(function(self, left, right, args, kind, op
   local files = {}
   ---@type FileEntry[]
   local conflicts = {}
-  local debug_opt = {
-    context = "GitAdapter:tracked_files()",
-    func = "debug",
-    debug_level = 1,
-    no_stdout = true,
-  }
-
-  ---@param job diffview.Job
-  local function on_exit(job)
-    utils.handle_job(job, { debug_opt = debug_opt })
-  end
+  local log_opt = { label = "GitAdapter:tracked_files()" }
 
   local namestat_job = Job({
     command = self:bin(),
     args = utils.vec_join(self:args(), "diff", "--ignore-submodules", "--name-status", args),
     cwd = self.ctx.toplevel,
-    on_exit = on_exit,
+    retry = 2,
+    log_opt = log_opt,
   })
   local numstat_job = Job({
     command = self:bin(),
     args = utils.vec_join(self:args(), "diff", "--ignore-submodules", "--numstat", args),
     cwd = self.ctx.toplevel,
-    on_exit = on_exit,
+    retry = 2,
+    log_opt = log_opt,
   })
 
-  await(Job.join({ namestat_job, numstat_job }))
+  local ok = await(Job.join({ namestat_job, numstat_job }))
 
-  local out_status
-  if not (#namestat_job.stdout == #numstat_job.stdout) then
-    out_status = await(
-      vcs_utils.ensure_output(2, { namestat_job, numstat_job }, "GitAdapter:tracked_files()")
-    )
-  end
-
-  if out_status == JobStatus.ERROR or not (namestat_job.code == 0 and numstat_job.code == 0) then
+  if not ok or #namestat_job.stdout ~= #numstat_job.stdout then
     callback(utils.vec_join(namestat_job.stderr, numstat_job.stderr), nil)
     return
   end
@@ -1632,20 +1583,12 @@ GitAdapter.untracked_files = async.wrap(function(self, left, right, opt, callbac
     command = self:bin(),
     args = utils.vec_join(self:args(), "ls-files", "--others", "--exclude-standard"),
     cwd = self.ctx.toplevel,
+    log_opt = { label = "GitAdapter:untracked_files()", }
   })
 
-  await(job)
+  local ok = await(job)
 
-  utils.handle_job(job, {
-    debug_opt = {
-      context = "GitAdapter:untracked_files()",
-      func = "debug",
-      debug_level = 1,
-      no_stdout = true,
-    }
-  })
-
-  if job.code ~= 0 then
+  if not ok then
     callback(job.stderr or {}, nil)
     return
   end
