@@ -7,6 +7,7 @@ local Semaphore = lazy.access("diffview.control", "Semaphore") ---@type Semaphor
 local loop = lazy.require("diffview.debounce") ---@module "diffview.debounce"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
+local api = vim.api
 local await, pawait = async.await, async.pawait
 local fmt = string.format
 local pl = lazy.access(utils, "path") ---@type PathLib
@@ -126,6 +127,16 @@ function Logger:init(opt)
   self.msg_buffer = {}
   self.msg_sem = Semaphore(1)
   self.batch_interval = opt.batch_interval or 3000
+
+  -- Flush msg buffer before exiting
+  api.nvim_create_autocmd("VimLeavePre", {
+    callback = function()
+      if self.batch_handle then
+        self.batch_handle.close()
+        await(self:flush())
+      end
+    end,
+  })
 end
 
 ---@return Logger.Time
@@ -269,32 +280,34 @@ Logger.queue_msg = async.void(function(self, msg)
 
   self.batch_handle = loop.set_timeout(
     async.void(function()
-      ---@diagnostic disable-next-line: cast-local-type
-      permit = nil
-
-      if next(self.msg_buffer) then
-        permit = await(self.msg_sem:acquire()) --[[@as Permit ]]
-
-        -- Eval lazy messages
-        for i = 1, #self.msg_buffer do
-          if type(self.msg_buffer[i]) == "function" then
-            self.msg_buffer[i] = self.msg_buffer[i]()
-          end
-        end
-
-        local fd, err = uv.fs_open(self.outfile, "a", tonumber("0644", 8))
-        assert(fd, err)
-        uv.fs_write(fd, table.concat(self.msg_buffer))
-        uv.fs_close(fd)
-
-        self.msg_buffer = {}
-      end
-
+      await(self:flush())
       self.batch_handle = nil
-      if permit then permit:forget() end
     end),
     self.batch_interval
   )
+end)
+
+---@private
+---@param self Logger
+Logger.flush = async.void(function(self)
+  if next(self.msg_buffer) then
+    local permit = await(self.msg_sem:acquire()) --[[@as Permit ]]
+
+    -- Eval lazy messages
+    for i = 1, #self.msg_buffer do
+      if type(self.msg_buffer[i]) == "function" then
+        self.msg_buffer[i] = self.msg_buffer[i]()
+      end
+    end
+
+    local fd, err = uv.fs_open(self.outfile, "a", tonumber("0644", 8))
+    assert(fd, err)
+    uv.fs_write(fd, table.concat(self.msg_buffer))
+    uv.fs_close(fd)
+
+    self.msg_buffer = {}
+    permit:forget()
+  end
 end)
 
 ---@param min_level integer
