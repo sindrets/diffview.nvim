@@ -506,15 +506,12 @@ end
 
 ---Run the given async tasks concurrently, and then wait for them all to
 ---terminate.
----@param ... AsyncFunc|Future
-M.join = M.void(function(...)
-  local args = { ... }
+---@param tasks (AsyncFunc|Future)[]
+M.join = M.void(function(tasks)
   local futures = {} ---@type Future[]
 
   -- Ensure all async tasks are started
-  for i = 1, select("#", ...) do
-    local cur = args[i]
-
+  for _, cur in ipairs(tasks) do
     if cur then
       if type(cur) == "function" then
         futures[#futures+1] = cur()

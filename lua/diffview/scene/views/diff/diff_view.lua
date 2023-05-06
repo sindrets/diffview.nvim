@@ -77,6 +77,7 @@ function DiffView:init(opt)
 
   ---@param entry FileEntry
   self.emitter:on("file_open_post", function(_, entry)
+    if entry.layout:is_nulled() then return end
     if entry.kind == "conflicting" then
       local file = entry.layout:get_main_win().file
 
@@ -176,7 +177,7 @@ end
 ---@private
 ---@param self DiffView
 ---@param file FileEntry
-DiffView._set_file = async.wrap(function(self, file, callback)
+DiffView._set_file = async.void(function(self, file)
   self.panel:render()
   self.panel:redraw()
   vim.cmd("redraw")
@@ -186,17 +187,14 @@ DiffView._set_file = async.wrap(function(self, file, callback)
   self.emitter:emit("file_open_pre", file, cur_entry)
   self.nulled = false
 
-  file.layout.emitter:once("files_opened", function()
-    callback()
-    self.emitter:emit("file_open_post", file, cur_entry)
+  await(self:use_entry(file))
 
-    if not self.cur_entry.opened then
-      self.cur_entry.opened = true
-      DiffviewGlobal.emitter:emit("file_open_new", file)
-    end
-  end)
+  self.emitter:emit("file_open_post", file, cur_entry)
 
-  self:use_entry(file)
+  if not self.cur_entry.opened then
+    self.cur_entry.opened = true
+    DiffviewGlobal.emitter:emit("file_open_new", file)
+  end
 end)
 
 ---Open the next file.
@@ -246,10 +244,12 @@ function DiffView:prev_file(highlight)
 end
 
 ---Set the active file.
+---@param self DiffView
 ---@param file FileEntry
 ---@param focus? boolean Bring focus to the diff buffers.
 ---@param highlight? boolean Bring the cursor to the file entry in the panel.
-function DiffView:set_file(file, focus, highlight)
+DiffView.set_file = async.void(function(self, file, focus, highlight)
+  ---@diagnostic disable: invisible
   self:ensure_layout()
 
   if self:file_safeguard() or not file then return end
@@ -262,34 +262,34 @@ function DiffView:set_file(file, focus, highlight)
         self.panel:highlight_file(file)
       end
 
-      self:_set_file(file)
+      await(self:_set_file(file))
 
       if focus then
         api.nvim_set_current_win(self.cur_layout:get_main_win().id)
       end
     end
   end
-end
+  ---@diagnostic enable: invisible
+end)
 
 ---Set the active file.
+---@param self DiffView
 ---@param path string
 ---@param focus? boolean Bring focus to the diff buffers.
 ---@param highlight? boolean Bring the cursor to the file entry in the panel.
-function DiffView:set_file_by_path(path, focus, highlight)
+DiffView.set_file_by_path = async.void(function(self, path, focus, highlight)
   ---@type FileEntry
   for _, file in self.files:ipairs() do
     if file.path == path then
-      self:set_file(file, focus, highlight)
+      await(self:set_file(file, focus, highlight))
       return
     end
   end
-end
+end)
 
 ---Get an updated list of files.
 ---@param self DiffView
----@param callback function
----@return string[] err
----@return FileDict
+---@param callback fun(err?: string[], files: FileDict)
 DiffView.get_updated_files = async.wrap(function(self, callback)
   vcs_utils.diff_file_list(
     self.adapter,
@@ -302,7 +302,6 @@ DiffView.get_updated_files = async.wrap(function(self, callback)
       merge_layout = DiffView.get_default_merge_layout(),
     },
     callback
-    ---@diagnostic disable-next-line: missing-return
   )
 end)
 

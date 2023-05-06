@@ -15,37 +15,22 @@ local M = {}
 ---@field emitter EventEmitter
 ---@field pivot_producer fun(): integer?
 ---@field name string
+---@field state table
 local Layout = oop.create_class("Layout")
 
 function Layout:init(opt)
   opt = opt or {}
   self.windows = opt.windows or {}
   self.emitter = opt.emitter or EventEmitter()
-
-  if not opt.emitter then
-    local last_equalalways
-
-    ---@param other Layout
-    ---@diagnostic disable-next-line: unused-local
-    self.emitter:on("create_pre", function(_, other)
-      last_equalalways = vim.o.equalalways
-      vim.opt.equalalways = true
-    end)
-
-    ---@param other Layout
-    self.emitter:on("create_post", async.sync_void(function(_, other)
-      other:open_null()
-      await(other:open_files())
-      vim.opt.equalalways = last_equalalways
-    end))
-  end
+  self.state = {}
 end
 
 ---@diagnostic disable: unused-local, missing-return
 
 ---@abstract
+---@param self Layout
 ---@param pivot? integer The window ID of the window around which the layout will be created.
-function Layout:create(pivot) oop.abstract_stub() end
+Layout.create = async.void(function(self, pivot) oop.abstract_stub() end)
 
 ---@abstract
 ---@param rev Rev
@@ -55,8 +40,9 @@ function Layout:create(pivot) oop.abstract_stub() end
 function Layout.should_null(rev, status, sym) oop.abstract_stub() end
 
 ---@abstract
+---@param self Layout
 ---@param entry FileEntry
-function Layout:use_entry(entry) oop.abstract_stub() end
+Layout.use_entry = async.void(function(self, entry) oop.abstract_stub() end)
 
 ---@abstract
 ---@return Window
@@ -80,6 +66,17 @@ function Layout:clone()
 
   return clone
 end
+
+function Layout:create_pre()
+  self.state.save_equalalways = vim.o.equalalways
+  vim.opt.equalalways = true
+end
+
+---@param self Layout
+Layout.create_post = async.void(function(self)
+  await(self:open_files())
+  vim.opt.equalalways = self.state.save_equalalways
+end)
 
 ---Check if any of the windows in the lauout are focused.
 ---@return boolean
@@ -218,6 +215,10 @@ end
 ---Check the validity of all composing layout windows.
 ---@return Layout.State
 function Layout:validate()
+  if not next(self.windows) then
+    return { valid = false }
+  end
+
   local state = { valid = true }
 
   for _, win in ipairs(self.windows) do
@@ -234,6 +235,17 @@ end
 ---@return boolean
 function Layout:is_valid()
   return self:validate().valid
+end
+
+---@return boolean
+function Layout:is_nulled()
+  if not self:is_valid() then return false end
+
+  for _, win in ipairs(self.windows) do
+    if not win:is_nulled() then return false end
+  end
+
+  return true
 end
 
 ---Validate the layout and recover if necessary.
@@ -271,7 +283,7 @@ function Layout:sync_scroll()
   local target, max = nil, 0
 
   for _, win in ipairs(self.windows) do
-    local lcount = api.nvim_buf_line_count(win.file.bufnr)
+    local lcount = api.nvim_buf_line_count(api.nvim_win_get_buf(win.id))
     if lcount > max then target, max = win, lcount end
   end
 
