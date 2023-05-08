@@ -339,6 +339,7 @@ DiffView.update_files = debounce.debounce_trailing(
     if err then
       utils.err("Failed to update files in a diff view!", true)
       logger:error("[DiffView] Failed to update files!")
+      await(async.scheduler())
       callback(err)
       return
     end

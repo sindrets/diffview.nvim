@@ -406,7 +406,7 @@ function Job:sync(duration)
 end
 
 ---@param code integer
----@param signal integer|uv.aliases.signals
+---@param signal? integer|uv.aliases.signals # (default: "sigterm")
 ---@return 0? success
 ---@return string? err_name
 ---@return string? err_msg
@@ -416,7 +416,7 @@ function Job:kill(code, signal)
   if not self.handle:is_closing() then
     self.code = code
     self.signal = signal
-    return self.handle:kill(signal or "sigkill")
+    return self.handle:kill(signal or "sigterm")
   end
 
   return 0
@@ -451,8 +451,7 @@ Job.join = async.wrap(function(jobs, callback)
   local success, errors = true, {}
 
   for _, job in ipairs(jobs) do
-    await(job)
-    local ok, err = job:is_success()
+    local ok, err = await(job)
     if not ok then
       success = false
       errors[#errors + 1] = err

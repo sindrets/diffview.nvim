@@ -45,13 +45,26 @@ function HgRev:object_name(abbrev_len)
   return "UNKNOWN"
 end
 
+---@param rev_from HgRev|string
+---@param rev_to HgRev|string
+---@return string?
 function HgRev.to_range(rev_from, rev_to)
-  if rev_from and rev_to then
-    return rev_from.commit .. "::" .. rev_to.commit
-  elseif rev_to then
-    return "::" .. rev_to.commit
+  local name_from = type(rev_from) == "string" and rev_from or rev_from:object_name()
+  local name_to
+
+  if rev_to then
+    if type(rev_to) == "string" then
+      name_to = rev_to
+    elseif rev_to.type == RevType.COMMIT then
+      name_to = rev_to:object_name()
+    end
   end
-  return rev_from.commit .. "::"
+
+  if name_from and name_to then
+    return name_from .. "::" .. name_to
+  else
+    return name_from .. "::" .. name_from
+  end
 end
 
 M.HgRev = HgRev

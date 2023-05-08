@@ -15,6 +15,7 @@ local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
 local await = async.await
+local fmt = string.format
 local logger = DiffviewGlobal.logger
 
 local M = {}
@@ -24,13 +25,15 @@ local perf_render = PerfTimer("[FileHistoryPanel] render")
 ---@type PerfTimer
 local perf_update = PerfTimer("[FileHistoryPanel] update")
 
+---@alias FileHistoryPanel.CurItem { [1]: LogEntry, [2]: FileEntry }
+
 ---@class FileHistoryPanel : Panel
 ---@field parent FileHistoryView
 ---@field adapter VCSAdapter
 ---@field entries LogEntry[]
 ---@field rev_range RevRange
 ---@field log_options ConfigLogOptions
----@field cur_item {[1]: LogEntry, [2]: FileEntry}
+---@field cur_item FileHistoryPanel.CurItem
 ---@field single_file boolean
 ---@field updating boolean
 ---@field shutdown boolean
@@ -183,6 +186,7 @@ FileHistoryPanel.update_entries = async.wrap(function(self, callback)
   local timeout = 128
   local ldt = 0 -- Last draw time
   local lock = false
+  ---@type ManagedFn, Closeable
   local update, handle
 
   update = debounce.throttle_trailing(
@@ -194,10 +198,7 @@ FileHistoryPanel.update_entries = async.wrap(function(self, callback)
 
         await(async.scheduler())
 
-        utils.err(utils.vec_join(
-          ("Updating file history failed! %s"):format(msg and "Error message:" or ""),
-          msg
-        ))
+        utils.err(fmt("Updating file history failed! Error message: %s", msg))
 
         self:render()
         self:redraw()
@@ -210,7 +211,7 @@ FileHistoryPanel.update_entries = async.wrap(function(self, callback)
         if self.shutdown then
           -- The parent view has closed: shutdown git jobs and clean up.
           handle.close()
-          update:close()
+          update.close()
 
           if self.option_panel then
             vim.schedule(function() self.option_panel:sync() end)
@@ -233,10 +234,10 @@ FileHistoryPanel.update_entries = async.wrap(function(self, callback)
       c = #entries
 
       if ldt > timeout then
-        logger:lvl(10):debug(string.format(
+        logger:lvl(10):fmt_debug(
           "[FH_PANEL] Rendering is slower than throttle timeout (%.3f ms). Skipping update.",
           ldt
-        ))
+        )
 
         ldt = ldt - timeout
         lock = false
@@ -260,11 +261,11 @@ FileHistoryPanel.update_entries = async.wrap(function(self, callback)
       if status == JobStatus.SUCCESS then
         update:close()
         perf_update:time()
-        logger:info(string.format(
+        logger:fmt_info(
           "[FileHistory] Completed update for %d entries successfully (%.3f ms).",
           #self.entries,
           perf_update.final_time
-        ))
+        )
       end
 
       if (was_empty or status == JobStatus.SUCCESS) then
@@ -287,9 +288,11 @@ FileHistoryPanel.update_entries = async.wrap(function(self, callback)
   self.updating = true
 
   handle = self.adapter:file_history(
-    self.log_options,
-    { default_layout = self.parent.get_default_layout(), },
-    update
+    {
+      log_opt = self.log_options,
+      layout_opt = { default_layout = self.parent.get_default_layout() },
+    },
+    update --[[@as function ]]
   )
 
   self:sync()
@@ -322,6 +325,7 @@ function FileHistoryPanel:list_files()
   return files
 end
 
+---@param file FileEntry
 function FileHistoryPanel:find_entry(file)
   for _, entry in ipairs(self.entries) do
     for _, f in ipairs(entry.files) do
@@ -365,6 +369,7 @@ function FileHistoryPanel:get_log_entry_at_cursor()
   return self:find_entry(item --[[@as FileEntry ]])
 end
 
+---@param new_item FileHistoryPanel.CurItem
 function FileHistoryPanel:set_cur_item(new_item)
   if self.cur_item[2] then
     self.cur_item[2]:set_active(false)
@@ -463,16 +468,19 @@ function FileHistoryPanel:next_file()
   return self:set_file_by_offset(vim.v.count1)
 end
 
+---@param item LogEntry|FileEntry
 function FileHistoryPanel:highlight_item(item)
   if not (self:is_open() and self:buf_loaded()) then return end
 
   if item:instanceof(LogEntry.__get()) then
+    ---@cast item LogEntry
     for _, comp_struct in ipairs(self.components.log.entries) do
       if comp_struct.comp.context == item then
         pcall(api.nvim_win_set_cursor, self.winid, { comp_struct.comp.lstart, 0 })
       end
     end
   else
+    ---@cast item FileEntry
     for _, comp_struct in ipairs(self.components.log.entries) do
       local i = utils.vec_indexof(comp_struct.comp.context.files, item)
 

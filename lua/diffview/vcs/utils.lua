@@ -6,9 +6,8 @@ local async = require("diffview.async")
 local utils = require("diffview.utils")
 
 local api = vim.api
-local await, pawait = async.await, async.pawait
+local await = async.await
 local fmt = string.format
-local logger = DiffviewGlobal.logger
 
 local M = {}
 

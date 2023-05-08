@@ -1,9 +1,8 @@
-local Job = require("diffview.job").Job
 local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
-local JobStatus = lazy.access("diffview.vcs.utils", "JobStatus") ---@type JobStatus|LazyModule
+local Job = lazy.access("diffview.job", "Job") ---@type diffview.Job|LazyModule
 local Rev = lazy.access("diffview.vcs.rev", "Rev") ---@type Rev|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local arg_parser = lazy.require("diffview.arg_parser") ---@module "diffview.arg_parser"
@@ -220,40 +219,33 @@ function VCSAdapter:file_history_options(range, paths, argo)
   oop.abstract_stub()
 end
 
----@class vcs.adapter.FileHistoryWorkerSpec : vcs.adapter.LayoutOpt
-
----@param thread thread
----@param log_opt ConfigLogOptions
----@param opt vcs.adapter.FileHistoryWorkerSpec
+---@param self VCSAdapter
 ---@param co_state table
----@param callback function
-function VCSAdapter:file_history_worker(thread, log_opt, opt, co_state, callback)
+---@param opt vcs.adapter.FileHistoryWorkerSpec
+---@param callback (fun(entries: LogEntry[], status: JobStatus, err?: string)) # Called whenever there are new entries available.
+VCSAdapter.file_history_worker = async.void(function(self, thread, log_opt, opt, co_state, callback)
   oop.abstract_stub()
-end
+end)
 
 ---@diagnostic enable: unused-local, missing-return
 
----@param log_opt ConfigLogOptions
----@param opt vcs.adapter.FileHistoryWorkerSpec
----@param callback function
----@return Closeable
-function VCSAdapter:file_history(log_opt, opt, callback)
-  local thread
+---@class vcs.adapter.FileHistoryWorkerSpec
+---@field log_opt ConfigLogOptions
+---@field layout_opt vcs.adapter.LayoutOpt
 
+---@param opt vcs.adapter.FileHistoryWorkerSpec
+---@param callback (fun(entries: LogEntry[], status: JobStatus, err?: string)) # Called whenever there are new entries available.
+function VCSAdapter:file_history(opt, callback)
   local co_state = {
     shutdown = false,
   }
 
-  thread = coroutine.create(function()
-    self:file_history_worker(thread, log_opt, opt, co_state, callback)
-  end)
-
-  self:handle_co(thread, coroutine.resume(thread))
+  self:file_history_worker(co_state, opt, callback)
 
   return {
     close = function()
       co_state.shutdown = true
-    end,
+    end
   }
 end
 

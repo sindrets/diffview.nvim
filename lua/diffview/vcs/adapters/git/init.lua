@@ -78,7 +78,7 @@ function GitAdapter.run_bootstrap()
   end
 
   if vim.fn.executable(git_cmd[1]) ~= 1 then
-    return err(("Configured `git_cmd` is not executable: '%s'"):format(git_cmd[1]))
+    return err(fmt("Configured `git_cmd` is not executable: '%s'", git_cmd[1]))
   end
 
   local out = utils.job(vim.tbl_flatten({ git_cmd, "version" }))
@@ -90,7 +90,7 @@ function GitAdapter.run_bootstrap()
 
   -- Parse version string
   local v, target = bs.version, bs.target_version
-  bs.target_version_string = ("%d.%d.%d"):format(target.major, target.minor, target.patch)
+  bs.target_version_string = fmt("%d.%d.%d", target.major, target.minor, target.patch)
   local parts = vim.split(bs.version_string, "%.")
   v.major = tonumber(parts[1])
   v.minor = tonumber(parts[2]) or 0
@@ -193,13 +193,17 @@ function GitAdapter.find_toplevel(top_indicators)
     end
   end
 
-  return (
-    ("Path not a git repo (or any parent): %s")
-    :format(table.concat(vim.tbl_map(function(v)
-      local rel_path = pl:relative(v, ".")
-      return utils.str_quote(rel_path == "" and "." or rel_path)
-    end, top_indicators) --[[@as vector ]], ", "))
-  ), ""
+  local msg_paths = vim.tbl_map(function(v)
+    local rel_path = pl:relative(v, ".")
+    return utils.str_quote(rel_path == "" and "." or rel_path)
+  end, top_indicators) --[[@as vector ]]
+
+  local err = fmt(
+    "Path not a git repo (or any parent): %s",
+    table.concat(msg_paths, ", ")
+  )
+
+  return err, ""
 end
 
 ---@param toplevel string
@@ -255,7 +259,7 @@ end
 ---@param path string
 ---@param rev Rev?
 function GitAdapter:get_show_args(path, rev)
-  return utils.vec_join(self:args(), "show", ("%s:%s"):format(rev and rev:object_name() or "", path))
+  return utils.vec_join(self:args(), "show", fmt("%s:%s", rev and rev:object_name() or "", path))
 end
 
 function GitAdapter:get_log_args(args)
@@ -348,7 +352,7 @@ function GitAdapter:prepare_fh_options(log_options, single_file)
     local ok, _ = self:verify_rev_arg(log_options.rev_range)
 
     if not ok then
-      utils.warn(("Bad range revision, ignoring: %s"):format(utils.str_quote(log_options.rev_range)))
+      utils.warn(fmt("Bad range revision, ignoring: %s", utils.str_quote(log_options.rev_range)))
     else
       rev_range = log_options.rev_range
     end
@@ -361,7 +365,7 @@ function GitAdapter:prepare_fh_options(log_options, single_file)
       local ok, out = self:verify_rev_arg(log_options.base)
 
       if not ok then
-        utils.warn(("Bad base revision, ignoring: %s"):format(utils.str_quote(log_options.base)))
+        utils.warn(fmt("Bad base revision, ignoring: %s", utils.str_quote(log_options.base)))
       else
         base = GitRev(RevType.COMMIT, out[1])
       end
@@ -422,7 +426,7 @@ end
 
 ---@param self GitAdapter
 ---@param state GitAdapter.FHState
----@param callback fun(status: JobStatus, data?: table, msg?: string[])
+---@param callback fun(status: JobStatus, data?: table, msg?: string)
 GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
   local raw = {}
   local namestat_job, numstat_job, shutdown
@@ -449,7 +453,12 @@ GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
 
         raw[handler_state.idx][handler_state.key] = handler_state.data
 
-        if not shutdown and raw[handler_state.idx].namestat and raw[handler_state.idx].numstat then
+        if not shutdown
+          and not raw[handler_state.idx].done
+          and raw[handler_state.idx].namestat
+          and raw[handler_state.idx].numstat
+        then
+          raw[handler_state.idx].done = true
           shutdown = callback(
             JobStatus.PROGRESS,
             structure_fh_data(raw[handler_state.idx].namestat, raw[handler_state.idx].numstat)
@@ -457,15 +466,15 @@ GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
 
           if shutdown then
             logger:warn("Killing file history jobs...")
-            namestat_job:kill(64, "sigkill")
-            numstat_job:kill(64, "sigkill")
+            namestat_job:kill(64)
+            numstat_job:kill(64)
           end
         end
       end
       handler_state.idx = handler_state.idx + 1
       handler_state.data = {}
     elseif line ~= "" then
-      table.insert(handler_state.data, line)
+      handler_state.data[#handler_state.data + 1] = line
     end
   end
 
@@ -499,7 +508,6 @@ GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
     log_opt = log_opt,
     on_stdout = on_stdout,
     on_exit = on_exit,
-    buffered_std = false,
   })
 
   numstat_job = Job({
@@ -522,7 +530,6 @@ GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
     log_opt = log_opt,
     on_stdout = on_stdout,
     on_exit = on_exit,
-    buffered_std = false,
   })
 
   local ok = await(Job.join({ namestat_job, numstat_job }))
@@ -530,7 +537,11 @@ GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
   if shutdown then
     callback(JobStatus.KILLED)
   elseif not ok then
-    callback(JobStatus.ERROR, nil, utils.vec_join(namestat_job.stderr, numstat_job.stderr))
+    callback(
+      JobStatus.ERROR,
+      nil,
+      table.concat(utils.vec_join(namestat_job.stderr, numstat_job.stderr), "\n")
+    )
   else
     callback(JobStatus.SUCCESS)
   end
@@ -538,7 +549,7 @@ end)
 
 ---@param self GitAdapter
 ---@param state GitAdapter.FHState
----@param callback fun(status: JobStatus, data?: table, msg?: string[])
+---@param callback fun(status: JobStatus, data?: table, msg?: string)
 GitAdapter.incremental_line_trace_data = async.wrap(function(self, state, callback)
   local raw = {}
   local trace_job, shutdown
@@ -565,8 +576,8 @@ GitAdapter.incremental_line_trace_data = async.wrap(function(self, state, callba
           )
 
           if shutdown then
-            logger:lvl(1):debug("Killing file history jobs...")
-            trace_job:kill(64, "sigkill")
+            logger:warn("Killing file history jobs...")
+            trace_job:kill(64)
           end
         end
       end
@@ -613,7 +624,7 @@ GitAdapter.incremental_line_trace_data = async.wrap(function(self, state, callba
   if shutdown then
     callback(JobStatus.KILLED)
   elseif not ok then
-    callback(JobStatus.ERROR, nil, trace_job.stderr)
+    callback(JobStatus.ERROR, nil, table.concat(trace_job.stderr, "\n"))
   else
     callback(JobStatus.SUCCESS)
   end
@@ -654,9 +665,9 @@ function GitAdapter:file_history_dry_run(log_opt)
   end, self:prepare_fh_options(log_options, single_file).flags) --[[@as vector ]]
 
   local description = utils.vec_join(
-    ("Top-level path: '%s'"):format(pl:vim_fnamemodify(self.ctx.toplevel, ":~")),
-    log_options.rev_range and ("Revision range: '%s'"):format(log_options.rev_range) or nil,
-    ("Flags: %s"):format(table.concat(options, " "))
+    fmt("Top-level path: '%s'", pl:vim_fnamemodify(self.ctx.toplevel, ":~")),
+    log_options.rev_range and fmt("Revision range: '%s'", log_options.rev_range) or nil,
+    fmt("Flags: %s", table.concat(options, " "))
   )
 
   log_options = utils.tbl_clone(log_options) --[[@as GitLogOptions ]]
@@ -696,7 +707,7 @@ function GitAdapter:file_history_options(range, paths, argo)
   local cfile = pl:vim_expand("%")
   cfile = pl:readlink(cfile) or cfile
 
-  logger:lvl(1):debug(("Found git top-level: %s"):format(utils.str_quote(self.ctx.toplevel)))
+  logger:fmt_debug("Found git top-level: %s", utils.str_quote(self.ctx.toplevel))
 
   local rel_paths = vim.tbl_map(function(v)
     return v == "." and "." or pl:relative(v, ".")
@@ -707,11 +718,11 @@ function GitAdapter:file_history_options(range, paths, argo)
   if range_arg then
     local ok = self:verify_rev_arg(range_arg)
     if not ok then
-      utils.err(("Bad revision: %s"):format(utils.str_quote(range_arg)))
+      utils.err(fmt("Bad revision: %s", utils.str_quote(range_arg)))
       return
     end
 
-    logger:lvl(1):debug(("Verified range rev: %s"):format(range_arg))
+    logger:fmt_debug("Verified range rev: %s", range_arg)
   end
 
   local log_flag_names = {
@@ -749,7 +760,7 @@ function GitAdapter:file_history_options(range, paths, argo)
   if range then
     paths, rel_paths = {}, {}
     log_options.L = {
-      ("%d,%d:%s"):format(range[1], range[2], pl:relative(pl:absolute(cfile), self.ctx.toplevel))
+      fmt("%d,%d:%s", range[1], range[2], pl:relative(pl:absolute(cfile), self.ctx.toplevel))
     }
   end
 
@@ -762,20 +773,25 @@ function GitAdapter:file_history_options(range, paths, argo)
   local ok, opt_description = self:file_history_dry_run(log_options)
 
   if not ok then
-    utils.info({
-      ("No git history for the target(s) given the current options! Targets: %s")
-        :format(#rel_paths == 0 and "':(top)'" or table.concat(vim.tbl_map(function(v)
-          return "'" .. v .. "'"
-        end, rel_paths) --[[@as vector ]], ", ")),
-      ("Current options: [ %s ]"):format(opt_description)
-    })
+    local msg = "No git history for the target(s) given the current options! Targets: %s\n"
+      .. "Current options: [ %s ]"
+
+    if #rel_paths == 0 then
+      utils.info(fmt(msg, "':(top)'", opt_description))
+    else
+      local msg_paths = vim.tbl_map(utils.str_quote, rel_paths)
+      utils.info(fmt(msg, table.concat(msg_paths, ", "), opt_description))
+    end
+
     return
   end
 
   if not self.ctx.dir then
     utils.err(
-      ("Failed to find the git dir for the repository: %s")
-      :format(utils.str_quote(self.ctx.toplevel))
+      fmt(
+        "Failed to find the git dir for the repository: %s",
+        utils.str_quote(self.ctx.toplevel)
+      )
     )
     return
   end
@@ -783,132 +799,201 @@ function GitAdapter:file_history_options(range, paths, argo)
   return log_options
 end
 
----@param state GitAdapter.FHState
----@return boolean ok
-function GitAdapter:parse_fh_line_trace_data(state)
-  local cur = state.cur
-
-  local files = {}
-
-  for _, line in ipairs(cur.namestat) do
-    if line:match("^diff %-%-git ") then
-      local a_path = line:match('^diff %-%-git "?a/(.-)"? "?b/')
-      local b_path = line:match('.*"? "?b/(.-)"?$')
-      local oldpath = a_path ~= b_path and a_path or nil
-
-      if state.single_file and oldpath then
-        state.old_path = oldpath
-      end
-
-      table.insert(files, FileEntry.with_layout(state.opt.default_layout or Diff2Hor, {
-        adapter = self,
-        path = b_path,
-        oldpath = oldpath,
-        kind = "working",
-        commit = state.commit,
-        revs = {
-          a = cur.left_hash and GitRev(RevType.COMMIT, cur.left_hash) or GitRev.new_null_tree(),
-          b = state.prepared_log_opts.base or GitRev(RevType.COMMIT, cur.right_hash),
-        },
-      }))
-    end
-  end
-
-  if files[1] then
-    table.insert(
-      state.entries,
-      LogEntry({
-        path_args = state.path_args,
-        commit = state.commit,
-        files = files,
-        single_file = state.single_file,
-      })
-    )
-
-    state.callback(state.entries, JobStatus.PROGRESS)
-  end
-
-  return true
-end
-
-
 ---@class GitAdapter.FHState
----@field thread thread
 ---@field path_args string[]
 ---@field log_options GitLogOptions
 ---@field prepared_log_opts GitAdapter.PreparedLogOpts
----@field opt vcs.adapter.FileHistoryWorkerSpec
+---@field layout_opt vcs.adapter.LayoutOpt
 ---@field single_file boolean
----@field resume_lock boolean
----@field cur table
----@field commit Commit
----@field entries LogEntry[]
 ---@field old_path string?
----@field callback function
 
----@param state GitAdapter.FHState
----@return boolean ok, JobStatus? status
-function GitAdapter:parse_fh_data(state)
-  local cur = state.cur
+---@param self GitAdapter
+---@param co_state table
+---@param opt vcs.adapter.FileHistoryWorkerSpec
+---@param callback (fun(entries: LogEntry[], status: JobStatus, err?: string)) # Called whenever there are new entries available.
+GitAdapter.file_history_worker = async.void(function(self, co_state, opt, callback)
+  local entries = {} ---@type LogEntry[]
 
-  -- 'git log --name-status' doesn't work properly for merge commits. It
-  -- lists only an incomplete list of files at best. We need to use 'git
-  -- show' to get file statuses for merge commits. And merges do not always
-  -- have changes.
-  if cur.merge_hash and cur.numstat[1] and #cur.numstat ~= #cur.namestat then
-    local job = Job({
-      command = self:bin(),
-      args = utils.vec_join(
-        self:args(),
-        "-P",
-        "-c",
-        "gc.auto=0",
-        "show",
-        "--format=",
-        "--diff-merges=first-parent",
-        "--name-status",
-        (state.single_file and state.log_options.follow) and "--follow" or nil,
-        cur.right_hash,
-        "--",
-        state.old_path or state.path_args
-      ),
-      cwd = self.ctx.toplevel,
-      retry = 2,
-      fail_condition = Job.FAIL_CONDITIONS.on_empty,
-      log_opt = { label = "GitAdapter:parse_fh_data()" },
-    })
+  local single_file = self:is_single_file(
+    opt.log_opt.single_file.path_args,
+    opt.log_opt.single_file.L
+  )
 
-    state.resume_lock = true
+  ---@type GitLogOptions
+  local log_options = config.get_log_options(
+    single_file,
+    single_file and opt.log_opt.single_file or opt.log_opt.multi_file,
+    "git"
+  )
 
-    -- Git sometimes fails this job silently (exit code 0). Not sure why,
-    -- possibly because we are running multiple git opeartions on the same
-    -- repo concurrently. Retrying the job usually solves this.
-    await(job)
+  local is_trace = #log_options.L > 0
 
-    if job.code == 0 then
-      cur.namestat = job.stdout
+  ---@type GitAdapter.FHState
+  local state = {
+    co_state = co_state,
+    path_args = opt.log_opt.single_file.path_args,
+    log_options = log_options,
+    prepared_log_opts = self:prepare_fh_options(log_options, single_file),
+    layout_opt = opt.layout_opt,
+    single_file = single_file,
+  }
+
+  local data_buffer = {}
+  local data_idx = 0
+
+  ---Wakes the data scheduler
+  ---@type function?
+  local data_step
+
+  local function inc_callback(status, new_data, msg)
+    data_buffer[#data_buffer+1] = { status, new_data, msg }
+
+    if data_step then
+      local temp = data_step
+      data_step = nil
+      temp(status, new_data, msg)
     end
 
-    state.resume_lock = false
-
-    if job.code ~= 0 then
-      state.callback({}, JobStatus.ERROR, job.stderr)
-      return false, JobStatus.FATAL
-    end
-
-    if #cur.namestat == 0 then
-      -- Give up: something has been renamed. We can no longer track the
-      -- history.
-      logger:warn(fmt("[%s] Giving up.", job.log_opt.label))
-      utils.warn("Displayed history may be incomplete. Check ':DiffviewLog' for details.", true)
-      return false
-    end
+    return co_state.shutdown
   end
 
+  ---@param cb (fun(status: JobStatus, new_data: table, err?: string))
+  local data_scheduler = async.wrap(function(cb)
+    data_idx = data_idx + 1
+
+    if data_buffer[data_idx] then
+      cb(unpack(data_buffer[data_idx], 1, 3))
+    else
+      -- Await new data from inc workers
+      data_step = cb
+    end
+  end)
+
+  if is_trace then
+    self:incremental_line_trace_data(state, inc_callback)
+  else
+    self:incremental_fh_data(state, inc_callback)
+  end
+
+  while true do
+    ---@type JobStatus, table?, string?
+    local status, new_data, msg = await(data_scheduler())
+
+    if status == JobStatus.KILLED then
+      logger:warn("File history processing was killed.")
+      callback(entries, status)
+      return
+    elseif status == JobStatus.ERROR then
+      callback(entries, status, msg)
+      return
+    elseif status == JobStatus.SUCCESS then
+      callback(entries, status)
+      return
+    elseif status ~= JobStatus.PROGRESS then
+      error("Unexpected state!")
+    end
+
+    -- Status is PROGRESS
+    assert(new_data, "No data received from scheduler!")
+
+    -- 'git log --name-status' doesn't work properly for merge commits. It
+    -- lists only an incomplete list of files at best. We need to use 'git
+    -- show' to get file statuses for merge commits. And merges do not always
+    -- have changes.
+    if new_data.merge_hash
+      and new_data.numstat[1]
+      and #new_data.numstat ~= #new_data.namestat
+    then
+      local job = Job({
+        command = self:bin(),
+        args = utils.vec_join(
+          self:args(),
+          "-P",
+          "-c",
+          "gc.auto=0",
+          "show",
+          "--format=",
+          "--diff-merges=first-parent",
+          "--name-status",
+          (state.single_file and state.log_options.follow) and "--follow" or nil,
+          new_data.right_hash,
+          "--",
+          state.old_path or state.path_args
+        ),
+        cwd = self.ctx.toplevel,
+        -- Git sometimes fails this job silently (exit code 0). Not sure why,
+        -- possibly because we are running multiple git opeartions on the same
+        -- repo concurrently. Retrying the job usually solves this.
+        retry = 2,
+        fail_condition = Job.FAIL_CONDITIONS.on_empty,
+        log_opt = { label = "GitAdapter:file_history_worker()" },
+      })
+
+      local ok = await(job)
+
+      if job.code == 0 then
+        new_data.namestat = job.stdout
+      end
+
+      if not ok or job.code ~= 0 then
+        callback(entries, JobStatus.ERROR, table.concat(job.stderr, "\n"))
+        return
+      end
+
+      if #new_data.namestat == 0 then
+        -- Give up: something has been renamed. We can no longer track the
+        -- history.
+        logger:warn(fmt("[%s] Giving up.", job.log_opt.label))
+        utils.warn("Displayed history may be incomplete. Check ':DiffviewLog' for details.", true)
+        callback(
+          entries,
+          JobStatus.ERROR,
+          fmt("Failed to get log data for merge commit '%s'!", new_data.right_hash)
+        )
+        return
+      end
+    end
+
+    local commit = Commit({
+      hash = new_data.right_hash,
+      author = new_data.author,
+      time = tonumber(new_data.time),
+      time_offset = new_data.time_offset,
+      rel_date = new_data.rel_date,
+      ref_names = new_data.ref_names,
+      subject = new_data.subject,
+      diff = new_data.diff,
+    })
+
+    ---@type boolean, (LogEntry|string)?
+    local ok, entry
+
+    if is_trace then
+      ok, entry = self:parse_fh_line_trace_data(new_data, commit, state)
+    else
+      ok, entry = self:parse_fh_data(new_data, commit, state)
+    end
+
+    -- Some commits might not have file data. In that case we simply ignore it,
+    -- as the fh panel doesn't support such entries at the moment.
+    if ok then
+      entries[#entries + 1] = entry
+      callback(entries, JobStatus.PROGRESS)
+    end
+  end
+end)
+
+---@param data table
+---@param commit GitCommit
+---@param state GitAdapter.FHState
+---@return boolean success
+---@return LogEntry|string ret
+function GitAdapter:parse_fh_data(data, commit, state)
   local files = {}
-  for i = 1, #cur.numstat do
-    local status = cur.namestat[i]:sub(1, 1):gsub("%s", " ")
-    local name = cur.namestat[i]:match("[%a%s][^%s]*\t(.*)")
+
+  for i = 1, #data.numstat do
+    local status = data.namestat[i]:sub(1, 1):gsub("%s", " ")
+    local name = data.namestat[i]:match("[%a%s][^%s]*\t(.*)")
     local oldname
 
     if name:match("\t") ~= nil then
@@ -920,159 +1005,101 @@ function GitAdapter:parse_fh_data(state)
     end
 
     local stats = {
-      additions = tonumber(cur.numstat[i]:match("^%d+")),
-      deletions = tonumber(cur.numstat[i]:match("^%d+%s+(%d+)")),
+      additions = tonumber(data.numstat[i]:match("^%d+")),
+      deletions = tonumber(data.numstat[i]:match("^%d+%s+(%d+)")),
     }
 
     if not stats.additions or not stats.deletions then
       stats = nil
     end
 
-    table.insert(files, FileEntry.with_layout(state.opt.default_layout or Diff2Hor, {
-      adapter = self,
-      path = name,
-      oldpath = oldname,
-      status = status,
-      stats = stats,
-      kind = "working",
-      commit = state.commit,
-      revs = {
-        a = cur.left_hash and GitRev(RevType.COMMIT, cur.left_hash) or GitRev.new_null_tree(),
-        b = state.prepared_log_opts.base or GitRev(RevType.COMMIT, cur.right_hash),
-      },
-    }))
+    table.insert(
+      files,
+      FileEntry.with_layout(
+        state.layout_opt.default_layout or Diff2Hor,
+        {
+          adapter = self,
+          path = name,
+          oldpath = oldname,
+          status = status,
+          stats = stats,
+          kind = "working",
+          commit = commit,
+          revs = {
+            a = data.left_hash and GitRev(RevType.COMMIT, data.left_hash) or GitRev.new_null_tree(),
+            b = state.prepared_log_opts.base or GitRev(RevType.COMMIT, data.right_hash),
+          },
+        }
+      )
+    )
   end
 
   if files[1] then
-    table.insert(
-      state.entries,
-      LogEntry({
-        path_args = state.path_args,
-        commit = state.commit,
-        files = files,
-        single_file = state.single_file,
-      })
-    )
-
-    state.callback(state.entries, JobStatus.PROGRESS)
-  end
-
-  return true
-end
-
-
-
----@param thread thread
----@param log_opt ConfigLogOptions
----@param opt vcs.adapter.FileHistoryWorkerSpec
----@param co_state table
----@param callback function
-function GitAdapter:file_history_worker(thread, log_opt, opt, co_state, callback)
-  ---@type LogEntry[]
-  local entries = {}
-  local data = {}
-  local data_idx = 1
-  local last_status
-  local err_msg
-
-  local single_file = self:is_single_file(log_opt.single_file.path_args, log_opt.single_file.L)
-
-  ---@type GitLogOptions
-  local log_options = config.get_log_options(
-    single_file,
-    single_file and log_opt.single_file or log_opt.multi_file,
-    "git"
-  )
-
-  local is_trace = #log_options.L > 0
-
-  ---@type GitAdapter.FHState
-  local state = {
-    thread = thread,
-    adapter = self,
-    path_args = log_opt.single_file.path_args,
-    log_options = log_options,
-    prepared_log_opts = self:prepare_fh_options(log_options, single_file),
-    opt = opt,
-    callback = callback,
-    entries = entries,
-    single_file = single_file,
-    resume_lock = false,
-  }
-
-  local function data_callback(status, d, msg)
-    if status == JobStatus.PROGRESS then
-      data[#data+1] = d
-    end
-
-    last_status = status
-    if msg then
-      err_msg = msg
-    end
-    if not state.resume_lock and coroutine.status(thread) == "suspended" then
-      self:handle_co(thread, coroutine.resume(thread))
-    end
-
-    if co_state.shutdown then
-      return true
-    end
-  end
-
-  if is_trace then
-    self:incremental_line_trace_data(state, data_callback)
-  else
-    self:incremental_fh_data(state, data_callback)
-  end
-
-  while true do
-    if not vim.tbl_contains({ JobStatus.SUCCESS, JobStatus.ERROR, JobStatus.KILLED }, last_status)
-        and not data[data_idx] then
-      coroutine.yield()
-    end
-
-    if last_status == JobStatus.KILLED then
-      logger:warn("File history processing was killed.")
-      return
-    elseif last_status == JobStatus.ERROR then
-      callback(entries, JobStatus.ERROR, err_msg)
-      return
-    elseif last_status == JobStatus.SUCCESS and data_idx > #data then
-      break
-    end
-
-    state.cur = data[data_idx]
-
-    state.commit = Commit({
-      hash = state.cur.right_hash,
-      author = state.cur.author,
-      time = tonumber(state.cur.time),
-      time_offset = state.cur.time_offset,
-      rel_date = state.cur.rel_date,
-      ref_names = state.cur.ref_names,
-      subject = state.cur.subject,
-      diff = state.cur.diff,
+    return true, LogEntry({
+      path_args = state.path_args,
+      commit = commit,
+      files = files,
+      single_file = state.single_file,
     })
-
-    local ok, status
-    if log_options.L[1] then
-      ok, status = self:parse_fh_line_trace_data(state)
-    else
-      ok, status = self:parse_fh_data(state)
-    end
-
-    if not ok then
-      if status == JobStatus.FATAL then
-        return
-      end
-      break
-    end
-
-    data_idx = data_idx + 1
   end
 
-  callback(entries, JobStatus.SUCCESS)
+  logger:debug("[GitAdapter:parse_fh_data] Encountered commit with no file data:", data)
+
+  return false, "Missing file data!"
 end
 
+---@param data table
+---@param commit GitCommit
+---@param state GitAdapter.FHState
+---@return boolean success
+---@return LogEntry|string ret
+function GitAdapter:parse_fh_line_trace_data(data, commit, state)
+  local files = {}
+
+  for _, line in ipairs(data.namestat) do
+    if line:match("^diff %-%-git ") then
+      local a_path = line:match('^diff %-%-git "?a/(.-)"? "?b/')
+      local b_path = line:match('.*"? "?b/(.-)"?$')
+      local oldpath = a_path ~= b_path and a_path or nil
+
+      if state.single_file and oldpath then
+        state.old_path = oldpath
+      end
+
+      table.insert(
+        files,
+        FileEntry.with_layout(state.layout_opt.default_layout or Diff2Hor,
+          {
+            adapter = self,
+            path = b_path,
+            oldpath = oldpath,
+            kind = "working",
+            commit = commit,
+            revs = {
+              a = data.left_hash
+                  and GitRev(RevType.COMMIT, data.left_hash)
+                  or GitRev.new_null_tree(),
+              b = state.prepared_log_opts.base or GitRev(RevType.COMMIT, data.right_hash),
+            },
+          }
+        )
+      )
+    end
+  end
+
+  if files[1] then
+    return true, LogEntry({
+      path_args = state.path_args,
+      commit = commit,
+      files = files,
+      single_file = state.single_file,
+    })
+  end
+
+  logger:debug("[GitAdapter:parse_fh_data] Encountered commit with no file data:", data)
+
+  return false, "Missing file data!"
+end
 
 ---@param argo ArgObject
 function GitAdapter:diffview_options(argo)
@@ -1087,7 +1114,7 @@ function GitAdapter:diffview_options(argo)
     return
   end
 
-  logger:lvl(1):debug(("Parsed revs: left = %s, right = %s"):format(left, right))
+  logger:fmt_debug("Parsed revs: left = %s, right = %s", left, right)
 
   ---@type DiffViewOptions
   local options = {
@@ -1128,7 +1155,7 @@ function GitAdapter:file_blob_hash(path, rev_arg)
   local out, code = self:exec_sync({
     "rev-parse",
     "--revs-only",
-    ("%s:%s"):format(rev_arg or "", path)
+    fmt("%s:%s", rev_arg or "", path)
   }, {
     cwd = self.ctx.toplevel,
     retry = 2,
@@ -1151,7 +1178,7 @@ function GitAdapter:symmetric_diff_revs(rev_arg)
 
   local function err()
     utils.err(utils.vec_join(
-      ("Failed to parse rev '%s'!"):format(rev_arg),
+      fmt("Failed to parse rev '%s'!", rev_arg),
       "Git output: ",
       stderr
     ))
@@ -1224,7 +1251,7 @@ function GitAdapter:parse_revs(rev_arg, opt)
     )
     if code ~= 0 then
       utils.err(utils.vec_join(
-        ("Failed to parse rev %s!"):format(utils.str_quote(rev_arg)),
+        fmt("Failed to parse rev %s!", utils.str_quote(rev_arg)),
         "Git output: ",
         stderr
       ))
@@ -1309,7 +1336,7 @@ function GitAdapter:file_restore(path, kind, commit)
 
   -- Check if file exists in history
   _, code = self:exec_sync(
-    { "cat-file", "-e", ("%s:%s"):format(kind == "staged" and "HEAD" or "", path) },
+    { "cat-file", "-e", fmt("%s:%s", kind == "staged" and "HEAD" or "", path) },
     self.ctx.toplevel
   )
   local exists_git = code == 0
@@ -1326,9 +1353,9 @@ function GitAdapter:file_restore(path, kind, commit)
 
   local undo
   if exists_local then
-    undo = (":sp %s | %%!git show %s"):format(vim.fn.fnameescape(rel_path), out[1]:sub(1, 11))
+    undo = fmt(":sp %s | %%!git show %s", vim.fn.fnameescape(rel_path), out[1]:sub(1, 11))
   else
-    undo = (":!git rm %s"):format(vim.fn.fnameescape(path))
+    undo = fmt(":!git rm %s", vim.fn.fnameescape(path))
   end
 
   -- Revert file
@@ -1339,8 +1366,7 @@ function GitAdapter:file_restore(path, kind, commit)
       local ok, err = utils.remove_buffer(false, bn)
       if not ok then
         utils.err({
-          ("Failed to delete buffer '%d'! Aborting file restoration. Error message:")
-            :format(bn),
+          fmt("Failed to delete buffer '%d'! Aborting file restoration. Error message:", bn),
           err
         }, true)
         return false
@@ -1352,8 +1378,7 @@ function GitAdapter:file_restore(path, kind, commit)
       local ok, err = pawait(pl.unlink, pl, abs_path)
       if not ok then
         utils.err({
-          ("Failed to delete file '%s'! Aborting file restoration. Error message:")
-            :format(abs_path),
+          fmt("Failed to delete file '%s'! Aborting file restoration. Error message:", abs_path),
           err
         }, true)
         return false
@@ -1404,12 +1429,12 @@ function GitAdapter:stage_index_file(file)
     local old_mode = out[1]:match("^(%d+)")
 
     if not old_mode then
-      old_mode = vim.fn.executable(file.absolute_path) and "100755" or "100644"
+      old_mode = vim.fn.executable(file.absolute_path) == 1 and "100755" or "100644"
     end
 
     out, code, err = self:exec_sync({ "update-index", "--index-info" }, {
       cwd = self.ctx.toplevel,
-      writer = ("%s %s %d\t%s"):format(old_mode, blob_hash, file.rev.stage, file.path),
+      writer = fmt("%s %s %d\t%s", old_mode, blob_hash, file.rev.stage, file.path),
     })
 
     if code ~= 0 then

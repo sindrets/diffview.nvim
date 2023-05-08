@@ -236,7 +236,7 @@ function Logger:_log(level_name, lazy_eval, x, ...)
         date,
         lineinfo,
         ctx.label and fmt("[%s] ", ctx.label) or "",
-        dstring(x())
+        table.concat(dvalues(x()), " ")
       )
     end)
   else

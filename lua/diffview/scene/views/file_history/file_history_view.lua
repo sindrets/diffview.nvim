@@ -160,7 +160,11 @@ function FileHistoryView:prev_item()
   end
 end
 
-function FileHistoryView:set_file(file, focus)
+---@param self FileHistoryView
+---@param file FileEntry
+---@param focus? boolean
+FileHistoryView.set_file = async.void(function(self, file, focus)
+  ---@diagnostic disable: invisible
   self:ensure_layout()
 
   if self:file_safeguard() or not file then return end
@@ -171,13 +175,14 @@ function FileHistoryView:set_file(file, focus)
     self.panel:set_cur_item({ entry, file })
     self.panel:highlight_item(file)
     self.nulled = false
-    self:_set_file(file)
+    await(self:_set_file(file))
 
     if focus then
       api.nvim_set_current_win(self.cur_layout:get_main_win().id)
     end
   end
-end
+  ---@diagnostic enable: invisible
+end)
 
 
 ---Ensures there are files to load, and loads the null buffer otherwise.
