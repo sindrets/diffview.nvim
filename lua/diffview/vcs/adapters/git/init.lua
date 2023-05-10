@@ -6,6 +6,7 @@ local GitRev = require("diffview.vcs.adapters.git.rev").GitRev
 local Job = require("diffview.job").Job
 local JobStatus = require("diffview.vcs.utils").JobStatus
 local LogEntry = require("diffview.vcs.log_entry").LogEntry
+local MultiJob = require("diffview.multi_job").MultiJob
 local RevType = require("diffview.vcs.rev").RevType
 local VCSAdapter = require("diffview.vcs.adapter").VCSAdapter
 local arg_parser = require("diffview.arg_parser")
@@ -429,6 +430,7 @@ end
 ---@param callback fun(status: JobStatus, data?: table, msg?: string)
 GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
   local raw = {}
+  local state_map
   local namestat_job, numstat_job, shutdown
 
   local namestat_state = {
@@ -442,8 +444,13 @@ GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
     idx = 0,
   }
 
+  local function reset_state(handler_state)
+    handler_state.data = {}
+    handler_state.idx = 0
+  end
+
   local function on_stdout(_, line, j)
-    local handler_state = j == namestat_job and namestat_state or numstat_state
+    local handler_state = state_map[j]
 
     if line == "\0" then
       if handler_state.idx > 0 then
@@ -483,10 +490,7 @@ GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
   end
 
   local rev_range = state.prepared_log_opts.rev_range
-  local log_opt = {
-    label = "GitAdapter:incremental_fh_data()",
-    func = "info",
-  }
+  local log_opt = { label = "GitAdapter:incremental_fh_data()" }
 
   namestat_job = Job({
     command = self:bin(),
@@ -532,7 +536,31 @@ GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
     on_exit = on_exit,
   })
 
-  local ok = await(Job.join({ namestat_job, numstat_job }))
+  state_map = {
+    [namestat_job] = namestat_state,
+    [numstat_job] = numstat_state,
+  }
+
+  local multi_job = MultiJob(
+    { namestat_job, numstat_job },
+    {
+      retry = 2,
+      fail_cond = function()
+        local sign = utils.sign(namestat_state.idx - numstat_state.idx)
+        if sign == 0 then return true end
+        local failed = sign < 0 and namestat_job or numstat_job
+
+        return false, { failed }, "Inbalance in file history data!"
+      end,
+      on_retry = function(_, jobs)
+        for _, job in ipairs(jobs) do
+          reset_state(state_map[job])
+        end
+      end,
+    }
+  )
+
+  local ok, err = await(multi_job)
 
   if shutdown then
     callback(JobStatus.KILLED)
@@ -540,7 +568,7 @@ GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
     callback(
       JobStatus.ERROR,
       nil,
-      table.concat(utils.vec_join(namestat_job.stderr, numstat_job.stderr), "\n")
+      table.concat(utils.vec_join(err, namestat_job.stderr, numstat_job.stderr), "\n")
     )
   else
     callback(JobStatus.SUCCESS)
@@ -857,6 +885,7 @@ GitAdapter.file_history_worker = async.void(function(self, co_state, opt, callba
     return co_state.shutdown
   end
 
+  ---Yield until data is available
   ---@param cb (fun(status: JobStatus, new_data: table, err?: string))
   local data_scheduler = async.wrap(function(cb)
     data_idx = data_idx + 1
@@ -925,20 +954,18 @@ GitAdapter.file_history_worker = async.void(function(self, co_state, opt, callba
         -- possibly because we are running multiple git opeartions on the same
         -- repo concurrently. Retrying the job usually solves this.
         retry = 2,
-        fail_condition = Job.FAIL_CONDITIONS.on_empty,
+        fail_cond = Job.FAIL_CONDITIONS.on_empty,
         log_opt = { label = "GitAdapter:file_history_worker()" },
       })
 
       local ok = await(job)
 
-      if job.code == 0 then
-        new_data.namestat = job.stdout
-      end
-
       if not ok or job.code ~= 0 then
         callback(entries, JobStatus.ERROR, table.concat(job.stderr, "\n"))
         return
       end
+
+      new_data.namestat = job.stdout
 
       if #new_data.namestat == 0 then
         -- Give up: something has been renamed. We can no longer track the
@@ -1506,21 +1533,33 @@ GitAdapter.tracked_files = async.wrap(function(self, left, right, args, kind, op
     command = self:bin(),
     args = utils.vec_join(self:args(), "diff", "--ignore-submodules", "--name-status", args),
     cwd = self.ctx.toplevel,
-    retry = 2,
     log_opt = log_opt,
   })
   local numstat_job = Job({
     command = self:bin(),
     args = utils.vec_join(self:args(), "diff", "--ignore-submodules", "--numstat", args),
     cwd = self.ctx.toplevel,
-    retry = 2,
     log_opt = log_opt,
   })
 
-  local ok = await(Job.join({ namestat_job, numstat_job }))
+  local multi_job = MultiJob(
+    { namestat_job, numstat_job },
+    {
+      retry = 2,
+      fail_cond = function()
+        local sign = utils.sign(#namestat_job.stdout - #numstat_job.stdout)
+        if sign == 0 then return true end
+        local failed = sign < 0 and namestat_job or numstat_job
 
-  if not ok or #namestat_job.stdout ~= #numstat_job.stdout then
-    callback(utils.vec_join(namestat_job.stderr, numstat_job.stderr), nil)
+        return false, { failed }, "Inbalance in diff data!"
+      end,
+    }
+  )
+
+  local ok, err = await(multi_job)
+
+  if not ok then
+    callback(utils.vec_join(err, namestat_job.stderr, numstat_job.stderr), nil)
     return
   end
 

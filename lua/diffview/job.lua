@@ -14,7 +14,8 @@ local M = {}
 
 ---@alias diffview.Job.OnOutCallback fun(err?: string, line: string, j: diffview.Job)
 ---@alias diffview.Job.OnExitCallback fun(j: diffview.Job, success: boolean, err?: string)
----@alias diffview.Job.FailCondition fun(j: diffview.Job): boolean, string
+---@alias diffview.Job.OnRetryCallback fun(j: diffview.Job)
+---@alias diffview.Job.FailCond fun(j: diffview.Job): boolean, string
 
 ---@alias StdioKind "in"|"out"|"err"
 
@@ -24,7 +25,7 @@ local M = {}
 ---@field args string[]
 ---@field cwd string
 ---@field retry integer
----@field is_failed diffview.Job.FailCondition
+---@field check_status diffview.Job.FailCond
 ---@field log_opt Logger.log_job.Opt
 ---@field writer string|string[]
 ---@field env string[]
@@ -41,6 +42,7 @@ local M = {}
 ---@field on_stdout_listeners diffview.Job.OnOutCallback[]
 ---@field on_stderr_listeners diffview.Job.OnOutCallback[]
 ---@field on_exit_listeners diffview.Job.OnExitCallback[]
+---@field on_retry_listeners diffview.Job.OnRetryCallback[]
 ---@field _started boolean
 ---@field _done boolean
 ---@field _retry_count integer
@@ -59,13 +61,14 @@ end
 Job.FAIL_CONDITIONS = {
   ---Fail on all non-zero exit codes.
   non_zero = function(j)
-    return j.code ~= 0, fmt("Job exited with a non-zero exit code: %d", j.code)
+    return j.code == 0, fmt("Job exited with a non-zero exit code: %d", j.code)
   end,
   ---Fail if there's no data in stdout.
   on_empty = function(j)
     local msg = fmt("Job expected output, but returned nothing! Code: %d", j.code)
-    if #j.stdout == 1 then return j.stdout[1] == "", msg end
-    return #j.stdout == 0, msg
+    local n = #j.stdout
+    if n == 0 or (n == 1 and j.stdout[1] == "") then return false, msg end
+    return true
   end,
 }
 
@@ -80,6 +83,7 @@ function Job:init(opt)
   self.on_stdout_listeners = {}
   self.on_stderr_listeners = {}
   self.on_exit_listeners = {}
+  self.on_retry_listeners = {}
   self._started = false
   self._done = false
   self._retry_count = 0
@@ -90,22 +94,23 @@ function Job:init(opt)
     debuginfo = debug.getinfo(3, "Sl"),
   })
 
-  if opt.fail_condition then
-    if type(opt.fail_condition) == "string" then
-      self.is_failed = Job.FAIL_CONDITIONS[opt.fail_condition]
-      assert(self.is_failed, fmt("Unknown fail condition: '%s'", opt.fail_condition))
-    elseif type(opt.fail_condition) == "function" then
-      self.is_failed = opt.fail_condition
+  if opt.fail_cond then
+    if type(opt.fail_cond) == "string" then
+      self.check_status = Job.FAIL_CONDITIONS[opt.fail_cond]
+      assert(self.check_status, fmt("Unknown fail condition: '%s'", opt.fail_cond))
+    elseif type(opt.fail_cond) == "function" then
+      self.check_status = opt.fail_cond
     else
-      error("Invalid fail condition: " .. vim.inspect(opt.fail_condition))
+      error("Invalid fail condition: " .. vim.inspect(opt.fail_cond))
     end
   else
-    self.is_failed = Job.FAIL_CONDITIONS.non_zero
+    self.check_status = Job.FAIL_CONDITIONS.non_zero
   end
 
   if opt.on_stdout then self:on_stdout(opt.on_stdout) end
   if opt.on_stderr then self:on_stderr(opt.on_stderr) end
   if opt.on_exit then self:on_exit(opt.on_exit) end
+  if opt.on_retry then self:on_retry(opt.on_retry) end
 end
 
 ---@param ... uv_handle_t
@@ -313,29 +318,26 @@ Job.start = async.wrap(function(self, callback)
 
     ---@type boolean, string?
     local ok, err = self:is_success()
+    local log = not self.log_opt.silent and logger or logger.mock --[[@as Logger ]]
 
     if not ok then
-      if not self.log_opt.silent then
-        logger:error(err)
-        logger:log_job(self, { func = "error", no_stdout = true })
-      end
+      log:error(err)
+      log:log_job(self, { func = "error", no_stdout = true })
 
       if self.retry > 0 then
         if self._retry_count < self.retry then
           self:do_retry(callback)
           return
         else
-          logger:error("All retries failed!")
+          log:error("All retries failed!")
         end
       end
     else
       if self._retry_count > 0 then
-        logger:info("Retry was successful!")
+        log:info("Retry was successful!")
       end
 
-      if not self.log_opt.silent then
-        logger:log_job(self, self.log_opt)
-      end
+      log:log_job(self, self.log_opt)
     end
 
     self._retry_count = 0
@@ -369,24 +371,36 @@ end)
 ---@param callback function
 Job.do_retry = async.void(function(self, callback)
   self._retry_count = self._retry_count + 1
-  logger:fmt_warn("(%d/%d) Retrying job...", self._retry_count, self.retry)
+
+  if not self.log_opt.silent then
+    logger:fmt_warn("(%d/%d) Retrying job...", self._retry_count, self.retry)
+  end
+
   await(async.timeout(1))
+
+  for _, listener in ipairs(self.on_retry_listeners) do
+    listener(self)
+  end
+
   self:start(callback)
 end)
 
----@param duration? integer # Max duration (ms) (default: 30_000)
+---@param self diffview.Job
+---@param timeout? integer # Max duration (ms) (default: 30_000)
 ---@return boolean success
 ---@return string? err
-function Job:sync(duration)
+function Job:sync(timeout)
+  if not self:is_started() then
+    self:start()
+  end
+
+  await(async.scheduler())
+
   if self:is_done() then
     return self:is_success()
   end
 
-  if not self:is_started() then self:start() end
-
-  await(async.scheduler())
-
-  local ok, status = vim.wait(duration or (30 * 1000), function()
+  local ok, status = vim.wait(timeout or (30 * 1000), function()
     return self:is_done()
   end, 1)
 
@@ -428,15 +442,19 @@ end
 Job.await = async.sync_wrap(function(self, callback)
   if self:is_done() then
     callback(self:is_success())
-    return
-  end
-
-  self:on_exit(function(_, ...) callback(...) end)
-
-  if not self:is_started() then
-    self:start()
+  elseif self:is_running() then
+    self:on_exit(function(_, ...) callback(...) end)
+  else
+    callback(await(self:start()))
   end
 end)
+
+---@param jobs diffview.Job[]
+function Job.start_all(jobs)
+  for _, job in ipairs(jobs) do
+    job:start()
+  end
+end
 
 ---@param jobs diffview.Job[]
 ---@param callback fun(success: boolean, errors?: string[])
@@ -493,11 +511,16 @@ function Job:on_exit(callback)
   table.insert(self.on_exit_listeners, callback)
 end
 
+---@param callback diffview.Job.OnRetryCallback
+function Job:on_retry(callback)
+  table.insert(self.on_retry_listeners, callback)
+end
+
 ---@return boolean success
 ---@return string? err
 function Job:is_success()
-  local failed, err = self:is_failed()
-  if failed then return false, err end
+  local ok, err = self:check_status()
+  if not ok then return false, err end
   return true
 end
 
@@ -507,6 +530,10 @@ end
 
 function Job:is_started()
   return self._started
+end
+
+function Job:is_running()
+  return self:is_started() and not self:is_done()
 end
 
 M.Job = Job
