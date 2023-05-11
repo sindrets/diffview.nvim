@@ -1,3 +1,4 @@
+local ffi = require("diffview.ffi")
 local oop = require("diffview.oop")
 
 local fmt = string.format
@@ -16,7 +17,6 @@ M._watching = setmetatable({}, { __mode = "k" })
 M._handles = {}
 
 ---@alias AsyncFunc (fun(...): Future)
-
 ---@alias AsyncKind "callback"|"void"
 
 local function dstring(object)
@@ -143,13 +143,8 @@ end
 function Future:dprint(...)
   if not DiffviewGlobal.logger then return end
   if DiffviewGlobal.debug_level >= 10 or M._watching[self] then
-    local args = { self, "::", ... }
-    local t = {}
-
-    for i = 1, table.maxn(args) do
-      t[i] = dstring(args[i])
-    end
-
+    local t = { self, "::", ... }
+    for i = 1, table.maxn(t) do t[i] = dstring(t[i]) end
     DiffviewGlobal.logger:debug(table.concat(t, " "))
   end
 end
@@ -232,7 +227,6 @@ function Future:notify_all(ok, ...)
     self.err = ret_values[2] or DEFAULT_ERROR
   end
 
-  -- self:dprint("notifying listeners:", self.listeners)
   local seen = {}
 
   while next(self.listeners) do
@@ -506,9 +500,10 @@ end
 
 ---Run the given async tasks concurrently, and then wait for them all to
 ---terminate.
----@param tasks (AsyncFunc|Future)[]
+---@param tasks (AsyncFunc|Waitable)[]
 M.join = M.void(function(tasks)
-  local futures = {} ---@type Future[]
+  ---@type Waitable[]
+  local futures = {}
 
   -- Ensure all async tasks are started
   for _, cur in ipairs(tasks) do
@@ -516,7 +511,7 @@ M.join = M.void(function(tasks)
       if type(cur) == "function" then
         futures[#futures+1] = cur()
       else
-        ---@cast cur Future
+        ---@cast cur Waitable
         futures[#futures+1] = cur
       end
     end
@@ -529,20 +524,15 @@ M.join = M.void(function(tasks)
 end)
 
 ---Run, and await the given async tasks in sequence.
----@param ... AsyncFunc|Future # Async functions or futures
-M.chain = M.void(function(...)
-  local args = { ... }
-
-  for i = 1, select("#", ...) do
-    local cur = args[i]
-    if cur then
-      if type(cur) == "function" then
-        ---@cast cur AsyncFunc
-        await(cur())
-      else
-        ---@cast cur Future
-        await(cur)
-      end
+---@param tasks (AsyncFunc|Waitable)[]
+M.chain = M.void(function(tasks)
+  for _, task in ipairs(tasks) do
+    if type(task) == "function" then
+      ---@cast task AsyncFunc
+      await(task())
+    else
+      ---@cast task Waitable
+      await(task)
     end
   end
 end)
@@ -566,11 +556,9 @@ end)
 ---@param fast_only? boolean # Only schedule if in an |api-fast| event.
 ---   When this is `true`, the scheduler will resume immediately unless the
 ---   editor is in an |api-fast| event. This means that the API might still be
----   limited by other locks (i.e. |textlock|).
+---   limited by other mechanisms (i.e. |textlock|).
 M.scheduler = M.wrap(function(fast_only, callback)
-  if (fast_only and not vim.in_fast_event())
-      or not require("diffview.ffi").nvim_is_locked()
-  then
+  if (fast_only and not vim.in_fast_event()) or not ffi.nvim_is_locked() then
     callback()
     return
   end

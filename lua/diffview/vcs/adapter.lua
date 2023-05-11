@@ -351,7 +351,7 @@ VCSAdapter.show = async.wrap(function(self, path, rev, callback)
     args = self:get_show_args(path, rev),
     cwd = self.ctx.toplevel,
     retry = 2,
-    fail_cond = Job.FAIL_CONDITIONS.on_empty,
+    fail_cond = Job.FAIL_COND.on_empty,
     log_opt = { label = "VCSAdapter:show()" },
     on_exit = async.void(function(_, ok, err)
       if not ok or job.code ~= 0 then

@@ -347,7 +347,7 @@ function M.job(cmd, cwd_or_opt)
     args = M.vec_slice(cmd, 2),
     cwd = opt.cwd,
     retry = opt.retry,
-    fail_cond = opt.fail_on_empty and Job.FAIL_CONDITIONS.on_empty or nil,
+    fail_cond = opt.fail_on_empty and Job.FAIL_COND.on_empty or nil,
     writer = opt.writer,
     log_opt = vim.tbl_extend("keep", opt.log_opt or {}, {
       silent = opt.silent,

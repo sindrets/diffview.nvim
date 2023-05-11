@@ -78,8 +78,8 @@ function Semaphore:forget_one()
   if self.permit_count == self.initial_count then return end
 
   if next(self.queue) then
-    local next_contractor = table.remove(self.queue, 1)
-    next_contractor(Permit({ parent = self }))
+    local next_contractee = table.remove(self.queue, 1)
+    next_contractee(Permit({ parent = self }))
   else
     self.permit_count = self.permit_count + 1
   end

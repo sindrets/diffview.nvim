@@ -488,11 +488,7 @@ HgAdapter.incremental_fh_data = async.wrap(function(self, state, callback)
   end
 
   local rev_range = state.prepared_log_opts.rev_range and '--rev=' .. state.prepared_log_opts.rev_range or nil
-  local log_opt = {
-    label = "HgAdapter:incremental_fh_data()",
-    func = "info",
-    no_stdout = true,
-  }
+  local log_opt = { label = "HgAdapter:incremental_fh_data()" }
 
   namestat_job = Job({
     command = self:bin(),
@@ -673,7 +669,7 @@ HgAdapter.file_history_worker = async.void(function(self, co_state, opt, callbac
         -- possibly because we are running multiple git opeartions on the same
         -- repo concurrently. Retrying the job usually solves this.
         retry = 2,
-        fail_condition = Job.FAIL_CONDITIONS.on_empty,
+        fail_cond = Job.FAIL_COND.on_empty,
         log_opt = { label = "HgAdapter:file_history_worker()" },
       })
 
@@ -1221,7 +1217,7 @@ HgAdapter.show = async.wrap(function(self, path, rev, callback)
     args = self:get_show_args(path, rev),
     cwd = self.ctx.toplevel,
     retry = 2,
-    fail_condition = Job.FAIL_CONDITIONS.on_empty,
+    fail_cond = Job.FAIL_COND.on_empty,
     log_opt = { label = "HgAdapter:show()" },
     on_exit = async.void(function(_, ok, err)
       if not ok or job.code ~= 0 then

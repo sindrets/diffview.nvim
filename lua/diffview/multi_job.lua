@@ -24,7 +24,8 @@ local M = {}
 ---@field _done boolean
 local MultiJob = oop.create_class("MultiJob")
 
-MultiJob.FAIL_CONDITIONS = {
+---Predefined fail conditions.
+MultiJob.FAIL_COND = {
   ---Fail if any of the jobs termintated with a non-zero exit code.
   ---@param mj MultiJob
   non_zero = function(mj)
@@ -79,7 +80,7 @@ function MultiJob:init(jobs, opt)
 
   if opt.fail_cond then
     if type(opt.fail_cond) == "string" then
-      self.check_status = MultiJob.FAIL_CONDITIONS[opt.fail_cond]
+      self.check_status = MultiJob.FAIL_COND[opt.fail_cond]
       assert(self.check_status, fmt("Unknown fail condition: '%s'", opt.fail_cond))
     elseif type(opt.fail_cond) == "function" then
       self.check_status = opt.fail_cond
@@ -87,7 +88,7 @@ function MultiJob:init(jobs, opt)
       error("Invalid fail condition: " .. vim.inspect(opt.fail_cond))
     end
   else
-    self.check_status = MultiJob.FAIL_CONDITIONS.non_zero
+    self.check_status = MultiJob.FAIL_COND.non_zero
   end
 
   if opt.on_exit then self:on_exit(opt.on_exit) end

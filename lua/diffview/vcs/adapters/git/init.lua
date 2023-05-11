@@ -954,7 +954,7 @@ GitAdapter.file_history_worker = async.void(function(self, co_state, opt, callba
         -- possibly because we are running multiple git opeartions on the same
         -- repo concurrently. Retrying the job usually solves this.
         retry = 2,
-        fail_cond = Job.FAIL_CONDITIONS.on_empty,
+        fail_cond = Job.FAIL_COND.on_empty,
         log_opt = { label = "GitAdapter:file_history_worker()" },
       })
 

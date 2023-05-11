@@ -58,12 +58,15 @@ local function prepare_env(env)
   return ret
 end
 
-Job.FAIL_CONDITIONS = {
+---Predefined fail conditions.
+Job.FAIL_COND = {
   ---Fail on all non-zero exit codes.
+  ---@param j diffview.Job
   non_zero = function(j)
     return j.code == 0, fmt("Job exited with a non-zero exit code: %d", j.code)
   end,
   ---Fail if there's no data in stdout.
+  ---@param j diffview.Job
   on_empty = function(j)
     local msg = fmt("Job expected output, but returned nothing! Code: %d", j.code)
     local n = #j.stdout
@@ -96,7 +99,7 @@ function Job:init(opt)
 
   if opt.fail_cond then
     if type(opt.fail_cond) == "string" then
-      self.check_status = Job.FAIL_CONDITIONS[opt.fail_cond]
+      self.check_status = Job.FAIL_COND[opt.fail_cond]
       assert(self.check_status, fmt("Unknown fail condition: '%s'", opt.fail_cond))
     elseif type(opt.fail_cond) == "function" then
       self.check_status = opt.fail_cond
@@ -104,7 +107,7 @@ function Job:init(opt)
       error("Invalid fail condition: " .. vim.inspect(opt.fail_cond))
     end
   else
-    self.check_status = Job.FAIL_CONDITIONS.non_zero
+    self.check_status = Job.FAIL_COND.non_zero
   end
 
   if opt.on_stdout then self:on_stdout(opt.on_stdout) end
@@ -322,7 +325,7 @@ Job.start = async.wrap(function(self, callback)
 
     if not ok then
       log:error(err)
-      log:log_job(self, { func = "error", no_stdout = true })
+      log:log_job(self, { func = "error", no_stdout = true, debuginfo = self.log_opt.debuginfo })
 
       if self.retry > 0 then
         if self._retry_count < self.retry then
@@ -501,7 +504,7 @@ end
 function Job:on_stderr(callback)
   table.insert(self.on_stderr_listeners, callback)
 
-  if not self:is_started() then
+  if not self:is_running() then
     self.buffered_std = false
   end
 end
