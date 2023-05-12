@@ -1,25 +1,25 @@
-local oop = require('diffview.oop')
+local Commit = require("diffview.vcs.adapters.hg.commit").HgCommit
+local Diff2Hor = require("diffview.scene.layouts.diff_2_hor").Diff2Hor
+local FileEntry = require("diffview.scene.file_entry").FileEntry
+local FlagOption = require("diffview.vcs.flag_option").FlagOption
+local HgRev = require('diffview.vcs.adapters.hg.rev').HgRev
+local Job = require("diffview.job").Job
+local JobStatus = require('diffview.vcs.utils').JobStatus
+local LogEntry = require("diffview.vcs.log_entry").LogEntry
+local RevType = require("diffview.vcs.rev").RevType
 local VCSAdapter = require('diffview.vcs.adapter').VCSAdapter
 local arg_parser = require("diffview.arg_parser")
-local utils = require('diffview.utils')
-local lazy = require('diffview.lazy')
+local async = require("diffview.async")
 local config = require('diffview.config')
-local async = require("plenary.async")
-local logger = require('diffview.logger')
-local JobStatus = require('diffview.vcs.utils').JobStatus
-local Commit = require("diffview.vcs.adapters.hg.commit").HgCommit
-local RevType = require("diffview.vcs.rev").RevType
-local HgRev = require('diffview.vcs.adapters.hg.rev').HgRev
-local Job = require("plenary.job")
-local CountDownLatch = require("diffview.control").CountDownLatch
-local FileEntry = require("diffview.scene.file_entry").FileEntry
-local Diff2Hor = require("diffview.scene.layouts.diff_2_hor").Diff2Hor
-local LogEntry = require("diffview.vcs.log_entry").LogEntry
-local FlagOption = require("diffview.vcs.flag_option").FlagOption
+local lazy = require('diffview.lazy')
+local oop = require('diffview.oop')
+local utils = require('diffview.utils')
 local vcs_utils = require("diffview.vcs.utils")
 
----@type PathLib
-local pl = lazy.access(utils, "path")
+local await, pawait = async.await, async.pawait
+local fmt = string.format
+local logger = DiffviewGlobal.logger
+local pl = lazy.access(utils, "path") ---@type PathLib
 
 local M = {}
 
@@ -47,15 +47,15 @@ function HgAdapter.run_bootstrap()
   local function err(msg)
     if msg then
       bs.err = msg
-      logger.error("[HgAdapter] " .. bs.err)
+      logger:error("[HgAdapter] " .. bs.err)
     end
   end
 
   if vim.fn.executable(hg_cmd[1]) ~= 1 then
-    return err(("Configured `hg_cmd` is not executable: '%s'"):format(hg_cmd[1]))
+    return err(fmt("Configured `hg_cmd` is not executable: '%s'", hg_cmd[1]))
   end
 
-  local out = utils.system_list(vim.tbl_flatten({ hg_cmd, "version" }))
+  local out = utils.job(vim.tbl_flatten({ hg_cmd, "version" }))
   bs.version_string = out[1] and out[1]:match("Mercurial .*%(version (%S+)%)") or nil
 
   if not bs.version_string then
@@ -64,7 +64,7 @@ function HgAdapter.run_bootstrap()
 
   -- Parse version string
   local v, target = bs.version, bs.target_version
-  bs.target_version_string = ("%d.%d.%d"):format(target.major, target.minor, target.patch)
+  bs.target_version_string = fmt("%d.%d.%d", target.major, target.minor, target.patch)
   local parts = vim.split(bs.version_string, "%.")
   v.major = tonumber(parts[1])
   v.minor = tonumber(parts[2]) or 0
@@ -129,7 +129,7 @@ end
 ---@param path string
 ---@return string?
 local function get_toplevel(path)
-  local out, code = utils.system_list(vim.tbl_flatten({config.get_config().hg_cmd, {"root"}}), path)
+  local out, code = utils.job(vim.tbl_flatten({config.get_config().hg_cmd, {"root"}}), path)
   if code ~= 0 then
     return nil
   end
@@ -152,13 +152,17 @@ function HgAdapter.find_toplevel(top_indicators)
     end
   end
 
-  return (
-    ("Path not a mercurial repo (or any parent): %s")
-    :format(table.concat(vim.tbl_map(function(v)
-      local rel_path = pl:relative(v, ".")
-      return utils.str_quote(rel_path == "" and "." or rel_path)
-    end, top_indicators) --[[@as vector ]], ", "))
-  ), ""
+  local msg_paths = vim.tbl_map(function(v)
+    local rel_path = pl:relative(v, ".")
+    return utils.str_quote(rel_path == "" and "." or rel_path)
+  end, top_indicators)
+
+  local err = fmt(
+    "Path not a mercurial repo (or any parent): %s",
+    table.concat(msg_paths, ", ")
+  )
+
+  return err, ""
 end
 
 ---@param toplevel string
@@ -298,13 +302,16 @@ function HgAdapter:file_history_options(range, paths, argo)
   local ok, opt_description = self:file_history_dry_run(log_options)
 
   if not ok then
-    utils.info({
-      ("No hg history for the target(s) given the current options! Targets: %s")
-        :format(#rel_paths == 0 and "':(top)'" or table.concat(vim.tbl_map(function(v)
-          return "'" .. v .. "'"
-        end, rel_paths) --[[@as vector ]], ", ")),
-      ("Current options: [ %s ]"):format(opt_description)
-    })
+    local msg = "No git history for the target(s) given the current options! Targets: %s\n"
+      .. "Current options: [ %s ]"
+
+    if #rel_paths == 0 then
+      utils.info(fmt(msg, "':(top)'", opt_description))
+    else
+      local msg_paths = vim.tbl_map(utils.str_quote, rel_paths)
+      utils.info(fmt(msg, table.concat(msg_paths, ", "), opt_description))
+    end
+
     return
   end
 
@@ -318,18 +325,12 @@ end
 ---@field flags string[]
 
 ---@class HgAdapter.FHState
----@field thread thread
 ---@field path_args string[]
 ---@field log_options HgLogOptions
 ---@field prepared_log_opts HgAdapter.PreparedLogOpts
----@field opt vcs.adapter.FileHistoryWorkerSpec
+---@field layout_opt vcs.adapter.LayoutOpt
 ---@field single_file boolean
----@field resume_lock boolean
----@field cur table
----@field commit Commit
----@field entries LogEntry[]
 ---@field old_path string?
----@field callback function
 
 ---@param log_options HgLogOptions
 ---@param single_file boolean
@@ -376,9 +377,9 @@ function HgAdapter:file_history_dry_run(log_opt)
   end, self:prepare_fh_options(log_options, single_file).flags) --[[@as vector ]]
 
   local description = utils.vec_join(
-    ("Top-level path: '%s'"):format(utils.path:vim_fnamemodify(self.ctx.toplevel, ":~")),
-    log_options.rev and ("Revision range: '%s'"):format(log_options.rev) or nil,
-    ("Flags: %s"):format(table.concat(options, " "))
+    fmt("Top-level path: '%s'", pl:vim_fnamemodify(self.ctx.toplevel, ":~")),
+    log_options.rev and fmt("Revision range: '%s'", log_options.rev) or nil,
+    fmt("Flags: %s", table.concat(options, " "))
   )
 
   log_options = utils.tbl_clone(log_options) --[[@as HgLogOptions ]]
@@ -386,7 +387,7 @@ function HgAdapter:file_history_dry_run(log_opt)
   -- TODO
   options = self:prepare_fh_options(log_options, single_file).flags
 
-  local context = "HgAdapter.file_history_dry_run()"
+  local context = "HgAdapter:file_history_dry_run()"
   local cmd = utils.vec_join(
     "log",
     log_options.rev and "--rev=" .. log_options.rev or nil,
@@ -396,16 +397,13 @@ function HgAdapter:file_history_dry_run(log_opt)
 
   local out, code = self:exec_sync(cmd, {
     cwd = self.ctx.toplevel,
-    debug_opt = {
-      context = context,
-      no_stdout = true,
-    },
+    log_opt = { label = context },
   })
 
   local ok = code == 0 and #out > 0
 
   if not ok then
-    logger.lvl(1).s_debug(("[%s] Dry run failed."):format(context))
+    logger:fmt_debug("[%s] Dry run failed.", context)
   end
 
   return ok, table.concat(description, ", ")
@@ -433,8 +431,8 @@ end
 
 ---@param self HgAdapter
 ---@param state HgAdapter.FHState
----@param callback fun(status: JobStatus, data?: table, msg?: string[])
-HgAdapter.incremental_fh_data = async.void(function(self, state, callback)
+---@param callback fun(status: JobStatus, data?: table, msg?: string)
+HgAdapter.incremental_fh_data = async.wrap(function(self, state, callback)
   local raw = {}
   local namestat_job, numstat_job, shutdown
 
@@ -460,57 +458,63 @@ HgAdapter.incremental_fh_data = async.void(function(self, state, callback)
 
         raw[handler_state.idx][handler_state.key] = handler_state.data
 
-        if not shutdown and raw[handler_state.idx].namestat and raw[handler_state.idx].numstat then
+        if not shutdown
+          and not raw[handler_state.idx].done
+          and raw[handler_state.idx].namestat
+          and raw[handler_state.idx].numstat
+        then
+          raw[handler_state.idx].done = true
           shutdown = callback(
             JobStatus.PROGRESS,
             structure_fh_data(raw[handler_state.idx].namestat, raw[handler_state.idx].numstat)
           )
 
           if shutdown then
-            logger.lvl(1).debug("Killing file history jobs...")
-            -- NOTE: The default `Job:shutdown` methods use `vim.wait` which
-            -- causes a segfault when called here.
-            namestat_job:_shutdown(64)
-            numstat_job:_shutdown(64)
+            logger:debug("Killing file history jobs...")
+            namestat_job:kill(64)
+            numstat_job:kill(64)
           end
         end
       end
       handler_state.idx = handler_state.idx + 1
       handler_state.data = {}
     elseif line ~= "" then
-      table.insert(handler_state.data, line)
+      handler_state.data[#handler_state.data + 1] = line
     end
   end
 
-  ---@type CountDownLatch
-  local latch = CountDownLatch(2)
-
-  local function on_exit(j, code)
-    if code == 0 then
-      on_stdout(nil, "\0", j)
-    end
-    latch:count_down()
+  local function on_exit(j, ok)
+    if ok and j.code == 0 then on_stdout(nil, "\0", j) end
   end
 
   local rev_range = state.prepared_log_opts.rev_range and '--rev=' .. state.prepared_log_opts.rev_range or nil
+  local log_opt = { label = "HgAdapter:incremental_fh_data()" }
 
-  namestat_job = Job:new({
+  namestat_job = Job({
     command = self:bin(),
     args = utils.vec_join(
       self:args(),
       "log",
       rev_range,
-      '--template=\\x00\n{node} {p1.node} {ifeq(p2.rev, -1 ,\"\", \"{p2.node}\")}\n{author|person}\n{date}\n{date|age}\n  {separate(", ", tags, topics)}\n  {desc|firstline}\n{files % "{status} {file}\n"}',
+      '--template=\\x00\n'
+        .. '{node} {p1.node} {ifeq(p2.rev, -1 ,\"\", \"{p2.node}\")}\n'
+        .. '{author|person}\n'
+        .. '{date}\n'
+        .. '{date|age}\n'
+        .. '  {separate(", ", tags, topics)}\n'
+        .. '  {desc|firstline}\n'
+        .. '{files % "{status} {file}\n"}',
       state.prepared_log_opts.flags,
       "--",
       state.path_args
     ),
     cwd = self.ctx.toplevel,
+    log_opt = log_opt,
     on_stdout = on_stdout,
     on_exit = on_exit,
   })
 
-  numstat_job = Job:new({
+  numstat_job = Job({
     command = self:bin(),
     args = utils.vec_join(
       self:args(),
@@ -523,109 +527,221 @@ HgAdapter.incremental_fh_data = async.void(function(self, state, callback)
       state.path_args
     ),
     cwd = self.ctx.toplevel,
+    log_opt = log_opt,
     on_stdout = on_stdout,
     on_exit = on_exit,
   })
 
-  namestat_job:start()
-  numstat_job:start()
-
-  latch:await()
-
-  local debug_opt = {
-    context = "HgAdapter:incremental_fh_data()",
-    func = "s_info",
-    no_stdout = true,
-  }
-  utils.handle_job(namestat_job, { debug_opt = debug_opt })
-  utils.handle_job(numstat_job, { debug_opt = debug_opt })
+  local ok = await(Job.join({ namestat_job, numstat_job }))
 
   if shutdown then
     callback(JobStatus.KILLED)
-  elseif namestat_job.code ~= 0 or numstat_job.code ~= 0 then
-    callback(JobStatus.ERROR, nil, utils.vec_join(
-      namestat_job:stderr_result(),
-      numstat_job:stderr_result())
+  elseif not ok then
+    callback(
+      JobStatus.ERROR,
+      nil,
+      table.concat(utils.vec_join(namestat_job.stderr, numstat_job.stderr), "\n")
     )
   else
     callback(JobStatus.SUCCESS)
   end
 end)
 
----@param state HgAdapter.FHState
-function HgAdapter:parse_fh_data(state)
-  local cur = state.cur
+function HgAdapter:is_single_file(path_args, lflags)
+  if path_args and self.ctx.toplevel then
+    return #path_args == 1
+      and not pl:is_dir(path_args[1])
+      and #self:exec_sync({ "files", "--", path_args }, self.ctx.toplevel) < 2
+  end
+  return true
+end
 
-  if cur.merge_hash and cur.numstat[1] and #cur.numstat ~= #cur.namestat then
-    local job
-    local job_spec = {
-      command = self:bin(),
-      args = utils.vec_join(
-        self:args(),
-        "status",
-        "--change",
-        cur.right_hash,
-        "--",
-        state.old_path or state.path_args
-      ),
-      cwd = self.ctx.toplevel,
-      on_exit = function(j)
-        if j.code == 0 then
-          cur.namestat = j:result()
-        end
-        self:handle_co(state.thread, coroutine.resume(state.thread))
-      end,
-    }
+---@param self HgAdapter
+---@param co_state table
+---@param opt vcs.adapter.FileHistoryWorkerSpec
+---@param callback (fun(entries: LogEntry[], status: JobStatus, err?: string)) # Called whenever there are new entries available.
+HgAdapter.file_history_worker = async.void(function(self, co_state, opt, callback)
+  local entries = {} ---@type LogEntry[]
 
-    local max_retries = 2
-    local context = "HgAdapter:parse_fh_data()"
-    state.resume_lock = true
+  local single_file = self:is_single_file(
+    opt.log_opt.single_file.path_args,
+    opt.log_opt.single_file.L
+  )
 
-    for i = 0, max_retries do
-      -- Git sometimes fails this job silently (exit code 0). Not sure why,
-      -- possibly because we are running multiple git opeartions on the same
-      -- repo concurrently. Retrying the job usually solves this.
-      job = Job:new(job_spec)
-      job:start()
-      coroutine.yield()
-      utils.handle_job(job, { fail_on_empty = true, context = context, log_func = logger.warn })
+  ---@type HgLogOptions
+  local log_options = config.get_log_options(
+    single_file,
+    single_file and opt.log_opt.single_file or opt.log_opt.multi_file,
+    "hg"
+  )
 
-      if #cur.namestat == 0 then
-        if i < max_retries then
-          logger.warn(("[%s] Retrying %d more time(s)."):format(context, max_retries - i))
-        end
-      else
-        if i > 0 then
-          logger.info(("[%s] Retry successful!"):format(context))
-        end
-        break
+  -- TODO: Change in the future if `-L` is implemented
+  local is_trace = false
+
+  ---@type HgAdapter.FHState
+  local state = {
+    co_state = co_state,
+    path_args = opt.log_opt.single_file.path_args,
+    log_options = log_options,
+    prepared_log_opts = self:prepare_fh_options(log_options, single_file),
+    layout_opt = opt.layout_opt,
+    single_file = single_file,
+  }
+
+  local data_buffer = {}
+  local data_idx = 0
+
+  ---Wakes the data scheduler
+  ---@type function?
+  local data_step
+
+  local function inc_callback(status, new_data, msg)
+    data_buffer[#data_buffer+1] = { status, new_data, msg }
+
+    if data_step then
+      local temp = data_step
+      data_step = nil
+      temp(status, new_data, msg)
+    end
+
+    return co_state.shutdown
+  end
+
+  ---@param cb (fun(status: JobStatus, new_data: table, err?: string))
+  local data_scheduler = async.wrap(function(cb)
+    data_idx = data_idx + 1
+
+    if data_buffer[data_idx] then
+      cb(unpack(data_buffer[data_idx], 1, 3))
+    else
+      -- Await new data from inc workers
+      data_step = cb
+    end
+  end)
+
+  if is_trace then
+    error("Unimplemented!")
+  else
+    self:incremental_fh_data(state, inc_callback)
+  end
+
+  while true do
+    ---@type JobStatus, table?, string?
+    local status, new_data, msg = await(data_scheduler())
+
+    if status == JobStatus.KILLED then
+      logger:warn("File history processing was killed.")
+      callback(entries, status)
+      return
+    elseif status == JobStatus.ERROR then
+      callback(entries, status, msg)
+      return
+    elseif status == JobStatus.SUCCESS then
+      callback(entries, status)
+      return
+    elseif status ~= JobStatus.PROGRESS then
+      error("Unexpected state!")
+    end
+
+    -- Status is PROGRESS
+    assert(new_data, "No data received from scheduler!")
+
+    -- 'git log --name-status' doesn't work properly for merge commits. It
+    -- lists only an incomplete list of files at best. We need to use 'git
+    -- show' to get file statuses for merge commits. And merges do not always
+    -- have changes.
+    if new_data.merge_hash
+      and new_data.numstat[1]
+      and #new_data.numstat ~= #new_data.namestat
+    then
+      local job = Job({
+        command = self:bin(),
+        args = utils.vec_join(
+          self:args(),
+          "status",
+          "--change",
+          new_data.right_hash,
+          "--",
+          state.old_path or state.path_args
+        ),
+        cwd = self.ctx.toplevel,
+        -- Git sometimes fails this job silently (exit code 0). Not sure why,
+        -- possibly because we are running multiple git opeartions on the same
+        -- repo concurrently. Retrying the job usually solves this.
+        retry = 2,
+        fail_cond = Job.FAIL_COND.on_empty,
+        log_opt = { label = "HgAdapter:file_history_worker()" },
+      })
+
+      local ok = await(job)
+
+      if job.code == 0 then
+        new_data.namestat = job.stdout
+      end
+
+      if not ok or job.code ~= 0 then
+        callback(entries, JobStatus.ERROR, table.concat(job.stderr, "\n"))
+        return
+      end
+
+      if #new_data.namestat == 0 then
+        -- Give up: something has been renamed. We can no longer track the
+        -- history.
+        logger:warn(fmt("[%s] Giving up.", job.log_opt.label))
+        utils.warn("Displayed history may be incomplete. Check ':DiffviewLog' for details.", true)
+        callback(
+          entries,
+          JobStatus.ERROR,
+          fmt("Failed to get log data for merge commit '%s'!", new_data.right_hash)
+        )
+        return
       end
     end
 
-    state.resume_lock = false
+    local commit = Commit({
+      hash = new_data.right_hash,
+      author = new_data.author,
+      time = tonumber(new_data.time),
+      time_offset = new_data.time_offset,
+      rel_date = new_data.rel_date,
+      ref_names = new_data.ref_names,
+      subject = new_data.subject,
+      diff = new_data.diff,
+    })
 
-    if job.code ~= 0 then
-      state.callback({}, JobStatus.ERROR, job:stderr_result())
-      return false, JobStatus.FATAL
+    ---@type boolean, (LogEntry|string)?
+    local ok, entry
+
+    if is_trace then
+      error("Unimplemented")
+    else
+      ok, entry = self:parse_fh_data(new_data, commit, state)
     end
 
-    if #cur.namestat == 0 then
-      -- Give up: something has been renamed. We can no longer track the
-      -- history.
-      logger.warn(("[%s] Giving up."):format(context))
-      utils.warn("Displayed history may be incomplete. Check ':DiffviewLog' for details.", true)
-      return false
+    -- Some commits might not have file data. In that case we simply ignore it,
+    -- as the fh panel doesn't support such entries at the moment.
+    if ok then
+      entries[#entries + 1] = entry
+      callback(entries, JobStatus.PROGRESS)
     end
   end
+end)
 
+---@param data table
+---@param commit HgCommit
+---@param state HgAdapter.FHState
+---@return boolean success
+---@return LogEntry|string ret
+function HgAdapter:parse_fh_data(data, commit, state)
   local files = {}
-  for i = 1, #cur.numstat - 1 do
-    local status = cur.namestat[i]:sub(1, 1):gsub("%s", " ")
-    local name = vim.trim(cur.namestat[i]:match("[%a%s]%s*(.*)"))
+
+  for i = 1, #data.numstat - 1 do
+    local status = data.namestat[i]:sub(1, 1):gsub("%s", " ")
+    local name = vim.trim(data.namestat[i]:match("[%a%s]%s*(.*)"))
     local oldname
 
     local stats = {}
-    local changes, diffstats = cur.numstat[i]:match(".*|%s+(%d+)%s+([+-]+)")
+    local changes, diffstats = data.numstat[i]:match(".*|%s+(%d+)%s+([+-]+)")
     if changes and diffstats then
       local _, adds = diffstats:gsub("+", "")
 
@@ -639,143 +755,39 @@ function HgAdapter:parse_fh_data(state)
       stats = nil
     end
 
-    table.insert(files, FileEntry.with_layout(state.opt.default_layout or Diff2Hor, {
-      adapter = self,
-      path = name,
-      oldpath = oldname,
-      status = status,
-      stats = stats,
-      kind = "working",
-      commit = state.commit,
-      revs = {
-        a = cur.left_hash and HgRev(RevType.COMMIT, cur.left_hash) or HgRev.new_null_tree(),
-        b = state.prepared_log_opts.base or HgRev(RevType.COMMIT, cur.right_hash),
-      }
-    }))
+    table.insert(
+      files,
+      FileEntry.with_layout(
+        state.layout_opt.default_layout or Diff2Hor,
+        {
+          adapter = self,
+          path = name,
+          oldpath = oldname,
+          status = status,
+          stats = stats,
+          kind = "working",
+          commit = commit,
+          revs = {
+            a = data.left_hash and HgRev(RevType.COMMIT, data.left_hash) or HgRev.new_null_tree(),
+            b = state.prepared_log_opts.base or HgRev(RevType.COMMIT, data.right_hash),
+          }
+        }
+      )
+    )
   end
 
   if files[1] then
-    table.insert(
-      state.entries,
-      LogEntry({
-        path_args = state.path_args,
-        commit = state.commit,
-        files = files,
-        single_file = state.single_file,
-      })
-    )
-
-    state.callback(state.entries, JobStatus.PROGRESS)
-  end
-
-  return true
-end
-
-function HgAdapter:is_single_file(path_args, lflags)
-  if path_args and self.ctx.toplevel then
-    return #path_args == 1
-      and not utils.path:is_dir(path_args[1])
-      and #self:exec_sync({ "files", "--", path_args }, self.ctx.toplevel) < 2
-  end
-  return true
-end
-
----@param thread thread
----@param log_opt ConfigLogOptions
----@param opt vcs.adapter.FileHistoryWorkerSpec
----@param co_state table
----@param callback function
-function HgAdapter:file_history_worker(thread, log_opt, opt, co_state, callback)
-  ---@type LogEntry[]
-  local entries = {}
-  local data = {}
-  local data_idx = 1
-  local last_status
-  local err_msg
-
-  local single_file = self:is_single_file(log_opt.single_file.path_args, {})
-
-  ---@type HgLogOptions
-  local log_options = config.get_log_options(
-    single_file,
-    single_file and log_opt.single_file or log_opt.multi_file,
-    "hg"
-  )
-
-  ---@type HgAdapter.FHState
-  local state = {
-    thread = thread,
-    path_args = log_opt.single_file.path_args,
-    log_options = log_options,
-    prepared_log_opts = self:prepare_fh_options(log_options, single_file),
-    opt = opt,
-    callback = callback,
-    entries = entries,
-    single_file = single_file,
-    resume_lock = false,
-  }
-
-  local function data_callback(status, d, msg)
-    if status == JobStatus.PROGRESS then
-      data[#data+1] = d
-    end
-
-    last_status = status
-    if msg then
-      err_msg = msg
-    end
-    if not state.resume_lock and coroutine.status(thread) == "suspended" then
-      self:handle_co(thread, coroutine.resume(thread))
-    end
-
-    if co_state.shutdown then
-      return true
-    end
-  end
-
-  self:incremental_fh_data(state, data_callback)
-
-  while true do
-    if not vim.tbl_contains({ JobStatus.SUCCESS, JobStatus.ERROR, JobStatus.KILLED }, last_status)
-        and not data[data_idx] then
-      coroutine.yield()
-    end
-
-    if last_status == JobStatus.KILLED then
-      logger.warn("File history processing was killed.")
-      return
-    elseif last_status == JobStatus.ERROR then
-      callback(entries, JobStatus.ERROR, err_msg)
-      return
-    elseif last_status == JobStatus.SUCCESS and data_idx > #data then
-      break
-    end
-
-    state.cur = data[data_idx]
-
-    state.commit = Commit({
-      hash = state.cur.right_hash,
-      author = state.cur.author,
-      time = tonumber(state.cur.time),
-      time_offset = state.cur.time_offset,
-      rel_date = state.cur.rel_date,
-      ref_names = state.cur.ref_names,
-      subject = state.cur.subject,
+    return true, LogEntry({
+      path_args = state.path_args,
+      commit = commit,
+      files = files,
+      single_file = state.single_file,
     })
-
-    local ok, status = self:parse_fh_data(state)
-
-    if not ok then
-      if status == JobStatus.FATAL then
-        return
-      end
-      break
-    end
-
-    data_idx = data_idx + 1
   end
 
-  callback(entries, JobStatus.SUCCESS)
+  logger:debug("[HgAdapter:parse_fh_data] Encountered commit with no file data:", data)
+
+  return false, "Missing file data!"
 end
 
 ---@param argo ArgObject
@@ -816,7 +828,8 @@ end
 function HgAdapter:head_rev()
   local out, code = self:exec_sync( { "log", "--template={node}", "--limit=1", "--" }, {
     cwd = self.ctx.toplevel,
-    retry_on_empty = 2,
+    retry = 2,
+    fail_on_empty = true,
   })
 
   if code ~= 0 then
@@ -885,14 +898,14 @@ function HgAdapter:parse_revs(rev_arg, opt)
     else
       local node, code, stderr = self:exec_sync({"log", "--limit=1", "--template={node}",  "--rev=" .. rev_arg}, self.ctx.toplevel)
       if code ~= 0 and node then
-        utils.err(("Failed to parse rev %s: %s"):format(utils.str_quote(rev_arg), stderr))
+        utils.err(fmt("Failed to parse rev %s: %s", utils.str_quote(rev_arg), stderr))
         return
       end
       left = HgRev(RevType.COMMIT, node[1])
 
       node, code, stderr = self:exec_sync({"log", "--limit=1", "--template={node}",  "--rev=reverse(" .. rev_arg .. ")"}, self.ctx.toplevel)
       if code ~= 0  and node then
-        utils.err(("Failed to parse rev %s: %s"):format(utils.str_quote(rev_arg), stderr))
+        utils.err(fmt("Failed to parse rev %s: %s", utils.str_quote(rev_arg), stderr))
         return
       end
 
@@ -909,7 +922,7 @@ end
 
 function HgAdapter:file_restore(path, kind, commit)
   local _, code
-  local abs_path = utils.path:join(self.ctx.toplevel, path)
+  local abs_path = pl:join(self.ctx.toplevel, path)
 
   _, code = self:exec_sync({"cat", "--", path}, self.ctx.toplevel)
 
@@ -920,12 +933,11 @@ function HgAdapter:file_restore(path, kind, commit)
   if not exists_hg then
     local bn = utils.find_file_buffer(abs_path)
     if bn then
-      async.util.scheduler()
+      await(async.scheduler())
       local ok, err = utils.remove_buffer(false, bn)
       if not ok then
         utils.err({
-          ("Failed to delete buffer '%d'! Aborting file restoration. Error message:")
-            :format(bn),
+          fmt("Failed to delete buffer '%d'! Aborting file restoration. Error message:", bn),
           err
         }, true)
         return false
@@ -934,11 +946,10 @@ function HgAdapter:file_restore(path, kind, commit)
 
     if kind == "working" or kind == "conflicting" then
       -- File is untracked and has no history: delete it from fs.
-      local ok, err = utils.path:unlink(abs_path)
+      local ok, err = pawait(pl.unlink, pl, abs_path)
       if not ok then
         utils.err({
-          ("Failed to delete file '%s'! Aborting file restoration. Error message:")
-            :format(abs_path),
+          fmt("Failed to delete file '%s'! Aborting file restoration. Error message:", abs_path),
           err
         }, true)
         return false
@@ -1001,22 +1012,9 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
   local files = {}
   ---@type FileEntry[]
   local conflicts = {}
-  ---@type CountDownLatch
-  local latch = CountDownLatch(3)
-  local debug_opt = {
-    context = "HgAdapter>tracked_files()",
-    func = "s_debug",
-    debug_level = 1,
-    no_stdout = true,
-  }
+  local log_opt = { label = "HgAdapter:tracked_files()" }
 
-  ---@param job Job
-  local function on_exit(job)
-    utils.handle_job(job, { debug_opt = debug_opt, fail_on_empty = false })
-    latch:count_down()
-  end
-
-  local namestat_job = Job:new({
+  local namestat_job = Job({
     command = self:bin(),
     args = utils.vec_join(
       self:args(),
@@ -1029,43 +1027,34 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
       args
     ),
     cwd = self.ctx.toplevel,
-    on_exit = on_exit,
+    retry = 2,
+    log_opt = log_opt,
   })
-  local mergestate_job = Job:new({
+  local mergestate_job = Job({
     command = self:bin(),
     args = utils.vec_join(self:args(), "debugmergestate", "-Tjson"),
     cwd = self.ctx.toplevel,
-    on_exit = on_exit,
+    retry = 2,
+    log_opt = log_opt,
   })
-  local numstat_job = Job:new({
+  local numstat_job = Job({
     command = self:bin(),
     args = utils.vec_join(self:args(), "diff", "--stat", args),
     cwd = self.ctx.toplevel,
-    on_exit = on_exit,
+    retry = 2,
+    log_opt = log_opt,
   })
 
-  namestat_job:start()
-  mergestate_job:start()
-  numstat_job:start()
-  latch:await()
-  local out_status
-  if
-    not (#namestat_job:result() == 0 and #numstat_job:result() == 0)
-    and not (#namestat_job:result() == #numstat_job:result() - 1)
-  then
-    out_status =
-      vcs_utils.ensure_output(2, { namestat_job, numstat_job }, "HgAdapter>tracked_files()")
-  end
+  local ok = await(Job.join({ namestat_job, mergestate_job, numstat_job }))
 
-  if out_status == JobStatus.ERROR or not (namestat_job.code == 0 and numstat_job.code == 0 and mergestate_job.code == 0) then
-    callback(utils.vec_join(namestat_job:stderr_result(), numstat_job:stderr_result(), mergestate_job:stderr_result()), nil)
+  if not ok or #namestat_job.stdout ~= (#numstat_job.stdout - 1) then
+    callback(utils.vec_join(namestat_job.stderr, numstat_job.stderr, mergestate_job.stderr), nil)
     return
   end
 
-  local numstat_out = numstat_job:result()
-  local namestat_out = namestat_job:result()
-  local mergestate_out = mergestate_job:result()
-
+  local numstat_out = numstat_job.stdout
+  local namestat_out = namestat_job.stdout
+  local mergestate_out = mergestate_job.stdout
 
   local data = {}
   local conflict_map = {}
@@ -1167,10 +1156,10 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
   end
 
   callback(nil, files, conflicts)
-end, 7)
+end)
 
 HgAdapter.untracked_files = async.wrap(function(self, left, right, opt, callback)
-  Job:new({
+  local job = Job({
     command = self:bin(),
     args = utils.vec_join(
       self:args(),
@@ -1181,42 +1170,35 @@ HgAdapter.untracked_files = async.wrap(function(self, left, right, opt, callback
       "--template={path}\\n"
     ),
     cwd = self.ctx.toplevel,
-    ---@type Job
-    on_exit = function(j)
-      utils.handle_job(j, {
-        debug_opt = {
-          context = "HgAdapter>untracked_files()",
-          func = "s_debug",
-          debug_level = 1,
-          no_stdout = true,
-        },
+    log_opt = { label = "HgAdapter:untracked_files()" }
+  })
+
+  await(job)
+
+  if job.code ~= 0 then
+    callback(job.stderr or {}, nil)
+    return
+  end
+
+  local files = {}
+  for _, s in ipairs(job.stdout) do
+    table.insert(
+      files,
+      FileEntry.with_layout(opt.default_layout, {
+        adapter = self,
+        path = s,
+        status = "?",
+        kind = "working",
+        revs = {
+          a = left,
+          b = right,
+        }
       })
+    )
+  end
 
-      if j.code ~= 0 then
-        callback(j:stderr_result() or {}, nil)
-        return
-      end
-
-      local files = {}
-      for _, s in ipairs(j:result()) do
-        table.insert(
-          files,
-          FileEntry.with_layout(opt.default_layout, {
-            adapter = self,
-            path = s,
-            status = "?",
-            kind = "working",
-            revs = {
-              a = left,
-              b = right,
-            }
-          })
-        )
-      end
-      callback(nil, files)
-    end,
-  }):start()
-end, 5)
+  callback(nil, files)
+end)
 
 ---@param self HgAdapter
 ---@param path string
@@ -1229,44 +1211,28 @@ HgAdapter.show = async.wrap(function(self, path, rev, callback)
     return
   end
 
-  local job = Job:new({
+  local job
+  job = Job({
     command = self:bin(),
     args = self:get_show_args(path, rev),
     cwd = self.ctx.toplevel,
-    ---@type Job
-    on_exit = async.void(function(j)
-      local context = "HgAdapter.show()"
-      utils.handle_job(j, {
-        fail_on_empty = true,
-        context = context,
-        debug_opt = { no_stdout = true, context = context },
-      })
-
-      if j.code ~= 0 then
-        callback(j:stderr_result() or {}, nil)
+    retry = 2,
+    fail_cond = Job.FAIL_COND.on_empty,
+    log_opt = { label = "HgAdapter:show()" },
+    on_exit = async.void(function(_, ok, err)
+      if not ok or job.code ~= 0 then
+        callback(utils.vec_join(err, job.stderr), nil)
         return
       end
 
-      local out_status
-
-      if #j:result() == 0 then
-        async.util.scheduler()
-        out_status = vcs_utils.ensure_output(2, { j }, context)
-      end
-
-      if out_status == JobStatus.ERROR then
-        callback(j:stderr_result() or {}, nil)
-        return
-      end
-
-      callback(nil, j:result())
+      callback(nil, job.stdout)
     end),
   })
   -- Problem: Running multiple 'show' jobs simultaneously may cause them to fail
   -- silently.
   -- Solution: queue them and run them one after another.
   vcs_utils.queue_sync_job(job)
-end, 4)
+end)
 
 HgAdapter.flags = {
   ---@type FlagOption[]
@@ -1303,7 +1269,7 @@ end
 -- TODO: implement completion
 function HgAdapter:rev_candidates(arg_lead, opt)
   opt = vim.tbl_extend("keep", opt or {}, { accept_range = false }) --[[@as RevCompletionSpec ]]
-  logger.lvl(1).debug("[completion] Revision candidates requested")
+  logger:lvl(1):debug("[completion] Revision candidates requested")
 
   local branches = self:exec_sync(
     { "branches", "--template={branch}\n" },

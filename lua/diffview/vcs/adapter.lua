@@ -1,15 +1,16 @@
-local Job = require("plenary.job")
-local async = require("plenary.async")
+local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
-local JobStatus = lazy.access("diffview.vcs.utils", "JobStatus") ---@type JobStatus|LazyModule
+local Job = lazy.access("diffview.job", "Job") ---@type diffview.Job|LazyModule
 local Rev = lazy.access("diffview.vcs.rev", "Rev") ---@type Rev|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local arg_parser = lazy.require("diffview.arg_parser") ---@module "diffview.arg_parser"
-local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local vcs_utils = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
+
+local await = async.await
+local logger = DiffviewGlobal.logger
 
 local M = {}
 
@@ -143,26 +144,26 @@ end
 
 ---Execute a VCS command synchronously.
 ---@param args string[]
----@param cwd_or_opt? string|utils.system_list.Opt
+---@param cwd_or_opt? string|utils.job.Opt
 ---@return string[] stdout
 ---@return integer code
 ---@return string[] stderr
----@overload fun(self: VCSAdapter, args: string[], cwd: string?)
----@overload fun(self: VCSAdapter, args: string[], opt: utils.system_list.Opt?)
+---@overload fun(self: VCSAdapter, args: string[], cwd?: string)
+---@overload fun(self: VCSAdapter, args: string[], opt?: utils.job.Opt)
 function VCSAdapter:exec_sync(args, cwd_or_opt)
   if not self:class().bootstrap.done then self:class().run_bootstrap() end
 
   local cmd = vim.tbl_flatten({ self:get_command(), args })
 
   if not self:class().bootstrap.ok then
-    logger.error(
+    logger:error(
       ("[VCSAdapter] Can't exec adapter command because bootstrap failed! Cmd: %s")
       :format(table.concat(cmd, " "))
     )
     return
   end
 
-  return utils.system_list(cmd, cwd_or_opt)
+  return utils.job(cmd, cwd_or_opt)
 end
 
 
@@ -178,7 +179,7 @@ function VCSAdapter:handle_co(thread, ok, result)
       debug.traceback(thread, result, 1)
     )
     utils.err(err_msg, true)
-    logger.s_error(table.concat(err_msg, "\n"))
+    logger:error(table.concat(err_msg, "\n"))
   end
   return ok, result
 end
@@ -218,39 +219,34 @@ function VCSAdapter:file_history_options(range, paths, argo)
   oop.abstract_stub()
 end
 
----@class vcs.adapter.FileHistoryWorkerSpec : vcs.adapter.LayoutOpt
-
----@param thread thread
----@param log_opt ConfigLogOptions
----@param opt vcs.adapter.FileHistoryWorkerSpec
+---@param self VCSAdapter
 ---@param co_state table
----@param callback function
-function VCSAdapter:file_history_worker(thread, log_opt, opt, co_state, callback)
+---@param opt vcs.adapter.FileHistoryWorkerSpec
+---@param callback (fun(entries: LogEntry[], status: JobStatus, err?: string)) # Called whenever there are new entries available.
+VCSAdapter.file_history_worker = async.void(function(self, thread, log_opt, opt, co_state, callback)
   oop.abstract_stub()
-end
+end)
 
 ---@diagnostic enable: unused-local, missing-return
 
----@param log_opt ConfigLogOptions
----@param opt vcs.adapter.FileHistoryWorkerSpec
----@param callback function
----@return fun() finalizer
-function VCSAdapter:file_history(log_opt, opt, callback)
-  local thread
+---@class vcs.adapter.FileHistoryWorkerSpec
+---@field log_opt ConfigLogOptions
+---@field layout_opt vcs.adapter.LayoutOpt
 
+---@param opt vcs.adapter.FileHistoryWorkerSpec
+---@param callback (fun(entries: LogEntry[], status: JobStatus, err?: string)) # Called whenever there are new entries available.
+function VCSAdapter:file_history(opt, callback)
   local co_state = {
     shutdown = false,
   }
 
-  thread = coroutine.create(function()
-    self:file_history_worker(thread, log_opt, opt, co_state, callback)
-  end)
+  self:file_history_worker(co_state, opt, callback)
 
-  self:handle_co(thread, coroutine.resume(thread))
-
-  return function()
-    co_state.shutdown = true
-  end
+  return {
+    close = function()
+      co_state.shutdown = true
+    end
+  }
 end
 
 -- Diff View
@@ -331,16 +327,16 @@ end
 ---@param callback function
 VCSAdapter.tracked_files = async.wrap(function(self, left, right, args, kind, opt, callback)
   oop.abstract_stub()
-end, 7)
+end)
 
 ---@param self VCSAdapter
 ---@param left Rev
 ---@param right Rev
 ---@param opt vcs.adapter.LayoutOpt
----@param callback function
+---@param callback? function
 VCSAdapter.untracked_files = async.wrap(function(self, left, right, opt, callback)
   oop.abstract_stub()
-end, 5)
+end)
 
 ---@diagnostic enable: unused-local, missing-return
 
@@ -349,44 +345,28 @@ end, 5)
 ---@param rev? Rev
 ---@param callback fun(stderr: string[]?, stdout: string[]?)
 VCSAdapter.show = async.wrap(function(self, path, rev, callback)
-  local job = Job:new({
+  local job
+  job = Job({
     command = self:bin(),
     args = self:get_show_args(path, rev),
     cwd = self.ctx.toplevel,
-    ---@type Job
-    on_exit = async.void(function(j)
-      local context = "VCSAdapter.show()"
-      utils.handle_job(j, {
-        fail_on_empty = true,
-        context = context,
-        debug_opt = { no_stdout = true, context = context },
-      })
-
-      if j.code ~= 0 then
-        callback(j:stderr_result() or {}, nil)
+    retry = 2,
+    fail_cond = Job.FAIL_COND.on_empty,
+    log_opt = { label = "VCSAdapter:show()" },
+    on_exit = async.void(function(_, ok, err)
+      if not ok or job.code ~= 0 then
+        callback(utils.vec_join(err, job.stderr), nil)
         return
       end
 
-      local out_status
-
-      if #j:result() == 0 then
-        async.util.scheduler()
-        out_status = vcs_utils.ensure_output(2, { j }, context)
-      end
-
-      if out_status == JobStatus.ERROR then
-        callback(j:stderr_result() or {}, nil)
-        return
-      end
-
-      callback(nil, j:result())
+      callback(nil, job.stdout)
     end),
   })
   -- Problem: Running multiple 'show' jobs simultaneously may cause them to fail
   -- silently.
   -- Solution: queue them and run them one after another.
-  vcs_utils.queue_sync_job(job)
-end, 4)
+  await(vcs_utils.queue_sync_job(job))
+end)
 
 ---Convert revs to string representation.
 ---@param left Rev

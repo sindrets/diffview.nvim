@@ -1,3 +1,4 @@
+local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 
 local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1") ---@type Diff1|LazyModule
@@ -11,6 +12,8 @@ local oop = lazy.require("diffview.oop") ---@module "diffview.oop"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
+local await = async.await
+
 local M = {}
 
 ---@class StandardView : View
@@ -121,8 +124,9 @@ function StandardView:use_layout(layout)
   end
 end
 
+---@param self StandardView
 ---@param entry FileEntry
-function StandardView:use_entry(entry)
+StandardView.use_entry = async.void(function(self, entry)
   local layout_key
 
   if entry.layout:instanceof(Diff1.__get()) then
@@ -146,31 +150,36 @@ function StandardView:use_entry(entry)
   end
 
   local old_layout = self.cur_layout
+  self.cur_entry = entry
 
   if entry.layout:class() == self.cur_layout:class() then
     self.cur_layout.emitter = entry.layout.emitter
-    self.cur_layout:use_entry(entry)
+    await(self.cur_layout:use_entry(entry))
   else
     if self.layouts[entry.layout:class()] then
       self.cur_layout = self.layouts[entry.layout:class()]
       self.cur_layout.emitter = entry.layout.emitter
-      self.cur_layout:use_entry(entry)
     else
       self:use_layout(entry.layout)
       self.cur_layout.emitter = entry.layout.emitter
-      self.cur_layout:use_entry(entry)
     end
 
-    self.cur_layout:create()
+    await(self.cur_layout:use_entry(entry))
+    local future = self.cur_layout:create()
     old_layout:destroy()
+
+    -- Wait for files to be created + opened
+    await(future)
 
     if not vim.o.equalalways then
       vim.cmd("wincmd =")
     end
-  end
 
-  self.cur_entry = entry
-end
+    if self.cur_layout:is_focused() then
+      self.cur_layout:get_main_win():focus()
+    end
+  end
+end)
 
 M.StandardView = StandardView
 

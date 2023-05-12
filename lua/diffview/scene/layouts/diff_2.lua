@@ -1,7 +1,10 @@
+local async = require("diffview.async")
 local RevType = require("diffview.vcs.rev").RevType
 local Window = require("diffview.scene.window").Window
 local Layout = require("diffview.scene.layout").Layout
 local oop = require("diffview.oop")
+
+local await = async.await
 
 local M = {}
 
@@ -38,8 +41,9 @@ function Diff2:set_file_b(file)
   file.symbol = "b"
 end
 
+---@param self Diff2
 ---@param entry FileEntry
-function Diff2:use_entry(entry)
+Diff2.use_entry = async.void(function(self, entry)
   local layout = entry.layout --[[@as Diff2 ]]
   assert(layout:instanceof(Diff2))
 
@@ -47,9 +51,9 @@ function Diff2:use_entry(entry)
   self:set_file_b(layout.b.file)
 
   if self:is_valid() then
-    self:open_files()
+    await(self:open_files())
   end
-end
+end)
 
 function Diff2:get_main_win()
   return self.b

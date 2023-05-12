@@ -6,10 +6,10 @@ local StandardView = lazy.access("diffview.scene.views.standard.standard_view", 
 local arg_parser = lazy.require("diffview.arg_parser") ---@module "diffview.arg_parser"
 local config = lazy.require("diffview.config") ---@module "diffview.config"
 local vcs = lazy.require("diffview.vcs") ---@module "diffview.vcs"
-local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
+local logger = DiffviewGlobal.logger
 
 local M = {}
 
@@ -21,7 +21,7 @@ function M.diffview_open(args)
   local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
   local rev_arg = argo.args[1]
 
-  logger.info("[command call] :DiffviewOpen " .. table.concat(vim.tbl_flatten({
+  logger:info("[command call] :DiffviewOpen " .. table.concat(vim.tbl_flatten({
     default_args,
     args,
   }), " "))
@@ -60,7 +60,7 @@ function M.diffview_open(args)
   end
 
   table.insert(M.views, v)
-  logger.lvl(1).s_debug("DiffView instantiation successful!")
+  logger:debug("DiffView instantiation successful!")
 
   return v
 end
@@ -71,7 +71,7 @@ function M.file_history(range, args)
   local default_args = config.get_config().default_args.DiffviewFileHistory
   local argo = arg_parser.parse(vim.tbl_flatten({ default_args, args }))
 
-  logger.info("[command call] :DiffviewFileHistory " .. table.concat(vim.tbl_flatten({
+  logger:info("[command call] :DiffviewFileHistory " .. table.concat(vim.tbl_flatten({
     default_args,
     args,
   }), " "))
@@ -106,7 +106,7 @@ function M.file_history(range, args)
   end
 
   table.insert(M.views, v)
-  logger.lvl(1).s_debug("FileHistoryView instantiation successful!")
+  logger:debug("FileHistoryView instantiation successful!")
 
   return v
 end

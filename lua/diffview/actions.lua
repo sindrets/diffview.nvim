@@ -1,3 +1,4 @@
+local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 
 local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
@@ -19,6 +20,8 @@ local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4") ---@type Dif
 local Diff4Mixed = lazy.access("diffview.scene.layouts.diff_4_mixed", "Diff4Mixed") ---@type Diff4Mixed|LazyModule
 
 local api = vim.api
+local await = async.await
+local pl = lazy.access(utils, "path") ---@type PathLib
 
 local M = setmetatable({}, {
   __index = function(_, k)
@@ -46,11 +49,11 @@ local function prepare_goto_file()
   if file then
     ---@cast file FileEntry
     -- Ensure file exists
-    if not utils.path:readable(file.absolute_path) then
+    if not pl:readable(file.absolute_path) then
       utils.err(
         string.format(
           "File does not exist on disk: '%s'",
-          utils.path:relative(file.absolute_path, ".")
+          pl:relative(file.absolute_path, ".")
         )
       )
       return
@@ -386,7 +389,7 @@ end
 
 ---@param target "ours"|"theirs"|"base"|"all"|"none"
 function M.conflict_choose_all(target)
-  return function()
+  return async.void(function()
     local view = lib.get_current_view() --[[@as DiffView ]]
 
     if (view and view:instanceof(DiffView.__get())) then
@@ -396,21 +399,15 @@ function M.conflict_choose_all(target)
         local item = view:infer_cur_file(false) ---@cast item -DirData
         if not item then return end
 
-        if item.active then
-          -- The entry is already open and the action can proceed like normal
-          resolve_all_conflicts(view, target)
-        else
-          -- The entry is not open
-          view.emitter:once("file_open_post", utils.bind(resolve_all_conflicts, view, target))
-
+        if not item.active then
           -- Open the entry
-          view:set_file(item)
+          await(view:set_file(item))
         end
-      else
-        resolve_all_conflicts(view, target)
       end
+
+      resolve_all_conflicts(view, target)
     end
-  end
+  end)
 end
 
 ---@param target "ours"|"theirs"|"base"|"all"|"none"

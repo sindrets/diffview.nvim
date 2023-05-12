@@ -1,10 +1,12 @@
----@diagnostic disable: redefined-local
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
-local luv = vim.loop
+
+local uv = vim.loop
+
 local M = {}
 
 ---@class PerfTimer : diffview.Object
+---@operator call : PerfTimer
 ---@field subject string|nil
 ---@field first integer Start time (ns)
 ---@field last integer Stop time (ns)
@@ -17,12 +19,12 @@ local PerfTimer = oop.create_class("PerfTimer")
 function PerfTimer:init(subject)
   self.subject = subject
   self.laps = {}
-  self.first = luv.hrtime()
+  self.first = uv.hrtime()
 end
 
 function PerfTimer:reset()
   self.laps = {}
-  self.first = luv.hrtime()
+  self.first = uv.hrtime()
   self.final_time = nil
 end
 
@@ -31,14 +33,14 @@ end
 function PerfTimer:lap(subject)
   self.laps[#self.laps + 1] = {
     subject or #self.laps + 1,
-    (luv.hrtime() - self.first) / 1000000,
+    (uv.hrtime() - self.first) / 1000000,
   }
 end
 
 ---Set final time.
 ---@return number
 function PerfTimer:time()
-  self.last = luv.hrtime() - self.first
+  self.last = uv.hrtime() - self.first
   self.final_time = self.last / 1000000
 
   return self.final_time

@@ -52,6 +52,6 @@ end, { nargs = 0, bang = true })
 
 command("DiffviewLog", function()
   vim.cmd(("sp %s | norm! G"):format(
-    vim.fn.fnameescape(require("diffview.logger").outfile)
+    vim.fn.fnameescape(DiffviewGlobal.logger.outfile)
   ))
 end, { nargs = 0, bang = true })

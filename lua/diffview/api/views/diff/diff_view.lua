@@ -1,3 +1,4 @@
+local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 
 local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
@@ -5,11 +6,11 @@ local FileEntry = lazy.access("diffview.scene.file_entry", "FileEntry") ---@type
 local FilePanel = lazy.access("diffview.scene.views.diff.file_panel", "FilePanel") ---@type FilePanel|LazyModule
 local Rev = lazy.access("diffview.vcs.adapters.git.rev", "GitRev") ---@type GitRev|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
-local async = lazy.require("plenary.async") ---@module "plenary.async"
 local vcs_utils = lazy.require("diffview.vcs") ---@module "diffview.vcs"
-local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 local oop = lazy.require("diffview.oop") ---@module "diffview.oop"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
+
+local logger = DiffviewGlobal.logger
 
 local M = {}
 
@@ -31,7 +32,7 @@ local CDiffView = oop.create_class("CDiffView", DiffView.__get())
 ---CDiffView constructor.
 ---@param opt any
 function CDiffView:init(opt)
-  logger.info("[api] Creating a new Custom DiffView.")
+  logger:info("[api] Creating a new Custom DiffView.")
   self.valid = false
 
   local err, adapter = vcs_utils.get_adapter({ top_indicators = { opt.git_root } })
@@ -90,7 +91,6 @@ end
 ---@override
 CDiffView.get_updated_files = async.wrap(function(self, callback)
   local err
-  callback = async.void(callback)
 
   repeat
     local ok, new_files = pcall(self.fetch_files, self)
@@ -113,9 +113,9 @@ CDiffView.get_updated_files = async.wrap(function(self, callback)
   until true
 
   utils.err(err, true)
-  logger.s_error(table.concat(err, "\n"))
+  logger:error(table.concat(err, "\n"))
   callback(err, nil)
-end, 2)
+end)
 
 function CDiffView:create_file_entries(files)
   local entries = {}

@@ -8,11 +8,12 @@ local lazy = require("diffview.lazy")
 local arg_parser = lazy.require("diffview.arg_parser") ---@module "diffview.arg_parser"
 local config = lazy.require("diffview.config") ---@module "diffview.config"
 local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
-local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local vcs = lazy.require("diffview.vcs") ---@module "diffview.vcs"
 
 local api = vim.api
+local logger = DiffviewGlobal.logger
+local pl = lazy.access(utils, "path") ---@type PathLib
 
 local M = {}
 
@@ -152,18 +153,18 @@ end
 ---Create a temporary adapter to get relevant completions
 ---@return VCSAdapter?
 function M.get_adapter()
-    local cfile = utils.path:vim_expand("%")
+    local cfile = pl:vim_expand("%")
     local top_indicators = utils.vec_join(
       vim.bo.buftype == ""
-          and utils.path:absolute(cfile)
+          and pl:absolute(cfile)
           or nil,
-      utils.path:realpath(".")
+      pl:realpath(".")
     )
 
     local err, adapter = vcs.get_adapter({ top_indicators = top_indicators })
 
     if err then
-      logger.s_warn("[completion] Failed to create adapter: " .. err)
+      logger:warn("[completion] Failed to create adapter: " .. err)
     end
 
     return adapter

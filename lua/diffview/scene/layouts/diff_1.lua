@@ -1,3 +1,4 @@
+local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 local Layout = require("diffview.scene.layout").Layout
 local oop = require("diffview.oop")
@@ -10,6 +11,8 @@ local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|Lazy
 local Window = lazy.access("diffview.scene.window", "Window") ---@type Window|LazyModule
 
 local api = vim.api
+local await = async.await
+
 local M = {}
 
 ---@class Diff1 : Layout
@@ -68,17 +71,18 @@ function Diff1:set_file_b(file)
   file.symbol = "b"
 end
 
+---@param self Diff1
 ---@param entry FileEntry
-function Diff1:use_entry(entry)
+Diff1.use_entry = async.void(function(self, entry)
   local layout = entry.layout --[[@as Diff1 ]]
   assert(layout:instanceof(Diff1))
 
   self:set_file_b(layout.b.file)
 
   if self:is_valid() then
-    self:open_files()
+    await(self:open_files())
   end
-end
+end)
 
 function Diff1:get_main_win()
   return self.b

@@ -2,6 +2,8 @@ local config = require("diffview.config")
 local hl = require("diffview.hl")
 local utils = require("diffview.utils")
 
+local pl = utils.path
+
 ---@param comp  RenderComponent
 ---@param show_path boolean
 ---@param depth integer|nil
@@ -147,7 +149,7 @@ return function(panel)
   local comp = panel.components.path.comp
 
   comp:add_line(
-    utils.path:shorten(utils.path:vim_fnamemodify(panel.adapter.ctx.toplevel, ":~"), width - 6),
+    pl:shorten(pl:vim_fnamemodify(panel.adapter.ctx.toplevel, ":~"), width - 6),
     "DiffviewFilePanelRootPath"
   )
 
@@ -200,9 +202,9 @@ return function(panel)
     comp = panel.components.info.entries.comp
 
     for _, arg in ipairs(extra_info) do
-      local relpath = utils.path:relative(arg, panel.adapter.ctx.toplevel)
+      local relpath = pl:relative(arg, panel.adapter.ctx.toplevel)
       if relpath == "" then relpath = "." end
-      comp:add_line(utils.path:shorten(relpath, width - 5), "DiffviewFilePanelPath")
+      comp:add_line(pl:shorten(relpath, width - 5), "DiffviewFilePanelPath")
     end
   end
 end

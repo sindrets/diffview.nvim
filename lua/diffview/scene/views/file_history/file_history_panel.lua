@@ -1,19 +1,23 @@
+local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 
 local FHOptionPanel = lazy.access("diffview.scene.views.file_history.option_panel", "FHOptionPanel") ---@type FHOptionPanel|LazyModule
+local JobStatus = lazy.access("diffview.vcs.utils", "JobStatus") ---@type JobStatus|LazyModule
 local LogEntry = lazy.access("diffview.vcs.log_entry", "LogEntry") ---@type LogEntry|LazyModule
 local Panel = lazy.access("diffview.ui.panel", "Panel") ---@type Panel|LazyModule
 local PerfTimer = lazy.access("diffview.perf", "PerfTimer") ---@type PerfTimer|LazyModule
 local config = lazy.require("diffview.config") ---@module "diffview.config"
 local debounce = lazy.require("diffview.debounce") ---@module "diffview.debounce"
-local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
 local oop = lazy.require("diffview.oop") ---@module "diffview.oop"
 local panel_renderer = lazy.require("diffview.scene.views.file_history.render") ---@module "diffview.scene.views.file_history.render"
 local renderer = lazy.require("diffview.renderer") ---@module "diffview.renderer"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
-local JobStatus = lazy.access('diffview.vcs.utils', 'JobStatus') ---@type JobStatus|LazyModule
 local api = vim.api
+local await = async.await
+local fmt = string.format
+local logger = DiffviewGlobal.logger
+
 local M = {}
 
 ---@type PerfTimer
@@ -21,13 +25,15 @@ local perf_render = PerfTimer("[FileHistoryPanel] render")
 ---@type PerfTimer
 local perf_update = PerfTimer("[FileHistoryPanel] update")
 
+---@alias FileHistoryPanel.CurItem { [1]: LogEntry, [2]: FileEntry }
+
 ---@class FileHistoryPanel : Panel
 ---@field parent FileHistoryView
 ---@field adapter VCSAdapter
 ---@field entries LogEntry[]
 ---@field rev_range RevRange
 ---@field log_options ConfigLogOptions
----@field cur_item {[1]: LogEntry, [2]: FileEntry}
+---@field cur_item FileHistoryPanel.CurItem
 ---@field single_file boolean
 ---@field updating boolean
 ---@field shutdown boolean
@@ -172,61 +178,66 @@ function FileHistoryPanel:update_components()
   self.constrain_cursor = renderer.create_cursor_constraint({ self.components.log.entries.comp })
 end
 
-function FileHistoryPanel:update_entries(callback)
+---@param self FileHistoryPanel
+---@param callback function
+FileHistoryPanel.update_entries = async.wrap(function(self, callback)
   perf_update:reset()
   local c = 0
-  local timeout = 64
+  local timeout = 128
   local ldt = 0 -- Last draw time
   local lock = false
-  local update, finalizer
+  ---@type ManagedFn, Closeable
+  local update, handle
 
-  update = debounce.throttle_trailing(timeout, true, function(entries, status, msg)
-    if status == JobStatus.ERROR then
-      self.updating = false
+  update = debounce.throttle_trailing(
+    timeout,
+    true,
+    async.void(function(entries, status, msg)
+      if status == JobStatus.ERROR then
+        self.updating = false
 
-      vim.schedule(function()
-        utils.err(utils.vec_join(
-          ("Updating file history failed! %s"):format(msg and "Error message:" or ""),
-          msg
-        ))
+        await(async.scheduler())
+
+        utils.err(fmt("Updating file history failed! Error message: %s", msg))
 
         self:render()
         self:redraw()
         self.option_panel:sync()
-        callback(nil, JobStatus.ERROR, msg)
-      end)
-
-      update:close()
-      return
-
-    elseif status == JobStatus.PROGRESS then
-      if self.shutdown then
-        -- The parent view has closed: shutdown git jobs and clean up.
-        finalizer()
         update:close()
-        vim.schedule(function()
+        callback(nil, JobStatus.ERROR, msg)
+        return
+
+      elseif status == JobStatus.PROGRESS then
+        if self.shutdown then
+          -- The parent view has closed: shutdown git jobs and clean up.
+          handle.close()
+          update.close()
+
           if self.option_panel then
-            self.option_panel:sync()
+            vim.schedule(function() self.option_panel:sync() end)
           end
-        end)
-        callback(nil, JobStatus.KILLED)
-        return
+
+          callback(nil, JobStatus.KILLED)
+          return
+        end
+
+        if #entries <= c or lock then
+          return
+        end
       end
 
-      if #entries <= c or lock then
-        return
-      end
-    end
+      lock = true
 
-    lock = true
+      await(async.scheduler())
 
-    vim.schedule(function()
+      if self.shutdown then return end
       c = #entries
+
       if ldt > timeout then
-        logger.lvl(10).debug(string.format(
+        logger:lvl(10):fmt_debug(
           "[FH_PANEL] Rendering is slower than throttle timeout (%.3f ms). Skipping update.",
           ldt
-        ))
+        )
 
         ldt = ldt - timeout
         lock = false
@@ -250,14 +261,14 @@ function FileHistoryPanel:update_entries(callback)
       if status == JobStatus.SUCCESS then
         update:close()
         perf_update:time()
-        logger.s_info(string.format(
+        logger:fmt_info(
           "[FileHistory] Completed update for %d entries successfully (%.3f ms).",
           #self.entries,
           perf_update.final_time
-        ))
+        )
       end
 
-      if (was_empty or status == JobStatus.SUCCESS) and type(callback) == "function" then
+      if (was_empty or status == JobStatus.SUCCESS) then
         vim.cmd("redraw")
         self.option_panel:sync()
         callback(entries, status)
@@ -265,7 +276,7 @@ function FileHistoryPanel:update_entries(callback)
 
       lock = false
     end)
-  end)
+  )
 
   for _, entry in ipairs(self.entries) do
     entry:destroy()
@@ -276,14 +287,16 @@ function FileHistoryPanel:update_entries(callback)
   self.entries = {}
   self.updating = true
 
-  finalizer = self.adapter:file_history(
-    self.log_options,
-    { default_layout = self.parent.get_default_layout(), },
-    update
+  handle = self.adapter:file_history(
+    {
+      log_opt = self.log_options,
+      layout_opt = { default_layout = self.parent.get_default_layout() },
+    },
+    update --[[@as function ]]
   )
 
   self:sync()
-end
+end)
 
 function FileHistoryPanel:num_items()
   if self.single_file then
@@ -312,6 +325,7 @@ function FileHistoryPanel:list_files()
   return files
 end
 
+---@param file FileEntry
 function FileHistoryPanel:find_entry(file)
   for _, entry in ipairs(self.entries) do
     for _, f in ipairs(entry.files) do
@@ -355,6 +369,7 @@ function FileHistoryPanel:get_log_entry_at_cursor()
   return self:find_entry(item --[[@as FileEntry ]])
 end
 
+---@param new_item FileHistoryPanel.CurItem
 function FileHistoryPanel:set_cur_item(new_item)
   if self.cur_item[2] then
     self.cur_item[2]:set_active(false)
@@ -453,16 +468,19 @@ function FileHistoryPanel:next_file()
   return self:set_file_by_offset(vim.v.count1)
 end
 
+---@param item LogEntry|FileEntry
 function FileHistoryPanel:highlight_item(item)
   if not (self:is_open() and self:buf_loaded()) then return end
 
   if item:instanceof(LogEntry.__get()) then
+    ---@cast item LogEntry
     for _, comp_struct in ipairs(self.components.log.entries) do
       if comp_struct.comp.context == item then
         pcall(api.nvim_win_set_cursor, self.winid, { comp_struct.comp.lstart, 0 })
       end
     end
   else
+    ---@cast item FileEntry
     for _, comp_struct in ipairs(self.components.log.entries) do
       local i = utils.vec_indexof(comp_struct.comp.context.files, item)
 
@@ -537,7 +555,7 @@ function FileHistoryPanel:render()
   perf_render:reset()
   panel_renderer.file_history_panel(self)
   perf_render:time()
-  logger.lvl(10).s_debug(perf_render)
+  logger:lvl(10):debug(perf_render)
 end
 
 ---@return LogOptions

@@ -1,28 +1,39 @@
-local utils = require "diffview.utils"
+local utils = require("diffview.utils")
+
+local uv = vim.loop
+
 local M = {}
 
----@class ManagedFn : function
----@field close fun() Release timer handle.
+---@class Closeable
+---@field close fun() # Perform cleanup and release the associated handle.
+
+---@class ManagedFn : Closeable
+
+---@param ... uv_handle_t
+function M.try_close(...)
+  local args = { ... }
+
+  for i = 1, select("#", ...) do
+    local handle = args[i]
+
+    if handle and not handle:is_closing() then
+      handle:close()
+    end
+  end
+end
 
 ---@return ManagedFn
 local function wrap(timer, fn)
-  local function close()
-    timer:stop()
-    if not timer:is_closing() then
-      timer:close()
-    end
-  end
-
   return setmetatable({}, {
     __call = function(_, ...)
       fn(...)
     end,
-    __index = function(_, k)
-      if k == "close" then
-        return close
-      end
-      return nil
-    end,
+    __index = {
+      close = function()
+        timer:stop()
+        M.try_close(timer)
+      end,
+    },
   })
 end
 
@@ -31,7 +42,7 @@ end
 ---@param fn function Function to debounce
 ---@return ManagedFn # Debounced function.
 function M.debounce_leading(ms, fn)
-  local timer = vim.loop.new_timer()
+  local timer = assert(uv.new_timer())
   local lock = false
 
   return wrap(timer, function(...)
@@ -53,7 +64,7 @@ end
 ---@param fn function Function to debounce
 ---@return ManagedFn # Debounced function.
 function M.debounce_trailing(ms, rush_first, fn)
-  local timer = vim.loop.new_timer()
+  local timer = assert(uv.new_timer())
   local lock = false
   local debounced_fn, args
 
@@ -84,7 +95,7 @@ end
 ---@param fn function Function to throttle
 ---@return ManagedFn # throttled function.
 function M.throttle_leading(ms, fn)
-  local timer = vim.loop.new_timer()
+  local timer = assert(uv.new_timer())
   local lock = false
 
   return wrap(timer, function(...)
@@ -106,7 +117,7 @@ end
 ---@param fn function Function to throttle
 ---@return ManagedFn # throttled function.
 function M.throttle_trailing(ms, rush_first, fn)
-  local timer = vim.loop.new_timer()
+  local timer = assert(uv.new_timer())
   local lock = false
   local throttled_fn, args
 
@@ -140,4 +151,51 @@ function M.throttle_trailing(ms, rush_first, fn)
   return throttled_fn
 end
 
+---Repeatedly call `func` with a fixed time delay.
+---@param func function
+---@param delay integer # Delay between executions (ms)
+---@return Closeable
+function M.set_interval(func, delay)
+  local timer = assert(uv.new_timer())
+
+  local ret = {
+    close = function()
+      timer:stop()
+      M.try_close(timer)
+    end,
+  }
+
+  timer:start(delay, delay, function()
+    local should_close = func()
+    if type(should_close) == "boolean" and should_close then
+      ret.close()
+    end
+  end)
+
+  return ret
+end
+
+---Call `func` after a fixed time delay.
+---@param func function
+---@param delay integer # Delay until execution (ms)
+---@return Closeable
+function M.set_timeout(func, delay)
+  local timer = assert(uv.new_timer())
+
+  local ret = {
+    close = function()
+      timer:stop()
+      M.try_close(timer)
+    end,
+  }
+
+  timer:start(delay, 0, function()
+    func()
+    ret.close()
+  end)
+
+  return ret
+end
+
 return M
+

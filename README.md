@@ -18,7 +18,6 @@ for any git rev.
 - Git ≥ 2.31.0 (for Git support)
 - Mercurial (for Mercurial support)
 - Neovim ≥ 0.7.0
-- [plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
 - [nvim-web-devicons](https://github.com/nvim-tree/nvim-web-devicons) (optional) For file icons
 
 ## Installation
@@ -27,13 +26,12 @@ Install the plugin with your package manager of choice.
 
 ```vim
 " Plug
-Plug 'nvim-lua/plenary.nvim'
-Plug 'sindrets/diffview.nvim'
+Plug "sindrets/diffview.nvim"
 ```
 
 ```lua
 -- Packer
-use { 'sindrets/diffview.nvim', requires = 'nvim-lua/plenary.nvim' }
+use "sindrets/diffview.nvim" 
 ```
 
 ## Merge Tool

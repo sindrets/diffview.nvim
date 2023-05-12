@@ -7,6 +7,7 @@ local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|Lazy
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
+local pl = lazy.access(utils, "path") ---@type PathLib
 
 local M = {}
 
@@ -60,10 +61,10 @@ function FileEntry:init(opt)
   self.adapter = opt.adapter
   self.path = opt.path
   self.oldpath = opt.oldpath
-  self.absolute_path = utils.path:absolute(opt.path, opt.adapter.ctx.toplevel)
-  self.parent_path = utils.path:parent(opt.path) or ""
-  self.basename = utils.path:basename(opt.path)
-  self.extension = utils.path:extension(opt.path)
+  self.absolute_path = pl:absolute(opt.path, opt.adapter.ctx.toplevel)
+  self.parent_path = pl:parent(opt.path) or ""
+  self.basename = pl:basename(opt.path)
+  self.extension = pl:extension(opt.path)
   self.revs = opt.revs
   self.layout = opt.layout
   self.status = opt.status
@@ -136,7 +137,7 @@ end
 
 ---@param stat? table
 function FileEntry:validate_stage_buffers(stat)
-  stat = stat or utils.path:stat(utils.path:join(self.adapter.ctx.dir, "index"))
+  stat = stat or pl:stat(pl:join(self.adapter.ctx.dir, "index"))
   local cached_stat = utils.tbl_access(fstat_cache, { self.adapter.ctx.toplevel, "index" })
 
   if stat and (not cached_stat or cached_stat.mtime < stat.mtime.sec) then
@@ -281,7 +282,7 @@ end
 ---@static
 ---@param adapter VCSAdapter
 function FileEntry.update_index_stat(adapter, stat)
-  stat = stat or utils.path:stat(utils.path:join(adapter.ctx.toplevel, "index"))
+  stat = stat or pl:stat(pl:join(adapter.ctx.toplevel, "index"))
 
   if stat then
     if not fstat_cache[adapter.ctx.toplevel] then

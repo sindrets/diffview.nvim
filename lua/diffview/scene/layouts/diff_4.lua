@@ -1,12 +1,13 @@
+local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 local Window = require("diffview.scene.window").Window
 local Layout = require("diffview.scene.layout").Layout
 local oop = require("diffview.oop")
 
----@type Diff1|LazyModule
-local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1")
----@type Diff3|LazyModule
-local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3")
+local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1") ---@type Diff1|LazyModule
+local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3") ---@type Diff3|LazyModule
+
+local await = async.await
 
 local M = {}
 
@@ -63,8 +64,9 @@ function Diff4:set_file_d(file)
   file.symbol = "d"
 end
 
+---@param self Diff4
 ---@param entry FileEntry
-function Diff4:use_entry(entry)
+Diff4.use_entry = async.void(function(self, entry)
   local layout = entry.layout --[[@as Diff4 ]]
   assert(layout:instanceof(Diff4))
 
@@ -74,9 +76,9 @@ function Diff4:use_entry(entry)
   self:set_file_d(layout.d.file)
 
   if self:is_valid() then
-    self:open_files()
+    await(self:open_files())
   end
-end
+end)
 
 function Diff4:get_main_win()
   return self.b

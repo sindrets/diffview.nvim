@@ -4,10 +4,6 @@ local M = {}
 
 M.plugin_deps = {
   {
-    name = "plenary",
-    optional = false,
-  },
-  {
     name = "nvim-web-devicons",
     optional = true,
   },

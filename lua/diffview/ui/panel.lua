@@ -1,13 +1,16 @@
 local EventEmitter = require("diffview.events").EventEmitter
 local File = require("diffview.vcs.file").File
 local PerfTimer = require("diffview.perf").PerfTimer
-local logger = require("diffview.logger")
 local oop = require("diffview.oop")
 local renderer = require("diffview.renderer")
 local utils = require("diffview.utils")
 
-local M = {}
 local api = vim.api
+local logger = DiffviewGlobal.logger
+local pl = utils.path
+
+local M = {}
+
 local uid_counter = 0
 
 ---@alias PanelConfig PanelFloatSpec|PanelSplitSpec
@@ -351,7 +354,7 @@ function Panel:init_buffer()
   end
 
   local bufname
-  if utils.path:is_abs(self.bufname) or utils.path:is_uri(self.bufname) then
+  if pl:is_abs(self.bufname) or pl:is_uri(self.bufname) then
     bufname = self.bufname
   else
     bufname = string.format("diffview:///panels/%d/%s", Panel.next_uid(), self.bufname)
@@ -391,7 +394,7 @@ function Panel:redraw()
   perf:reset()
   renderer.render(self.bufid, self.render_data)
   perf:time()
-  logger.lvl(10).s_debug(perf)
+  logger:lvl(10):debug(perf)
 end
 
 ---Update components, render and redraw.

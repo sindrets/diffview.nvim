@@ -1,32 +1,29 @@
+local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 
-local async = lazy.require("plenary.async") ---@module "plenary.async"
-local logger = lazy.require("diffview.logger") ---@module "diffview.logger"
-
----@module "plenary.job"
-local Job = lazy.require("plenary.job", function(m)
-  -- Ensure plenary's `new` method will use the right metatable when this is
-  -- invoked as a method.
-  local new = m.new
-  function m.new(_, ...)
-    return new(m, ...)
-  end
-  return m
-end)
+local Job = lazy.access("diffview.job", "Job") ---@type diffview.Job|LazyModule
 
 local api = vim.api
+local await = async.await
+local logger = DiffviewGlobal.logger
+
 local M = {}
 
 ---@class vector<T> : { [integer]: T }
 ---@alias falsy false|nil
+---@alias truthy true|number|string|table|function|thread|userdata
 
-local mapping_callbacks = {}
 local path_sep = package.config:sub(1, 1)
 
 ---@type PathLib
 M.path = lazy.require("diffview.path", function(module)
   return module.PathLib({ separator = "/" })
 end)
+
+---@return number # Current time (ms)
+function M.now()
+  return vim.loop.hrtime() / 1000000
+end
 
 ---Echo string with multiple lines.
 ---@param msg string|string[]
@@ -92,8 +89,7 @@ function M.err(msg, schedule)
   end
   msg = M.vec_slice(msg)
 
-  local log_fn = schedule and logger.s_error or logger.error
-  log_fn(table.concat(msg, "\n"))
+  logger:error(table.concat(msg, "\n"))
 
   msg[1] = "[Diffview.nvim] " .. msg[1]
   M.echo_multiln(msg, "ErrorMsg", schedule)
@@ -106,7 +102,7 @@ end
 ---@return any result Return value
 function M.no_win_event_call(f)
   local last = vim.o.eventignore
-  ---@diagnostic disable-next-line: undefined-field
+  ---@diagnostic disable-next-line: param-type-mismatch
   vim.opt.eventignore:prepend(
     "WinEnter,WinLeave,WinNew,WinClosed,BufWinEnter,BufWinLeave,BufEnter,BufLeave"
   )
@@ -146,8 +142,8 @@ function M.pick(index, ...)
 end
 
 ---Get the first non-nil value among the given arguments.
----@param ... unknown
----@return unknown?
+---@param ... any
+---@return any?
 function M.sate(...)
   local args = { ... }
 
@@ -327,150 +323,46 @@ function M.str_quote(s, opt)
   end
 end
 
----@class utils.handle_job.Opt
----@field fail_on_empty boolean Consider the job as failed if the code is 0 and stdout is empty.
----@field log_func function|string
----@field context string Context for the logger.
----@field debug_opt LogJobSpec
-
----Handles logging of failed jobs. If the given job hasn't failed, this does nothing.
----@param job Job
----@param opt? utils.handle_job.Opt
-function M.handle_job(job, opt)
-  ---@cast job Job|{ [string]: any }
-
-  opt = opt or {}
-  local empty = false
-  if opt.fail_on_empty then
-    local out = job:result()
-    empty = not (out[2] ~= nil or out[1] and out[1] ~= "")
-  end
-
-  if job.code == 0 and not empty then
-    if opt.debug_opt then
-      logger.log_job(job, opt.debug_opt)
-    end
-    return
-  end
-
-  local log_func = logger.s_error
-
-  if type(opt.log_func) == "string" then
-    log_func = logger[opt.log_func]
-  elseif type(opt.log_func) == "function" then
-    log_func = opt.log_func --[[@as function ]]
-  end
-
-  local args = vim.tbl_map(function(arg)
-    return ("'%s'"):format(arg:gsub("'", [['"'"']]))
-  end, job.args) --[[@as string[] ]]
-
-  local msg
-  local context = opt.context and ("[%s] "):format(opt.context) or ""
-  if empty and job.code == 0 then
-    msg = ("%sJob expected output, but returned nothing! Code: %s"):format(context, job.code)
-  else
-    msg = ("%sJob exited with a non-zero exit status! Code: %s"):format(context, job.code)
-  end
-
-  log_func(msg)
-  log_func(("%s   [cmd] %s %s"):format(context, job.command, table.concat(args, " ")))
-
-  if job._raw_cwd then
-    log_func(("%s   [cwd] %s"):format(context, job._raw_cwd))
-  end
-
-  local stderr = job:stderr_result()
-  if #stderr > 0 then
-    log_func(("%s[stderr] %s"):format(context, table.concat(stderr, "\n")))
-  end
-end
-
----@class utils.system_list.Opt
+---@class utils.job.Opt
 ---@field cwd string Working directory of the job.
----@field writer Job|table|string Something that will write to the stdin of this job.
+---@field writer string|string[] Something that will write to the stdin of this job.
 ---@field silent boolean Supress log output.
----@field fail_on_empty boolean Return code 1 if stdout is empty and code is 0.
----@field retry_on_empty integer Number of times to retry job if stdout is empty and code is 0. Implies `fail_on_empty`.
----@field context string Context for the logger.
----@field debug_opt LogJobSpec
+---@field fail_on_empty boolean Return code 1 if stdout is empty.
+---@field retry integer Number of times the job will be retried if it fails.
+---@field log_opt Logger.log_job.Opt
 
----Get the output of a system command.
 ---@param cmd string[]
----@param cwd_or_opt? string|utils.system_list.Opt
----@return string[] stdout
----@return integer code
----@return string[] stderr
----@overload fun(cmd: string[], cwd: string?)
----@overload fun(cmd: string[], opt: utils.system_list.Opt?)
-function M.system_list(cmd, cwd_or_opt)
-  if vim.in_fast_event() then
-    async.util.scheduler()
-  end
-
-  ---@type utils.system_list.Opt
+---@param cwd_or_opt? string|utils.job.Opt
+function M.job(cmd, cwd_or_opt)
   local opt
+
   if type(cwd_or_opt) == "string" then
     opt = { cwd = cwd_or_opt }
   else
     opt = cwd_or_opt or {}
   end
 
-  opt.fail_on_empty = vim.F.if_nil(opt.fail_on_empty, (opt.retry_on_empty or 0) > 0)
-  opt.context = opt.context or "system_list()"
-  local context = ("[%s] "):format(opt.context)
-  ---@diagnostic disable-next-line: redefined-local
-  local logger = opt.silent and logger.mock or logger
-
-  local command = table.remove(cmd, 1)
-  local num_retries = 0
-  local max_retries = opt.retry_on_empty or 0
-  local job, stdout, stderr, code, empty
-  local job_spec = {
-    command = command,
-    args = cmd,
+  local job = Job({
+    command = cmd[1],
+    args = M.vec_slice(cmd, 2),
     cwd = opt.cwd,
+    retry = opt.retry,
+    fail_cond = opt.fail_on_empty and Job.FAIL_COND.on_empty or nil,
     writer = opt.writer,
-    on_stderr = function(_, data)
-      table.insert(stderr, data)
-    end,
-  }
+    log_opt = vim.tbl_extend("keep", opt.log_opt or {}, {
+      silent = opt.silent,
+      debuginfo = debug.getinfo(2, "Sl"),
+    }),
+  })
 
-  for i = 0, max_retries do
-    if i > 0 then
-      logger.warn(
-        ("%sJob expected output, but returned nothing! Retrying %d more time(s)...")
-        :format(context, max_retries - i + 1)
-      )
-      logger.log_job(job, { func = logger.warn, context = opt.context })
-      num_retries = num_retries + 1
-    end
+  local ok = job:sync()
+  local code = job.code
 
-    stderr = {}
-    job = Job:new(job_spec)
-    stdout, code = job:sync()
-    empty = not (stdout[2] ~= nil or stdout[1] and stdout[1] ~= "")
-
-    if (code ~= 0 or not empty) then
-      break
-    end
+  if not ok then
+    if opt.fail_on_empty then code = 1 end
   end
 
-  if opt.debug_opt then
-    M.handle_job(job, { fail_on_empty = opt.fail_on_empty, debug_opt = opt.debug_opt })
-  elseif not opt.silent then
-    M.handle_job(job, { fail_on_empty = opt.fail_on_empty, context = opt.context })
-  end
-
-  if num_retries > 0 and code == 0 and not empty then
-    logger.info(("%sRetry was successful!"):format(context))
-  end
-
-  if opt.fail_on_empty and code == 0 and empty then
-    code = 1
-  end
-
-  return stdout, code, stderr
+  return job.stdout, code, job.stderr
 end
 
 ---Map of options that accept comma separated, list-like values, but don't work
@@ -525,7 +417,7 @@ function M.set_local(winids, option_map, opt)
         else
           if o.method == "remove" then
             if is_list_like then
-              vim.opt_local[fullname] = cur_value:gsub(",?" .. vim.pesc(value), "")
+              vim.opt_local[fullname] = cur_value:gsub(",?" .. vim.pesc(tostring(value)), "")
             else
               vim.opt_local[fullname]:remove(value)
             end
@@ -620,7 +512,7 @@ function M.tbl_pack(...)
 end
 
 function M.tbl_unpack(t, i, j)
-  return unpack(t, i or 1, j or t.n or #t)
+  return unpack(t, i or 1, j or t.n or table.maxn(t))
 end
 
 function M.tbl_clear(t)
@@ -636,7 +528,7 @@ end
 function M.tbl_access(t, table_path)
   local keys = type(table_path) == "table"
       and table_path
-      or vim.split(table_path, ".", { plain = true })
+      or vim.split(table_path --[[@as string ]], ".", { plain = true })
 
   local cur = t
 
@@ -756,7 +648,7 @@ end
 function M.tbl_set(t, table_path, value)
   local keys = type(table_path) == "table"
       and table_path
-      or vim.split(table_path, ".", { plain = true })
+      or vim.split(table_path --[[@as string ]], ".", { plain = true })
 
   local cur = t
 
@@ -782,7 +674,7 @@ end
 function M.tbl_ensure(t, table_path)
   local keys = type(table_path) == "table"
       and table_path
-      or vim.split(table_path, ".", { plain = true })
+      or vim.split(table_path --[[@as string ]], ".", { plain = true })
 
   local ret = M.tbl_access(t, keys)
   if not ret then
@@ -1127,6 +1019,7 @@ function M.remove_buffer(force, bn)
   for _, id in ipairs(win_ids) do
     if vim.fn.win_gettype(id) ~= "autocmd" then
       api.nvim_win_call(id, function()
+        ---@diagnostic disable-next-line: param-type-mismatch
         local alt_bufid = vim.fn.bufnr("#")
         if alt_bufid ~= -1 then
           api.nvim_set_current_buf(alt_bufid)
@@ -1363,10 +1256,18 @@ end
 ---@param ... any Arguments to prepend to arguments provided to the bound function when invoking `func`.
 ---@return fun(...): unknown
 function M.bind(func, ...)
-  local args = M.tbl_pack(...)
+  local bound_args = M.tbl_pack(...)
 
   return function(...)
-    return func(M.tbl_unpack(args), ...)
+    -- Construct the call args by combining the bound args with the new args.
+    local args = { M.tbl_unpack(bound_args) }
+    local new_args = M.tbl_pack(...)
+
+    for i = 1, new_args.n do
+      args[bound_args.n + i] = new_args[i]
+    end
+
+    return func(unpack(args, 1, bound_args.n + new_args.n))
   end
 end
 
@@ -1416,19 +1317,14 @@ local function split_merge(t, first, last, comparator)
 end
 
 ---Perform a merge sort on a given list.
----@param t any[]
----@param comparator function|nil
+---@generic T
+---@param t T[]
+---@param comparator? (fun(a: T, b: T): boolean)
 function M.merge_sort(t, comparator)
-  if not comparator then
-    comparator = function(a, b)
-      return a < b
-    end
-  end
-
+  comparator = comparator or function(a, b) return a < b end
   split_merge(t, 1, #t, comparator)
 end
 
-M._mapping_callbacks = mapping_callbacks
 M.path_sep = path_sep
 
 return M

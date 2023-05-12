@@ -1,3 +1,4 @@
+local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
@@ -10,6 +11,7 @@ local StandardView = lazy.access("diffview.scene.views.standard.standard_view", 
 local config = lazy.require("diffview.config") ---@module "diffview.config"
 
 local api = vim.api
+local await = async.await
 
 local M = {}
 
@@ -81,8 +83,9 @@ function FileHistoryView:cur_file()
 end
 
 ---@private
+---@param self FileHistoryView
 ---@param file FileEntry
-function FileHistoryView:_set_file(file)
+FileHistoryView._set_file = async.void(function(self, file)
   self.panel:render()
   self.panel:redraw()
   vim.cmd("redraw")
@@ -92,36 +95,34 @@ function FileHistoryView:_set_file(file)
   self.emitter:emit("file_open_pre", file, cur_entry)
   self.nulled = false
 
-  file.layout.emitter:once("files_opened", function()
-    local log_options = self.panel:get_log_options()
+  await(self:use_entry(file))
 
-    -- For line tracing diffs: create custom folds derived from the diff patch
-    -- hunks. Should not be used with custom `++base` as then we won't know
-    -- where to create the custom folds in the base file.
-    if log_options.L and next(log_options.L) and not log_options.base then
-      local log_entry = self.panel.cur_item[1]
-      local diff = log_entry:get_diff(file.path)
+  local log_options = self.panel:get_log_options()
 
-      if diff and not file:has_patch_folds() then
-        file:update_patch_folds(diff)
+  -- For line tracing diffs: create custom folds derived from the diff patch
+  -- hunks. Should not be used with custom `++base` as then we won't know
+  -- where to create the custom folds in the base file.
+  if log_options.L and next(log_options.L) and not log_options.base then
+    local log_entry = self.panel.cur_item[1]
+    local diff = log_entry:get_diff(file.path)
 
-        for _, win in ipairs(self.cur_layout.windows) do
-          win:use_winopts({ foldmethod = "manual" })
-          win:apply_custom_folds()
-        end
+    if diff and not file:has_patch_folds() then
+      file:update_patch_folds(diff)
+
+      for _, win in ipairs(self.cur_layout.windows) do
+        win:use_winopts({ foldmethod = "manual" })
+        win:apply_custom_folds()
       end
     end
+  end
 
-    self.emitter:emit("file_open_post", file, cur_entry)
+  self.emitter:emit("file_open_post", file, cur_entry)
 
-    if not self.cur_entry.opened then
-      self.cur_entry.opened = true
-      DiffviewGlobal.emitter:emit("file_open_new", file)
-    end
-  end)
-
-  self:use_entry(file)
-end
+  if not self.cur_entry.opened then
+    self.cur_entry.opened = true
+    DiffviewGlobal.emitter:emit("file_open_new", file)
+  end
+end)
 
 function FileHistoryView:next_item()
   self:ensure_layout()
@@ -159,7 +160,11 @@ function FileHistoryView:prev_item()
   end
 end
 
-function FileHistoryView:set_file(file, focus)
+---@param self FileHistoryView
+---@param file FileEntry
+---@param focus? boolean
+FileHistoryView.set_file = async.void(function(self, file, focus)
+  ---@diagnostic disable: invisible
   self:ensure_layout()
 
   if self:file_safeguard() or not file then return end
@@ -170,13 +175,14 @@ function FileHistoryView:set_file(file, focus)
     self.panel:set_cur_item({ entry, file })
     self.panel:highlight_item(file)
     self.nulled = false
-    self:_set_file(file)
+    await(self:_set_file(file))
 
     if focus then
       api.nvim_set_current_win(self.cur_layout:get_main_win().id)
     end
   end
-end
+  ---@diagnostic enable: invisible
+end)
 
 
 ---Ensures there are files to load, and loads the null buffer otherwise.

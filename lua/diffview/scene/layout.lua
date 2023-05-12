@@ -1,3 +1,4 @@
+local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
@@ -5,6 +6,8 @@ local EventEmitter = lazy.access("diffview.events", "EventEmitter") ---@type Eve
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
+local await = async.await
+
 local M = {}
 
 ---@class Layout : diffview.Object
@@ -12,37 +15,22 @@ local M = {}
 ---@field emitter EventEmitter
 ---@field pivot_producer fun(): integer?
 ---@field name string
+---@field state table
 local Layout = oop.create_class("Layout")
 
 function Layout:init(opt)
   opt = opt or {}
   self.windows = opt.windows or {}
   self.emitter = opt.emitter or EventEmitter()
-
-  if not opt.emitter then
-    local last_equalalways
-
-    ---@param other Layout
-    ---@diagnostic disable-next-line: unused-local
-    self.emitter:on("create_pre", function(_, other)
-      last_equalalways = vim.o.equalalways
-      vim.opt.equalalways = true
-    end)
-
-    ---@param other Layout
-    self.emitter:on("create_post", function(_, other)
-      other:open_null()
-      other:open_files()
-      vim.opt.equalalways = last_equalalways
-    end)
-  end
+  self.state = {}
 end
 
 ---@diagnostic disable: unused-local, missing-return
 
 ---@abstract
+---@param self Layout
 ---@param pivot? integer The window ID of the window around which the layout will be created.
-function Layout:create(pivot) oop.abstract_stub() end
+Layout.create = async.void(function(self, pivot) oop.abstract_stub() end)
 
 ---@abstract
 ---@param rev Rev
@@ -52,8 +40,9 @@ function Layout:create(pivot) oop.abstract_stub() end
 function Layout.should_null(rev, status, sym) oop.abstract_stub() end
 
 ---@abstract
+---@param self Layout
 ---@param entry FileEntry
-function Layout:use_entry(entry) oop.abstract_stub() end
+Layout.use_entry = async.void(function(self, entry) oop.abstract_stub() end)
 
 ---@abstract
 ---@return Window
@@ -77,6 +66,17 @@ function Layout:clone()
 
   return clone
 end
+
+function Layout:create_pre()
+  self.state.save_equalalways = vim.o.equalalways
+  vim.opt.equalalways = true
+end
+
+---@param self Layout
+Layout.create_post = async.void(function(self)
+  await(self:open_files())
+  vim.opt.equalalways = self.state.save_equalalways
+end)
 
 ---Check if any of the windows in the lauout are focused.
 ---@return boolean
@@ -159,69 +159,34 @@ function Layout:is_files_loaded()
   return true
 end
 
----@param callback? fun()
-function Layout:open_files(callback)
+---@param self Layout
+Layout.open_files = async.void(function(self)
   if #self:files() < #self.windows then
     self:open_null()
-
-    if vim.is_callable(callback) then
-      ---@cast callback -?
-      callback()
-    end
-
     self.emitter:emit("files_opened")
-
     return
   end
 
-  local load_count = 0
-  local all_loaded = self:is_files_loaded()
-
   vim.cmd("diffoff!")
 
+  if not self:is_files_loaded() then
+    self:open_null()
+
+    -- Wait for all files to be loaded before opening
+    for _, win in ipairs(self.windows) do
+      await(win:load_file())
+    end
+  end
+
+  await(async.scheduler())
+
   for _, win in ipairs(self.windows) do
-    if not all_loaded then
-      win:open_null()
-    end
-
-    if win.file then
-      if all_loaded then
-        win:open_file()
-      else
-        win:load_file(function()
-          load_count = load_count + 1
-
-          if load_count == #self.windows then
-            ---@diagnostic disable-next-line: redefined-local
-            for _, win in ipairs(self.windows) do
-              win:open_file()
-            end
-
-            self:sync_scroll()
-
-            if vim.is_callable(callback) then
-              ---@cast callback -?
-              callback()
-            end
-
-            self.emitter:emit("files_opened")
-          end
-        end)
-      end
-    end
+    await(win:open_file())
   end
 
-  if all_loaded then
-    self:sync_scroll()
-
-    if vim.is_callable(callback) then
-      ---@cast callback -?
-      callback()
-    end
-
-    self.emitter:emit("files_opened")
-  end
-end
+  self:sync_scroll()
+  self.emitter:emit("files_opened")
+end)
 
 function Layout:open_null()
   for _, win in ipairs(self.windows) do
@@ -250,6 +215,10 @@ end
 ---Check the validity of all composing layout windows.
 ---@return Layout.State
 function Layout:validate()
+  if not next(self.windows) then
+    return { valid = false }
+  end
+
   local state = { valid = true }
 
   for _, win in ipairs(self.windows) do
@@ -266,6 +235,17 @@ end
 ---@return boolean
 function Layout:is_valid()
   return self:validate().valid
+end
+
+---@return boolean
+function Layout:is_nulled()
+  if not self:is_valid() then return false end
+
+  for _, win in ipairs(self.windows) do
+    if not win:is_nulled() then return false end
+  end
+
+  return true
 end
 
 ---Validate the layout and recover if necessary.
@@ -303,7 +283,7 @@ function Layout:sync_scroll()
   local target, max = nil, 0
 
   for _, win in ipairs(self.windows) do
-    local lcount = api.nvim_buf_line_count(win.file.bufnr)
+    local lcount = api.nvim_buf_line_count(api.nvim_win_get_buf(win.id))
     if lcount > max then target, max = win, lcount end
   end
 
