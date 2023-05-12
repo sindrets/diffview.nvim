@@ -193,7 +193,7 @@ function HgAdapter:init(opt)
 
   self.ctx = {
     toplevel = opt.toplevel,
-    dir = opt.toplevel,
+    dir = self:get_dir(opt.toplevel),
     path_args = opt.path_args or {},
   }
 
@@ -210,6 +210,14 @@ end
 
 function HgAdapter:get_log_args(args)
   return utils.vec_join("log", "--stat", '--rev', args)
+end
+
+function HgAdapter:get_dir(path)
+  local out, code = self:exec_sync({ "root", "--template={hgpath}" }, path)
+  if code ~= 0 then
+    return nil
+  end
+  return out[1] and vim.trim(out[1])
 end
 
 function HgAdapter:get_merge_context()
