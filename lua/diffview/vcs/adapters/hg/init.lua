@@ -440,7 +440,7 @@ end
 ---@param self HgAdapter
 ---@param state HgAdapter.FHState
 ---@param callback fun(status: JobStatus, data?: table, msg?: string)
-HgAdapter.incremental_fh_data = async.wrap(function(self, state, callback)
+HgAdapter.incremental_fh_data = async.void(function(self, state, callback)
   local raw = {}
   local namestat_job, numstat_job, shutdown
 
@@ -615,6 +615,7 @@ HgAdapter.file_history_worker = async.void(function(self, co_state, opt, callbac
     return co_state.shutdown
   end
 
+  ---Yield until data is available
   ---@param cb (fun(status: JobStatus, new_data: table, err?: string))
   local data_scheduler = async.wrap(function(cb)
     data_idx = data_idx + 1
