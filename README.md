@@ -16,8 +16,8 @@ for any git rev.
 ## Requirements
 
 - Git ≥ 2.31.0 (for Git support)
-- Mercurial (for Mercurial support)
-- Neovim ≥ 0.7.0
+- Mercurial ≥ 5.4.0 (for Mercurial support)
+- Neovim ≥ 0.7.0 (with LuaJIT)
 - [nvim-web-devicons](https://github.com/nvim-tree/nvim-web-devicons) (optional) For file icons
 
 ## Installation

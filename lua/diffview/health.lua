@@ -1,4 +1,5 @@
 local health = vim.health or require("health")
+local fmt = string.format
 
 local M = {}
 
@@ -27,6 +28,11 @@ function M.check()
     health.report_error("Diffview.nvim requires Neovim 0.7.0+")
   end
 
+  -- LuaJIT
+  if not _G.jit then
+    health.report_error("Not running on LuaJIT! Non-JIT Lua runtimes are not officially supported by the plugin. Mileage may vary.")
+  end
+
   health.report_start("Checking plugin dependencies")
 
   local missing_essential = false
@@ -36,10 +42,10 @@ function M.check()
       health.report_ok(plugin.name .. " installed.")
     else
       if plugin.optional then
-        health.report_warn(("Optional dependency '%s' not found."):format(plugin.name))
+        health.report_warn(fmt("Optional dependency '%s' not found.", plugin.name))
       else
         missing_essential = true
-        health.report_error(("Dependency '%s' not found!"):format(plugin.name))
+        health.report_error(fmt("Dependency '%s' not found!", plugin.name))
       end
     end
   end
@@ -65,11 +71,11 @@ function M.check()
       if not bs.done then kind.class.run_bootstrap() end
 
       if bs.version_string then
-        health.report_ok(("%s found."):format(kind.name))
+        health.report_ok(fmt("%s found.", kind.name))
       end
 
       if bs.ok then
-        health.report_ok(("%s is up-to-date. (%s)"):format(kind.name, bs.version_string))
+        health.report_ok(fmt("%s is up-to-date. (%s)", kind.name, bs.version_string))
         has_valid_adapter = true
       else
         health.report_warn(bs.err or (kind.name .. ": Unknown error"))
