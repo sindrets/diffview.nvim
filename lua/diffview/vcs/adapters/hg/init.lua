@@ -740,11 +740,25 @@ function HgAdapter:parse_fh_data(data, commit, state)
 
   for i = 1, #data.numstat - 1 do
     local status = data.namestat[i]:sub(1, 1):gsub("%s", " ")
-    local name = vim.trim(data.namestat[i]:match("[%a%s]%s*(.*)"))
-    local oldname
+    if status == 'R' then
+      -- R is for Removed in mercurial
+      status = 'D'
+    end
+
 
     local stats = {}
-    local changes, diffstats = data.numstat[i]:match(".*|%s+(%d+)%s+([+-]+)")
+    local name, changes, diffstats = data.numstat[i]:match("(.*)|%s+(%d+)%s*([+-]*)")
+    name = vim.trim(name)
+
+    local oldname
+    if name:match('=>') ~= nil then
+      oldname, name = name:match('(.*) => (.*)')
+      oldname = vim.trim(oldname)
+      name = vim.trim(name)
+      -- Mark as Renamed
+      status = 'R'
+    end
+
     if changes and diffstats then
       local _, adds = diffstats:gsub("+", "")
 
@@ -1224,7 +1238,13 @@ HgAdapter.show = async.wrap(function(self, path, rev, callback)
     log_opt = { label = "HgAdapter:show()" },
     on_exit = async.void(function(_, ok, err)
       if not ok or job.code ~= 0 then
-        callback(utils.vec_join(err, job.stderr), nil)
+        -- Non zero exit code might mean the file was removed
+        local out = job.stderr and job.stderr[1] or ''
+        if out:match('no such file in rev') then
+          callback(nil, {})
+        else
+          callback(utils.vec_join(err, job.stderr), nil)
+        end
         return
       end
 
