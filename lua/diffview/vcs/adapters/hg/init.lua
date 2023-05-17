@@ -649,13 +649,13 @@ HgAdapter.file_history_worker = async.void(function(self, co_state, opt, callbac
     -- Status is PROGRESS
     assert(new_data, "No data received from scheduler!")
 
-    -- 'git log --name-status' doesn't work properly for merge commits. It
-    -- lists only an incomplete list of files at best. We need to use 'git
+    -- 'hg log' doesn't work properly for merge commits. It
+    -- lists only an incomplete list of files at best. We need to use 'hg
     -- show' to get file statuses for merge commits. And merges do not always
     -- have changes.
     if new_data.merge_hash
       and new_data.numstat[1]
-      and #new_data.numstat ~= #new_data.namestat
+      or (#new_data.numstat -1) ~= #new_data.namestat
     then
       local job = Job({
         command = self:bin(),
@@ -668,10 +668,6 @@ HgAdapter.file_history_worker = async.void(function(self, co_state, opt, callbac
           state.old_path or state.path_args
         ),
         cwd = self.ctx.toplevel,
-        -- Git sometimes fails this job silently (exit code 0). Not sure why,
-        -- possibly because we are running multiple git opeartions on the same
-        -- repo concurrently. Retrying the job usually solves this.
-        retry = 2,
         fail_cond = Job.FAIL_COND.on_empty,
         log_opt = { label = "HgAdapter:file_history_worker()" },
       })
