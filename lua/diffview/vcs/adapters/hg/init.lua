@@ -839,7 +839,7 @@ function HgAdapter:rev_to_pretty_string(left, right)
 end
 
 function HgAdapter:head_rev()
-  local out, code = self:exec_sync( { "log", "--template={node}", "--limit=1", "--" }, {
+  local out, code = self:exec_sync({ "log", "--template={node}", "--limit=1", "--rev=.", "--" }, {
     cwd = self.ctx.toplevel,
     retry = 2,
     fail_on_empty = true,
