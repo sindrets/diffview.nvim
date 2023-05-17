@@ -1066,7 +1066,7 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
 
   local ok = await(Job.join({ namestat_job, mergestate_job, numstat_job }))
 
-  if not ok or #namestat_job.stdout ~= (#numstat_job.stdout - 1) then
+  if not ok then
     callback(utils.vec_join(namestat_job.stderr, numstat_job.stderr, mergestate_job.stderr), nil)
     return
   end
