@@ -185,7 +185,7 @@ function Window:show_winbar_info()
     if self.file.kind == "conflicting" then
       return conf.view.merge_tool.winbar_info
     else
-      if view and view:class() == FileHistoryView.__get() then
+      if view and view.class == FileHistoryView.__get() then
         return conf.view.file_history.winbar_info
       else
         return conf.view.default.winbar_info

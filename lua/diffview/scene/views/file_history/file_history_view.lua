@@ -4,9 +4,9 @@ local oop = require("diffview.oop")
 
 local CommitLogPanel = lazy.access("diffview.ui.panels.commit_log_panel", "CommitLogPanel") ---@type CommitLogPanel|LazyModule
 local EventName = lazy.access("diffview.events", "EventName") ---@type EventName|LazyModule
-local FileEntry = lazy.access("diffview.scene.file_entry", "FileEntry") ---@type FileEntry|LazyModule
 local FileHistoryPanel = lazy.access("diffview.scene.views.file_history.file_history_panel", "FileHistoryPanel") ---@type FileHistoryPanel|LazyModule
 local JobStatus = lazy.access("diffview.vcs.utils", "JobStatus") ---@type JobStatus|LazyModule
+local LogEntry = lazy.access("diffview.vcs.log_entry", "LogEntry") ---@type LogEntry|LazyModule
 local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
 local config = lazy.require("diffview.config") ---@module "diffview.config"
 
@@ -27,7 +27,7 @@ function FileHistoryView:init(opt)
   self.valid = false
   self.adapter = opt.adapter
 
-  FileHistoryView:super().init(self, {
+  self:super({
     panel = FileHistoryPanel({
       parent = self,
       adapter = self.adapter,
@@ -73,7 +73,7 @@ function FileHistoryView:close()
     end
 
     self.commit_log_panel:destroy()
-    FileHistoryView:super().close(self)
+    FileHistoryView.super_class.close(self)
   end
 end
 
@@ -224,12 +224,12 @@ function FileHistoryView:infer_cur_file()
   if self.panel:is_focused() then
     local item = self.panel:get_item_at_cursor()
 
-    if item and not item:instanceof(FileEntry.__get()) then
+    if LogEntry.__get():ancestorof(item) then
+      ---@cast item LogEntry
       return item.files[1]
     end
 
-    ---@cast item FileEntry?
-    return item
+    return item --[[@as FileEntry ]]
   end
 
   return self.panel.cur_item[2]

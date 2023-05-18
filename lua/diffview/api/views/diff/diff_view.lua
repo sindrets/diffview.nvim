@@ -58,7 +58,7 @@ function CDiffView:init(opt)
   self.fetch_files = opt.update_files
   self.get_file_data = opt.get_file_data
 
-  CDiffView:super().init(self, vim.tbl_extend("force", opt, {
+  self:super(vim.tbl_extend("force", opt, {
     adapter = adapter,
     panel = FilePanel(
       adapter,

@@ -17,7 +17,7 @@ local Diff3Hor = oop.create_class("Diff3Hor", Diff3)
 Diff3Hor.name = "diff3_horizontal"
 
 function Diff3Hor:init(opt)
-  Diff3Hor:super().init(self, opt)
+  self:super(opt)
 end
 
 ---@override

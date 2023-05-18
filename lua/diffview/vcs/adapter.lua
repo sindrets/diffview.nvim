@@ -151,11 +151,11 @@ end
 ---@overload fun(self: VCSAdapter, args: string[], cwd?: string)
 ---@overload fun(self: VCSAdapter, args: string[], opt?: utils.job.Opt)
 function VCSAdapter:exec_sync(args, cwd_or_opt)
-  if not self:class().bootstrap.done then self:class().run_bootstrap() end
+  if not self.class.bootstrap.done then self.class.run_bootstrap() end
 
   local cmd = vim.tbl_flatten({ self:get_command(), args })
 
-  if not self:class().bootstrap.ok then
+  if not self.class.bootstrap.ok then
     logger:error(
       ("[VCSAdapter] Can't exec adapter command because bootstrap failed! Cmd: %s")
       :format(table.concat(cmd, " "))

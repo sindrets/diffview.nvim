@@ -238,7 +238,7 @@ end
 ---@param opt vcs.adapter.VCSAdapter.Opt
 function GitAdapter:init(opt)
   opt = opt or {}
-  GitAdapter:super().init(self, opt)
+  self:super(opt)
 
   local cwd = opt.cpath or vim.loop.cwd()
 

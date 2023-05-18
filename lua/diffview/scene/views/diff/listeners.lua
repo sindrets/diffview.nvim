@@ -30,7 +30,7 @@ return function(view)
         file.layout:detach_files()
       end
 
-      for _, f in view.panel.files:ipairs() do
+      for _, f in view.panel.files:iter() do
         f.layout:restore_winopts()
       end
     end,

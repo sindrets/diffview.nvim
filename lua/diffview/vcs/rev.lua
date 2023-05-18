@@ -3,12 +3,12 @@ local oop = require("diffview.oop")
 local M = {}
 
 ---@enum RevType
-local RevType = {
+local RevType = oop.enum({
   LOCAL   = 1,
   COMMIT  = 2,
   STAGE   = 3,
   CUSTOM  = 4,
-}
+})
 
 ---@alias RevRange { first: Rev, last: Rev }
 

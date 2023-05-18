@@ -52,7 +52,7 @@ end
 ---@param adapter VCSAdapter
 ---@param opt CommitLogPanelSpec
 function CommitLogPanel:init(adapter, opt)
-  CommitLogPanel:super().init(self, {
+  self:super({
     bufname = opt.name,
     config = opt.config or get_user_config().commit_log_panel.win_config,
   })

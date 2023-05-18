@@ -44,7 +44,7 @@ FHOptionPanel.bufopts = {
 ---FHOptionPanel constructor.
 ---@param parent FileHistoryPanel
 function FHOptionPanel:init(parent)
-  FHOptionPanel:super().init(self, {
+  self:super({
     ---@type PanelSplitSpec
     config = {
       position = "bottom",
@@ -152,7 +152,7 @@ end
 
 ---@override
 function FHOptionPanel:open()
-  FHOptionPanel:super().open(self)
+  FHOptionPanel.super_class.open(self)
   self.option_state = utils.tbl_deep_clone(self.parent:get_log_options())
 
   api.nvim_win_call(self.winid, function()

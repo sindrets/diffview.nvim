@@ -29,7 +29,7 @@ Diff1.name = "diff1_plain"
 
 ---@param opt Diff1.init.Opt
 function Diff1:init(opt)
-  Diff1:super().init(self)
+  self:super()
   self.b = Window({ file = opt.b, id = opt.winid_b })
   self:use_windows(self.b)
 end

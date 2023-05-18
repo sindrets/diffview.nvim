@@ -4,7 +4,8 @@ local M = {}
 
 ---@alias vcs.FileKind "conflicting"|"working"|"staged"
 
----@class FileDict : diffview.Object, { [integer]: FileEntry }
+---@class FileDict : diffview.Object
+---@field [integer] FileEntry
 ---@field sets FileEntry[][]
 ---@field conflicting FileEntry[]
 ---@field working FileEntry[]
@@ -23,22 +24,19 @@ function FileDict:init()
   self:update_file_trees()
 end
 
-do
-  local __index = FileDict.__index
-  function FileDict:__index(k)
-    if type(k) == "number" then
-      local offset = 0
+function FileDict:__index(k)
+  if type(k) == "number" then
+    local offset = 0
 
-      for _, set in ipairs(self.sets) do
-        if k - offset <= #set then
-          return set[k - offset]
-        end
-
-        offset = offset + #set
+    for _, set in ipairs(self.sets) do
+      if k - offset <= #set then
+        return set[k - offset]
       end
-    else
-      return __index(self, k)
+
+      offset = offset + #set
     end
+  else
+    return FileDict[k]
   end
 end
 
@@ -50,10 +48,7 @@ end
 
 function FileDict:len()
   local l = 0
-
-  for _, set in ipairs(self.sets) do
-    l = l + #set
-  end
+  for _, set in ipairs(self.sets) do l = l + #set end
 
   return l
 end
@@ -61,24 +56,13 @@ end
 function FileDict:iter()
   local i = 0
   local n = self:len()
-  return function()
-    i = i + 1
-    if i <= n then
-      return self[i]
-    end
-  end
-end
 
-function FileDict:ipairs()
-  local i = 0
-  local n = #self.conflicting + #self.working + #self.staged
-  ---@return integer, FileEntry
+  ---@return integer?, FileEntry?
   return function()
     i = i + 1
 
     if i <= n then
       return i, self[i]
-      ---@diagnostic disable-next-line: missing-return
     end
   end
 end

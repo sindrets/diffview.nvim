@@ -12,7 +12,7 @@ local M = {}
 local GitCommit = oop.create_class("GitCommit", Commit.__get())
 
 function GitCommit:init(opt)
-  GitCommit:super().init(self, opt)
+  self:super(opt)
 
   if opt.time_offset then
     self.time_offset = Commit.parse_time_offset(opt.time_offset)

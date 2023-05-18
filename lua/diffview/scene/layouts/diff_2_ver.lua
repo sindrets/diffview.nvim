@@ -23,7 +23,7 @@ Diff2Ver.name = "diff2_vertical"
 
 ---@param opt Diff2Hor.init.Opt
 function Diff2Ver:init(opt)
-  Diff2Ver:super().init(self, opt)
+  self:super(opt)
 end
 
 ---@override

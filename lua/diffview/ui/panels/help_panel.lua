@@ -34,7 +34,7 @@ HelpPanel.default_type = "float"
 ---@param opt HelpPanelSpec
 function HelpPanel:init(parent, keymap_groups, opt)
   opt = opt or {}
-  HelpPanel:super().init(self, {
+  self:super({
     bufname = opt.name,
     config = opt.config or function()
       local c = vim.deepcopy(Panel.default_config_float)
@@ -96,7 +96,7 @@ function HelpPanel:apply_cmd()
 end
 
 function HelpPanel:init_buffer()
-  HelpPanel:super().init_buffer(self)
+  HelpPanel.super_class.init_buffer(self)
   local conf = get_user_config().keymaps
   local default_opt = { silent = true, nowait = true, buffer = self.bufid }
 

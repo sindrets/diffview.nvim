@@ -6,9 +6,9 @@ local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local M = {}
 
 ---@enum EventName
-local EventName = {
+local EventName = oop.enum({
   FILES_STAGED = 1,
-}
+})
 
 ---@alias ListenerType "normal"|"once"|"any"|"any_once"
 ---@alias ListenerCallback (fun(e: Event, ...): boolean?)
@@ -19,7 +19,7 @@ local EventName = {
 ---@field call function
 
 ---@class Event : diffview.Object
----@operator call:Event
+---@operator call : Event
 ---@field id any
 ---@field propagate boolean
 local Event = oop.create_class("Event")
@@ -232,4 +232,5 @@ end
 M.EventName = EventName
 M.Event = Event
 M.EventEmitter = EventEmitter
+
 return M

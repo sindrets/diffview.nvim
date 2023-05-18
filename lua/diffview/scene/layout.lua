@@ -57,7 +57,7 @@ function Layout:destroy()
 end
 
 function Layout:clone()
-  local clone = self:class()({ emitter = self.emitter }) --[[@as Layout ]]
+  local clone = self.class({ emitter = self.emitter }) --[[@as Layout ]]
 
   for i, win in ipairs(self.windows) do
     clone.windows[i]:set_id(win.id)

@@ -73,7 +73,7 @@ FileHistoryPanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 function FileHistoryPanel:init(opt)
   local conf = config.get_config()
 
-  FileHistoryPanel:super().init(self, {
+  self:super({
     config = conf.file_history_panel.win_config,
     bufname = "DiffviewFileHistoryPanel",
   })
@@ -106,7 +106,7 @@ end
 
 ---@override
 function FileHistoryPanel:open()
-  FileHistoryPanel:super().open(self)
+  FileHistoryPanel.super_class.open(self)
   vim.cmd("wincmd =")
 end
 
@@ -127,7 +127,7 @@ function FileHistoryPanel:destroy()
     renderer.destroy_comp_struct(self.components)
   end
 
-  FileHistoryPanel:super().destroy(self)
+  FileHistoryPanel.super_class.destroy(self)
 end
 
 function FileHistoryPanel:setup_buffer()

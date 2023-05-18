@@ -1,19 +1,24 @@
 --[[
--- An implementation of Myers' diff algorithm
--- Derived from: https://github.com/Swatinem/diff
---]]
+
+An implementation of Myers' diff algorithm
+Derived from: https://github.com/Swatinem/diff
+
+]]
+
 local oop = require("diffview.oop")
+
 local M = {}
 
 ---@enum EditToken
-local EditToken = {
+local EditToken = oop.enum({
   NOOP    = 1,
   DELETE  = 2,
   INSERT  = 3,
   REPLACE = 4,
-}
+})
 
 ---@class Diff : diffview.Object
+---@operator call : Diff
 ---@field a any[]
 ---@field b any[]
 ---@field moda boolean[]
@@ -48,6 +53,7 @@ function Diff:init(a, b, eql_fn)
   self:lcs(1, #self.a + 1, 1, #self.b + 1)
 end
 
+---@return EditToken[]
 function Diff:create_edit_script()
   local astart = 1
   local bstart = 1
@@ -86,6 +92,11 @@ function Diff:create_edit_script()
   return script
 end
 
+---@private
+---@param astart integer
+---@param aend integer
+---@param bstart integer
+---@param bend integer
 function Diff:lcs(astart, aend, bstart, bend)
   -- separate common head
   while astart < aend and bstart < bend and self.eql_fn(self.a[astart], self.b[bstart]) do
@@ -118,6 +129,18 @@ function Diff:lcs(astart, aend, bstart, bend)
   end
 end
 
+---@class Diff.Snake
+---@field x integer
+---@field y integer
+---@field u integer
+---@field v integer
+
+---@private
+---@param astart integer
+---@param aend integer
+---@param bstart integer
+---@param bend integer
+---@return Diff.Snake
 function Diff:snake(astart, aend, bstart, bend)
   local N = aend - astart
   local MM = bend - bstart
@@ -196,56 +219,7 @@ function Diff:snake(astart, aend, bstart, bend)
   error("Unexpected state!")
 end
 
-function M._test_exec(a, b, script)
-  local ai = 1
-  local bi = 1
-
-  for _, opr in ipairs(script) do
-    if opr == EditToken.NOOP then
-      ai = ai + 1
-      bi = bi + 1
-    elseif opr == EditToken.DELETE then
-      table.remove(a, ai)
-    elseif opr == EditToken.INSERT then
-      table.insert(a, ai, b[bi])
-      ai = ai + 1
-      bi = bi + 1
-    elseif opr == EditToken.REPLACE then
-      table.remove(a, ai)
-      table.insert(a, ai, b[bi])
-      ai = ai + 1
-      bi = bi + 1
-    end
-  end
-end
-
-function M._test_diff(a, b)
-  local diff = Diff(a, b)
-  local script = diff:create_edit_script()
-  print("a", vim.inspect(a))
-  print("b", vim.inspect(b))
-  print("script", vim.inspect(script))
-  M._test_exec(a, b, script)
-  print("result", vim.inspect(a))
-end
-
-function M._test()
-  -- deletion
-  local a = { 1, 2, 3, 4, 5, 6, 7, 8, 9 }
-  local b = { 1, 2, 5, 6, 8, 9 }
-  M._test_diff(a, b)
-
-  -- insertion
-  a = { 1, 2, 5, 6, 8, 9 }
-  b = { 1, 2, 3, 4, 5, 6, 7, 8, 9 }
-  M._test_diff(a, b)
-
-  -- deletion, insertion, replacement
-  a = { 1, 2, 3, 4, 5, 6, 7, 8, 9 }
-  b = { 1, 2, 10, 11, 5, 6, 12, 13, 8 }
-  M._test_diff(a, b)
-end
-
 M.EditToken = EditToken
 M.Diff = Diff
+
 return M

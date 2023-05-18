@@ -15,14 +15,10 @@ local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local api = vim.api
 local M = {}
 
----@class LayoutMode
-
----@class ELayoutMode
----@field HORIZONTAL LayoutMode
----@field VERTICAL LayoutMode
+---@enum LayoutMode
 local LayoutMode = oop.enum({
-  "HORIZONTAL",
-  "VERTICAL",
+  HORIZONTAL = 1,
+  VERTICAL = 2,
 })
 
 ---@class View : diffview.Object

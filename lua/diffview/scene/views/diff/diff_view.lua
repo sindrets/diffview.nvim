@@ -20,6 +20,7 @@ local GitAdapter = lazy.access("diffview.vcs.adapters.git", "GitAdapter") ---@ty
 
 local api = vim.api
 local await = async.await
+local fmt = string.format
 local logger = DiffviewGlobal.logger
 local pl = lazy.access(utils, "path") ---@type PathLib
 
@@ -30,7 +31,7 @@ local M = {}
 ---@field selected_file? string Path to the preferred initially selected file.
 
 ---@class DiffView : StandardView
----@operator call:DiffView
+---@operator call : DiffView
 ---@field adapter VCSAdapter
 ---@field rev_arg string
 ---@field path_args string[]
@@ -44,7 +45,7 @@ local M = {}
 ---@field merge_ctx? vcs.MergeContext
 ---@field initialized boolean
 ---@field valid boolean
----@field watcher any UV fs poll handle.
+---@field watcher uv_fs_poll_t # UV fs poll handle.
 local DiffView = oop.create_class("DiffView", StandardView.__get())
 
 ---DiffView constructor
@@ -64,7 +65,7 @@ function DiffView:init(opt)
         :relative(self.adapter.ctx.toplevel)
         :get()
 
-  DiffView:super().init(self, {
+  self:super({
     panel = FilePanel(
       self.adapter,
       self.files,
@@ -74,52 +75,7 @@ function DiffView:init(opt)
   })
 
   self.attached_bufs = {}
-
-  ---@param entry FileEntry
-  self.emitter:on("file_open_post", function(_, entry)
-    if entry.layout:is_nulled() then return end
-    if entry.kind == "conflicting" then
-      local file = entry.layout:get_main_win().file
-
-      local count_conflicts = vim.schedule_wrap(function()
-        local conflicts = vcs_utils.parse_conflicts(api.nvim_buf_get_lines(file.bufnr, 0, -1, false))
-
-        entry.stats = entry.stats or {}
-        entry.stats.conflicts = #conflicts
-
-        self.panel:render()
-        self.panel:redraw()
-      end)
-
-      count_conflicts()
-
-      if file.bufnr and not self.attached_bufs[file.bufnr] then
-        self.attached_bufs[file.bufnr] = true
-
-        local work = debounce.throttle_trailing(1000, true, vim.schedule_wrap(function()
-          if not self:is_cur_tabpage() or self.cur_entry ~= entry then
-            self.attached_bufs[file.bufnr] = false
-            return
-          else
-            count_conflicts()
-          end
-        end))
-
-        api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
-          buffer = file.bufnr,
-          callback = function()
-            if not self.attached_bufs[file.bufnr] then
-              work:close()
-              return true
-            else
-              work()
-            end
-          end,
-        })
-      end
-    end
-  end)
-
+  self.emitter:on("file_open_post", utils.bind(self.file_open_post, self))
   self.valid = true
 end
 
@@ -127,21 +83,23 @@ function DiffView:post_open()
   vim.cmd("redraw")
 
   self.commit_log_panel = CommitLogPanel(self.adapter, {
-    name = ("diffview://%s/log/%d/%s"):format(self.adapter.ctx.dir, self.tabpage, "commit_log"),
+    name = fmt("diffview://%s/log/%d/%s", self.adapter.ctx.dir, self.tabpage, "commit_log"),
   })
 
   if config.get_config().watch_index and self.adapter:instanceof(GitAdapter.__get()) then
     self.watcher = vim.loop.new_fs_poll()
-    ---@diagnostic disable-next-line: unused-local
-    self.watcher:start(self.adapter.ctx.dir .. "/index", 1000, function(err, prev, cur)
-      if not err then
-        vim.schedule(function()
+    self.watcher:start(
+      self.adapter.ctx.dir .. "/index",
+      1000,
+      ---@diagnostic disable-next-line: unused-local
+      vim.schedule_wrap(function(err, prev, cur)
+        if not err then
           if self:is_cur_tabpage() then
             self:update_files()
           end
-        end)
-      end
-    end)
+        end
+      end)
+    )
   end
 
   self:init_event_listeners()
@@ -155,6 +113,61 @@ function DiffView:post_open()
   end)
 end
 
+---@param e Event
+---@param new_entry FileEntry
+---@param old_entry FileEntry
+---@diagnostic disable-next-line: unused-local
+function DiffView:file_open_post(e, new_entry, old_entry)
+  if new_entry.layout:is_nulled() then return end
+  if new_entry.kind == "conflicting" then
+    local file = new_entry.layout:get_main_win().file
+
+    local count_conflicts = vim.schedule_wrap(function()
+      local conflicts = vcs_utils.parse_conflicts(api.nvim_buf_get_lines(file.bufnr, 0, -1, false))
+
+      new_entry.stats = new_entry.stats or {}
+      new_entry.stats.conflicts = #conflicts
+
+      self.panel:render()
+      self.panel:redraw()
+    end)
+
+    count_conflicts()
+
+    if file.bufnr and not self.attached_bufs[file.bufnr] then
+      self.attached_bufs[file.bufnr] = true
+
+      local work = debounce.throttle_trailing(
+        1000,
+        true,
+        vim.schedule_wrap(function()
+          if not self:is_cur_tabpage() or self.cur_entry ~= new_entry then
+            self.attached_bufs[file.bufnr] = false
+            return
+          end
+
+          count_conflicts()
+        end)
+      )
+
+      api.nvim_create_autocmd(
+        { "TextChanged", "TextChangedI" },
+        {
+          buffer = file.bufnr,
+          callback = function()
+            if not self.attached_bufs[file.bufnr] then
+              work:close()
+              return true
+            end
+
+            work()
+          end,
+        }
+      )
+    end
+  end
+end
+
 ---@override
 function DiffView:close()
   if not self.closing then
@@ -165,12 +178,12 @@ function DiffView:close()
       self.watcher:close()
     end
 
-    for _, file in self.files:ipairs() do
+    for _, file in self.files:iter() do
       file:destroy()
     end
 
     self.commit_log_panel:destroy()
-    DiffView:super().close(self)
+    DiffView.super_class.close(self)
   end
 end
 
@@ -254,7 +267,7 @@ DiffView.set_file = async.void(function(self, file, focus, highlight)
 
   if self:file_safeguard() or not file then return end
 
-  for _, f in self.files:ipairs() do
+  for _, f in self.files:iter() do
     if f == file then
       self.panel:set_cur_file(file)
 
@@ -279,7 +292,7 @@ end)
 ---@param highlight? boolean Bring the cursor to the file entry in the panel.
 DiffView.set_file_by_path = async.void(function(self, path, focus, highlight)
   ---@type FileEntry
-  for _, file in self.files:ipairs() do
+  for _, file in self.files:iter() do
     if file.path == path then
       await(self:set_file(file, focus, highlight))
       return
@@ -355,13 +368,17 @@ DiffView.update_files = debounce.debounce_trailing(
     await(async.scheduler())
 
     for _, v in ipairs(files) do
+      -- We diff the old file list against the new file list in order to find
+      -- the most efficient way to morph the current list into the new. This
+      -- way we avoid having to discard and recreate buffers for files that
+      -- exist in both lists.
       ---@param aa FileEntry
       ---@param bb FileEntry
       local diff = Diff(v.cur_files, v.new_files, function(aa, bb)
         return aa.path == bb.path and aa.oldpath == bb.oldpath
       end)
-      local script = diff:create_edit_script()
 
+      local script = diff:create_edit_script()
       local ai = 1
       local bi = 1
 
@@ -416,8 +433,7 @@ DiffView.update_files = debounce.debounce_trailing(
           end
 
           v.cur_files[ai]:destroy()
-          table.remove(v.cur_files, ai)
-          table.insert(v.cur_files, ai, v.new_files[bi])
+          v.cur_files[ai] = v.new_files[bi]
           ai = ai + 1
           bi = bi + 1
         end
@@ -448,7 +464,7 @@ DiffView.update_files = debounce.debounce_trailing(
 
     -- Set initially selected file
     if not self.initialized and self.options.selected_file then
-      for _, file in self.files:ipairs() do
+      for _, file in self.files:iter() do
         if file.path == self.options.selected_file then
           self.panel:set_cur_file(file)
           break
@@ -464,9 +480,11 @@ DiffView.update_files = debounce.debounce_trailing(
     self.update_needed = false
     perf:time()
     logger:lvl(5):debug(perf)
-    logger:info(
-      ("[%s] Completed update for %d files successfully (%.3f ms)")
-      :format(self:class():name(), self.files:len(), perf.final_time)
+    logger:fmt_info(
+      "[%s] Completed update for %d files successfully (%.3f ms)",
+      self.class:name(),
+      self.files:len(),
+      perf.final_time
     )
     self.emitter:emit("files_updated", self.files)
 
@@ -513,9 +531,10 @@ function DiffView:infer_cur_file(allow_dir)
   if self.panel:is_focused() then
     ---@type any
     local item = self.panel:get_item_at_cursor()
-    if item and (
-        (item.class and item:instanceof(FileEntry.__get()))
-        or (allow_dir and type(item.collapsed) == "boolean")) then
+
+    if FileEntry.__get():ancestorof(item)
+      or (allow_dir and type(item.collapsed) == "boolean")
+    then
       return item
     end
   else

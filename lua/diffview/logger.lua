@@ -98,23 +98,21 @@ end
 local Logger = oop.create_class("Logger")
 
 ---@enum Logger.OutfileStatus
-Logger.OutfileStatus = {
+Logger.OutfileStatus = oop.enum({
   UNKNOWN = 1,
   READY = 2,
   ERROR = 3,
-}
-vim.tbl_add_reverse_lookup(Logger.OutfileStatus)
+})
 
 ---@enum Logger.LogLevels
-Logger.LogLevels = {
+Logger.LogLevels = oop.enum({
   fatal = 1,
   error = 2,
   warn = 3,
   info = 4,
   debug = 5,
   trace = 6,
-}
-vim.tbl_add_reverse_lookup(Logger.LogLevels)
+})
 
 Logger.mock = Mock()
 

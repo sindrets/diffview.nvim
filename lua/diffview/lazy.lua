@@ -1,3 +1,5 @@
+local fmt = string.format
+
 local lazy = {}
 
 ---@class LazyModule : { [string] : unknown }
@@ -12,49 +14,37 @@ local lazy = {}
 ---@param handler fun(t: any): table?
 ---@return LazyModule
 function lazy.wrap(t, handler)
-  local use_handler = type(handler) == "function"
-  local export = not use_handler and t or nil
+  local export
 
-  local function __get()
-    if not export and use_handler then
-      ---@cast handler function
-      export = handler(t)
-    end
+  local ret = {
+    __get = function()
+      if export == nil then
+        ---@cast handler function
+        export = handler(t)
+      end
 
-    return export
-  end
+      return export
+    end,
+    __loaded = function()
+      return export ~= nil
+    end,
+  }
 
-  return setmetatable({}, {
+  return setmetatable(ret, {
     __index = function(_, key)
-      if key == "__get" then
-        return __get
-      elseif key == "__loaded" then
-        return export ~= nil
-      end
-
-      if not export then
-        __get()
-      end
-
+      if export == nil then ret.__get() end
       ---@cast export table
       return export[key]
     end,
     __newindex = function(_, key, value)
-      if not export then
-        __get()
-      end
-
+      if export == nil then ret.__get() end
       export[key] = value
     end,
     __call = function(_, ...)
-      if not export then
-        __get()
-      end
-
+      if export == nil then ret.__get() end
       ---@cast export table
       return export(...)
     end,
-    __get = __get,
   })
 end
 
@@ -112,13 +102,16 @@ end
 function lazy.access(x, access_path)
   local keys = type(access_path) == "table"
       and access_path
-      or vim.split(access_path, ".", { plain = true })
+      or vim.split(access_path --[[@as string ]], ".", { plain = true })
 
   local handler = function(module)
     local export = module
+
     for _, key in ipairs(keys) do
       export = export[key]
+      assert(export ~= nil, fmt("Failed to lazy-access! No key '%s' in table!", key))
     end
+
     return export
   end
 

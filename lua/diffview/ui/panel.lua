@@ -297,7 +297,7 @@ function Panel:open()
   end
 
   self:resize()
-  utils.set_local(self.winid, self:class().winopts)
+  utils.set_local(self.winid, self.class.winopts)
   utils.set_local(self.winid, config.win_opts)
 end
 
@@ -349,7 +349,7 @@ end
 function Panel:init_buffer()
   local bn = api.nvim_create_buf(false, false)
 
-  for k, v in pairs(self:class().bufopts) do
+  for k, v in pairs(self.class.bufopts) do
     api.nvim_buf_set_option(bn, k, v)
   end
 
@@ -384,8 +384,9 @@ function Panel:init_buffer()
   return bn
 end
 
-Panel:virtual("update_components")
-Panel:virtual("render")
+function Panel:update_components() oop.abstract_stub() end
+
+function Panel:render() oop.abstract_stub() end
 
 function Panel:redraw()
   if not self.render_data then
@@ -474,7 +475,7 @@ function Panel:off_autocmd(callback, event)
 end
 
 function Panel:get_default_config(panel_type)
-  local producer = self:class()["default_config_" .. (panel_type or self:class().default_type)]
+  local producer = self.class["default_config_" .. (panel_type or self.class.default_type)]
 
   local config
   if vim.is_callable(producer) then

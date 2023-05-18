@@ -9,7 +9,7 @@ local M = {}
 local HgCommit = oop.create_class('HgCommit', Commit)
 
 function HgCommit:init(opt)
-  HgCommit:super().init(self, opt)
+  self:super(opt)
 
   if opt.time_offset then
     self.time_offset = HgCommit.parse_time_offset(opt.time_offset)

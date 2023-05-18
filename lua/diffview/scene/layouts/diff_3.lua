@@ -32,7 +32,7 @@ local Diff3 = oop.create_class("Diff3", Layout)
 
 ---@param opt Diff3.init.Opt
 function Diff3:init(opt)
-  Diff3:super().init(self)
+  self:super()
   self.a = Window({ file = opt.a, id = opt.winid_a })
   self.b = Window({ file = opt.b, id = opt.winid_b })
   self.c = Window({ file = opt.c, id = opt.winid_c })

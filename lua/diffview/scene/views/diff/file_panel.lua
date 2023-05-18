@@ -48,7 +48,7 @@ FilePanel.bufopts = vim.tbl_extend("force", Panel.bufopts, {
 ---@param path_args string[]
 function FilePanel:init(adapter, files, path_args, rev_pretty_name)
   local conf = config.get_config()
-  FilePanel:super().init(self, {
+  self:super({
     config = conf.file_panel.win_config,
     bufname = "DiffviewFilePanel",
   })
@@ -68,7 +68,7 @@ end
 
 ---@override
 function FilePanel:open()
-  FilePanel:super().open(self)
+  FilePanel.super_class.open(self)
   vim.cmd("wincmd =")
 end
 
@@ -183,7 +183,7 @@ function FilePanel:ordered_file_list()
   if self.listing_style == "list" then
     local list = {}
 
-    for _, file in self.files:ipairs() do
+    for _, file in self.files:iter() do
       list[#list + 1] = file
     end
 

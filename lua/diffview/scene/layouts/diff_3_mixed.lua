@@ -17,7 +17,7 @@ local Diff3Mixed = oop.create_class("Diff3Mixed", Diff3)
 Diff3Mixed.name = "diff3_mixed"
 
 function Diff3Mixed:init(opt)
-  Diff3Mixed:super().init(self, opt)
+  self:super(opt)
 end
 
 ---@override

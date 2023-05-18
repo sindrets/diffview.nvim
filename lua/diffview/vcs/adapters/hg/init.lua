@@ -189,7 +189,7 @@ end
 
 function HgAdapter:init(opt)
   opt = opt or {}
-  HgAdapter:super().init(self, opt)
+  self:super(opt)
 
   self.ctx = {
     toplevel = opt.toplevel,

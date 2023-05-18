@@ -1,8 +1,9 @@
-local Scanner = require("diffview.scanner")
 local FileDict = require("diffview.vcs.file_dict").FileDict
 local RevType = require("diffview.vcs.rev").RevType
+local Scanner = require("diffview.scanner")
 local Semaphore = require("diffview.control").Semaphore
 local async = require("diffview.async")
+local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 
 local api = vim.api
@@ -12,13 +13,13 @@ local fmt = string.format
 local M = {}
 
 ---@enum JobStatus
-local JobStatus = {
+local JobStatus = oop.enum({
   SUCCESS  = 1,
   PROGRESS = 2,
   ERROR    = 3,
   KILLED   = 4,
   FATAL    = 5,
-}
+})
 
 ---@type diffview.Job[]
 local sync_jobs = {}

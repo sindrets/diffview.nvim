@@ -21,7 +21,7 @@ Diff2Hor.name = "diff2_horizontal"
 
 ---@param opt Diff2Hor.init.Opt
 function Diff2Hor:init(opt)
-  Diff2Hor:super().init(self, opt)
+  self:super(opt)
 end
 
 ---@override
