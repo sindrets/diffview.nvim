@@ -26,7 +26,7 @@ Install the plugin with your package manager of choice.
 
 ```vim
 " Plug
-Plug "sindrets/diffview.nvim"
+Plug 'sindrets/diffview.nvim'
 ```
 
 ```lua
