@@ -1,0 +1,140 @@
+name: Bug report
+description: Report a problem with diffview.nvim
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before reporting: search [existing issues](https://github.com/sindrets/diffview.nvim/issues) and make sure that diffview.nvim is updated to the latest version.
+  - type: textarea
+    attributes:
+      label: "Description"
+      description: "A description of the problem you're facing."
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: "Expected behavior"
+      description: "A description of the behavior you expected:"
+  - type: textarea
+    attributes:
+      label: "Actual behavior"
+      description: "Observed behavior (may optionally include images, or videos)."
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: "Steps to reproduce"
+      description: "Steps to reproduce the issue, preferably using the minimal config provided below."
+      placeholder: |
+        1. `nvim --clean -u mini.lua`
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: "Health check"
+      render: markdown
+      value: |
+        <details>
+        <summary>Output of <code>:checkhealth diffview</code></summary>
+
+        ```
+        #######################
+        ### PUT OUTPUT HERE ###
+        #######################
+        ```
+
+        </details>
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: "Log info"
+      description: "Include relevant info from `:DiffviewLog`. Look at the time stamps of the log messages to determine what is relevant. Please do not include the entire log."
+      render: markdown
+      value: |
+        <details>
+        <summary>Relevant info from <code>:DiffviewLog</code></summary>
+
+        ```
+        ############################
+        ### PUT LOG CONTENT HERE ###
+        ############################
+        ```
+
+        </details>
+    validations:
+      required: false
+  - type: textarea
+    attributes:
+      label: "Neovim version"
+      description: "Output of `nvim --version`"
+      render: markdown
+      placeholder: |
+        NVIM v0.9.0
+        Build type: RelWithDebInfo
+        LuaJIT 2.1.0-beta3
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: "Operating system and version"
+      description: "On \\*nix systems you can use the output of `uname -srom`"
+      placeholder: "Linux 6.3.1-arch2-1 x86_64 GNU/Linux"
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: "Minimal config"
+      description: "If possible, please provide a **minimal** configuration necessary to reproduce the issue. Save this as `mini.lua`. If *absolutely* necessary, add plugins and config options from your `init.lua` at the indicated lines."
+      render: Lua
+      value: |
+        -- #######################################
+        -- ### USAGE: nvim --clean -u mini.lua ###
+        -- #######################################
+
+        local root = vim.fn.stdpath("run") .. "/nvim/diffview.nvim"
+        vim.fn.mkdir(root, "p")
+
+        -- set stdpaths to use root
+        for _, name in ipairs({ "config", "data", "state", "cache" }) do
+          vim.env[("XDG_%s_HOME"):format(name:upper())] = root .. "/" .. name
+        end
+
+        -- bootstrap lazy
+        local lazypath = root .. "/plugins/lazy.nvim"
+        if not vim.loop.fs_stat(lazypath) then
+          vim.fn.system({ "git", "clone", "--filter=blob:none", "https://github.com/folke/lazy.nvim.git", lazypath, })
+        end
+        vim.opt.runtimepath:prepend(lazypath)
+
+        -- install plugins
+        local plugins = {
+          {
+            "sindrets/diffview.nvim",
+            dependencies = { "nvim-tree/nvim-web-devicons" },
+            config = function()
+              require("diffview").setup({
+                -- ##############################################################################
+                -- ### ADD DIFFVIEW.NVIM CONFIG THAT IS _NECESSARY_ FOR REPRODUCING THE ISSUE ###
+                -- ##############################################################################
+              })
+            end,
+          },
+          -- ##################################################################
+          -- ### ADD PLUGINS THAT ARE _NECESSARY_ FOR REPRODUCING THE ISSUE ###
+          -- ##################################################################
+        }
+        require("lazy").setup(plugins, { root = root .. "/plugins" })
+        require("lazy").sync({ show = false, wait = true })
+
+        vim.opt.termguicolors = true
+        vim.cmd("colorscheme " .. (vim.fn.has("nvim-0.8") == 1 and "habamax" or "slate"))
+
+        -- ############################################################################
+        -- ### ADD INIT.LUA SETTINGS THAT ARE _NECESSARY_ FOR REPRODUCING THE ISSUE ###
+        -- ############################################################################
+    validations:
+      required: false
