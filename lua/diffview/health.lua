@@ -1,6 +1,17 @@
 local health = vim.health or require("health")
 local fmt = string.format
 
+-- Polyfill deprecated health api
+if vim.fn.has("nvim-0.10") ~= 1 then
+  health = {
+    start = health.report_start,
+    ok = health.report_ok,
+    info = health.report_info,
+    warn = health.report_warn,
+    error = health.report_error,
+  }
+end
+
 local M = {}
 
 M.plugin_deps = {
@@ -25,40 +36,40 @@ end
 
 function M.check()
   if vim.fn.has("nvim-0.7") == 0 then
-    health.report_error("Diffview.nvim requires Neovim 0.7.0+")
+    health.error("Diffview.nvim requires Neovim 0.7.0+")
   end
 
   -- LuaJIT
   if not _G.jit then
-    health.report_error("Not running on LuaJIT! Non-JIT Lua runtimes are not officially supported by the plugin. Mileage may vary.")
+    health.error("Not running on LuaJIT! Non-JIT Lua runtimes are not officially supported by the plugin. Mileage may vary.")
   end
 
-  health.report_start("Checking plugin dependencies")
+  health.start("Checking plugin dependencies")
 
   local missing_essential = false
 
   for _, plugin in ipairs(M.plugin_deps) do
     if lualib_available(plugin.name) then
-      health.report_ok(plugin.name .. " installed.")
+      health.ok(plugin.name .. " installed.")
     else
       if plugin.optional then
-        health.report_warn(fmt("Optional dependency '%s' not found.", plugin.name))
+        health.warn(fmt("Optional dependency '%s' not found.", plugin.name))
       else
         missing_essential = true
-        health.report_error(fmt("Dependency '%s' not found!", plugin.name))
+        health.error(fmt("Dependency '%s' not found!", plugin.name))
       end
     end
   end
 
-  health.report_start("Checking VCS tools")
+  health.start("Checking VCS tools")
 
   ;(function()
     if missing_essential then
-      health.report_warn("Cannot perform checks on external dependencies without all essential plugin dependencies installed!")
+      health.warn("Cannot perform checks on external dependencies without all essential plugin dependencies installed!")
       return
     end
 
-    health.report_info("The plugin requires at least one of the supported VCS tools to be valid.")
+    health.info("The plugin requires at least one of the supported VCS tools to be valid.")
 
     local has_valid_adapter = false
     local adapter_kinds = {
@@ -71,19 +82,19 @@ function M.check()
       if not bs.done then kind.class.run_bootstrap() end
 
       if bs.version_string then
-        health.report_ok(fmt("%s found.", kind.name))
+        health.ok(fmt("%s found.", kind.name))
       end
 
       if bs.ok then
-        health.report_ok(fmt("%s is up-to-date. (%s)", kind.name, bs.version_string))
+        health.ok(fmt("%s is up-to-date. (%s)", kind.name, bs.version_string))
         has_valid_adapter = true
       else
-        health.report_warn(bs.err or (kind.name .. ": Unknown error"))
+        health.warn(bs.err or (kind.name .. ": Unknown error"))
       end
     end
 
     if not has_valid_adapter then
-      health.report_error("No valid VCS tool was found!")
+      health.error("No valid VCS tool was found!")
     end
   end)()
 end
