@@ -56,7 +56,7 @@ function HgAdapter.run_bootstrap()
   end
 
   local out = utils.job(vim.tbl_flatten({ hg_cmd, "version" }))
-  bs.version_string = out[1] and out[1]:match("Mercurial .*%(version (%S+)%)") or nil
+  bs.version_string = out[1] and out[1]:match("Mercurial .*%(version (%d%.%d%.%d%.).*%)") or nil
 
   if not bs.version_string then
     return err("Could not get Mercurial version!")
@@ -73,9 +73,9 @@ function HgAdapter.run_bootstrap()
   local version_ok = (function()
     if v.major < target.major then
       return false
-    elseif v.minor < target.minor then
+    elseif v.major == target.major and v.minor < target.minor then
       return false
-    elseif v.patch < target.patch then
+    elseif v.major == target.major and v.minor == target.minor and v.patch < target.patch then
       return false
     end
     return true
