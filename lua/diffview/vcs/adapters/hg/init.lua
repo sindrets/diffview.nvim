@@ -71,12 +71,12 @@ function HgAdapter.run_bootstrap()
   v.patch = tonumber(parts[3]) or 0
 
   local version_ok = (function()
-    if v.major < target.major then
-      return false
-    elseif v.major == target.major and v.minor < target.minor then
-      return false
-    elseif v.major == target.major and v.minor == target.minor and v.patch < target.patch then
-      return false
+    if v.major ~= target.major then
+      return v.major > target.major
+    elseif v.minor ~= target.minor then
+      return v.minor > target.minor
+    elseif v.patch ~= target.patch then
+      return v.patch > target.patch
     end
     return true
   end)()
