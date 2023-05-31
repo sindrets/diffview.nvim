@@ -41,12 +41,12 @@ HgAdapter.bootstrap = {
 
 local function hg_version(hg_cmd)
   local out = utils.job(vim.tbl_flatten({ hg_cmd, "version" }))
-  if not out then
+  if not out[1] then
     return nil
   end
 
   local pattern = "Mercurial .*%(version (%d+%.%d+%.?%d*)%S*%)"
-  local version = string.match(out, pattern)
+  local version = string.match(out[1], pattern)
   local major, minor, patch = string.match(version or "", "^(%d+)%.(%d+)(%.?%d*)$")
 
   if not version or not major or not minor then
