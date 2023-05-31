@@ -39,6 +39,36 @@ HgAdapter.bootstrap = {
   }
 }
 
+local function hg_version(hg_cmd)
+  local out = utils.job(vim.tbl_flatten({ hg_cmd, "version" }))
+  if not out then
+    return nil
+  end
+
+  local pattern = "Mercurial .*%(version (%d+%.%d+%.?%d*)%S*%)"
+  local version = string.match(out, pattern)
+  local major, minor, patch = string.match(version or "", "^(%d+)%.(%d+)(%.?%d*)$")
+
+  if not version or not major or not minor then
+    return nil
+  end
+
+  -- If patch version is not provided or is ".", set it to '0'.
+  if patch == "" or patch == "." then
+    patch = "0"
+  else
+    -- If patch version starts with ".", remove it.
+    patch = patch:sub(2)
+  end
+
+  return {
+    major = tonumber(major),
+    minor = tonumber(minor) or 0,
+    patch = tonumber(patch) or 0,
+    version_string = version,
+  }
+end
+
 function HgAdapter.run_bootstrap()
   local hg_cmd = config.get_config().hg_cmd
   local bs = HgAdapter.bootstrap
@@ -55,31 +85,20 @@ function HgAdapter.run_bootstrap()
     return err(fmt("Configured `hg_cmd` is not executable: '%s'", hg_cmd[1]))
   end
 
-  local out = utils.job(vim.tbl_flatten({ hg_cmd, "version" }))
-  bs.version_string = out[1] and out[1]:match("Mercurial .*%(version (%d%.%d%.%d).*%)") or nil
-
-  if not bs.version_string then
+  local version = hg_version(hg_cmd)
+  if not version then
     return err("Could not get Mercurial version!")
   end
+  bs.version_string = version.version_string
 
   -- Parse version string
   local v, target = bs.version, bs.target_version
   bs.target_version_string = fmt("%d.%d.%d", target.major, target.minor, target.patch)
-  local parts = vim.split(bs.version_string, "%.")
-  v.major = tonumber(parts[1])
-  v.minor = tonumber(parts[2]) or 0
-  v.patch = tonumber(parts[3]) or 0
+  v.major = version.major
+  v.minor = version.minor
+  v.patch = version.patch
 
-  local version_ok = (function()
-    if v.major ~= target.major then
-      return v.major > target.major
-    elseif v.minor ~= target.minor then
-      return v.minor > target.minor
-    elseif v.patch ~= target.patch then
-      return v.patch > target.patch
-    end
-    return true
-  end)()
+  local version_ok = vcs_utils.check_semver(v, target)
 
   if not version_ok then
     return err(string.format(
