@@ -39,36 +39,6 @@ HgAdapter.bootstrap = {
   }
 }
 
-local function hg_version(hg_cmd)
-  local out = utils.job(vim.tbl_flatten({ hg_cmd, "version" }))
-  if not out[1] then
-    return nil
-  end
-
-  local pattern = "Mercurial .*%(version (%d+%.%d+%.?%d*)%S*%)"
-  local version = string.match(out[1], pattern)
-  local major, minor, patch = string.match(version or "", "^(%d+)%.(%d+)(%.?%d*)$")
-
-  if not version or not major or not minor then
-    return nil
-  end
-
-  -- If patch version is not provided or is ".", set it to '0'.
-  if patch == "" or patch == "." then
-    patch = "0"
-  else
-    -- If patch version starts with ".", remove it.
-    patch = patch:sub(2)
-  end
-
-  return {
-    major = tonumber(major),
-    minor = tonumber(minor) or 0,
-    patch = tonumber(patch) or 0,
-    version_string = version,
-  }
-end
-
 function HgAdapter.run_bootstrap()
   local hg_cmd = config.get_config().hg_cmd
   local bs = HgAdapter.bootstrap
@@ -85,21 +55,27 @@ function HgAdapter.run_bootstrap()
     return err(fmt("Configured `hg_cmd` is not executable: '%s'", hg_cmd[1]))
   end
 
-  local version = hg_version(hg_cmd)
+  local out = utils.job(vim.tbl_flatten({ hg_cmd, "version" }))
+  local version = out[1] and out[1]:match("Mercurial .*%(version (%S*)%)") or nil
   if not version then
     return err("Could not get Mercurial version!")
   end
-  bs.version_string = version.version_string
 
   -- Parse version string
+  local major, minor, patch = version:match("(%d+)%.?(%d*)%.?(%d*)")
+  if not major then
+    return err(string.format("Could not parse Mercurial version: %s!", version))
+  end
+
   local v, target = bs.version, bs.target_version
+  v.major = tonumber(major)
+  v.minor = tonumber(minor) or 0
+  v.patch = tonumber(patch) or 0
+
+  bs.version_string = version
   bs.target_version_string = fmt("%d.%d.%d", target.major, target.minor, target.patch)
-  v.major = version.major
-  v.minor = version.minor
-  v.patch = version.patch
 
   local version_ok = vcs_utils.check_semver(v, target)
-
   if not version_ok then
     return err(string.format(
       "Mercurial version is outdated! Some functionality might not work as expected, "
