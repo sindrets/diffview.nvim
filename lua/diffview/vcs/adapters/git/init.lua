@@ -97,16 +97,7 @@ function GitAdapter.run_bootstrap()
   v.minor = tonumber(parts[2]) or 0
   v.patch = tonumber(parts[3]) or 0
 
-  local version_ok = (function()
-    if v.major < target.major then
-      return false
-    elseif v.minor < target.minor then
-      return false
-    elseif v.patch < target.patch then
-      return false
-    end
-    return true
-  end)()
+  local version_ok = vcs_utils.check_semver(v, target)
 
   if not version_ok then
     return err(string.format(

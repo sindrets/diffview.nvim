@@ -602,6 +602,20 @@ function M.parse_conflicts(lines, winid)
   return ret, cur_conflict, cur_idx or 0
 end
 
+---@param version { major: integer, minor: integer, patch: integer }
+---@param required { major: integer, minor: integer, patch: integer }
+---@return boolean
+function M.check_semver(version, required)
+  if version.major ~= required.major then
+    return version.major > required.major
+  elseif version.minor ~= required.minor then
+    return version.minor > required.minor
+  elseif version.patch ~= required.patch then
+    return version.patch > required.patch
+  end
+  return true
+end
+
 
 M.JobStatus = JobStatus
 return M

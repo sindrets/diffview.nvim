@@ -56,31 +56,26 @@ function HgAdapter.run_bootstrap()
   end
 
   local out = utils.job(vim.tbl_flatten({ hg_cmd, "version" }))
-  bs.version_string = out[1] and out[1]:match("Mercurial .*%(version (%S+)%)") or nil
-
-  if not bs.version_string then
+  local version = out[1] and out[1]:match("Mercurial .*%(version (%S*)%)") or nil
+  if not version then
     return err("Could not get Mercurial version!")
   end
 
   -- Parse version string
+  local major, minor, patch = version:match("(%d+)%.?(%d*)%.?(%d*)")
+  if not major then
+    return err(string.format("Could not parse Mercurial version: %s!", version))
+  end
+
   local v, target = bs.version, bs.target_version
+  v.major = tonumber(major)
+  v.minor = tonumber(minor) or 0
+  v.patch = tonumber(patch) or 0
+
+  bs.version_string = version
   bs.target_version_string = fmt("%d.%d.%d", target.major, target.minor, target.patch)
-  local parts = vim.split(bs.version_string, "%.")
-  v.major = tonumber(parts[1])
-  v.minor = tonumber(parts[2]) or 0
-  v.patch = tonumber(parts[3]) or 0
 
-  local version_ok = (function()
-    if v.major < target.major then
-      return false
-    elseif v.minor < target.minor then
-      return false
-    elseif v.patch < target.patch then
-      return false
-    end
-    return true
-  end)()
-
+  local version_ok = vcs_utils.check_semver(v, target)
   if not version_ok then
     return err(string.format(
       "Mercurial version is outdated! Some functionality might not work as expected, "
