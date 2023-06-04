@@ -3,6 +3,7 @@ local config = require("diffview.config")
 local hl = require("diffview.hl")
 local utils = require("diffview.utils")
 
+local fmt = string.format
 local logger = DiffviewGlobal.logger
 local perf = PerfTimer("[FileHistoryPanel] Render internal")
 local pl = utils.path
@@ -15,23 +16,32 @@ local function render_files(comp, files)
   for i, file in ipairs(files) do
     comp:add_text(i == #files and "└   " or "│   ", "DiffviewNonText")
 
-    if file.status then
-      comp:add_text(file.status .. " ", hl.get_git_hl(file.status))
-    end
+    if file:is_null_entry() then
+      comp:add_text(
+        "No diff",
+        file.active and "DiffviewFilePanelSelected" or "DiffviewFilePanelFileName"
+      )
+    else
+      if file.status then
+        comp:add_text(file.status .. " ", hl.get_git_hl(file.status))
+      else
+        comp:add_text("-" .. " ", "DiffviewNonText")
+      end
 
-    local icon, icon_hl = hl.get_file_icon(file.basename, file.extension)
-    comp:add_text(icon, icon_hl)
+      local icon, icon_hl = hl.get_file_icon(file.basename, file.extension)
+      comp:add_text(icon, icon_hl)
 
-    if #file.parent_path > 0 then
-      comp:add_text(file.parent_path .. "/", "DiffviewFilePanelPath")
-    end
+      if #file.parent_path > 0 then
+        comp:add_text(file.parent_path .. "/", "DiffviewFilePanelPath")
+      end
 
-    comp:add_text(file.basename, file.active and "DiffviewFilePanelSelected" or "DiffviewFilePanelFileName")
+      comp:add_text(file.basename, file.active and "DiffviewFilePanelSelected" or "DiffviewFilePanelFileName")
 
-    if file.stats then
-      comp:add_text(" " .. file.stats.additions, "DiffviewFilePanelInsertions")
-      comp:add_text(", ")
-      comp:add_text(tostring(file.stats.deletions), "DiffviewFilePanelDeletions")
+      if file.stats then
+        comp:add_text(" " .. file.stats.additions, "DiffviewFilePanelInsertions")
+        comp:add_text(", ")
+        comp:add_text(tostring(file.stats.deletions), "DiffviewFilePanelDeletions")
+      end
     end
 
     comp:ln()
@@ -47,7 +57,7 @@ end
 local function render_entries(panel, parent, entries, updating)
   local c = config.get_config()
   local max_num_files = -1
-  local max_len_stats = 7
+  local max_len_stats = -1
 
   for _, entry in ipairs(entries) do
     if #entry.files > max_num_files then
@@ -72,7 +82,7 @@ local function render_entries(panel, parent, entries, updating)
     end
 
     local entry_struct = parent[i]
-    local comp = entry_struct.commit.comp
+    local comp = entry_struct.commit.comp --[[@as RenderComponent ]]
 
     if not entry.single_file then
       comp:add_text((entry.folded and c.signs.fold_closed or c.signs.fold_open) .. " ", "CursorLineNr")
@@ -80,31 +90,52 @@ local function render_entries(panel, parent, entries, updating)
 
     if entry.status then
       comp:add_text(entry.status, hl.get_git_hl(entry.status))
+    else
+      comp:add_text("-", "DiffviewNonText")
     end
 
     if not entry.single_file then
-      local counter = " "
-        .. utils.str_left_pad(tostring(#entry.files), #tostring(max_num_files))
-        .. (" file%s"):format(#entry.files > 1 and "s" or " ")
-      comp:add_text(counter, "DiffviewFilePanelCounter")
+      local s_num_files = tostring(max_num_files)
+
+      if entry.nulled then
+        comp:add_text(utils.str_center_pad("empty", #s_num_files + 7), "DiffviewFilePanelCounter")
+      else
+        comp:add_text(
+          fmt(
+            " %s file%s",
+            utils.str_left_pad(tostring(#entry.files), #s_num_files),
+            #entry.files > 1 and "s" or " "
+          ),
+          "DiffviewFilePanelCounter"
+        )
+      end
     end
 
-    if entry.stats then
-      local adds = tostring(entry.stats.additions)
-      local dels = tostring(entry.stats.deletions)
+    if max_len_stats ~= -1 then
+      local adds = { "-", "DiffviewNonText" }
+      local dels = { "-", "DiffviewNonText" }
+
+      if entry.stats and entry.stats.additions then
+        adds = { tostring(entry.stats.additions), "DiffviewFilePanelInsertions" }
+      end
+
+      if entry.stats and entry.stats.deletions then
+        dels = { tostring(entry.stats.deletions), "DiffviewFilePanelDeletions" }
+      end
+
       comp:add_text(" | ", "DiffviewNonText")
-      comp:add_text(adds, "DiffviewFilePanelInsertions")
-      comp:add_text(string.rep(" ", max_len_stats - (#adds + #dels)))
-      comp:add_text(dels, "DiffviewFilePanelDeletions")
-      comp:add_text(" | ", "DiffviewNonText")
+      comp:add_text(unpack(adds))
+      comp:add_text(string.rep(" ", max_len_stats - (#adds[1] + #dels[1])))
+      comp:add_text(unpack(dels))
+      comp:add_text(" |", "DiffviewNonText")
     end
 
     if entry.commit.hash then
-      comp:add_text(entry.commit.hash:sub(1, 8) .. " ", "DiffviewSecondary")
+      comp:add_text(" " .. entry.commit.hash:sub(1, 8), "DiffviewSecondary")
     end
 
     if entry.commit.ref_names then
-      comp:add_text(("(%s) "):format(entry.commit.ref_names), "DiffviewReference")
+      comp:add_text((" (%s)"):format(entry.commit.ref_names), "DiffviewReference")
     end
 
     local subject = utils.str_trunc(entry.commit.subject, 72)
@@ -114,18 +145,18 @@ local function render_entries(panel, parent, entries, updating)
     end
 
     comp:add_text(
-      subject .. " ",
+      " " .. subject,
       panel.cur_item[1] == entry and "DiffviewFilePanelSelected" or "DiffviewFilePanelFileName"
     )
 
     if entry.commit then
       -- 3 months
       local date = (
-          os.difftime(os.time(), entry.commit.time) > 60 * 60 * 24 * 30 * 3
-            and entry.commit.iso_date
+        os.difftime(os.time(), entry.commit.time) > 60 * 60 * 24 * 30 * 3
+          and entry.commit.iso_date
           or entry.commit.rel_date
-        )
-      comp:add_text(entry.commit.author .. ", " .. date, "DiffviewFilePanelPath")
+      )
+      comp:add_text(" " .. entry.commit.author .. ", " .. date, "DiffviewFilePanelPath")
     end
 
     comp:ln()
