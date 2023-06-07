@@ -766,8 +766,8 @@ function GitAdapter:file_history_options(range, paths, argo)
     { "base" },
     { "G" },
     { "S" },
-    { "after" },
-    { "before" },
+    { "after", "since" },
+    { "before", "until" },
   }
 
   local log_options = { rev_range = range_arg } --[[@as GitLogOptions ]]
@@ -1953,8 +1953,8 @@ function GitAdapter:init_completion()
   self.comp.file_history:put({ "--grep" }, {})
   self.comp.file_history:put({ "-G" }, {})
   self.comp.file_history:put({ "-S" }, {})
-  self.comp.file_history:put({ "--after" }, {})
-  self.comp.file_history:put({ "--before" }, {})
+  self.comp.file_history:put({ "--after", "--since" }, {})
+  self.comp.file_history:put({ "--before", "--until" }, {})
 end
 
 M.GitAdapter = GitAdapter
