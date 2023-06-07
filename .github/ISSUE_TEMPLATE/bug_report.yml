@@ -35,7 +35,6 @@ body:
   - type: textarea
     attributes:
       label: "Health check"
-      render: markdown
       value: |
         <details>
         <summary>Output of <code>:checkhealth diffview</code></summary>
@@ -53,7 +52,6 @@ body:
     attributes:
       label: "Log info"
       description: "Include relevant info from `:DiffviewLog`. Look at the time stamps of the log messages to determine what is relevant. Please do not include the entire log."
-      render: markdown
       value: |
         <details>
         <summary>Relevant info from <code>:DiffviewLog</code></summary>
