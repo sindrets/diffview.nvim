@@ -937,14 +937,18 @@ function HgAdapter:parse_revs(rev_arg, opt)
   return left, right
 end
 
-function HgAdapter:file_restore(path, kind, commit)
+---@param self HgAdapter
+---@param path string
+---@param kind vcs.FileKind
+---@param commit string?
+---@param callback fun(ok: boolean, undo?: string)
+HgAdapter.file_restore = async.wrap(function(self, path, kind, commit, callback)
   local _, code
   local abs_path = pl:join(self.ctx.toplevel, path)
 
   _, code = self:exec_sync({"cat", "--", path}, self.ctx.toplevel)
 
   local exists_hg = code == 0
-
   local undo
 
   if not exists_hg then
@@ -957,7 +961,8 @@ function HgAdapter:file_restore(path, kind, commit)
           fmt("Failed to delete buffer '%d'! Aborting file restoration. Error message:", bn),
           err
         }, true)
-        return false
+        callback(false)
+        return
       end
     end
 
@@ -969,7 +974,8 @@ function HgAdapter:file_restore(path, kind, commit)
           fmt("Failed to delete file '%s'! Aborting file restoration. Error message:", abs_path),
           err
         }, true)
-        return false
+        callback(false)
+        return
       end
     else
       -- File only exists in index
@@ -986,8 +992,8 @@ function HgAdapter:file_restore(path, kind, commit)
     )
   end
 
-  return true, undo
-end
+  callback(true, undo)
+end)
 
 ---Check whether untracked files should be listed.
 ---@param opt? VCSAdapter.show_untracked.Opt

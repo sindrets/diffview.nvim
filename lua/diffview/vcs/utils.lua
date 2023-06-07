@@ -151,18 +151,16 @@ end, 7)
 ---@param path string
 ---@param kind vcs.FileKind
 ---@param commit? string
-M.restore_file = async.wrap(function(adapter, path, kind, commit, callback)
-  local ok, undo = adapter:file_restore(path, kind, commit)
+M.restore_file = async.void(function(adapter, path, kind, commit)
+  local ok, undo = await(adapter:file_restore(path, kind, commit))
 
   if not ok then
     utils.err("Failed to revert file! See ':DiffviewLog' for details.", true)
-    return callback()
+    return
   end
 
   local rev_name = (commit and commit:sub(1, 11)) or (kind == "staged" and "HEAD" or "index")
   utils.info(fmt("File restored from %s. %s", rev_name, undo and "Undo with " .. undo), true)
-
-  callback()
 end)
 
 --[[

@@ -1348,10 +1348,12 @@ function GitAdapter:rev_to_args(left, right)
 end
 
 
+---@param self GitAdapter
 ---@param path string
 ---@param kind vcs.FileKind
 ---@param commit string?
-function GitAdapter:file_restore(path, kind, commit)
+---@param callback fun(ok: boolean, undo?: string)
+GitAdapter.file_restore = async.wrap(function(self, path, kind, commit, callback)
   local out, code
   local abs_path = pl:join(self.ctx.toplevel, path)
   local rel_path = pl:vim_fnamemodify(abs_path, ":~")
@@ -1369,7 +1371,8 @@ function GitAdapter:file_restore(path, kind, commit)
     out, code = self:exec_sync({ "hash-object", "-w", "--", path }, self.ctx.toplevel)
     if code ~= 0 then
       utils.err("Failed to write file blob into the object database. Aborting file restoration.", true)
-      return false
+      callback(false)
+      return
     end
   end
 
@@ -1391,7 +1394,8 @@ function GitAdapter:file_restore(path, kind, commit)
           fmt("Failed to delete buffer '%d'! Aborting file restoration. Error message:", bn),
           err
         }, true)
-        return false
+        callback(false)
+        return
       end
     end
 
@@ -1403,7 +1407,8 @@ function GitAdapter:file_restore(path, kind, commit)
           fmt("Failed to delete file '%s'! Aborting file restoration. Error message:", abs_path),
           err
         }, true)
-        return false
+        callback(false)
+        return
       end
     else
       -- File only exists in index
@@ -1420,8 +1425,8 @@ function GitAdapter:file_restore(path, kind, commit)
     )
   end
 
-  return true, undo
-end
+  callback(true, undo)
+end)
 
 ---@param file vcs.File
 function GitAdapter:stage_index_file(file)

@@ -229,9 +229,8 @@ return function(view)
         return
       end
 
-      vcs_utils.restore_file(view.adapter, file.path, file.kind, commit, function()
-        view:update_files()
-      end)
+      await(vcs_utils.restore_file(view.adapter, file.path, file.kind, commit))
+      view:update_files()
     end),
     listing_style = function()
       if view.panel.listing_style == "list" then

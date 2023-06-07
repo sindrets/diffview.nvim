@@ -302,14 +302,15 @@ function VCSAdapter:show_untracked(opt)
 end
 
 ---Restore file
+---@param self VCSAdapter
 ---@param path string
 ---@param kind vcs.FileKind
 ---@param commit string?
 ---@return boolean success
 ---@return string? undo # If the adapter supports it: a command that will undo the restoration.
-function VCSAdapter:file_restore(path, kind, commit)
+VCSAdapter.file_restore = async.void(function(self, path, kind, commit)
   oop.abstract_stub()
-end
+end)
 
 ---Update the index entry for a given file with the contents of an index buffer.
 ---@param file vcs.File
