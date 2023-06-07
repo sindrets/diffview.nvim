@@ -386,7 +386,9 @@ function GitAdapter:prepare_fh_options(log_options, single_file)
       o.author and { "-E", "--author=" .. o.author } or nil,
       o.grep and { "-E", "--grep=" .. o.grep } or nil,
       o.G and { "-E", "-G" .. o.G } or nil,
-      o.S and { "-S" .. o.S, "--pickaxe-regex" } or nil
+      o.S and { "-S" .. o.S, "--pickaxe-regex" } or nil,
+      o.after and { "--after=" .. o.after } or nil,
+      o.before and { "--before=" .. o.before } or nil
     )
   }
 end
@@ -764,6 +766,8 @@ function GitAdapter:file_history_options(range, paths, argo)
     { "base" },
     { "G" },
     { "S" },
+    { "after", "since" },
+    { "before", "until" },
   }
 
   local log_options = { rev_range = range_arg } --[[@as GitLogOptions ]]
@@ -1787,6 +1791,12 @@ GitAdapter.flags = {
     FlagOption("=S", "-S", "Search occurrences", {
       prompt_label = "(Extended regular expression)"
     }),
+    FlagOption("=A", "--after=", "List only commits after a certain date", {
+      prompt_label = "(YYYY-mm-dd, YYYY-mm-dd HH:mm:ss)"
+    }),
+    FlagOption("=B", "--before=", "List only commits before a certain date", {
+      prompt_label = "(YYYY-mm-dd, YYYY-mm-dd HH:mm:ss)"
+    }),
     FlagOption("--", "--", "Limit to files", {
       key = "path_args",
       expect_list = true,
@@ -1943,6 +1953,8 @@ function GitAdapter:init_completion()
   self.comp.file_history:put({ "--grep" }, {})
   self.comp.file_history:put({ "-G" }, {})
   self.comp.file_history:put({ "-S" }, {})
+  self.comp.file_history:put({ "--after", "--since" }, {})
+  self.comp.file_history:put({ "--before", "--until" }, {})
 end
 
 M.GitAdapter = GitAdapter

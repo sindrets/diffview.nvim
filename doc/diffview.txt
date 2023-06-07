@@ -282,9 +282,19 @@ COMMANDS                                        *diffview-commands*
                 lines that match {pattern} (extended regular expression).
 
         -S{pattern}
-                Look for differences that change the number of occurences of
+                Look for differences that change the number of occurrences of
                 the specified {pattern} (extended regular expression) in a
                 file.
+
+        --after={datetime}, --since={datetime}
+                List only commits after a certain date. {datetime} can be
+                YYYY-mm-dd, YYYY-mm-dd HH:mm:ss, or natural language (for
+                instance "2 weeks 6 hours 12 minutes ago")
+
+        --before={datetime}, --until={datetime}
+                List only commits before a certain date. {datetime} can be
+                YYYY-mm-dd, YYYY-mm-dd HH:mm:ss, or natural language (for
+                instance "2 weeks 6 hours 12 minutes ago")
 
     Mercurial Options: ~
 

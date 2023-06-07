@@ -273,6 +273,8 @@ M._config = M.defaults
 ---@field rev_range string
 ---@field base string
 ---@field path_args string[]
+---@field after string
+---@field before string
 
 ---@class HgLogOptions
 ---@field follow string
