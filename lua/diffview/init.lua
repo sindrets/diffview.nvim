@@ -23,6 +23,22 @@ end
 
 function M.init()
   local au = api.nvim_create_autocmd
+
+  -- Fix the strange behavior that "<afile>" expands non-files
+  -- as file name in some cases.
+  --
+  -- About more information please checkout:
+  --  * sindrets/diffview.nvim#369
+  --  * neovim/neovim#23943
+  local fetch_tabnr = function (state)
+    if vim.fn.has("nvim-0.9.2") ~= 1 then
+      return tonumber(state.match)
+    else
+      return tonumber(state.file)
+    end
+  end
+
+  -- Set up highlighting
   hl.setup()
 
   -- Set up autocommands
@@ -45,7 +61,7 @@ function M.init()
     group = M.augroup,
     pattern = "*",
     callback = function(state)
-      M.close(tonumber(state.file))
+      M.close(fetch_tabnr(state))
     end,
   })
   au("BufWritePost", {
@@ -59,7 +75,7 @@ function M.init()
     group = M.augroup,
     pattern = "*",
     callback = function(state)
-      M.emit("win_closed", tonumber(state.file))
+      M.emit("win_closed", fetch_tabnr(state))
     end,
   })
   au("ColorScheme", {
