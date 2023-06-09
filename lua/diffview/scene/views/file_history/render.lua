@@ -107,7 +107,7 @@ local function render_entries(panel, parent, entries, updating)
       comp:add_text(("(%s) "):format(entry.commit.ref_names), "DiffviewReference")
     end
 
-    local subject = utils.str_shorten(entry.commit.subject, 72)
+    local subject = utils.str_trunc(entry.commit.subject, 72)
 
     if subject == "" then
       subject = "[empty message]"
@@ -142,7 +142,7 @@ local function prepare_panel_cache(panel)
   local c = {}
   cache[panel] = c
   c.root_path = panel.state.form == "column"
-      and pl:shorten(
+      and pl:truncate(
         pl:vim_fnamemodify(panel.adapter.ctx.toplevel, ":~"),
         panel:get_config().width - 6
       )

@@ -20,16 +20,30 @@ local function handle_uv_err(x, err, err_msg)
   return x
 end
 
+-- Ref: https://learn.microsoft.com/en-us/dotnet/standard/io/file-path-formats
+local WINDOWS_PATH_SPECIFIER = {
+  dos_dev = "^[\\/][\\/][.?][\\/]", -- DOS Device path
+  unc = "^[\\/][\\/]", -- UNC path
+  rel_drive = "^[\\/]", -- Relative drive
+  drive = [[^[a-zA-Z]:]],
+}
+table.insert(WINDOWS_PATH_SPECIFIER, WINDOWS_PATH_SPECIFIER.dos_dev)
+table.insert(WINDOWS_PATH_SPECIFIER, WINDOWS_PATH_SPECIFIER.unc)
+table.insert(WINDOWS_PATH_SPECIFIER, WINDOWS_PATH_SPECIFIER.rel_drive)
+table.insert(WINDOWS_PATH_SPECIFIER, WINDOWS_PATH_SPECIFIER.drive)
+
 ---@class PathLib
+---@operator call : PathLib
 ---@field sep "/"|"\\"
 ---@field os "unix"|"windows" Determines the type of paths we're dealing with.
 ---@field cwd string Leave as `nil` to always use current cwd.
 local PathLib = oop.create_class("PathLib")
 
 function PathLib:init(o)
-  self.sep = o.separator or package.config:sub(1, 1)
   self.os = o.os or (is_windows and "windows" or "unix")
+  assert(vim.tbl_contains({ "unix", "windows" }, self.os), "Invalid OS type!")
   self._is_windows = self.os == "windows"
+  self.sep = o.separator or (self._is_windows and "\\" or "/")
   self.cwd = o.cwd and self:convert(o.cwd) or nil
 end
 
@@ -55,7 +69,15 @@ function PathLib:_clean(...)
     end
   end
 
-  return unpack(paths)
+  return unpack(paths, 1, argc)
+end
+
+---@private
+---@param path string
+function PathLib:_split_root(path)
+  local root = self:root(path)
+  if not root then return "", path end
+  return root, path:sub(#root + 1)
 end
 
 ---Check if a given path is a URI.
@@ -78,15 +100,27 @@ end
 ---@return string
 function PathLib:convert(path, sep)
   sep = sep or self.sep
-  local scheme, p = "", tostring(path)
+  local prefix
+  local p = tostring(path)
 
   if self:is_uri(path) then
-    scheme, p = path:match("^(%w+://)(.*)")
+    sep = "/"
+    prefix, p = path:match("^(%w+://)(.*)")
+  elseif self._is_windows then
+    for _, pat in ipairs(WINDOWS_PATH_SPECIFIER) do
+      prefix = path:match(pat)
+
+      if prefix then
+        prefix = prefix:gsub("[\\/]", sep)
+        p = path:sub(#prefix + 1)
+        break
+      end
+    end
   end
 
   p, _ = p:gsub("[\\/]+", sep)
 
-  return scheme .. p
+  return (prefix or "") .. p
 end
 
 ---Convert a path to use the appropriate path separators for the current OS.
@@ -103,7 +137,11 @@ function PathLib:is_abs(path)
   path = self:_clean(path)
 
   if self._is_windows then
-    return path:match("^[A-Z]:") ~= nil
+    for _, pat in ipairs(WINDOWS_PATH_SPECIFIER) do
+      if path:match(pat) ~= nil then return true end
+    end
+
+    return false
   else
     return path:sub(1, 1) == self.sep
   end
@@ -134,11 +172,16 @@ end
 ---@param path string
 ---@return boolean
 function PathLib:is_root(path)
-  path = self:_clean(path)
+  path = self:remove_trailing(self:_clean(path))
 
   if self:is_abs(path) then
     if self._is_windows then
-      return path:match(("^([A-Z]:%s?$)"):format(self.sep)) ~= nil
+      for _, pat in ipairs(WINDOWS_PATH_SPECIFIER) do
+        local prefix = path:match(pat)
+        if prefix and #path == #prefix then return true end
+      end
+
+      return false
     else
       return path == self.sep
     end
@@ -155,7 +198,10 @@ function PathLib:root(path)
 
   if self:is_abs(path) then
     if self._is_windows then
-      return path:match("^([A-Z]:)")
+      for _, pat in ipairs(WINDOWS_PATH_SPECIFIER) do
+        local root = path:match(pat)
+        if root then return root end
+      end
     else
       return self.sep
     end
@@ -194,6 +240,12 @@ function PathLib:normalize(path, opt)
   local parts = self:explode(path)
   if root then
     table.remove(parts, 1)
+
+    if self._is_windows and root == root:match(WINDOWS_PATH_SPECIFIER.rel_drive) then
+      -- Resolve relative drive
+      -- path="/foo/bar/baz", cwd="D:/lorem/ipsum" -> "D:/foo/bar/baz"
+      root = self:root(cwd)
+    end
   end
 
   local normal = path
@@ -261,32 +313,19 @@ function PathLib:join(...)
     segments = segments[1]
   end
 
-  segments = { self:_clean(unpack(segments)) }
-  local argc = select("#", unpack(segments))
-  local result = ""
-  local idx = 1
+  local ret = ""
 
-  if self:is_uri(segments[idx] or "") then
-    result = segments[idx]
-    idx = idx + 1
-  end
-
-  if not self._is_windows and segments[idx] == self.sep then
-    result = result .. self.sep
-    idx = idx + 1
-  end
-
-  local segc = 0
-  for i = idx, argc do
-    if segments[i] ~= nil and segments[i] ~= "" then
-      result = result
-      .. (segc > 0 and self.sep or "")
-      .. string.match(segments[i], [[^(.-)[/\]?$]])
-      segc = segc + 1
+  for i = 1, table.maxn(segments) do
+    local cur = segments[i]
+    if cur then
+      if i > 1 and not ret:sub(-1, -1):match("[\\/]") then
+        ret = ret .. self.sep
+      end
+      ret = ret .. cur
     end
   end
 
-  return result
+  return self:_clean(ret)
 end
 
 ---Explodes the path into an ordered list of path segments.
@@ -304,14 +343,14 @@ function PathLib:explode(path)
     i = i + 1
   end
 
-  local root = self:root(path)
+  local root
+  root, path = self:_split_root(path)
 
-  if root then
+  if root ~= "" then
     parts[i] = root
-    if self._is_windows then
-      path = path:sub(#root + #self.sep + 1, -1)
-    else
-      path = path:sub(#root + 1, -1)
+
+    if path:sub(1, 1) == self.sep then
+      path = path:sub(2)
     end
   end
 
@@ -326,23 +365,26 @@ end
 ---@param path string
 ---@return string
 function PathLib:add_trailing(path)
-  path = tostring(path)
+  local root
+  root, path = self:_split_root(path)
 
+  if #path == 0 then return root .. path end
   if path:sub(-1) == self.sep then
-    return path
+    return root .. path
   end
 
-  return path .. self.sep
+  return root .. path .. self.sep
 end
 
 ---Remove any trailing separator, if present.
 ---@param path string
 ---@return string
 function PathLib:remove_trailing(path)
-  path = tostring(path)
+  local root
+  root, path = self:_split_root(path)
   local p, _ = path:gsub(self.sep .. "$", "")
 
-  return p
+  return root .. p
 end
 
 ---Get the basename of the given path.
@@ -419,7 +461,7 @@ end
 ---@param path string
 ---@param max_length integer
 ---@return string
-function PathLib:shorten(path, max_length)
+function PathLib:truncate(path, max_length)
   path = self:_clean(path)
 
   if #path > max_length - 1 then

@@ -233,7 +233,7 @@ end
 ---@param max_length integer
 ---@param head? boolean Truncate the head rather than the tail.
 ---@return string
-function M.str_shorten(s, max_length, head)
+function M.str_trunc(s, max_length, head)
   if string.len(s) > max_length then
     if head then
       return "…" .. s:sub(string.len(s) - max_length + 1, string.len(s))

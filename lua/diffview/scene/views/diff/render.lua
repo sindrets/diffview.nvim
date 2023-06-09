@@ -149,7 +149,7 @@ return function(panel)
   local comp = panel.components.path.comp
 
   comp:add_line(
-    pl:shorten(pl:vim_fnamemodify(panel.adapter.ctx.toplevel, ":~"), width - 6),
+    pl:truncate(pl:vim_fnamemodify(panel.adapter.ctx.toplevel, ":~"), width - 6),
     "DiffviewFilePanelRootPath"
   )
 
@@ -204,7 +204,7 @@ return function(panel)
     for _, arg in ipairs(extra_info) do
       local relpath = pl:relative(arg, panel.adapter.ctx.toplevel)
       if relpath == "" then relpath = "." end
-      comp:add_line(pl:shorten(relpath, width - 5), "DiffviewFilePanelPath")
+      comp:add_line(pl:truncate(relpath, width - 5), "DiffviewFilePanelPath")
     end
   end
 end
