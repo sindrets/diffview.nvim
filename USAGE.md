@@ -17,12 +17,12 @@ $ gh pr checkout {PR_ID}
 Now, run a symmetric diff against the base branch:
 
 ```vim
-:DiffviewOpen origin/main...HEAD --imply-local
+:DiffviewOpen origin/HEAD...HEAD --imply-local
 ```
 
 The symmetric difference rev range (triple dot) will here compare the changes on
-the current branch (the PR branch) against its merge-base in `origin/main`. This
-is different than comparing directly against `origin/main` if the branches have
+the current branch (the PR branch) against its merge-base in `origin/HEAD`. This
+is different from comparing directly against `origin/HEAD` if the branches have
 diverged, and is usually what you want when comparing changes in a PR. For more
 info see the section on "SPECIFYING REVISIONS" in `man git-rev-parse(1)`.
 
@@ -56,13 +56,13 @@ review the changes introduced in each of those commits individually. To do
 this, you can use `:DiffviewFileHistory`:
 
 ```vim
-:DiffviewFileHistory --range=origin/main...HEAD --right-only --no-merges
+:DiffviewFileHistory --range=origin/HEAD...HEAD --right-only --no-merges
 ```
 
 Here we are again using a symmetric difference range. However, symdiff ranges
 have different behavior between `git-diff` and `git-log`. Whereas in `git-diff`
 it compares against the merge-base, here it will select only the commits that
-are reachable from *either* `origin/main` *or* `HEAD`, but not from both (in
+are reachable from _either_ `origin/HEAD` _or_ `HEAD`, but not from both (in
 other words, it's actually performing a symmetric difference here).
 
 We then use the cherry-pick option `--right-only` to limit the commits to only
@@ -80,7 +80,7 @@ create a new commit from within the editor:
 
 ### Use a Git Wrapper Plugin (Recommended)
 
-Diffview.nvim *is not*, and *does not try to be* a complete git wrapper. As
+Diffview.nvim _is not_, and _does not try to be_ a complete git wrapper. As
 such, there are a number of features offered by such plugins that won't ever be
 implemented here, because they are deemed out-of-scope. It's therefore
 recommended to use some form of a Git wrapper plugin in order to get a more
