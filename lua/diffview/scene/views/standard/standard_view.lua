@@ -103,7 +103,7 @@ function StandardView:use_layout(layout)
   self.cur_layout = layout:clone()
   self.layouts[layout.class] = self.cur_layout
 
-  layout.pivot_producer = function()
+  self.cur_layout.pivot_producer = function()
     local was_open = self.panel:is_open()
     local was_only_win = was_open and #utils.tabpage_list_normal_wins(self.tabpage) == 1
     self.panel:close()
