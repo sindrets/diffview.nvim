@@ -237,15 +237,20 @@ File.create_buffer = async.wrap(function(self, callback)
     return
   end
 
+  -- Create buffer and set name *before* calling `produce_data()` to ensure
+  -- that multiple file instances won't ever try to create the same file.
   self.bufnr = api.nvim_create_buf(false, false)
-  local bufopts = vim.deepcopy(File.bufopts)
-
   api.nvim_buf_set_name(self.bufnr, fullname)
 
   local err, lines = await(self:produce_data())
   if err then error(table.concat(err, "\n")) end
 
   await(async.scheduler())
+
+  -- Revalidate buffer in case the file was destroyed before `produce_data()`
+  -- returned.
+  if not api.nvim_buf_is_valid(self.bufnr) then return end
+  local bufopts = vim.deepcopy(File.bufopts)
 
   if self.rev.type == RevType.STAGE and self.rev.stage == 0 then
     self.blob_hash = self.adapter:file_blob_hash(self.path)
@@ -267,21 +272,19 @@ File.create_buffer = async.wrap(function(self, callback)
     api.nvim_buf_set_option(self.bufnr, option, value)
   end
 
-  if api.nvim_buf_is_valid(self.bufnr) then
-    local last_modifiable = vim.bo[self.bufnr].modifiable
-    local last_modified = vim.bo[self.bufnr].modified
-    vim.bo[self.bufnr].modifiable = true
-    api.nvim_buf_set_lines(self.bufnr, 0, -1, false, lines)
+  local last_modifiable = vim.bo[self.bufnr].modifiable
+  local last_modified = vim.bo[self.bufnr].modified
+  vim.bo[self.bufnr].modifiable = true
+  api.nvim_buf_set_lines(self.bufnr, 0, -1, false, lines)
 
-    api.nvim_buf_call(self.bufnr, function()
-      vim.cmd("filetype detect")
-    end)
+  api.nvim_buf_call(self.bufnr, function()
+    vim.cmd("filetype detect")
+  end)
 
-    vim.bo[self.bufnr].modifiable = last_modifiable
-    vim.bo[self.bufnr].modified = last_modified
-    self:post_buf_created()
-    callback(self.bufnr)
-  end
+  vim.bo[self.bufnr].modifiable = last_modifiable
+  vim.bo[self.bufnr].modified = last_modified
+  self:post_buf_created()
+  callback(self.bufnr)
   ---@diagnostic enable: invisible
 end)
 
