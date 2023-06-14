@@ -742,8 +742,10 @@ function HgAdapter:parse_fh_data(data, commit, state)
     end
 
 
-    local stats = {}
-    local name, changes, diffstats = data.numstat[i]:match("(.*)|%s+(%d+)%s*([+-]*)")
+    -- TODO(zegervdv): Cannot get diffstats from mercurial reliably
+    -- see https://github.com/sindrets/diffview.nvim/issues/366
+    local stats = nil
+    local name, _ = data.numstat[i]:match("(.*)|.*")
     name = vim.trim(name)
 
     local oldname
@@ -753,19 +755,6 @@ function HgAdapter:parse_fh_data(data, commit, state)
       name = vim.trim(name)
       -- Mark as Renamed
       status = 'R'
-    end
-
-    if changes and diffstats then
-      local _, adds = diffstats:gsub("+", "")
-
-      stats = {
-        additions = tonumber(adds),
-        deletions = tonumber(changes) - tonumber(adds),
-      }
-    end
-
-    if not stats.additions or not stats.deletions then
-      stats = nil
     end
 
     table.insert(
@@ -1056,22 +1045,14 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
     retry = 2,
     log_opt = log_opt,
   })
-  local numstat_job = Job({
-    command = self:bin(),
-    args = utils.vec_join(self:args(), "diff", "--stat", args),
-    cwd = self.ctx.toplevel,
-    retry = 2,
-    log_opt = log_opt,
-  })
 
-  local ok = await(Job.join({ namestat_job, mergestate_job, numstat_job }))
+  local ok = await(Job.join({ namestat_job, mergestate_job }))
 
   if not ok then
-    callback(utils.vec_join(namestat_job.stderr, numstat_job.stderr, mergestate_job.stderr), nil)
+    callback(utils.vec_join(namestat_job.stderr, mergestate_job.stderr), nil)
     return
   end
 
-  local numstat_out = numstat_job.stdout
   local namestat_out = namestat_job.stdout
   local mergestate_out = mergestate_job.stdout
 
@@ -1079,28 +1060,14 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
   local conflict_map = {}
   local file_info = {}
 
-  -- Last line in numstat is a summary and should not be used
-  table.remove(numstat_out, #numstat_out)
-
-  local numstat_info = {}
-  for _, s in ipairs(numstat_out) do
-      local name, changes, diffstats = s:match("%s*([^|]*)%s+|%s+(%d+)%s+([+-]+)")
-      if changes and diffstats then
-        local _, adds = diffstats:gsub("+", "")
-
-        numstat_info[name] = {
-          additions = tonumber(adds),
-          deletions = tonumber(changes) - tonumber(adds),
-        }
-      end
-  end
-
   for _, s in ipairs(namestat_out) do
     if s ~= " " then
       local status = s:sub(1, 1):gsub("%s", " ")
       local name = vim.trim(s:match("[%a%s]%s*(.*)"))
-
-      local stats = numstat_info[name] or {}
+      
+      -- TODO(zegervdv): Cannot get correct values from mercurial
+      -- see https://github.com/sindrets/diffview.nvim/issues/366
+      local stats = {}
 
       if not (kind == "staged") then
         file_info[name] = {
