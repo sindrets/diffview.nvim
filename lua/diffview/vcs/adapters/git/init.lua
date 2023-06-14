@@ -1360,7 +1360,7 @@ GitAdapter.file_restore = async.wrap(function(self, path, kind, commit, callback
 
   -- Check if file exists in history
   _, code = self:exec_sync(
-    { "cat-file", "-e", fmt("%s:%s", kind == "staged" and "HEAD" or "", path) },
+    { "cat-file", "-e", fmt("%s:%s", commit or (kind == "staged" and "HEAD") or "", path) },
     self.ctx.toplevel
   )
   local exists_git = code == 0
