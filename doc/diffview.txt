@@ -359,12 +359,23 @@ EXAMPLE CONFIGURATION WITH DEFAULT SETTINGS: |diffview.defaults|
 enhanced_diff_hl                                *diffview-config-enhanced_diff_hl*
         Type: `boolean`, Default: `false`
 
-        Enable/disable enhanced diff highlighting. In `diff2*` layouts this
-        will highlight the delete fill-chars more subtly, and show
-        |hl-DiffAdd| in the old state buffer, as |hl-DiffDelete|. This makes
-        the highlighting more inline with how 2-way diffs are displayed in
-        other diff tools. As - in a 2-way diff - an "addition" in the old
-        state actually represents a deletion.
+        Enable/disable enhanced diff highlighting. This option has slightly
+        different effects in different |diffview-layouts|.
+
+        In all layouts: highlight delete fill-chars more subtly. These chars
+            are used as filler in places where other diff buffers have
+            insertions at that postion. Unfortunately many color schemes give
+            it a distracting highlight, such as a bright red. This makes diffs
+            more difficult to visually parse, as your eyes get drawn towards
+            the bright red areas of your display with absolutely no
+            information in them.
+
+        In `diff2*` layouts: show |hl-DiffAdd| as |hl-DiffDelete| in the
+            buffer representing the old state. This makes the highlighting
+            more inline with how 2-way diffs are displayed in other diff
+            tools. As - in a 2-way diff - an "insertion" in the old state
+            actually represents a deletion from the perspective of the new
+            state.
 
 git_cmd                                         *diffview-config-git_cmd*
         Type: `string[]`, Default: `{ "git" }`
@@ -419,6 +430,7 @@ view.x.layout                                   *diffview-config-view.x.layout*
               • C: THEIRS (incoming branch)
               • D: BASE (common ancestor)
 
+                                                *diffview-layouts*
             {diff1_plain}
                 Available for: merge_tool
 
@@ -904,7 +916,7 @@ conflict_choose({version})                      *diffview-actions-conflict_choos
                 See |diffview-conflict-versions| to tell what versions of the
                 file these names correspond with.
 
-conflict_choose_all({version})              *diffview-actions-conflict_choose_all*
+conflict_choose_all({version})                  *diffview-actions-conflict_choose_all*
         Contexts: `merge_tool`, `file_panel`
 
         Replace all merge conflicts in the current file at once. Choosing `'none'`

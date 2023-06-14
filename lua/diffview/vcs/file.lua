@@ -87,6 +87,12 @@ function File:init(opt)
     foldcolumn = "1",
     foldlevel = 0,
     foldenable = true,
+    winhl = {
+      "DiffAdd:DiffviewDiffAdd",
+      "DiffDelete:DiffviewDiffDelete",
+      "DiffChange:DiffviewDiffChange",
+      "DiffText:DiffviewDiffText",
+    },
   }
 
   -- Set winbar info

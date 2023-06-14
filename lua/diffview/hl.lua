@@ -460,6 +460,10 @@ M.hl_links = {
   StatusDeleted = "diffRemoved",
   StatusBroken = "diffRemoved",
   StatusIgnored = "Comment",
+  DiffAdd = "DiffAdd",
+  DiffDelete = "DiffDelete",
+  DiffChange = "DiffChange",
+  DiffText = "DiffText",
 }
 
 function M.update_diff_hl()
@@ -468,12 +472,14 @@ function M.update_diff_hl()
   local style = M.get_style("DiffDelete", true) or "NONE"
 
   M.hi("DiffviewDiffAddAsDelete", { fg = fg, bg = bg, style = style })
-  M.hi_link("DiffviewDiffDelete", "Comment", { default = true })
+  M.hi_link("DiffviewDiffDeleteDim", "Comment", { default = true })
+
+  if config.get_config().enhanced_diff_hl then
+    M.hi_link("DiffviewDiffDelete", "DiffviewDiffDeleteDim")
+  end
 end
 
 function M.setup()
-  M.update_diff_hl()
-
   for name, v in pairs(M.get_hl_groups()) do
     v = vim.tbl_extend("force", v, { default = true })
     M.hi("Diffview" .. name, v)
@@ -482,6 +488,8 @@ function M.setup()
   for from, to in pairs(M.hl_links) do
     M.hi_link("Diffview" .. from, to, { default = true })
   end
+
+  M.update_diff_hl()
 end
 
 return M
