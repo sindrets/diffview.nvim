@@ -1,13 +1,7 @@
-local assert = require("luassert")
+local helpers = require("tests.diffview.helpers.init")
 
-local function eq(a, b)
-  if a == nil or b == nil then return assert.are.equal(a, b) end
-  return assert.are.same(a, b)
-end
-local function neq(a, b)
-  if a == nil or b == nil then return assert.are_not.equal(a, b) end
-  return assert.are_not.same(a, b)
-end
+local eq = helpers.smart_same
+local neq = helpers.smart_nsame
 
 -- Windows path standards:
 -- https://learn.microsoft.com/en-us/dotnet/standard/io/file-path-formats
