@@ -217,9 +217,7 @@ return function(view)
       end
 
       local file = view:infer_cur_file()
-      if not file then
-        return
-      end
+      if not file then return end
 
       local bufid = utils.find_file_buffer(file.path)
 
@@ -259,9 +257,7 @@ return function(view)
       view:update_files()
     end,
     open_all_folds = function()
-      if not view.panel:is_focused() or view.panel.listing_style ~= "tree" then
-        return
-      end
+      if not view.panel:is_focused() or view.panel.listing_style ~= "tree" then return end
 
       for _, file_set in ipairs({
         view.panel.components.conflicting.files,
@@ -279,9 +275,7 @@ return function(view)
       view.panel:redraw()
     end,
     close_all_folds = function()
-      if not view.panel:is_focused() or view.panel.listing_style ~= "tree" then
-        return
-      end
+      if not view.panel:is_focused() or view.panel.listing_style ~= "tree" then return end
 
       for _, file_set in ipairs({
         view.panel.components.conflicting.files,
@@ -299,18 +293,12 @@ return function(view)
       view.panel:redraw()
     end,
     open_fold = function()
-      if not view.panel:is_focused() then
-        return
-      end
+      if not view.panel:is_focused() then return end
       local dir = view.panel:get_dir_at_cursor()
-      if dir then
-        view.panel:set_item_fold(dir, true)
-      end
+      if dir then view.panel:set_item_fold(dir, true) end
     end,
     close_fold = function()
-      if not view.panel:is_focused() then
-        return
-      end
+      if not view.panel:is_focused() then return end
       local dir, comp = view.panel:get_dir_at_cursor()
       if dir and comp then
         if not dir.collapsed then
@@ -324,13 +312,9 @@ return function(view)
       end
     end,
     toggle_fold = function()
-      if not view.panel:is_focused() then
-        return
-      end
+      if not view.panel:is_focused() then return end
       local dir = view.panel:get_dir_at_cursor()
-      if dir then
-        view.panel:toggle_item_fold(dir)
-      end
+      if dir then view.panel:toggle_item_fold(dir) end
     end,
   }
 end
