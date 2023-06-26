@@ -105,7 +105,7 @@ return function(view)
     end,
     open_commit_log = function()
       if view.left.type == RevType.STAGE and view.right.type == RevType.LOCAL then
-        utils.info("Changes not commited yet. No log available for these changes.")
+        utils.info("Changes not committed yet. No log available for these changes.")
         return
       end
 
@@ -124,9 +124,9 @@ return function(view)
       if item then
         local success
         if item.kind == "working" or item.kind == "conflicting" then
-          success = view.adapter:add_files({item.path})
+          success = view.adapter:add_files({ item.path })
         elseif item.kind == "staged" then
-          success = view.adapter:reset_files({item.path})
+          success = view.adapter:reset_files({ item.path })
         end
 
         if not success then
@@ -149,7 +149,7 @@ return function(view)
 
           ---@type Node
           local item_node
-          tree.root:deep_some(function (node, _, _)
+          tree.root:deep_some(function(node, _, _)
             if node == item._node then
               item_node = node
               return true

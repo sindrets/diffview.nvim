@@ -389,7 +389,7 @@ function M.create_cursor_constraint(components)
   ---constraint, the next component is determined by the direction the cursor is
   ---moving.
   ---@param winid_or_opt number|{from: number, to: number}
-  ---@param delta number The amount of change from the current cursor positon.
+  ---@param delta number The amount of change from the current cursor position.
   ---Not needed if the first argument is a table.
   ---@return number
   return function(winid_or_opt, delta)
