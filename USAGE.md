@@ -47,6 +47,15 @@ involved.
 
 ![diffview symdiff demo](https://user-images.githubusercontent.com/2786478/229858634-c751ebe3-cc43-48de-adda-bf0b71fa2ce7.png)
 
+> NOTE: If Git complains `fatal: Not a valid object name origin/HEAD` then it
+> likely means that your local origin remote doesn't have a default branch
+> configured. You can have Git automatically query your remote and detect its
+> default branch like this:
+>
+> ```sh
+> git remote set-head -a origin
+> ```
+
 [^1]: The files as they currently exist on disk.
 
 ### Comparing Changes From the Individual PR Commits
