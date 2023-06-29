@@ -165,47 +165,49 @@ end
 ---@param pipe uv_pipe_t
 ---@param out string[]
 ---@param line_listeners? diffview.Job.OnOutCallback[]
----@param err? string
----@param data? string
-function Job:line_reader(pipe, out, line_listeners, err, data)
+function Job:line_reader(pipe, out, line_listeners)
   local line_buffer
 
-  if err then
-    logger:error("[Job:line_reader()] " .. err)
-  end
+  ---@param err? string
+  ---@param data? string
+  return function (err, data)
+    if err then
+      logger:error("[Job:line_reader()] " .. err)
+    end
 
-  if data then
-    local has_eol = data:sub(-1) == "\n"
-    local lines = vim.split(data, "\r?\n")
+    if data then
+      local has_eol = data:sub(-1) == "\n"
+      local lines = vim.split(data, "\r?\n")
 
-    lines[1] = (line_buffer or "") .. lines[1]
-    line_buffer = nil
+      lines[1] = (line_buffer or "") .. lines[1]
+      line_buffer = nil
 
-    for i, line in ipairs(lines) do
-      if not has_eol and i == #lines then
-        line_buffer = line
-      else
-        out[#out+1] = line
+      for i, line in ipairs(lines) do
+        if not has_eol and i == #lines then
+          line_buffer = line
+        else
+          out[#out+1] = line
 
-        if line_listeners then
-          for _, listener in ipairs(line_listeners) do
-            listener(nil, line, self)
+          if line_listeners then
+            for _, listener in ipairs(line_listeners) do
+              listener(nil, line, self)
+            end
           end
         end
       end
-    end
-  else
-    if line_buffer then
-      out[#out+1] = line_buffer
+    else
+      if line_buffer then
+        out[#out+1] = line_buffer
 
-      if line_listeners then
-        for _, listener in ipairs(line_listeners) do
-          listener(nil, line_buffer, self)
+        if line_listeners then
+          for _, listener in ipairs(line_listeners) do
+            listener(nil, line_buffer, self)
+          end
         end
       end
-    end
 
-    try_close(pipe)
+      try_close(pipe)
+    end
   end
 end
 
@@ -221,7 +223,7 @@ function Job:handle_reader(pipe, out, kind)
       out = self.on_stdout_listeners,
       err = self.on_stderr_listeners,
     })[kind] or {}
-    pipe:read_start(utils.bind(self.line_reader, self, pipe, out, listeners))
+    pipe:read_start(self:line_reader(pipe, out, listeners))
   end
 end
 
