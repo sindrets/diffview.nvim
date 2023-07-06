@@ -255,7 +255,10 @@ File.create_buffer = async.wrap(function(self, callback)
 
   -- Revalidate buffer in case the file was destroyed before `produce_data()`
   -- returned.
-  if not api.nvim_buf_is_valid(self.bufnr) then return end
+  if not api.nvim_buf_is_valid(self.bufnr) then
+    error("The buffer has been invalidated!")
+    return
+  end
   local bufopts = vim.deepcopy(File.bufopts)
 
   if self.rev.type == RevType.STAGE and self.rev.stage == 0 then

@@ -92,11 +92,15 @@ end
 Window.load_file = async.wrap(function(self, callback)
   assert(self.file)
 
-  if self.file.bufnr and api.nvim_buf_is_valid(self.file.bufnr) then
-    return callback(true)
-  end
+  if self.file:is_valid() then return callback(true) end
 
   local ok, err = pawait(self.file.create_buffer, self.file)
+
+  if ok and not self.file:is_valid() then
+    -- The buffer may have been destroyed during the await
+    ok = false
+    err = "The file buffer is invalid!"
+  end
 
   if not ok then
     logger:error(err)
