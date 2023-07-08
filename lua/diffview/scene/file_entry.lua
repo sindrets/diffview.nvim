@@ -1,6 +1,7 @@
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
+local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1") ---@type Diff1|LazyModule
 local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2") ---@type Diff2|LazyModule
 local File = lazy.access("diffview.vcs.file", "File") ---@type vcs.File|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
@@ -279,6 +280,11 @@ function FileEntry:has_patch_folds()
   return true
 end
 
+---@return boolean
+function FileEntry:is_null_entry()
+  return self.path == "null" and self.layout:get_main_win().file == File.NULL_FILE
+end
+
 ---@static
 ---@param adapter VCSAdapter
 function FileEntry.update_index_stat(adapter, stat)
@@ -336,5 +342,19 @@ function FileEntry.with_layout(layout_class, opt)
   })
 end
 
+function FileEntry.new_null_entry(adapter)
+  return FileEntry({
+    adapter = adapter,
+    path = "null",
+    kind = "working",
+    binary = false,
+    nulled = true,
+    layout = Diff1({
+      b = File.NULL_FILE,
+    })
+  })
+end
+
 M.FileEntry = FileEntry
+
 return M

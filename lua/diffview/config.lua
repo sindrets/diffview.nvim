@@ -83,7 +83,8 @@ M.defaults = {
       ---@type ConfigLogOptions
       git = {
         single_file = {
-          diff_merges = "combined",
+          diff_merges = "first-parent",
+          follow = true,
         },
         multi_file = {
           diff_merges = "first-parent",

@@ -31,23 +31,14 @@ end
 ---@param schedule? boolean Schedule the echo call.
 function M.echo_multiln(msg, hl, schedule)
   if schedule then
-    vim.schedule(function()
-      M.echo_multiln(msg, hl, false)
-    end)
+    vim.schedule(function() M.echo_multiln(msg, hl, false) end)
     return
   end
 
-  vim.cmd("echohl " .. (hl or "None"))
-  if type(msg) ~= "table" then
-    msg = { msg }
-  end
-  for _, chunk in ipairs(msg) do
-    for _, line in ipairs(vim.split(chunk, "\n", { trimempty = false })) do
-      line = line:gsub('["|\t]', { ['"'] = [[\"]], ["\t"] = "        " })
-      vim.cmd(string.format('echom "%s"', line))
-    end
-  end
-  vim.cmd("echohl None")
+  if type(msg) ~= "table" then msg = { msg } end
+
+  local text = table.concat(msg, "\n")
+  api.nvim_echo({ { text, hl } }, true, {})
 end
 
 ---@param msg string|string[]
@@ -61,7 +52,7 @@ function M.info(msg, schedule)
   end
   msg = M.vec_slice(msg)
   msg[1] = "[Diffview.nvim] " .. msg[1]
-  M.echo_multiln(msg, "Directory", schedule)
+  M.echo_multiln(msg, "DiagnosticInfo", schedule)
 end
 
 ---@param msg string|string[]
@@ -1252,9 +1243,10 @@ function M.temp_win(bufnr, enter)
 end
 
 ---Create a copy of `func` bound to the given arguments.
----@param func function
+---@generic T
+---@param func fun(...): T
 ---@param ... any Arguments to prepend to arguments provided to the bound function when invoking `func`.
----@return fun(...): unknown
+---@return fun(...): T
 function M.bind(func, ...)
   local bound_args = M.tbl_pack(...)
 

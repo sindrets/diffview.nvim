@@ -622,6 +622,11 @@ HgAdapter.file_history_worker = async.void(function(self, co_state, opt, callbac
     end
   end)
 
+  logger:info(
+    "[FileHistory] Updating with options:",
+    vim.inspect(state.prepared_log_opts, { newline = " ", indent = "" })
+  )
+
   if is_trace then
     error("Unimplemented!")
   else
@@ -787,9 +792,20 @@ function HgAdapter:parse_fh_data(data, commit, state)
     })
   end
 
-  logger:debug("[HgAdapter:parse_fh_data] Encountered commit with no file data:", data)
+  if state.path_args[1] then
+    -- If path args are provided we never want to show empty log entries.
+    logger:warn("[HgAdapter:parse_fh_data()] Encountered commit with no file data:", data)
+    return false, "Found no relevant file data with given path args!"
+  end
 
-  return false, "Missing file data!"
+  -- Commit is likely identical to it's parent. Return an empty log entry.
+  return true, LogEntry({
+    path_args = state.path_args,
+    commit = commit,
+    single_file = state.single_file,
+    nulled = true,
+    files = { FileEntry.new_null_entry(self) },
+  })
 end
 
 ---@param argo ArgObject

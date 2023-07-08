@@ -1,7 +1,13 @@
+local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
+
+local FileEntry = lazy.access("diffview.scene.file_entry", "FileEntry") ---@type FileEntry
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
+
 local M = {}
 
 ---@class LogEntry : diffview.Object
+---@operator call : LogEntry
 ---@field path_args string[]
 ---@field commit Commit
 ---@field files FileEntry[]
@@ -9,6 +15,7 @@ local M = {}
 ---@field stats GitStats
 ---@field single_file boolean
 ---@field folded boolean
+---@field nulled boolean
 local LogEntry = oop.create_class("LogEntry")
 
 function LogEntry:init(opt)
@@ -17,6 +24,7 @@ function LogEntry:init(opt)
   self.files = opt.files
   self.folded = true
   self.single_file = opt.single_file
+  self.nulled = utils.sate(opt.nulled, false)
   self:update_status()
   self:update_stats()
 end
@@ -77,6 +85,20 @@ function LogEntry:get_diff(path)
       return diff_entry
     end
   end
+end
+
+---@param adapter VCSAdapter
+---@param opt table
+---@return LogEntry
+function LogEntry.new_null_entry(adapter, opt)
+  opt = opt or {}
+
+  return LogEntry(
+    vim.tbl_extend("force", opt, {
+      nulled = true,
+      files = { FileEntry.new_null_entry(adapter) },
+    })
+  )
 end
 
 M.LogEntry = LogEntry
