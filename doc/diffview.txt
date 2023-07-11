@@ -296,6 +296,13 @@ COMMANDS                                        *diffview-commands*
                 YYYY-mm-dd, YYYY-mm-dd HH:mm:ss, or natural language (for
                 instance "2 weeks 6 hours 12 minutes ago")
 
+        -g, --walk-reflogs
+               Instead of walking the commit ancestry chain, walk reflog
+               entries from the most recent one to older ones. When this
+               option is used you cannot specify commits to exclude (that is,
+               ^commit, commit1..commit2, and commit1...commit2 notations
+               cannot be used).
+
     Mercurial Options: ~
 
         --rev={rev}
