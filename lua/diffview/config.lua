@@ -276,6 +276,7 @@ M._config = M.defaults
 ---@field path_args string[]
 ---@field after string
 ---@field before string
+---@field g boolean
 
 ---@class HgLogOptions
 ---@field follow string
@@ -316,6 +317,7 @@ M.log_option_defaults = {
     G = nil,
     S = nil,
     path_args = {},
+    g = false,
   },
   ---@type HgLogOptions
   hg = {

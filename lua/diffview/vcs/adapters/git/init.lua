@@ -400,7 +400,8 @@ function GitAdapter:prepare_fh_options(log_options, single_file)
       o.G and { "-E", "-G" .. o.G } or nil,
       o.S and { "-S" .. o.S, "--pickaxe-regex" } or nil,
       o.after and { "--after=" .. o.after } or nil,
-      o.before and { "--before=" .. o.before } or nil
+      o.before and { "--before=" .. o.before } or nil,
+      o.g and { "-g" } or nil
     )
   }
 end
@@ -786,6 +787,7 @@ function GitAdapter:file_history_options(range, paths, argo)
     { "S" },
     { "after", "since" },
     { "before", "until" },
+    { "g", "walk-reflogs" },
   }
 
   local log_options = { rev_range = range_arg } --[[@as GitLogOptions ]]
@@ -807,6 +809,10 @@ function GitAdapter:file_history_options(range, paths, argo)
 
   if log_options.L and next(log_options.L) then
     log_options.follow = false -- '--follow' is not compatible with '-L'
+  end
+
+  if log_options.g then
+      log_options.reverse = false -- '--reverse' is not compatible with '--walk-reflogs'
   end
 
   log_options.path_args = paths
