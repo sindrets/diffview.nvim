@@ -175,7 +175,7 @@ local function prepare_panel_cache(panel)
   c.root_path = panel.state.form == "column"
       and pl:truncate(
         pl:vim_fnamemodify(panel.adapter.ctx.toplevel, ":~"),
-        panel:get_config().width - 6
+        panel:infer_width() - 6
       )
     or pl:vim_fnamemodify(panel.adapter.ctx.toplevel, ":~")
   c.args = table.concat(panel.log_options.single_file.path_args, " ")

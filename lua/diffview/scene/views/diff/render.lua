@@ -138,12 +138,7 @@ return function(panel)
 
   panel.render_data:clear()
   local conf = config.get_config()
-  local width = panel:get_width()
-
-  if width == -1 then
-    local panel_config = panel:get_config()
-    width = panel_config.width
-  end
+  local width = panel:infer_width()
 
   ---@type RenderComponent
   local comp = panel.components.path.comp

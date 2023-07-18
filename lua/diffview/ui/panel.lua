@@ -14,7 +14,7 @@ local M = {}
 local uid_counter = 0
 
 ---@alias PanelConfig PanelFloatSpec|PanelSplitSpec
----@alias PanelType '"split"'|'"float"'
+---@alias PanelType "split"|"float"
 
 ---@type PerfTimer
 local perf = PerfTimer("[Panel] redraw")
@@ -68,8 +68,8 @@ Panel.default_type = "split"
 ---@field position "left"|"top"|"right"|"bottom"
 ---@field relative "editor"|"win"
 ---@field win integer
----@field width integer
----@field height integer
+---@field width? integer
+---@field height? integer
 ---@field win_opts WindowOptions
 
 ---@type PanelSplitSpec
@@ -249,7 +249,7 @@ function Panel:resize()
   if config.type == "split" then
     if self.state.form == "column" and config.width then
       api.nvim_win_set_width(self.winid, config.width)
-    elseif config.height then
+    elseif self.state.form == "row" and config.height then
       api.nvim_win_set_height(self.winid, config.height)
     end
   elseif config.type == "float" then
@@ -487,22 +487,70 @@ function Panel:get_default_config(panel_type)
   return config
 end
 
----@return integer
+---@return integer?
 function Panel:get_width()
   if self:is_open() then
     return api.nvim_win_get_width(self.winid)
   end
-
-  return -1
 end
 
----@return integer
+---@return integer?
 function Panel:get_height()
   if self:is_open() then
     return api.nvim_win_get_height(self.winid)
   end
+end
 
-  return -1
+function Panel:infer_width()
+  local cur_width = self:get_width()
+  if cur_width then return cur_width end
+
+  local config = self:get_config()
+  if config.width then return config.width end
+
+  -- PanelFloatSpec requires both width and height to be defined. If we get
+  -- here then the panel is a split.
+  ---@cast config PanelSplitSpec
+
+  if config.win and api.nvim_win_is_valid(config.win) then
+    if self.state.form == "row" then
+      return api.nvim_win_get_width(config.win)
+    elseif self.state.form == "column" then
+      return math.floor(api.nvim_win_get_width(config.win) / 2)
+    end
+  end
+
+  if self.state.form == "row" then
+    return vim.o.columns
+  end
+
+  return math.floor(vim.o.columns / 2)
+end
+
+function Panel:infer_height()
+  local cur_height = self:get_height()
+  if cur_height then return cur_height end
+
+  local config = self:get_config()
+  if config.height then return config.height end
+
+  -- PanelFloatSpec requires both width and height to be defined. If we get
+  -- here then the panel is a split.
+  ---@cast config PanelSplitSpec
+
+  if config.win and api.nvim_win_is_valid(config.win) then
+    if self.state.form == "row" then
+      return math.floor(api.nvim_win_get_height(config.win) / 2)
+    elseif self.state.form == "column" then
+      return api.nvim_win_get_height(config.win)
+    end
+  end
+
+  if self.state.form == "row" then
+    return math.floor(vim.o.lines / 2)
+  end
+
+  return vim.o.lines
 end
 
 function Panel.next_uid()
