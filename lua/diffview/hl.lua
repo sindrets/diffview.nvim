@@ -449,6 +449,7 @@ M.hl_links = {
   FolderName = "Directory",
   FolderSign = "PreProc",
   Reference = "Function",
+  ReflogSelector = "Identifier",
   StatusAdded = "diffAdded",
   StatusUntracked = "diffAdded",
   StatusModified = "diffChanged",

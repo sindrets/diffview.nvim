@@ -134,6 +134,10 @@ local function render_entries(panel, parent, entries, updating)
       comp:add_text(" " .. entry.commit.hash:sub(1, 8), "DiffviewSecondary")
     end
 
+    if (entry.commit --[[@as GitCommit ]]).reflog_selector then
+      comp:add_text((" %s"):format((entry.commit --[[@as GitCommit ]]).reflog_selector), "DiffviewReflogSelector")
+    end
+
     if entry.commit.ref_names then
       comp:add_text((" (%s)"):format(entry.commit.ref_names), "DiffviewReference")
     end

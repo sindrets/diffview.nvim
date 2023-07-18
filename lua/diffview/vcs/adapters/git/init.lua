@@ -47,9 +47,11 @@ GitAdapter.bootstrap = {
 GitAdapter.COMMIT_PRETTY_FMT = (
   "%H %P"      -- Commit hash followed by parent hashes
   .. "%n%an"   -- Author name
-  .. "%n%ad"   -- Author date
-  .. "%n%ar"   -- Author date relative
+  .. "%n%at"   -- Author date: UNIX timestamp
+  .. "%n%ai"   -- Author date: ISO (gives us timezone)
+  .. "%n%ar"   -- Author date: relative
   .. "%n..%D"  -- Ref names
+  .. "%n..%gd" -- Reflog selectors
   .. "%n..%s"  -- Subject
   -- The leading dots here are only used for padding to ensure those lines
   -- won't ever be completetely empty. This way the lines will be
@@ -388,6 +390,7 @@ function GitAdapter:prepare_fh_options(log_options, single_file)
       o.first_parent and { "--first-parent" } or nil,
       o.show_pulls and { "--show-pulls" } or nil,
       o.reflog and { "--reflog" } or nil,
+      o.walk_reflogs and { "--walk-reflogs" } or nil,
       o.all and { "--all" } or nil,
       o.merges and { "--merges" } or nil,
       o.no_merges and { "--no-merges" } or nil,
@@ -451,6 +454,7 @@ end
 ---@field time_offset string
 ---@field rel_date string
 ---@field ref_names string
+---@field reflog_selector string
 ---@field subject string
 ---@field namestat string[]
 ---@field numstat string[]
@@ -462,7 +466,7 @@ end
 ---@return GitAdapter.LogData data
 local function structure_fh_data(stat_data, keep_diff)
   local right_hash, left_hash, merge_hash = unpack(utils.str_split(stat_data[1]))
-  local time, time_offset = unpack(utils.str_split(stat_data[3]))
+  local time_offset = utils.str_split(stat_data[4])[3]
 
   ---@type GitAdapter.LogData
   local ret = {
@@ -470,14 +474,15 @@ local function structure_fh_data(stat_data, keep_diff)
     right_hash = right_hash,
     merge_hash = merge_hash,
     author = stat_data[2],
-    time = tonumber(time),
+    time = tonumber(stat_data[3]),
     time_offset = time_offset,
-    rel_date = stat_data[4],
-    ref_names = stat_data[5] and stat_data[5]:sub(3) or "",
-    subject = stat_data[6] and stat_data[6]:sub(3) or "",
+    rel_date = stat_data[5],
+    ref_names = stat_data[6] and stat_data[6]:sub(3) or "",
+    reflog_selector = stat_data[7] and stat_data[7]:sub(3) or "",
+    subject = stat_data[8] and stat_data[8]:sub(3) or "",
   }
 
-  local namestat, numstat = structure_stat_data(stat_data, 7)
+  local namestat, numstat = structure_stat_data(stat_data, 9)
   ret.namestat = namestat
   ret.numstat = numstat
 
@@ -491,7 +496,7 @@ local function structure_fh_data(stat_data, keep_diff)
     -- of `--diff-merges`.
     ret.valid = false
   else
-    ret.valid = #stat_data >= 6 and pcall(
+    ret.valid = #stat_data >= 8 and pcall(
       vim.validate,
       {
         left_hash = { ret.left_hash, "string", true },
@@ -502,6 +507,7 @@ local function structure_fh_data(stat_data, keep_diff)
         time_offset = { ret.time_offset, "string" },
         rel_date = { ret.rel_date, "string" },
         ref_names = { ret.ref_names, "string" },
+        reflog_selector = { ret.reflog_selector, "string" },
         subject = { ret.subject, "string" },
       }
     )
@@ -569,7 +575,6 @@ function GitAdapter:stream_fh_data(state)
       "gc.auto=0",
       "log",
       "--pretty=format:%x00%n" .. GitAdapter.COMMIT_PRETTY_FMT,
-      "--date=raw",
       "--numstat",
       "--raw",
       state.prepared_log_opts.flags,
@@ -649,7 +654,6 @@ function GitAdapter:stream_line_trace_data(state)
       "--color=never",
       "--no-ext-diff",
       "--pretty=format:%x00%n" .. GitAdapter.COMMIT_PRETTY_FMT,
-      "--date=raw",
       state.prepared_log_opts.flags,
       state.prepared_log_opts.rev_range,
       "--"
@@ -772,6 +776,7 @@ function GitAdapter:file_history_options(range, paths, argo)
     { "first-parent" },
     { "show-pulls" },
     { "reflog" },
+    { "walk-reflogs", "g" },
     { "all" },
     { "merges" },
     { "no-merges" },
@@ -985,6 +990,7 @@ GitAdapter.file_history_worker = async.void(function(self, out_stream, opt)
       time_offset = new_data.time_offset,
       rel_date = new_data.rel_date,
       ref_names = new_data.ref_names,
+      reflog_selector = new_data.reflog_selector,
       subject = new_data.subject,
       diff = new_data.diff,
     })
@@ -1028,7 +1034,6 @@ GitAdapter.fh_retry_commit = async.wrap(function(self, rev_arg, state, opt, call
       "gc.auto=0",
       "show",
       "--pretty=format:" .. GitAdapter.COMMIT_PRETTY_FMT,
-      "--date=raw",
       "--numstat",
       "--raw",
       "--diff-merges=" .. (opt.is_merge and "first-parent" or state.log_options.diff_merges),
@@ -1849,6 +1854,7 @@ GitAdapter.flags = {
     FlagOption("-p", "--first-parent", "Follow only the first parent upon seeing a merge commit"),
     FlagOption("-s", "--show-pulls", "Show merge commits the first introduced a change to a branch"),
     FlagOption("-R", "--reflog", "Include all reachable objects mentioned by reflogs"),
+    FlagOption("-g", "--walk-reflogs", "Walk reflogs instead of the commit ancestry chain"),
     FlagOption("-a", "--all", "Include all refs"),
     FlagOption("-m", "--merges", "List only merge commits"),
     FlagOption("-n", "--no-merges", "List no merge commits"),
@@ -2055,6 +2061,7 @@ function GitAdapter:init_completion()
   self.comp.file_history:put({ "--first-parent" })
   self.comp.file_history:put({ "--show-pulls" })
   self.comp.file_history:put({ "--reflog" })
+  self.comp.file_history:put({ "--walk-reflogs", "-g" })
   self.comp.file_history:put({ "--all" })
   self.comp.file_history:put({ "--merges" })
   self.comp.file_history:put({ "--no-merges" })
