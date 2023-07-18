@@ -63,19 +63,31 @@ end
 ---@return string[] top_indicators # Top-level indicators
 function VCSAdapter.get_repo_paths(path_args, cpath) oop.abstract_stub() end
 
+---@class VCSAdapter.TopLevel
+---@field path string
+---@field src string
+
 ---Try to find the top-level of a working tree by using the given indicative
 ---paths.
 ---@abstract
 ---@param top_indicators string[] A list of paths that might indicate what working tree we are in.
 ---@return string? err
----@return string toplevel # Absolute path
+---@return VCSAdapter.TopLevel toplevel # Absolute path
 function VCSAdapter.find_toplevel(top_indicators) oop.abstract_stub() end
+
+---@abstract
+---@param toplevel VCSAdapter.TopLevel
+---@param path_args string[]
+---@param cpath string?
+---@return string? err
+---@return VCSAdapter
+function VCSAdapter.create(toplevel, path_args, cpath) oop.abstract_stub() end
 
 ---@diagnostic enable: unused-local, missing-return
 
 ---@class vcs.adapter.VCSAdapter.Opt
 ---@field cpath string? # CWD path
----@field toplevel string # VCS toplevel path
+---@field toplevel VCSAdapter.TopLevel # VCS toplevel path
 ---@field path_args string[] # Extra path arguments
 
 function VCSAdapter:init()
@@ -141,6 +153,10 @@ function VCSAdapter:args()
   return utils.vec_slice(self:get_command(), 2)
 end
 
+function VCSAdapter:job_env()
+  return nil
+end
+
 
 ---Execute a VCS command synchronously.
 ---@param args string[]
@@ -163,7 +179,13 @@ function VCSAdapter:exec_sync(args, cwd_or_opt)
     return
   end
 
-  return utils.job(cmd, cwd_or_opt)
+  local opt = type(cwd_or_opt) == "table"
+    and cwd_or_opt
+    or { cwd = cwd_or_opt }
+
+  opt.env = opt.env or self:job_env()
+
+  return utils.job(cmd, opt)
 end
 
 
@@ -350,6 +372,7 @@ VCSAdapter.show = async.wrap(function(self, path, rev, callback)
   job = Job({
     command = self:bin(),
     args = self:get_show_args(path, rev),
+    env = self:job_env(),
     cwd = self.ctx.toplevel,
     retry = 2,
     fail_cond = Job.FAIL_COND.on_empty,

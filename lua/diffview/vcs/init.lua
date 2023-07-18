@@ -15,6 +15,7 @@ local M = {}
 ---@return string? err
 ---@return VCSAdapter? adapter
 function M.get_adapter(opt)
+  ---@type VCSAdapter[]
   local adapter_kinds = { GitAdapter, HgAdapter }
 
   if not opt.cmd_ctx then

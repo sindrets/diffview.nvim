@@ -323,7 +323,9 @@ Job.start = async.wrap(function(self, callback)
 
     ---@type boolean, string?
     local ok, err = self:is_success()
-    local log = not self.log_opt.silent and logger or logger.mock --[[@as Logger ]]
+    local log = (DiffviewGlobal.debug_level > 0 or not self.log_opt.silent)
+      and logger
+      or logger.mock --[[@as Logger ]]
 
     if not ok then
       log:error(err)

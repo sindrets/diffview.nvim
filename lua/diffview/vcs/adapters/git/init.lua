@@ -180,7 +180,7 @@ end
 ---paths.
 ---@param top_indicators string[] A list of paths that might indicate what working tree we are in.
 ---@return string? err
----@return string toplevel # as an absolute path
+---@return VCSAdapter.TopLevel toplevel # as an absolute path
 function GitAdapter.find_toplevel(top_indicators)
   local toplevel
   for _, p in ipairs(top_indicators) do
@@ -192,7 +192,7 @@ function GitAdapter.find_toplevel(top_indicators)
     if p and pl:readable(p) then
       toplevel = get_toplevel(p)
       if toplevel then
-        return nil, toplevel
+        return nil, { path = toplevel, src = p }
       end
     end
   end
@@ -207,10 +207,10 @@ function GitAdapter.find_toplevel(top_indicators)
     table.concat(msg_paths, ", ")
   )
 
-  return err, ""
+  return err, {}
 end
 
----@param toplevel string
+---@param toplevel VCSAdapter.TopLevel
 ---@param path_args string[]
 ---@param cpath string?
 ---@return string? err
@@ -246,10 +246,10 @@ function GitAdapter:init(opt)
   local cwd = opt.cpath or vim.loop.cwd()
 
   self.ctx = {
-    toplevel = opt.toplevel,
+    toplevel = opt.toplevel.path,
     dir = self:get_dir(opt.toplevel),
     path_args = vim.tbl_map(function(pathspec)
-      return GitAdapter.pathspec_expand(opt.toplevel, cwd, pathspec)
+      return GitAdapter.pathspec_expand(opt.toplevel.path, cwd, pathspec)
     end, opt.path_args or {}) --[[@as string[] ]]
   }
 
@@ -258,6 +258,12 @@ end
 
 function GitAdapter:get_command()
   return config.get_config().git_cmd
+end
+
+function GitAdapter:job_env()
+  return vim.tbl_extend("force", vim.loop.os_environ(), {
+    GIT_DIR = self.ctx.dir,
+  })
 end
 
 ---@param path string
@@ -270,8 +276,12 @@ function GitAdapter:get_log_args(args)
   return utils.vec_join("log", "--first-parent", "--stat", args)
 end
 
-function GitAdapter:get_dir(path)
-  local out, code = self:exec_sync({ "rev-parse", "--path-format=absolute", "--git-dir" }, path)
+---@param toplevel VCSAdapter.TopLevel
+function GitAdapter:get_dir(toplevel)
+  local out, code = self:exec_sync(
+    { "rev-parse", "--path-format=absolute", "--git-dir" },
+    toplevel.src
+  )
   if code ~= 0 then
     return nil
   end
@@ -565,6 +575,7 @@ GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
       "--",
       state.path_args
     ),
+    env = self:job_env(),
     cwd = self.ctx.toplevel,
     log_opt = { label = "GitAdapter:incremental_fh_data()" },
     on_stdout = on_stdout,
@@ -644,6 +655,7 @@ GitAdapter.incremental_line_trace_data = async.wrap(function(self, state, callba
       state.prepared_log_opts.rev_range,
       "--"
     ),
+    env = self:job_env(),
     cwd = self.ctx.toplevel,
     log_opt = { label = "GitAdapter:incremental_line_trace_data()" },
     on_stdout = on_stdout,
@@ -1046,6 +1058,7 @@ GitAdapter.fh_retry_commit = async.wrap(function(self, rev_arg, state, opt, call
       "--",
       state.old_path or state.path_args
     ),
+    env = self:job_env(),
     cwd = self.ctx.toplevel,
     fail_cond = Job.FAIL_COND.on_empty,
     log_opt = { label = "GitAdapter:fh_retry_commit()" },
@@ -1662,12 +1675,14 @@ GitAdapter.tracked_files = async.wrap(function(self, left, right, args, kind, op
   local namestat_job = Job({
     command = self:bin(),
     args = utils.vec_join(self:args(), "diff", "--ignore-submodules", "--name-status", args),
+    env = self:job_env(),
     cwd = self.ctx.toplevel,
     log_opt = log_opt,
   })
   local numstat_job = Job({
     command = self:bin(),
     args = utils.vec_join(self:args(), "diff", "--ignore-submodules", "--numstat", args),
+    env = self:job_env(),
     cwd = self.ctx.toplevel,
     log_opt = log_opt,
   })
@@ -1776,6 +1791,7 @@ GitAdapter.untracked_files = async.wrap(function(self, left, right, opt, callbac
   local job = Job({
     command = self:bin(),
     args = utils.vec_join(self:args(), "ls-files", "--others", "--exclude-standard"),
+    env = self:job_env(),
     cwd = self.ctx.toplevel,
     log_opt = { label = "GitAdapter:untracked_files()", }
   })

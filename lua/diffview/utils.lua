@@ -318,6 +318,7 @@ end
 ---@field cwd string Working directory of the job.
 ---@field writer string|string[] Something that will write to the stdin of this job.
 ---@field silent boolean Supress log output.
+---@field env table<string, string>
 ---@field fail_on_empty boolean Return code 1 if stdout is empty.
 ---@field retry integer Number of times the job will be retried if it fails.
 ---@field log_opt Logger.log_job.Opt
@@ -337,6 +338,7 @@ function M.job(cmd, cwd_or_opt)
     command = cmd[1],
     args = M.vec_slice(cmd, 2),
     cwd = opt.cwd,
+    env = opt.env,
     retry = opt.retry,
     fail_cond = opt.fail_on_empty and Job.FAIL_COND.on_empty or nil,
     writer = opt.writer,
