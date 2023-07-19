@@ -1064,7 +1064,7 @@ GitAdapter.fh_retry_commit = async.wrap(function(self, rev_arg, state, opt, call
     await(async.timeout(10))
   end
 
-  if job.code ~= 0 then
+  if not data or not (job:is_success()) then
     callback({
       name = "job_fail",
       msg = table.concat(utils.vec_join(err, job.stderr), "\n"),
