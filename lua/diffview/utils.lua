@@ -498,10 +498,18 @@ function M.tbl_deep_clone(t)
   return clone
 end
 
+---@generic T
+---@param ... T
+---@return { n: integer, [integer]: T }
 function M.tbl_pack(...)
   return { n = select("#", ...), ... }
 end
 
+---@generic T
+---@param t { n?: integer, [integer]: T }
+---@param i? integer
+---@param j? integer
+---@return T ...
 function M.tbl_unpack(t, i, j)
   return unpack(t, i or 1, j or t.n or table.maxn(t))
 end
@@ -1260,6 +1268,20 @@ function M.bind(func, ...)
     end
 
     return func(unpack(args, 1, bound_args.n + new_args.n))
+  end
+end
+
+---Create a copy of `func` bound to the given arguments. The new function will
+---not accept any additional arguments.
+---@generic T
+---@param func fun(...): T
+---@param ... any Arguments to apply to `func` when the bound function is invoked.
+---@return fun(): T
+function M.hard_bind(func, ...)
+  local bound_args = M.tbl_pack(...)
+
+  return function()
+    return func(M.tbl_unpack(bound_args))
   end
 end
 

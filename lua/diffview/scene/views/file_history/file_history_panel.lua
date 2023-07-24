@@ -153,7 +153,7 @@ function FileHistoryPanel:update_components()
   end
 
   local entry_schema = { name = "entries" }
-  for i, entry in ipairs(self.entries) do
+  for i, entry in ipairs(utils.vec_slice(self.entries)) do
     if self.updating and i > 128 then
       break
     end
@@ -182,101 +182,8 @@ end
 ---@param callback function
 FileHistoryPanel.update_entries = async.wrap(function(self, callback)
   perf_update:reset()
-  local c = 0
   local timeout = 128
   local ldt = 0 -- Last draw time
-  local lock = false
-  ---@type ManagedFn, Closeable
-  local update, handle
-
-  update = debounce.throttle_trailing(
-    timeout,
-    true,
-    async.void(function(entries, status, msg)
-      if status == JobStatus.ERROR then
-        self.updating = false
-
-        await(async.scheduler())
-
-        utils.err(fmt("Updating file history failed! Error message: %s", msg))
-
-        self:render()
-        self:redraw()
-        self.option_panel:sync()
-        update:close()
-        callback(nil, JobStatus.ERROR, msg)
-        return
-
-      elseif status == JobStatus.PROGRESS then
-        if self.shutdown then
-          -- The parent view has closed: shutdown git jobs and clean up.
-          handle.close()
-          update.close()
-
-          if self.option_panel then
-            vim.schedule(function() self.option_panel:sync() end)
-          end
-
-          callback(nil, JobStatus.KILLED)
-          return
-        end
-
-        if #entries <= c or lock then
-          return
-        end
-      end
-
-      lock = true
-
-      await(async.scheduler())
-
-      if self.shutdown then return end
-      c = #entries
-
-      if ldt > timeout then
-        logger:lvl(10):fmt_debug(
-          "[FH_PANEL] Rendering is slower than throttle timeout (%.3f ms). Skipping update.",
-          ldt
-        )
-
-        ldt = ldt - timeout
-        lock = false
-        return
-      end
-
-      local was_empty = #self.entries == 0
-      self.entries = utils.vec_slice(entries)
-
-      if was_empty then
-        self.single_file = self.entries[1] and self.entries[1].single_file
-      end
-
-      if status == JobStatus.SUCCESS then self.updating = false end
-
-      if not (status == JobStatus.PROGRESS and not self.parent:is_cur_tabpage()) then
-        self:sync()
-        ldt = renderer.last_draw_time
-      end
-
-      if status == JobStatus.SUCCESS then
-        update:close()
-        perf_update:time()
-        logger:fmt_info(
-          "[FileHistory] Completed update for %d entries successfully (%.3f ms).",
-          #self.entries,
-          perf_update.final_time
-        )
-      end
-
-      if (was_empty or status == JobStatus.SUCCESS) then
-        vim.cmd("redraw")
-        self.option_panel:sync()
-        callback(entries, status)
-      end
-
-      lock = false
-    end)
-  )
 
   for _, entry in ipairs(self.entries) do
     entry:destroy()
@@ -287,15 +194,89 @@ FileHistoryPanel.update_entries = async.wrap(function(self, callback)
   self.entries = {}
   self.updating = true
 
-  handle = self.adapter:file_history(
-    {
-      log_opt = self.log_options,
-      layout_opt = { default_layout = self.parent.get_default_layout() },
-    },
-    update --[[@as function ]]
-  )
+  local stream = self.adapter:file_history({
+    log_opt = self.log_options,
+    layout_opt = { default_layout = self.parent.get_default_layout() },
+  })
 
   self:sync()
+
+  local render = debounce.throttle_trailing(
+    timeout,
+    true,
+    async.void(function(was_empty)
+      if ldt > timeout then
+        logger:lvl(10):fmt_debug(
+          "[FH_PANEL] Rendering is slower than throttle timeout (%.3f ms). Skipping rerender.",
+          ldt
+        )
+
+        ldt = ldt - timeout
+        return
+      end
+
+      await(async.scheduler())
+
+      if was_empty then
+        self:update_components()
+        self.parent:next_item()
+      else
+        self:sync()
+      end
+
+      ldt = renderer.last_draw_time
+    end)
+  )
+
+  local ret = {}
+
+  for _, item in stream:iter() do
+    if self.shutdown then
+      stream:close(true)
+      ret = { nil, JobStatus.KILLED }
+      break
+    end
+
+    ---@type LogEntry[], JobStatus, string?
+    local entries, status, msg = unpack(item, 1, 3)
+
+    if status == JobStatus.ERROR then
+      utils.err(fmt("Updating file history failed! Error message: %s", msg), true)
+      ret = { nil, JobStatus.ERROR, msg }
+      break
+    elseif status == JobStatus.SUCCESS then
+      ret = { entries, status }
+      perf_update:time()
+      logger:fmt_info(
+        "[FileHistory] Completed update for %d entries successfully (%.3f ms).",
+        #self.entries,
+        perf_update.final_time
+      )
+    elseif status == JobStatus.PROGRESS then
+      local was_empty = #self.entries == 0
+      self.entries = utils.vec_slice(entries)
+
+      if was_empty and self.entries[1] then
+        self.single_file = self.entries[1] and self.entries[1].single_file
+      end
+
+      render(was_empty)
+    else
+      error("Unexpected state!")
+    end
+  end
+
+  await(async.scheduler())
+  self.updating = false
+  render:close()
+
+  if not self.shutdown then
+    self:sync()
+    self.option_panel:sync()
+    vim.cmd("redraw")
+  end
+
+  callback(unpack(ret, 1, 3))
 end)
 
 function FileHistoryPanel:num_items()
