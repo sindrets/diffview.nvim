@@ -3,6 +3,7 @@ local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
 local Job = lazy.access("diffview.job", "Job") ---@type diffview.Job|LazyModule
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local await = async.await
 local fmt = string.format
@@ -212,6 +213,43 @@ end
 
 function MultiJob:is_running()
   return self:is_started() and not self:is_done()
+end
+
+---@return string[]
+function MultiJob:stdout()
+  return vim.tbl_flatten(
+    ---@param value diffview.Job
+    vim.tbl_map(function(value)
+      return value.stdout
+    end, self.jobs)
+  )
+end
+
+---@return string[]
+function MultiJob:stderr()
+  return vim.tbl_flatten(
+    ---@param value diffview.Job
+    vim.tbl_map(function(value)
+      return value.stderr
+    end, self.jobs)
+  )
+end
+
+---@param code integer
+---@param signal? integer|uv.aliases.signals # (default: "sigterm")
+---@return 0|nil success
+function MultiJob:kill(code, signal)
+  ---@type 0?
+  local ret = 0
+
+  for _, job in ipairs(self.jobs) do
+    if job:is_running() then
+      local success = job:kill(code, signal)
+      if not success then ret = nil end
+    end
+  end
+
+  return ret
 end
 
 M.MultiJob = MultiJob

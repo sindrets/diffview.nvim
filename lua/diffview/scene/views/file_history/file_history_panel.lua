@@ -237,15 +237,15 @@ FileHistoryPanel.update_entries = async.wrap(function(self, callback)
       break
     end
 
-    ---@type LogEntry[], JobStatus, string?
-    local entries, status, msg = unpack(item, 1, 3)
+    ---@type JobStatus, LogEntry?, string?
+    local status, entry, msg = unpack(item, 1, 3)
 
     if status == JobStatus.ERROR then
       utils.err(fmt("Updating file history failed! Error message: %s", msg), true)
       ret = { nil, JobStatus.ERROR, msg }
       break
     elseif status == JobStatus.SUCCESS then
-      ret = { entries, status }
+      ret = { self.entries, status }
       perf_update:time()
       logger:fmt_info(
         "[FileHistory] Completed update for %d entries successfully (%.3f ms).",
@@ -253,11 +253,12 @@ FileHistoryPanel.update_entries = async.wrap(function(self, callback)
         perf_update.final_time
       )
     elseif status == JobStatus.PROGRESS then
+      ---@cast entry -?
       local was_empty = #self.entries == 0
-      self.entries = utils.vec_slice(entries)
+      self.entries[#self.entries + 1] = entry
 
       if was_empty and self.entries[1] then
-        self.single_file = self.entries[1] and self.entries[1].single_file
+        self.single_file = self.entries[1].single_file
       end
 
       render(was_empty)

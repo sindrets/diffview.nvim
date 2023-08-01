@@ -854,8 +854,6 @@ end
 ---@param out_stream AsyncListStream
 ---@param opt vcs.adapter.FileHistoryWorkerSpec
 GitAdapter.file_history_worker = async.void(function(self, out_stream, opt)
-  local entries = {} ---@type LogEntry[]
-
   local single_file = self:is_single_file(
     opt.log_opt.single_file.path_args,
     opt.log_opt.single_file.L
@@ -907,15 +905,15 @@ GitAdapter.file_history_worker = async.void(function(self, out_stream, opt)
 
     if status == JobStatus.KILLED then
       logger:warn("File history processing was killed.")
-      out_stream:push({ entries, status })
+      out_stream:push({ status })
       out_stream:close()
       return
     elseif status == JobStatus.ERROR then
-      out_stream:push({ entries, status, msg })
+      out_stream:push({ status, nil, msg })
       out_stream:close()
       return
     elseif status == JobStatus.SUCCESS then
-      out_stream:push({ entries, status })
+      out_stream:push({ status })
       out_stream:close()
       return
     elseif status ~= JobStatus.PROGRESS then
@@ -951,7 +949,8 @@ GitAdapter.file_history_worker = async.void(function(self, out_stream, opt)
       if err then
         if err.name == "job_fail" then
           logger:error(err.msg)
-          out_stream:push({ entries, JobStatus.ERROR, err.msg })
+          out_stream:push({ JobStatus.ERROR, nil, err.msg })
+          out_stream:close()
           return
         elseif err.name == "bad_data" then
           logger:warn(err.msg)
@@ -992,10 +991,7 @@ GitAdapter.file_history_worker = async.void(function(self, out_stream, opt)
 
     -- Some commits might not have file data. In that case we simply ignore it,
     -- as the fh panel doesn't support such entries at the moment.
-    if ok then
-      entries[#entries + 1] = entry
-      out_stream:push({ entries, JobStatus.PROGRESS })
-    end
+    if ok then out_stream:push({ JobStatus.PROGRESS, entry }) end
 
     ::continue::
   end

@@ -1,9 +1,11 @@
+local AsyncListStream = require("diffview.stream").AsyncListStream
 local Commit = require("diffview.vcs.adapters.hg.commit").HgCommit
 local Diff2Hor = require("diffview.scene.layouts.diff_2_hor").Diff2Hor
 local FileEntry = require("diffview.scene.file_entry").FileEntry
 local FlagOption = require("diffview.vcs.flag_option").FlagOption
 local HgRev = require('diffview.vcs.adapters.hg.rev').HgRev
 local Job = require("diffview.job").Job
+local MultiJob = require("diffview.multi_job").MultiJob
 local JobStatus = require('diffview.vcs.utils').JobStatus
 local LogEntry = require("diffview.vcs.log_entry").LogEntry
 local RevType = require("diffview.vcs.rev").RevType
@@ -431,20 +433,21 @@ local function structure_fh_data(namestat_data, numstat_data)
 end
 
 
----@param self HgAdapter
 ---@param state HgAdapter.FHState
----@param callback fun(status: JobStatus, data?: table, msg?: string)
-HgAdapter.incremental_fh_data = async.void(function(self, state, callback)
-  local raw = {}
-  local namestat_job, numstat_job, shutdown
+function HgAdapter:stream_fh_data(state)
+  ---@type AsyncListStream
+  local stream
+  ---@type diffview.Job
+  local namestat_job, numstat_job
+  ---@type MultiJob
+  local mjob
 
+  local raw = {}
   local namestat_state = {
-    data = {},
     key = "namestat",
     idx = 0,
   }
   local numstat_state = {
-    data = {},
     key = "numstat",
     idx = 0,
   }
@@ -453,31 +456,27 @@ HgAdapter.incremental_fh_data = async.void(function(self, state, callback)
     local handler_state = j == namestat_job and namestat_state or numstat_state
 
     if line == "\0" then
-      if handler_state.idx > 0 then
+      if handler_state.data then
         if not raw[handler_state.idx] then
           raw[handler_state.idx] = {}
         end
 
-        raw[handler_state.idx][handler_state.key] = handler_state.data
+        local raw_entry = raw[handler_state.idx]
+        raw_entry[handler_state.key] = handler_state.data
 
-        if not shutdown
-          and not raw[handler_state.idx].done
-          and raw[handler_state.idx].namestat
-          and raw[handler_state.idx].numstat
+        if not raw_entry.done
+            and raw_entry.namestat
+            and raw_entry.numstat
         then
-          raw[handler_state.idx].done = true
-          shutdown = callback(
-            JobStatus.PROGRESS,
-            structure_fh_data(raw[handler_state.idx].namestat, raw[handler_state.idx].numstat)
+          raw_entry.done = true
+          local log_data = structure_fh_data(
+            raw_entry.namestat,
+            raw_entry.numstat
           )
-
-          if shutdown then
-            logger:debug("Killing file history jobs...")
-            namestat_job:kill(64)
-            numstat_job:kill(64)
-          end
+          stream:push({ JobStatus.PROGRESS, log_data })
         end
       end
+
       handler_state.idx = handler_state.idx + 1
       handler_state.data = {}
     elseif line ~= "" then
@@ -485,9 +484,35 @@ HgAdapter.incremental_fh_data = async.void(function(self, state, callback)
     end
   end
 
-  local function on_exit(j, ok)
-    if ok and j.code == 0 then on_stdout(nil, "\0", j) end
-  end
+  stream = AsyncListStream({
+    ---@param kill? boolean Shutdown signal
+    on_close = function(kill)
+      if kill then
+        if mjob:is_running() then
+          logger:warn("Received shutdown signal. Killing file history jobs...")
+          mjob:kill(64)
+        else
+          logger:warn("Received shutdown signal, but no jobs are running. Nothing to do.")
+        end
+
+        stream:push({ JobStatus.KILLED })
+        return
+      end
+
+      local ok, err = mjob:is_success()
+      if mjob:is_done() and ok then on_stdout(nil, "\0") end
+
+      if not ok then
+        stream:push({
+          JobStatus.ERROR,
+          nil,
+          table.concat(utils.vec_join(err, mjob:stderr()), "\n")
+        })
+      else
+        stream:push({ JobStatus.SUCCESS })
+      end
+    end
+  })
 
   local rev_range = state.prepared_log_opts.rev_range and '--rev=' .. state.prepared_log_opts.rev_range or nil
   local log_opt = { label = "HgAdapter:incremental_fh_data()" }
@@ -499,13 +524,13 @@ HgAdapter.incremental_fh_data = async.void(function(self, state, callback)
       "log",
       rev_range,
       '--template=\\x00\n'
-        .. '{node} {p1.node} {ifeq(p2.rev, -1 ,\"\", \"{p2.node}\")}\n'
-        .. '{author|person}\n'
-        .. '{date}\n'
-        .. '{date|age}\n'
-        .. '  {separate(", ", tags, topics)}\n'
-        .. '  {desc|firstline}\n'
-        .. '{files % "{status} {file}\n"}',
+      .. '{node} {p1.node} {ifeq(p2.rev, -1 ,\"\", \"{p2.node}\")}\n'
+      .. '{author|person}\n'
+      .. '{date}\n'
+      .. '{date|age}\n'
+      .. '  {separate(", ", tags, topics)}\n'
+      .. '  {desc|firstline}\n'
+      .. '{files % "{status} {file}\n"}',
       state.prepared_log_opts.flags,
       "--",
       state.path_args
@@ -513,7 +538,6 @@ HgAdapter.incremental_fh_data = async.void(function(self, state, callback)
     cwd = self.ctx.toplevel,
     log_opt = log_opt,
     on_stdout = on_stdout,
-    on_exit = on_exit,
   })
 
   numstat_job = Job({
@@ -531,23 +555,16 @@ HgAdapter.incremental_fh_data = async.void(function(self, state, callback)
     cwd = self.ctx.toplevel,
     log_opt = log_opt,
     on_stdout = on_stdout,
-    on_exit = on_exit,
   })
 
-  local ok = await(Job.join({ namestat_job, numstat_job }))
+  mjob = MultiJob(
+    { namestat_job, numstat_job },
+    { on_exit = utils.hard_bind(stream.close, stream) }
+  )
+  mjob:start()
 
-  if shutdown then
-    callback(JobStatus.KILLED)
-  elseif not ok then
-    callback(
-      JobStatus.ERROR,
-      nil,
-      table.concat(utils.vec_join(namestat_job.stderr, numstat_job.stderr), "\n")
-    )
-  else
-    callback(JobStatus.SUCCESS)
-  end
-end)
+  return stream
+end
 
 function HgAdapter:is_single_file(path_args, lflags)
   if path_args and self.ctx.toplevel then
@@ -559,12 +576,9 @@ function HgAdapter:is_single_file(path_args, lflags)
 end
 
 ---@param self HgAdapter
----@param co_state table
+---@param out_stream AsyncListStream
 ---@param opt vcs.adapter.FileHistoryWorkerSpec
----@param callback (fun(entries: LogEntry[], status: JobStatus, err?: string)) # Called whenever there are new entries available.
-HgAdapter.file_history_worker = async.void(function(self, co_state, opt, callback)
-  local entries = {} ---@type LogEntry[]
-
+HgAdapter.file_history_worker = async.void(function(self, out_stream, opt)
   local single_file = self:is_single_file(
     opt.log_opt.single_file.path_args,
     opt.log_opt.single_file.L
@@ -582,7 +596,7 @@ HgAdapter.file_history_worker = async.void(function(self, co_state, opt, callbac
 
   ---@type HgAdapter.FHState
   local state = {
-    co_state = co_state,
+    out_stream = out_stream,
     path_args = opt.log_opt.single_file.path_args,
     log_options = log_options,
     prepared_log_opts = self:prepare_fh_options(log_options, single_file),
@@ -590,62 +604,43 @@ HgAdapter.file_history_worker = async.void(function(self, co_state, opt, callbac
     single_file = single_file,
   }
 
-  local data_buffer = {}
-  local data_idx = 0
-
-  ---Wakes the data scheduler
-  ---@type function?
-  local data_step
-
-  local function inc_callback(status, new_data, msg)
-    data_buffer[#data_buffer+1] = { status, new_data, msg }
-
-    if data_step then
-      local temp = data_step
-      data_step = nil
-      temp(status, new_data, msg)
-    end
-
-    return co_state.shutdown
-  end
-
-  ---Yield until data is available
-  ---@param cb (fun(status: JobStatus, new_data: table, err?: string))
-  local data_scheduler = async.wrap(function(cb)
-    data_idx = data_idx + 1
-
-    if data_buffer[data_idx] then
-      cb(unpack(data_buffer[data_idx], 1, 3))
-    else
-      -- Await new data from inc workers
-      data_step = cb
-    end
-  end)
-
   logger:info(
     "[FileHistory] Updating with options:",
     vim.inspect(state.prepared_log_opts, { newline = " ", indent = "" })
   )
 
+  ---@type AsyncListStream
+  local in_stream
+
   if is_trace then
     error("Unimplemented!")
   else
-    self:incremental_fh_data(state, inc_callback)
+    in_stream = self:stream_fh_data(state)
   end
 
-  while true do
+  ---@param kill? boolean
+  out_stream:on_close(function(kill)
+    if kill then
+      in_stream:close(true)
+    end
+  end)
+
+  for _, item in in_stream:iter() do
     ---@type JobStatus, table?, string?
-    local status, new_data, msg = await(data_scheduler())
+    local status, new_data, msg = unpack(item, 1, 3)
 
     if status == JobStatus.KILLED then
       logger:warn("File history processing was killed.")
-      callback(entries, status)
+      out_stream:push({ status })
+      out_stream:close()
       return
     elseif status == JobStatus.ERROR then
-      callback(entries, status, msg)
+      out_stream:push({ status, nil, msg })
+      out_stream:close()
       return
     elseif status == JobStatus.SUCCESS then
-      callback(entries, status)
+      out_stream:push({ status })
+      out_stream:close()
       return
     elseif status ~= JobStatus.PROGRESS then
       error("Unexpected state!")
@@ -684,7 +679,8 @@ HgAdapter.file_history_worker = async.void(function(self, co_state, opt, callbac
       end
 
       if not ok or job.code ~= 0 then
-        callback(entries, JobStatus.ERROR, table.concat(job.stderr, "\n"))
+        out_stream:push({ JobStatus.ERROR, nil, table.concat(job.stderr, "\n") })
+        out_stream:close()
         return
       end
 
@@ -693,11 +689,11 @@ HgAdapter.file_history_worker = async.void(function(self, co_state, opt, callbac
         -- history.
         logger:warn(fmt("[%s] Giving up.", job.log_opt.label))
         utils.warn("Displayed history may be incomplete. Check ':DiffviewLog' for details.", true)
-        callback(
-          entries,
+        out_stream:push({
           JobStatus.ERROR,
+          nil,
           fmt("Failed to get log data for merge commit '%s'!", new_data.right_hash)
-        )
+        })
         return
       end
     end
@@ -724,10 +720,7 @@ HgAdapter.file_history_worker = async.void(function(self, co_state, opt, callbac
 
     -- Some commits might not have file data. In that case we simply ignore it,
     -- as the fh panel doesn't support such entries at the moment.
-    if ok then
-      entries[#entries + 1] = entry
-      callback(entries, JobStatus.PROGRESS)
-    end
+    if ok then out_stream:push({ JobStatus.PROGRESS, entry }) end
   end
 end)
 
@@ -1080,7 +1073,7 @@ HgAdapter.tracked_files = async.wrap(function (self, left, right, args, kind, op
     if s ~= " " then
       local status = s:sub(1, 1):gsub("%s", " ")
       local name = vim.trim(s:match("[%a%s]%s*(.*)"))
-      
+
       -- TODO(zegervdv): Cannot get correct values from mercurial
       -- see https://github.com/sindrets/diffview.nvim/issues/366
       local stats = {}

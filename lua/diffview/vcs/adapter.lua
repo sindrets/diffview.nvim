@@ -221,10 +221,9 @@ function VCSAdapter:file_history_options(range, paths, argo)
 end
 
 ---@param self VCSAdapter
----@param co_state table
+---@param out_stream AsyncListStream
 ---@param opt vcs.adapter.FileHistoryWorkerSpec
----@param callback (fun(entries: LogEntry[], status: JobStatus, err?: string)) # Called whenever there are new entries available.
-VCSAdapter.file_history_worker = async.void(function(self, thread, log_opt, opt, co_state, callback)
+VCSAdapter.file_history_worker = async.void(function(self, out_stream, opt)
   oop.abstract_stub()
 end)
 
