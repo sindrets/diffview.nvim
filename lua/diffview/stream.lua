@@ -29,15 +29,6 @@ function Stream:init(src)
   self.drained = false
 end
 
----@return Stream
-function Stream:clone()
-  local clone = Stream(self.src)
-  clone.head = self.head
-  clone.drained = self.drained
-
-  return clone
-end
-
 ---@private
 ---@param src table|function
 function Stream:create_src(src)
@@ -214,7 +205,8 @@ local StreamState = oop.enum({
 ---@class AsyncListStream : AsyncStream
 ---@operator call : AsyncListStream
 ---@field private data unknown[]
----@field private state StreamState
+---@field private state { [AsyncListStream.EventKind]: { listeners: function[], args?: unknown[] } }
+---@field private flow_state StreamState
 ---@field private sem Semaphore
 ---@field private close_listeners? (fun(...))[]
 ---@field private post_close_listeners (fun())[]
@@ -222,13 +214,17 @@ local StreamState = oop.enum({
 local AsyncListStream = oop.create_class("AsyncListStream", AsyncStream)
 M.AsyncListStream = AsyncListStream
 
+---@alias AsyncListStream.EventKind "on_close"|"on_post_close"
+
 function AsyncListStream:init(opt)
   opt = opt or {}
 
   self.data = {}
-  self.state = StreamState.OPEN
-  self.close_listeners = { opt.on_close }
-  self.post_close_listeners = {}
+  self.state = {
+    on_close = { listeners = { opt.on_close } },
+    on_post_close = { listeners = { opt.on_post_close } },
+  }
+  self.flow_state = StreamState.OPEN
   self.sem = control.Semaphore(1)
 
   local src = async.wrap(function(callback)
@@ -253,28 +249,19 @@ function AsyncListStream:push(...)
   for i = 1, select("#", ...) do
     if args[i] ~= nil then
       if args[i] == Stream.EOF then
-        if self.state ~= StreamState.CLOSING then
-          self.state = StreamState.CLOSING
+        if self.flow_state ~= StreamState.CLOSING then
+          self.flow_state = StreamState.CLOSING
 
           -- Release permit while calling 'on_close' callbacks so that they're
           -- able to invoke some final pushes before fully closing the stream.
           permit:forget()
-
-          for _, listener in ipairs(self.close_listeners) do
-            if self.on_close_args then
-              listener(utils.tbl_unpack(self.on_close_args))
-            else
-              listener()
-            end
-          end
-
+          self:invoke_listeners("on_close")
           permit = await(self.sem:acquire()) --[[@as Permit ]]
 
           self.data[#self.data+1] = args[i]
-          self.on_close_args = nil
-          self.state = StreamState.CLOSED
+          self.flow_state = StreamState.CLOSED
 
-          for _, listener in ipairs(self.post_close_listeners) do listener() end
+          self:invoke_listeners("on_post_close")
 
           break
         end
@@ -296,20 +283,38 @@ end
 ---@param ... any Arguments to pass to the `on_close` callback.
 function AsyncListStream:close(...)
   if self:is_closed() then return end
-  self.on_close_args = utils.tbl_pack(...)
+  self.state.on_close.args = utils.tbl_pack(...)
   self:push(Stream.EOF)
 end
 
 function AsyncListStream:is_closed()
-  return self.state == StreamState.CLOSED
+  return self.flow_state == StreamState.CLOSED
 end
 
+---@param callback function
 function AsyncListStream:on_close(callback)
-  table.insert(self.close_listeners, callback)
+  table.insert(self.state.on_close.listeners, callback)
 end
 
+---@param callback function
 function AsyncListStream:on_post_close(callback)
-  table.insert(self.post_close_listeners, callback)
+  table.insert(self.state.on_post_close.listeners, callback)
+end
+
+---@private
+---@param kind AsyncListStream.EventKind
+function AsyncListStream:invoke_listeners(kind)
+  local event_state = self.state[kind]
+
+  for _, listener in ipairs(event_state.listeners) do
+    if event_state.args then
+      listener(utils.tbl_unpack(event_state.args))
+    else
+      listener()
+    end
+  end
+
+  event_state.args = nil
 end
 
 return M

@@ -2,6 +2,7 @@ local async = require("diffview.async")
 local helpers = require("diffview.tests.helpers")
 
 local await = async.await
+local async_test = helpers.async_test
 local eq, neq = helpers.eq, helpers.neq
 
 describe("diffview.stream", function()
@@ -18,11 +19,11 @@ describe("diffview.stream", function()
   }
 
   describe("Stream", function()
-    it("collects simple array", function()
+    it("can collect a simple array", function()
       eq(arr1, Stream(arr1):collect())
     end)
 
-    it("iterates simple array", function()
+    it("can iterate a simple array", function()
       local s0 = {}
       local s1 = {}
 
@@ -37,14 +38,14 @@ describe("diffview.stream", function()
       eq(s0, s1)
     end)
 
-    it("slices", function()
+    it("can slice", function()
       eq(
         vim.list_slice(arr1, 2, 4),
         Stream(arr1):slice(2, 4):collect()
       )
     end)
 
-    it("maps", function()
+    it("can map", function()
       local function f(item)
         return item.name:upper():rep(5)
       end
@@ -55,7 +56,7 @@ describe("diffview.stream", function()
       )
     end)
 
-    it("filters", function()
+    it("can filter", function()
       local function f(item)
         return item.i % 2 ~= 0
       end
@@ -66,25 +67,25 @@ describe("diffview.stream", function()
       )
     end)
 
-    it("reduces without init value", function()
+    it("can reduce without an init value", function()
       eq(
-        15,
-        Stream({ 1, 2, 3, 4, 5 }):reduce(function(acc, cur)
-          return acc + cur
+        "abcde",
+        Stream({ "a", "b", "c", "d", "e" }):reduce(function(acc, cur)
+          return acc .. cur
         end)
       )
     end)
 
-    it("reduces with init value", function()
+    it("can reduce with an init value", function()
       eq(
-        "reduced names: abcde",
+        "init abcde",
         Stream(arr1):reduce(function(acc, cur)
           return acc .. cur.name
-        end, "reduced names: ")
+        end, "init ")
       )
     end)
 
-    it("runs a pipeline of transforms", function()
+    it("can run a pipeline of transforms", function()
       eq(
         "AAAAACCCCCEEEEE",
         Stream(arr1)
@@ -102,22 +103,38 @@ describe("diffview.stream", function()
   end)
 
   describe("AsyncStream", function()
-    it("can iterate", helpers.async_test(function()
-      local iter = ipairs(arr1)
+    local function mock_iter(src_arr)
+      src_arr = src_arr or arr1
+      local iter = ipairs(src_arr)
       local i = 0
 
-      eq(
-        arr1,
-        AsyncStream(
-          async.wrap(function(callback)
-            if i == #arr1 then return callback(nil) end
-            await(async.timeout(1))
-            local _, ret = iter(arr1, i)
-            i = i + 1
-            return callback(ret)
-          end)
-        ):collect()
-      )
+      return async.wrap(function(callback)
+        if i == #src_arr then return callback(nil) end
+        await(async.timeout(1))
+        local _, ret = iter(src_arr, i)
+        i = i + 1
+        return callback(ret)
+      end)
+    end
+
+    it("can iterate", async_test(function()
+      local s0 = {}
+      local s1 = {}
+
+      for i, v in ipairs(arr1) do
+        s0[#s0+1] = { i, v }
+      end
+
+      for i, v in AsyncStream(mock_iter(arr1)):iter() do
+        s1[#s1 + 1] = { i, v }
+      end
+
+      eq(s0, s1)
+    end))
+
+    it("can be awaited", async_test(function()
+      local stream = AsyncStream(mock_iter(arr1))
+      eq(arr1, await(stream))
     end))
   end)
 
@@ -130,13 +147,32 @@ describe("diffview.stream", function()
       stream:close()
     end)
 
-    it("can iterate", helpers.async_test(function()
+    it("can iterate", async_test(function()
+      local s0 = {}
+      local s1 = {}
+
+      for i, v in ipairs(arr1) do
+        s0[#s0+1] = { i, v }
+      end
+
       local stream = AsyncListStream()
       mock_worker(stream)
-      eq(arr1, stream:collect())
+
+      for i, v in stream:iter() do
+        s1[#s1 + 1] = { i, v }
+      end
+
+      eq(s0, s1)
     end))
 
-    it("can close early", helpers.async_test(function()
+    it("can be awaited", async_test(function()
+      local stream = AsyncListStream()
+      mock_worker(stream)
+
+      eq(arr1, await(stream))
+    end))
+
+    it("can close early", async_test(function()
       local stream = AsyncListStream()
       mock_worker(stream)
 
@@ -149,7 +185,16 @@ describe("diffview.stream", function()
       eq(vim.list_slice(arr1, 1, 3), ret)
     end))
 
-    it("can push final items during on_close()", helpers.async_test(function()
+    it("can't push items after close", async_test(function()
+      local stream = AsyncListStream()
+      stream:push(1, 2, 3)
+      stream:close()
+      stream:push(4, 5, 6)
+
+      eq({ 1, 2, 3 }, stream:collect())
+    end))
+
+    it("can push final items during on_close()", async_test(function()
       local final_arr = { "final_1", "final_2", "final_3" }
       local stream
       stream = AsyncListStream({
@@ -171,11 +216,30 @@ describe("diffview.stream", function()
       )
     end))
 
-    it("can be awaited", helpers.async_test(function()
-      local stream = AsyncListStream()
-      mock_worker(stream)
+    it("calls on_close() callbacks with the appropriate args", async.sync_wrap(function(done)
+      local stream = AsyncListStream({
+        on_close = function(...)
+          eq({ nil, 1, nil, 2, 3 }, { ... })
+          done()
+        end,
+      })
+      stream:close(nil, 1, nil, 2, 3)
+    end))
 
-      eq(arr1, await(stream))
+    it("calls the event callbacks in the appropriate order", async_test(function()
+      local ret = {}
+      local stream = AsyncListStream({
+        on_close = function()
+          table.insert(ret, 1)
+        end,
+        on_post_close = function()
+          table.insert(ret, 2)
+        end,
+      })
+
+      stream:close()
+      await(stream)
+      eq({ 1, 2 }, ret)
     end))
   end)
 end)
