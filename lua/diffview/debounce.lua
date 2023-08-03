@@ -8,6 +8,7 @@ local M = {}
 ---@field close fun() # Perform cleanup and release the associated handle.
 
 ---@class ManagedFn : Closeable
+---@operator call : unknown ...
 
 ---@param ... uv_handle_t
 function M.try_close(...)

@@ -14,16 +14,19 @@ M.last_draw_time = 0
 ---@field first integer 0 indexed, inclusive
 ---@field last integer Exclusive
 
----@class renderer.HlList : { [integer]: renderer.HlData }
+---@class renderer.HlList
 ---@field offset integer
+---@field [integer] renderer.HlData
 
----@class CompStruct : { [integer|string]: CompStruct }
+---@class CompStruct
 ---@field _name string
 ---@field comp RenderComponent
+---@field [integer|string] CompStruct
 
----@class CompSchema : { [integer]: CompSchema }
+---@class CompSchema
 ---@field name? string
 ---@field context? table
+---@field [integer] CompSchema
 
 ---@class RenderComponent : diffview.Object
 ---@field name string
@@ -36,7 +39,6 @@ M.last_draw_time = 0
 ---@field lstart integer 0 indexed, Inclusive
 ---@field lend integer Exclusive
 ---@field height integer
----@field leaf boolean
 ---@field data_root RenderData
 local RenderComponent = oop.create_class("RenderComponent")
 
@@ -50,7 +52,6 @@ function RenderComponent:init(name)
   self.lstart = -1
   self.lend = -1
   self.height = 0
-  self.leaf = false
 end
 
 ---@param parent RenderComponent
@@ -71,8 +72,6 @@ local function create_subcomponents(parent, comp_struct, schema)
     comp_struct[v.name] = comp_struct[i]
     if #v > 0 then
       create_subcomponents(sub_comp, comp_struct[i], v)
-    else
-      sub_comp.leaf = true
     end
   end
 end
@@ -199,28 +198,24 @@ function RenderComponent:destroy()
   self.components = nil
 end
 
+function RenderComponent:isleaf()
+  return (not next(self.components))
+end
+
 ---@param line integer
 ---@return RenderComponent?
 function RenderComponent:get_comp_on_line(line)
   line = line - 1
+  local ret
 
-  local function recurse(child)
-    if line >= child.lstart and line < child.lend then
-      -- print(child.name, line, child.lstart, child.lend)
-      if #child.components > 0 then
-        for _, v in ipairs(child.components) do
-          local target = recurse(v)
-          if target then
-            return target
-          end
-        end
-      else
-        return child
-      end
+  self:deep_some(function(child)
+    if line >= child.lstart and line < child.lend and child:isleaf() then
+      ret = child
+      return true
     end
-  end
+  end)
 
-  return recurse(self)
+  return ret
 end
 
 ---@param callback fun(comp: RenderComponent, i: integer, parent: RenderComponent): boolean?

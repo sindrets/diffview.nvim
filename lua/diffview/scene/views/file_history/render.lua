@@ -82,7 +82,7 @@ local function render_entries(panel, parent, entries, updating)
     end
 
     local entry_struct = parent[i]
-    local comp = entry_struct.commit.comp --[[@as RenderComponent ]]
+    local comp = entry_struct.commit.comp
 
     if not entry.single_file then
       comp:add_text((entry.folded and c.signs.fold_closed or c.signs.fold_open) .. " ", "CursorLineNr")
@@ -272,14 +272,12 @@ return {
 
     panel.render_data:clear()
 
-    ---@type RenderComponent
     local comp = panel.components.switches.title.comp
     local log_options = panel.parent:get_log_options()
 
     comp:add_line("Switches", "DiffviewFilePanelTitle")
 
     for _, item in ipairs(panel.components.switches.items) do
-      ---@type RenderComponent
       comp = item.comp
       local option = comp.context.option --[[@as FlagOption ]]
       local enabled = log_options[option.key] --[[@as boolean ]]
@@ -296,9 +294,7 @@ return {
     comp:add_line("Options", "DiffviewFilePanelTitle")
 
     for _, item in ipairs(panel.components.options.items) do
-      ---@type RenderComponent
       comp = item.comp
-      ---@type FlagOption
       local option = comp.context.option --[[@as FlagOption ]]
       local value = log_options[option.key] or ""
 

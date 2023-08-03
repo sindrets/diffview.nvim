@@ -140,7 +140,6 @@ return function(panel)
   local conf = config.get_config()
   local width = panel:infer_width()
 
-  ---@type RenderComponent
   local comp = panel.components.path.comp
 
   comp:add_line(
