@@ -304,10 +304,13 @@ end
 function Panel:close()
   if self:is_open() then
     local num_wins = api.nvim_tabpage_list_wins(api.nvim_win_get_tabpage(self.winid))
+
     if #num_wins == 1 then
       -- Ensure that the tabpage doesn't close if the panel is the last window.
-      vim.cmd("sp")
-      File.load_null_buffer(0)
+      api.nvim_win_call(self.winid, function()
+        vim.cmd("sp")
+        File.load_null_buffer(0)
+      end)
     elseif self:is_focused() then
       vim.cmd("wincmd p")
     end
