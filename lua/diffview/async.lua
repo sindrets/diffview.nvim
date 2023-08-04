@@ -566,4 +566,6 @@ M.scheduler = M.wrap(function(fast_only, callback)
   vim.schedule(callback)
 end)
 
+M.schedule_now = M.wrap(vim.schedule, 1)
+
 return M

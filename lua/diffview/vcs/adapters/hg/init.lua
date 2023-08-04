@@ -22,6 +22,7 @@ local await, pawait = async.await, async.pawait
 local fmt = string.format
 local logger = DiffviewGlobal.logger
 local pl = lazy.access(utils, "path") ---@type PathLib
+local uv = vim.loop
 
 local M = {}
 
@@ -625,9 +626,20 @@ HgAdapter.file_history_worker = async.void(function(self, out_stream, opt)
     end
   end)
 
+  local last_wait = uv.hrtime()
+  local interval = (1000 / 15) * 1E6
+
   for _, item in in_stream:iter() do
     ---@type JobStatus, table?, string?
     local status, new_data, msg = unpack(item, 1, 3)
+
+    -- Make sure to yield to the scheduler periodically to keep the editor
+    -- responsive.
+    local now = uv.hrtime()
+    if (now - last_wait > interval) then
+      last_wait = now
+      await(async.schedule_now())
+    end
 
     if status == JobStatus.KILLED then
       logger:warn("File history processing was killed.")

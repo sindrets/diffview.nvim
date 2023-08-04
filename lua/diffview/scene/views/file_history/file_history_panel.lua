@@ -182,8 +182,6 @@ end
 ---@param callback function
 FileHistoryPanel.update_entries = async.wrap(function(self, callback)
   perf_update:reset()
-  local timeout = 128
-  local ldt = 0 -- Last draw time
 
   for _, entry in ipairs(self.entries) do
     entry:destroy()
@@ -201,31 +199,18 @@ FileHistoryPanel.update_entries = async.wrap(function(self, callback)
 
   self:sync()
 
-  local render = debounce.throttle_trailing(
-    timeout,
-    true,
-    async.void(function(was_empty)
-      if ldt > timeout then
-        logger:lvl(10):fmt_debug(
-          "[FH_PANEL] Rendering is slower than throttle timeout (%.3f ms). Skipping rerender.",
-          ldt
-        )
-
-        ldt = ldt - timeout
-        return
-      end
-
-      await(async.scheduler())
-
-      if was_empty then
+  local render = debounce.throttle_render(
+    15,
+    function()
+      if not self:cur_file() then
         self:update_components()
         self.parent:next_item()
       else
         self:sync()
       end
 
-      ldt = renderer.last_draw_time
-    end)
+      vim.cmd("redraw")
+    end
   )
 
   local ret = {}
@@ -255,13 +240,13 @@ FileHistoryPanel.update_entries = async.wrap(function(self, callback)
     elseif status == JobStatus.PROGRESS then
       ---@cast entry -?
       local was_empty = #self.entries == 0
-      self.entries[#self.entries + 1] = entry
+      self.entries = utils.vec_join(self.entries, { entry })
 
-      if was_empty and self.entries[1] then
+      if was_empty then
         self.single_file = self.entries[1].single_file
       end
 
-      render(was_empty)
+      render()
     else
       error("Unexpected state!")
     end
@@ -269,7 +254,6 @@ FileHistoryPanel.update_entries = async.wrap(function(self, callback)
 
   await(async.scheduler())
   self.updating = false
-  render:close()
 
   if not self.shutdown then
     self:sync()
