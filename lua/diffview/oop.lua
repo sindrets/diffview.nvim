@@ -215,9 +215,9 @@ end
 
 function Symbol:__tostring()
   if self.name then
-    return fmt("<Symbol: '%s'>", self.name)
+    return fmt("<Symbol('%s)>", self.name)
   else
-    return fmt("<Symbol: #%d>", self.id)
+    return fmt("<Symbol(#%d)>", self.id)
   end
 end
 

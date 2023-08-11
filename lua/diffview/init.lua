@@ -250,7 +250,7 @@ end
 local function _emit(no_recursion, event_name, ...)
   local view = lib.get_current_view()
 
-  if view and not view.closing then
+  if view and not view.closing:check() then
     local that = view.emitter
     local fn = no_recursion and that.nore_emit or that.emit
     fn(that, event_name, ...)

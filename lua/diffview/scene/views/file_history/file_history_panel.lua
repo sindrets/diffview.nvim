@@ -6,6 +6,8 @@ local JobStatus = lazy.access("diffview.vcs.utils", "JobStatus") ---@type JobSta
 local LogEntry = lazy.access("diffview.vcs.log_entry", "LogEntry") ---@type LogEntry|LazyModule
 local Panel = lazy.access("diffview.ui.panel", "Panel") ---@type Panel|LazyModule
 local PerfTimer = lazy.access("diffview.perf", "PerfTimer") ---@type PerfTimer|LazyModule
+local Signal = lazy.access("diffview.control", "Signal") ---@type Signal|LazyModule
+local WorkPool = lazy.access("diffview.control", "WorkPool") ---@type WorkPool|LazyModule
 local config = lazy.require("diffview.config") ---@module "diffview.config"
 local debounce = lazy.require("diffview.debounce") ---@module "diffview.debounce"
 local oop = lazy.require("diffview.oop") ---@module "diffview.oop"
@@ -35,8 +37,9 @@ local perf_update = PerfTimer("[FileHistoryPanel] update")
 ---@field log_options ConfigLogOptions
 ---@field cur_item FileHistoryPanel.CurItem
 ---@field single_file boolean
+---@field work_pool WorkPool
+---@field shutdown Signal
 ---@field updating boolean
----@field shutdown boolean
 ---@field render_data RenderData
 ---@field option_panel FHOptionPanel
 ---@field option_mapping string
@@ -83,6 +86,9 @@ function FileHistoryPanel:init(opt)
   self.entries = opt.entries
   self.cur_item = {}
   self.single_file = opt.entries[1] and opt.entries[1].single_file
+  self.work_pool = WorkPool()
+  self.shutdown = Signal()
+  self.updating = false
   self.option_panel = FHOptionPanel(self, self.adapter.flags)
   self.log_options = {
     single_file = vim.tbl_extend(
@@ -111,12 +117,17 @@ function FileHistoryPanel:open()
 end
 
 ---@override
-function FileHistoryPanel:destroy()
+---@param self FileHistoryPanel
+FileHistoryPanel.destroy = async.sync_void(function(self)
+  self.shutdown:send()
+
+  await(self.work_pool)
+  await(async.scheduler())
+
   for _, entry in ipairs(self.entries) do
     entry:destroy()
   end
 
-  self.shutdown = true
   self.entries = nil
   self.cur_item = nil
   self.option_panel:destroy()
@@ -128,7 +139,7 @@ function FileHistoryPanel:destroy()
   end
 
   FileHistoryPanel.super_class.destroy(self)
-end
+end)
 
 function FileHistoryPanel:setup_buffer()
   local conf = config.get_config()
@@ -182,6 +193,7 @@ end
 ---@param callback function
 FileHistoryPanel.update_entries = async.wrap(function(self, callback)
   perf_update:reset()
+  local checkout = self.work_pool:check_in()
 
   for _, entry in ipairs(self.entries) do
     entry:destroy()
@@ -202,6 +214,7 @@ FileHistoryPanel.update_entries = async.wrap(function(self, callback)
   local render = debounce.throttle_render(
     15,
     function()
+      if self.shutdown:check() then return end
       if not self:cur_file() then
         self:update_components()
         self.parent:next_item()
@@ -216,8 +229,8 @@ FileHistoryPanel.update_entries = async.wrap(function(self, callback)
   local ret = {}
 
   for _, item in stream:iter() do
-    if self.shutdown then
-      stream:close(true)
+    if self.shutdown:check() then
+      stream:close(self.shutdown:new_consumer())
       ret = { nil, JobStatus.KILLED }
       break
     end
@@ -240,7 +253,7 @@ FileHistoryPanel.update_entries = async.wrap(function(self, callback)
     elseif status == JobStatus.PROGRESS then
       ---@cast entry -?
       local was_empty = #self.entries == 0
-      self.entries = utils.vec_join(self.entries, { entry })
+      self.entries[#self.entries+1] = entry
 
       if was_empty then
         self.single_file = self.entries[1].single_file
@@ -255,12 +268,13 @@ FileHistoryPanel.update_entries = async.wrap(function(self, callback)
   await(async.scheduler())
   self.updating = false
 
-  if not self.shutdown then
+  if not self.shutdown:check() then
     self:sync()
     self.option_panel:sync()
     vim.cmd("redraw")
   end
 
+  checkout:send()
   callback(unpack(ret, 1, 3))
 end)
 

@@ -531,9 +531,9 @@ function GitAdapter:stream_fh_data(state)
   end
 
   stream = AsyncListStream({
-    ---@param kill? boolean Shutdown signal
-    on_close = function(kill)
-      if kill then
+    ---@param shutdown? SignalConsumer Shutdown signal
+    on_close = function(shutdown)
+      if shutdown and shutdown:check() then
         if job:is_running() then
           logger:warn("Received shutdown signal. Killing file history jobs...")
           job:kill(64)
@@ -871,7 +871,6 @@ GitAdapter.file_history_worker = async.void(function(self, out_stream, opt)
 
   ---@type GitAdapter.FHState
   local state = {
-    out_stream = out_stream,
     path_args = opt.log_opt.single_file.path_args,
     log_options = log_options,
     prepared_log_opts = self:prepare_fh_options(log_options, single_file),
@@ -893,11 +892,9 @@ GitAdapter.file_history_worker = async.void(function(self, out_stream, opt)
     in_stream = self:stream_fh_data(state)
   end
 
-  ---@param kill? boolean
-  out_stream:on_close(function(kill)
-    if kill then
-      in_stream:close(true)
-    end
+  ---@param shutdown? SignalConsumer
+  out_stream:on_close(function(shutdown)
+    if shutdown then in_stream:close(shutdown) end
   end)
 
   local last_wait = uv.hrtime()

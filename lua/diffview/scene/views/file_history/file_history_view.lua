@@ -65,8 +65,8 @@ end
 
 ---@override
 function FileHistoryView:close()
-  if not self.closing then
-    self.closing = true
+  if not self.closing:check() then
+    self.closing:send()
 
     for _, entry in ipairs(self.panel.entries or {}) do
       entry:destroy()

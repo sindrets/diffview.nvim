@@ -113,7 +113,7 @@ MultiJob.start = async.wrap(function(self, callback)
 
   self:reset()
 
-  self._stared = true
+  self._started = true
 
   local jobs = self.jobs
   local retry_status

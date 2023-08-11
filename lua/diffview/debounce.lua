@@ -154,6 +154,8 @@ function M.throttle_trailing(ms, rush_first, fn)
   return throttled_fn
 end
 
+---Throttle a function against a target framerate. The function will always be
+---called when the editor is unlocked and writing to buffers is possible.
 ---@param framerate integer # Target framerate. Set to <= 0 to render whenever the scheduler is ready.
 ---@param fn function
 function M.throttle_render(framerate, fn)

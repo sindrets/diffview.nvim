@@ -1,13 +1,14 @@
 local lazy = require("diffview.lazy")
 
-local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1") --[[@as Diff1|LazyModule ]]
-local Diff2Hor = lazy.access("diffview.scene.layouts.diff_2_hor", "Diff2Hor") --[[@as Diff2Hor|LazyModule ]]
-local Diff2Ver = lazy.access("diffview.scene.layouts.diff_2_ver", "Diff2Ver") --[[@as Diff2Ver|LazyModule ]]
-local Diff3Hor = lazy.access("diffview.scene.layouts.diff_3_hor", "Diff3Hor") --[[@as Diff3Hor|LazyModule ]]
-local Diff3Ver = lazy.access("diffview.scene.layouts.diff_3_ver", "Diff3Ver") --[[@as Diff3Ver|LazyModule ]]
-local Diff4Mixed = lazy.access("diffview.scene.layouts.diff_4_mixed", "Diff4Mixed") --[[@as Diff4Mixed|LazyModule ]]
-local EventEmitter = lazy.access("diffview.events", "EventEmitter") --[[@as EventEmitter|LazyModule ]]
-local File = lazy.access("diffview.vcs.file", "File") --[[@as vcs.File|LazyModule ]]
+local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1") ---@type Diff1|LazyModule
+local Diff2Hor = lazy.access("diffview.scene.layouts.diff_2_hor", "Diff2Hor") ---@type Diff2Hor|LazyModule
+local Diff2Ver = lazy.access("diffview.scene.layouts.diff_2_ver", "Diff2Ver") ---@type Diff2Ver|LazyModule
+local Diff3Hor = lazy.access("diffview.scene.layouts.diff_3_hor", "Diff3Hor") ---@type Diff3Hor|LazyModule
+local Diff3Ver = lazy.access("diffview.scene.layouts.diff_3_ver", "Diff3Ver") ---@type Diff3Ver|LazyModule
+local Diff4Mixed = lazy.access("diffview.scene.layouts.diff_4_mixed", "Diff4Mixed") ---@type Diff4Mixed|LazyModule
+local EventEmitter = lazy.access("diffview.events", "EventEmitter") ---@type EventEmitter|LazyModule
+local File = lazy.access("diffview.vcs.file", "File") ---@type vcs.File|LazyModule
+local Signal = lazy.access("diffview.control", "Signal") ---@type Signal|LazyModule
 local config = lazy.require("diffview.config") ---@module "diffview.config"
 local oop = lazy.require("diffview.oop") ---@module "diffview.oop"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
@@ -26,7 +27,7 @@ local LayoutMode = oop.enum({
 ---@field emitter EventEmitter
 ---@field default_layout Layout (class)
 ---@field ready boolean
----@field closing boolean
+---@field closing Signal
 local View = oop.create_class("View")
 
 ---@diagnostic disable unused-local
@@ -45,7 +46,7 @@ function View:init(opt)
   self.emitter = opt.emitter or EventEmitter()
   self.default_layout = opt.default_layout or View.get_default_layout()
   self.ready = utils.sate(opt.ready, false)
-  self.closing = utils.sate(opt.closing, false)
+  self.closing = utils.sate(opt.closing, Signal())
 
   local function wrap_event(event)
     DiffviewGlobal.emitter:on(event, function(_, view, ...)
@@ -70,7 +71,7 @@ function View:open()
 end
 
 function View:close()
-  self.closing = true
+  self.closing:send()
 
   if self.tabpage and api.nvim_tabpage_is_valid(self.tabpage) then
     DiffviewGlobal.emitter:emit("view_leave", self)
