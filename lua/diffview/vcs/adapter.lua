@@ -2,6 +2,7 @@ local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 local oop = require("diffview.oop")
 
+local AsyncListStream = lazy.access("diffview.stream", "AsyncListStream") ---@type AsyncListStream|LazyModule
 local Job = lazy.access("diffview.job", "Job") ---@type diffview.Job|LazyModule
 local Rev = lazy.access("diffview.vcs.rev", "Rev") ---@type Rev|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
@@ -220,10 +221,9 @@ function VCSAdapter:file_history_options(range, paths, argo)
 end
 
 ---@param self VCSAdapter
----@param co_state table
+---@param out_stream AsyncListStream
 ---@param opt vcs.adapter.FileHistoryWorkerSpec
----@param callback (fun(entries: LogEntry[], status: JobStatus, err?: string)) # Called whenever there are new entries available.
-VCSAdapter.file_history_worker = async.void(function(self, thread, log_opt, opt, co_state, callback)
+VCSAdapter.file_history_worker = async.void(function(self, out_stream, opt)
   oop.abstract_stub()
 end)
 
@@ -234,19 +234,12 @@ end)
 ---@field layout_opt vcs.adapter.LayoutOpt
 
 ---@param opt vcs.adapter.FileHistoryWorkerSpec
----@param callback (fun(entries: LogEntry[], status: JobStatus, err?: string)) # Called whenever there are new entries available.
-function VCSAdapter:file_history(opt, callback)
-  local co_state = {
-    shutdown = false,
-  }
+---@return AsyncListStream out_stream
+function VCSAdapter:file_history(opt)
+  local out_stream = AsyncListStream()
+  self:file_history_worker(out_stream, opt)
 
-  self:file_history_worker(co_state, opt, callback)
-
-  return {
-    close = function()
-      co_state.shutdown = true
-    end
-  }
+  return out_stream
 end
 
 -- Diff View

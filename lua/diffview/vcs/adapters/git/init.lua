@@ -1,3 +1,4 @@
+local AsyncListStream = require("diffview.stream").AsyncListStream
 local Commit = require("diffview.vcs.adapters.git.commit").GitCommit
 local Diff2Hor = require("diffview.scene.layouts.diff_2_hor").Diff2Hor
 local FileEntry = require("diffview.scene.file_entry").FileEntry
@@ -22,6 +23,7 @@ local await, pawait = async.await, async.pawait
 local fmt = string.format
 local logger = DiffviewGlobal.logger
 local pl = lazy.access(utils, "path") ---@type PathLib
+local uv = vim.loop
 
 local M = {}
 
@@ -508,47 +510,57 @@ local function structure_fh_data(stat_data, keep_diff)
   return ret
 end
 
----@param self GitAdapter
 ---@param state GitAdapter.FHState
----@param callback fun(status: JobStatus, data?: table, msg?: string)
-GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
-  ---@type diffview.Job, boolean
-  local stat_job, shutdown
-
-  local raw = {}
-  local job_state = {
-    data = {},
-    idx = 0,
-  }
+function GitAdapter:stream_fh_data(state)
+  ---@type diffview.Job, AsyncListStream
+  local job, stream
+  ---@type string[]?
+  local data
 
   local function on_stdout(_, line)
     if line == "\0" then
-      if job_state.idx > 0 then
-        if not raw[job_state.idx] then
-          raw[job_state.idx] = {}
-        end
-
-        raw[job_state.idx].data = job_state.data
-
-        if not shutdown then
-          local log_data = structure_fh_data(raw[job_state.idx].data)
-          shutdown = callback(JobStatus.PROGRESS, log_data)
-
-          if shutdown then
-            logger:warn("Received shutdown signal. Killing file history jobs...")
-            stat_job:kill(64)
-          end
-        end
+      if data then
+        local log_data = structure_fh_data(data)
+        stream:push({ JobStatus.PROGRESS, log_data })
       end
 
-      job_state.idx = job_state.idx + 1
-      job_state.data = {}
+      data = {}
     else
-      job_state.data[#job_state.data + 1] = line
+      data[#data + 1] = line
     end
   end
 
-  stat_job = Job({
+  stream = AsyncListStream({
+    ---@param shutdown? SignalConsumer Shutdown signal
+    on_close = function(shutdown)
+      if shutdown and shutdown:check() then
+        if job:is_running() then
+          logger:warn("Received shutdown signal. Killing file history jobs...")
+          job:kill(64)
+        else
+          logger:warn("Received shutdown signal, but no jobs are running. Nothing to do.")
+        end
+
+        stream:push({ JobStatus.KILLED })
+        return
+      end
+
+      local ok, err = job:is_success()
+      if job:is_done() and ok and job.code == 0 then on_stdout(nil, "\0") end
+
+      if not ok then
+        stream:push({
+          JobStatus.ERROR,
+          nil,
+          table.concat(utils.vec_join(err, job.stderr), "\n")
+        })
+      else
+        stream:push({ JobStatus.SUCCESS })
+      end
+    end
+  })
+
+  job = Job({
     command = self:bin(),
     args = utils.vec_join(
       self:args(),
@@ -568,67 +580,65 @@ GitAdapter.incremental_fh_data = async.void(function(self, state, callback)
     cwd = self.ctx.toplevel,
     log_opt = { label = "GitAdapter:incremental_fh_data()" },
     on_stdout = on_stdout,
+    on_exit = utils.hard_bind(stream.close, stream),
   })
 
-  local ok, err = await(stat_job)
-  if ok and stat_job.code == 0 then on_stdout(nil, "\0") end
+  job:start()
 
-  if shutdown then
-    callback(JobStatus.KILLED)
-  elseif not ok then
-    callback(
-      JobStatus.ERROR,
-      nil,
-      table.concat(utils.vec_join(err, stat_job.stderr), "\n")
-    )
-  else
-    callback(JobStatus.SUCCESS)
-  end
-end)
+  return stream
+end
 
----@param self GitAdapter
 ---@param state GitAdapter.FHState
----@param callback fun(status: JobStatus, data?: table, msg?: string)
-GitAdapter.incremental_line_trace_data = async.wrap(function(self, state, callback)
-  ---@type diffview.Job, boolean
-  local trace_job, shutdown
-
-  local raw = {}
-  local trace_state = {
-    data = {},
-    idx = 0,
-  }
+function GitAdapter:stream_line_trace_data(state)
+  ---@type diffview.Job, AsyncListStream
+  local job, stream
+  ---@type string[]?
+  local data
 
   local function on_stdout(_, line)
     if line == "\0" then
-      if trace_state.idx > 0 then
-        if not raw[trace_state.idx] then
-          raw[trace_state.idx] = {}
-        end
-
-        raw[trace_state.idx] = trace_state.data
-
-        if not shutdown then
-          shutdown = callback(
-            JobStatus.PROGRESS,
-            structure_fh_data(raw[trace_state.idx], true)
-          )
-
-          if shutdown then
-            logger:warn("Killing file history jobs...")
-            trace_job:kill(64)
-          end
-        end
+      if data then
+        local log_data = structure_fh_data(data, true)
+        stream:push({ JobStatus.PROGRESS, log_data })
       end
 
-      trace_state.idx = trace_state.idx + 1
-      trace_state.data = {}
+      data = {}
     else
-      trace_state.data[#trace_state.data + 1] = line
+      data[#data + 1] = line
     end
   end
 
-  trace_job = Job({
+  stream = AsyncListStream({
+    ---@param kill? boolean Shutdown signal
+    on_close = function(kill)
+      if kill then
+        if job:is_running() then
+          logger:warn("Received shutdown signal. Killing file history jobs...")
+          job:kill(64)
+        else
+          logger:warn("Received shutdown signal, but no jobs are running. Nothing to do.")
+        end
+
+        stream:push({ JobStatus.KILLED })
+        return
+      end
+
+      local ok, err = job:is_success()
+      if job:is_done() and ok and job.code == 0 then on_stdout(nil, "\0") end
+
+      if not ok then
+        stream:push({
+          JobStatus.ERROR,
+          nil,
+          table.concat(utils.vec_join(err, job.stderr), "\n")
+        })
+      else
+        stream:push({ JobStatus.SUCCESS })
+      end
+    end
+  })
+
+  job = Job({
     command = self:bin(),
     args = utils.vec_join(
       self:args(),
@@ -647,20 +657,13 @@ GitAdapter.incremental_line_trace_data = async.wrap(function(self, state, callba
     cwd = self.ctx.toplevel,
     log_opt = { label = "GitAdapter:incremental_line_trace_data()" },
     on_stdout = on_stdout,
+    on_exit = utils.hard_bind(stream.close, stream),
   })
 
-  local ok = await(trace_job)
-  if ok and trace_job.code == 0 then on_stdout(nil, "\0") end
+  job:start()
 
-  if shutdown then
-    callback(JobStatus.KILLED)
-  elseif not ok then
-    callback(JobStatus.ERROR, nil, table.concat(trace_job.stderr, "\n"))
-  else
-    callback(JobStatus.SUCCESS)
-  end
-end)
-
+  return stream
+end
 
 ---@param path_args string[]
 ---@param lflags string[]
@@ -849,12 +852,9 @@ end
 ---@field old_path string?
 
 ---@param self GitAdapter
----@param co_state table
+---@param out_stream AsyncListStream
 ---@param opt vcs.adapter.FileHistoryWorkerSpec
----@param callback (fun(entries: LogEntry[], status: JobStatus, err?: string)) # Called whenever there are new entries available.
-GitAdapter.file_history_worker = async.void(function(self, co_state, opt, callback)
-  local entries = {} ---@type LogEntry[]
-
+GitAdapter.file_history_worker = async.void(function(self, out_stream, opt)
   local single_file = self:is_single_file(
     opt.log_opt.single_file.path_args,
     opt.log_opt.single_file.L
@@ -871,7 +871,6 @@ GitAdapter.file_history_worker = async.void(function(self, co_state, opt, callba
 
   ---@type GitAdapter.FHState
   local state = {
-    co_state = co_state,
     path_args = opt.log_opt.single_file.path_args,
     log_options = log_options,
     prepared_log_opts = self:prepare_fh_options(log_options, single_file),
@@ -879,62 +878,52 @@ GitAdapter.file_history_worker = async.void(function(self, co_state, opt, callba
     single_file = single_file,
   }
 
-  local data_buffer = {}
-  local data_idx = 0
-
-  ---Wakes the data scheduler
-  ---@type function?
-  local data_step
-
-  local function inc_callback(status, new_data, msg)
-    data_buffer[#data_buffer+1] = { status, new_data, msg }
-
-    if data_step then
-      local temp = data_step
-      data_step = nil
-      temp(status, new_data, msg)
-    end
-
-    return co_state.shutdown
-  end
-
-  ---Yield until data is available
-  ---@param cb (fun(status: JobStatus, new_data: table, err?: string))
-  local data_scheduler = async.wrap(function(cb)
-    data_idx = data_idx + 1
-
-    if data_buffer[data_idx] then
-      cb(unpack(data_buffer[data_idx], 1, 3))
-    else
-      -- Await new data from inc workers
-      data_step = cb
-    end
-  end)
-
   logger:info(
     "[FileHistory] Updating with options:",
     vim.inspect(state.prepared_log_opts, { newline = " ", indent = "" })
   )
 
+  ---@type AsyncListStream
+  local in_stream
+
   if is_trace then
-    self:incremental_line_trace_data(state, inc_callback)
+    in_stream = self:stream_line_trace_data(state)
   else
-    self:incremental_fh_data(state, inc_callback)
+    in_stream = self:stream_fh_data(state)
   end
 
-  while true do
+  ---@param shutdown? SignalConsumer
+  out_stream:on_close(function(shutdown)
+    if shutdown then in_stream:close(shutdown) end
+  end)
+
+  local last_wait = uv.hrtime()
+  local interval = (1000 / 15) * 1E6
+
+  for _, item in in_stream:iter() do
     ---@type JobStatus, GitAdapter.LogData?, string?
-    local status, new_data, msg = await(data_scheduler())
+    local status, new_data, msg = unpack(item, 1, 3)
+
+    -- Make sure to yield to the scheduler periodically to keep the editor
+    -- responsive.
+    local now = uv.hrtime()
+    if (now - last_wait > interval) then
+      last_wait = now
+      await(async.schedule_now())
+    end
 
     if status == JobStatus.KILLED then
       logger:warn("File history processing was killed.")
-      callback(entries, status)
+      out_stream:push({ status })
+      out_stream:close()
       return
     elseif status == JobStatus.ERROR then
-      callback(entries, status, msg)
+      out_stream:push({ status, nil, msg })
+      out_stream:close()
       return
     elseif status == JobStatus.SUCCESS then
-      callback(entries, status)
+      out_stream:push({ status })
+      out_stream:close()
       return
     elseif status ~= JobStatus.PROGRESS then
       error("Unexpected state!")
@@ -954,19 +943,23 @@ GitAdapter.file_history_worker = async.void(function(self, co_state, opt, callba
       local rev_arg = new_data.right_hash
       local is_merge = new_data.merge_hash ~= nil
 
+      if is_trace and is_merge then goto continue end
+
       logger:fmt_warn("Received malformed or insufficient data for '%s'! Retrying...", rev_arg)
       logger:debug(new_data)
       err, new_data = await(
         self:fh_retry_commit(rev_arg, state, {
           is_merge = is_merge,
           retry_count = not is_merge and 2,
+          keep_diff = is_trace,
         })
       )
 
       if err then
         if err.name == "job_fail" then
           logger:error(err.msg)
-          callback(entries, JobStatus.ERROR, err.msg)
+          out_stream:push({ JobStatus.ERROR, nil, err.msg })
+          out_stream:close()
           return
         elseif err.name == "bad_data" then
           logger:warn(err.msg)
@@ -1007,10 +1000,7 @@ GitAdapter.file_history_worker = async.void(function(self, co_state, opt, callba
 
     -- Some commits might not have file data. In that case we simply ignore it,
     -- as the fh panel doesn't support such entries at the moment.
-    if ok then
-      entries[#entries + 1] = entry
-      callback(entries, JobStatus.PROGRESS)
-    end
+    if ok then out_stream:push({ JobStatus.PROGRESS, entry }) end
 
     ::continue::
   end
@@ -1019,6 +1009,7 @@ end)
 ---@class GitAdapter.fh_retry_commit.Opt
 ---@field is_merge boolean
 ---@field retry_count integer
+---@field keep_diff boolean
 
 ---@param self GitAdapter
 ---@param rev_arg string
@@ -1057,7 +1048,7 @@ GitAdapter.fh_retry_commit = async.wrap(function(self, rev_arg, state, opt, call
     _, err = await(job:start())
 
     if not err and job.code == 0 then
-      data = structure_fh_data(job.stdout, false)
+      data = structure_fh_data(job.stdout, opt.keep_diff)
       if data.valid then break end
     end
 

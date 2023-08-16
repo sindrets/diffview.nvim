@@ -1,5 +1,7 @@
+local async = require("diffview.async")
 local utils = require("diffview.utils")
 
+local await = async.await
 local uv = vim.loop
 
 local M = {}
@@ -147,6 +149,48 @@ function M.throttle_trailing(ms, rush_first, fn)
         end
       end
     end)
+  end)
+
+  return throttled_fn
+end
+
+---Throttle a function against a target framerate. The function will always be
+---called when the editor is unlocked and writing to buffers is possible.
+---@param framerate integer # Target framerate. Set to <= 0 to render whenever the scheduler is ready.
+---@param fn function
+function M.throttle_render(framerate, fn)
+  local lock = false
+  local use_framerate = framerate > 0
+  local period = use_framerate and (1000 / framerate) * 1E6 or 0
+  local throttled_fn
+  local args, last
+
+  throttled_fn = async.void(function(...)
+    args = utils.tbl_pack(...)
+    if lock then return end
+
+    lock = true
+    await(async.schedule_now())
+    fn(utils.tbl_unpack(args))
+    args = nil
+
+    if use_framerate then
+      local now = uv.hrtime()
+
+      if last and now - last < period then
+        local wait = period - (now - last)
+        await(async.timeout(wait / 1E6))
+        last = last + period
+      else
+        last = now
+      end
+    end
+
+    lock = false
+
+    if args ~= nil then
+      throttled_fn(utils.tbl_unpack(args))
+    end
   end)
 
   return throttled_fn

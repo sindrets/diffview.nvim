@@ -170,8 +170,8 @@ end
 
 ---@override
 function DiffView:close()
-  if not self.closing then
-    self.closing = true
+  if not self.closing:check() then
+    self.closing:send()
 
     if self.watcher then
       self.watcher:stop()

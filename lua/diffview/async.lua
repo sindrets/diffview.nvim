@@ -8,11 +8,11 @@ local DEFAULT_ERROR = "Unkown error."
 
 local M = {}
 
----@private
+---@package
 ---@type { [Future]: boolean }
 M._watching = setmetatable({}, { __mode = "k" })
 
----@private
+---@package
 ---@type { [thread]: Future }
 M._handles = {}
 
@@ -65,26 +65,34 @@ end
 
 ---@class Waitable : diffview.Object
 local Waitable = oop.create_class("Waitable")
+M.Waitable = Waitable
 
 ---@abstract
 ---@return any ... # Any values returned by the waitable
 function Waitable:await() oop.abstract_stub() end
 
-M.Waitable = Waitable
+---Schedule a callback to be invoked when this waitable has settled.
+---@param callback function
+function Waitable:finally(callback)
+  (M.void(function()
+    local ret = tbl_pack(M.await(self))
+    callback(tbl_unpack(ret))
+  end))()
+end
 
 ---@class Future : Waitable
 ---@operator call : Future
----@field private thread thread
----@field private listeners Future[]
----@field private parent? Future
----@field private func? function
----@field private return_values? any[]
----@field private err? string
----@field private kind AsyncKind
----@field private started boolean
----@field private awaiting_cb boolean
----@field private done boolean
----@field private has_raised boolean # `true` if this future has raised an error.
+---@field package thread thread
+---@field package listeners Future[]
+---@field package parent? Future
+---@field package func? function
+---@field package return_values? any[]
+---@field package err? string
+---@field package kind AsyncKind
+---@field package started boolean
+---@field package awaiting_cb boolean
+---@field package done boolean
+---@field package has_raised boolean # `true` if this future has raised an error.
 local Future = oop.create_class("Future", Waitable)
 
 function Future:init(opt)
@@ -107,18 +115,18 @@ function Future:init(opt)
   self.has_raised = false
 end
 
----@private
+---@package
 ---@return string
 function Future:__tostring()
   return dstring(self.thread)
 end
 
----@private
+---@package
 function Future:destroy()
   M._handles[self.thread] = nil
 end
 
----@private
+---@package
 ---@param value boolean
 function Future:set_done(value)
   self.done = value
@@ -138,7 +146,7 @@ function Future:get_returned()
   return unpack(self.return_values, 2, table.maxn(self.return_values))
 end
 
----@private
+---@package
 ---@param ... any
 function Future:dprint(...)
   if not DiffviewGlobal.logger then return end
@@ -149,7 +157,7 @@ function Future:dprint(...)
   end
 end
 
----@private
+---@package
 ---@param ... any
 function Future:dprintf(...)
   self:dprint(fmt(...))
@@ -165,13 +173,13 @@ function Future:unwatch()
   M._watching[self] = nil
 end
 
----@private
+---@package
 ---@return boolean
 function Future:is_watching()
   return not not M._watching[self]
 end
 
----@private
+---@package
 ---@param force? boolean
 function Future:raise(force)
   if self.has_raised and not force then return end
@@ -179,7 +187,7 @@ function Future:raise(force)
   error(self.err)
 end
 
----@private
+---@package
 function Future:step(...)
   self:dprint("step")
   local ret = { coroutine.resume(self.thread, ...) }
@@ -217,7 +225,7 @@ function Future:step(...)
   end
 end
 
----@private
+---@package
 ---@param ok boolean
 ---@param ... any
 function Future:notify_all(ok, ...)
@@ -241,6 +249,7 @@ function Future:notify_all(ok, ...)
   end
 end
 
+---@override
 ---@return any ... # Return values
 function Future:await()
   if self.err then
@@ -302,7 +311,7 @@ function Future:await()
   return self:get_returned()
 end
 
----@private
+---@package
 ---@return any ...
 function Future:toplevel_await()
   local ok, status
@@ -337,15 +346,13 @@ end
 ---@field nparams? integer
 ---@field args any[]
 
----@private
+---@package
 ---@param func function
 ---@param opt async._run.Opt
 function M._run(func, opt)
-  ---@diagnostic disable: invisible
   opt = opt or {}
 
   local handle ---@type Future
-  local wrapped_cb
   local use_err_handler = not not current_thread()
 
   local function wrapped_func(...)
@@ -381,7 +388,7 @@ function M._run(func, opt)
   if opt.kind == "callback" then
     local cur_cb = opt.args[opt.nparams]
 
-    function wrapped_cb(...)
+    local function wrapped_cb(...)
       handle:set_done(true)
       handle.return_values = { true, ... }
       if cur_cb then cur_cb(...) end
@@ -405,7 +412,6 @@ function M._run(func, opt)
   handle:step(tbl_unpack(opt.args))
 
   return handle
-  ---@diagnostic enable: invisible
 end
 
 ---Create an async task for a function with no return values.
@@ -565,5 +571,7 @@ M.scheduler = M.wrap(function(fast_only, callback)
 
   vim.schedule(callback)
 end)
+
+M.schedule_now = M.wrap(vim.schedule, 1)
 
 return M

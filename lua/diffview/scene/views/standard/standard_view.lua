@@ -44,7 +44,7 @@ end
 
 ---@override
 function StandardView:close()
-  self.closing = true
+  self.closing:send()
   self.panel:destroy()
 
   if self.tabpage and api.nvim_tabpage_is_valid(self.tabpage) then

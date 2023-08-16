@@ -31,6 +31,7 @@ function M.setup()
   vim.env.XDG_DATA_HOME = M.root(".tests/data")
   vim.env.XDG_STATE_HOME = M.root(".tests/state")
   vim.env.XDG_CACHE_HOME = M.root(".tests/cache")
+  require("diffview.tests.init")
 end
 
 M.setup()

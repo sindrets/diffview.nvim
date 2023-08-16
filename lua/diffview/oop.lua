@@ -79,7 +79,6 @@ function M.create_class(name, super_class)
     {
       __name = name,
       super_class = super_class,
-      init = function(...) end,
     },
     {
       __index = super_class,
@@ -194,6 +193,32 @@ end
 function M.is_instance(x)
   if type(x) ~= "table" then return false end
   return M.is_class(x.class)
+end
+
+---@class Symbol
+---@operator call : Symbol
+---@field public name? string
+---@field public id integer
+---@field private _id_counter integer
+local Symbol = M.create_class("Symbol")
+M.Symbol = Symbol
+
+---@private
+Symbol._id_counter = 1
+
+---@param name? string
+function Symbol:init(name)
+  self.name = name
+  self.id = Symbol._id_counter
+  Symbol._id_counter = Symbol._id_counter + 1
+end
+
+function Symbol:__tostring()
+  if self.name then
+    return fmt("<Symbol('%s)>", self.name)
+  else
+    return fmt("<Symbol(#%d)>", self.id)
+  end
 end
 
 return M

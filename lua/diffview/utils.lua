@@ -245,7 +245,7 @@ function M.str_split(s, sep)
   local i = 1
   while i ~= nil do
     sep_start, sep_end = iter()
-    table.insert(result, s:sub(i, (sep_start or 0) - 1))
+    result[#result + 1] = s:sub(i, (sep_start or 0) - 1)
     i = sep_end
   end
 
@@ -471,7 +471,8 @@ function M.tabnr_to_id(tabnr)
   end
 end
 
----@generic T
+---Shallow clone a table.
+---@generic T : table
 ---@param t `T`
 ---@return T
 function M.tbl_clone(t)
@@ -484,6 +485,10 @@ function M.tbl_clone(t)
   return clone
 end
 
+---Deep clone a table.
+---@generic T : table
+---@param t `T`
+---@return T
 function M.tbl_deep_clone(t)
   local clone = {}
 
@@ -498,10 +503,18 @@ function M.tbl_deep_clone(t)
   return clone
 end
 
+---@generic T
+---@param ... T
+---@return { n: integer, [integer]: T }
 function M.tbl_pack(...)
   return { n = select("#", ...), ... }
 end
 
+---@generic T
+---@param t { n?: integer, [integer]: T }
+---@param i? integer
+---@param j? integer
+---@return T ...
 function M.tbl_unpack(t, i, j)
   return unpack(t, i or 1, j or t.n or table.maxn(t))
 end
@@ -576,7 +589,7 @@ function M.tbl_merge(t, ...)
   for _, theirs in ipairs({...}) do
     for k, v in pairs(theirs) do
       if type(k) == "number" and k % 1 == 0 then
-        table.insert(ret, v)
+        ret[#ret + 1] = v
       else
         ret[k] = v
       end
@@ -598,7 +611,7 @@ function M.tbl_deep_merge(t, ...)
           ret[k] = M.tbl_deep_clone(v)
         end
       elseif type(k) == "number" and k % 1 == 0 then
-        table.insert(ret, v)
+        ret[#ret + 1] = v
       else
         ret[k] = v
       end
@@ -619,7 +632,7 @@ function M.tbl_fmap(t, func)
     local v = func(item)
     if v ~= nil then
       if type(key) == "number" then
-        table.insert(ret, v)
+        ret[#ret + 1] = v
       else
         ret[key] = v
       end
@@ -694,7 +707,7 @@ function M.vec_slice(t, first, last)
   end
 
   for i = first or 1, last or #t do
-    table.insert(slice, t[i])
+    slice[#slice + 1] = t[i]
   end
 
   return slice
@@ -747,12 +760,12 @@ function M.vec_union(...)
     if type(args[i]) ~= "nil" then
       if type(args[i]) ~= "table" and not seen[args[i]] then
         seen[args[i]] = true
-        result[#result+1] = args[i]
+        result[#result + 1] = args[i]
       else
         for _, v in ipairs(args[i]) do
           if not seen[v] then
             seen[v] = true
-            result[#result+1] = v
+            result[#result + 1] = v
           end
         end
       end
@@ -1059,7 +1072,7 @@ function M.win_find_buf(bufid, tabpage)
 
   for _, id in ipairs(wins) do
     if api.nvim_win_get_buf(id) == bufid then
-      table.insert(result, id)
+      result[#result + 1] = id
     end
   end
 
@@ -1260,6 +1273,20 @@ function M.bind(func, ...)
     end
 
     return func(unpack(args, 1, bound_args.n + new_args.n))
+  end
+end
+
+---Create a copy of `func` bound to the given arguments. The new function will
+---not accept any additional arguments.
+---@generic T
+---@param func fun(...): T
+---@param ... any Arguments to apply to `func` when the bound function is invoked.
+---@return fun(): T
+function M.hard_bind(func, ...)
+  local bound_args = M.tbl_pack(...)
+
+  return function()
+    return func(M.tbl_unpack(bound_args))
   end
 end
 
