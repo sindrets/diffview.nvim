@@ -491,27 +491,21 @@ local function structure_fh_data(stat_data, keep_diff)
   end
 
   -- Soft validate the data
-  if (ret.merge_hash and (#namestat == 0 or #numstat == 0)) or #namestat ~= #numstat then
-    -- Merge commits are likely to be missing stat data depending on the value
-    -- of `--diff-merges`.
-    ret.valid = false
-  else
-    ret.valid = #stat_data >= 8 and pcall(
-      vim.validate,
-      {
-        left_hash = { ret.left_hash, "string", true },
-        right_hash = { ret.right_hash, "string" },
-        merge_hash = { ret.merge_hash, "string", true },
-        author = { ret.author, "string" },
-        time = { ret.time, "number" },
-        time_offset = { ret.time_offset, "string" },
-        rel_date = { ret.rel_date, "string" },
-        ref_names = { ret.ref_names, "string" },
-        reflog_selector = { ret.reflog_selector, "string" },
-        subject = { ret.subject, "string" },
-      }
-    )
-  end
+  ret.valid = #namestat == #numstat and pcall(
+    vim.validate,
+    {
+      left_hash = { ret.left_hash, "string", true },
+      right_hash = { ret.right_hash, "string" },
+      merge_hash = { ret.merge_hash, "string", true },
+      author = { ret.author, "string" },
+      time = { ret.time, "number" },
+      time_offset = { ret.time_offset, "string" },
+      rel_date = { ret.rel_date, "string" },
+      ref_names = { ret.ref_names, "string" },
+      reflog_selector = { ret.reflog_selector, "string" },
+      subject = { ret.subject, "string" },
+    }
+  )
 
   return ret
 end
@@ -1036,7 +1030,7 @@ GitAdapter.fh_retry_commit = async.wrap(function(self, rev_arg, state, opt, call
       "--pretty=format:" .. GitAdapter.COMMIT_PRETTY_FMT,
       "--numstat",
       "--raw",
-      "--diff-merges=" .. (opt.is_merge and "first-parent" or state.log_options.diff_merges),
+      "--diff-merges=" .. state.log_options.diff_merges,
       (state.single_file and state.log_options.follow) and "--follow" or nil,
       rev_arg,
       "--",

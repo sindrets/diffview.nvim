@@ -56,17 +56,32 @@ COMMANDS                                        *diffview-commands*
         {paths...} may be provided to narrow down what files are shown. If the
         `-C` flag is not defined, the git top-level is determined from the
         current buffer when possible. Otherwise it's determined from the cwd.
-        Examples:
->vim
+
+        Examples: >vim
+
+            " Diff the working tree against the index:
             :DiffviewOpen
+
+            " Diff the working tree against a specific commit:
             :DiffviewOpen HEAD~2
-            :DiffviewOpen HEAD~4..HEAD~2
             :DiffviewOpen d4a7b0d
-            :DiffviewOpen d4a7b0d^!
+
+            " Diff a commit range:
+            :DiffviewOpen HEAD~4..HEAD~2
             :DiffviewOpen d4a7b0d..519b30e
+
+            " Diff the changes introduced by a specific commit (kind of like
+            " `git show d4a7b0d`):
+            :DiffviewOpen d4a7b0d^!
+
+            " Diff HEAD against it's merge base in origin/main:
             :DiffviewOpen origin/main...HEAD
+
+            " Limit the scope to the given paths:
             :DiffviewOpen HEAD~2 -- lua/diffview plugin
-            :DiffviewOpen d4a7b0d -uno
+
+            " Hide untracked files:
+            :DiffviewOpen -uno
 <
 
                                                 *diffview-staging*
@@ -170,25 +185,44 @@ COMMANDS                                        *diffview-commands*
         <Tab>, or by using the mappings that are shown directly in the panel,
         preceding the flags' descriptions.
 
-        NOTE: Commits are only listed if git-log is able to show its file
-        stats given your currently configured log options. As such pay
-        attention to the value of `--diff-merges`, as this controls how
-        git-log treats merge commits and subsequently it's willingness to show
-        stats for these commits. Setting `--diff-merges=off` will tell git-log
-        to never compare merge commits, and as such they won't show up in the
-        file history view.
+                                                *diffview-inspect-stash*
+        The latest Git stash is always stored in the reference `refs/stash`.
+        We can find all the stashes by traversing the reflog for this
+        reference. This can be achieved with the flag option `--walk-reflogs`
+        (or it's short form `-g`). The following command will list all stashes
+        in the file history panel: >
+                :DiffviewFileHistory -g --range=stash
+<
 
-        Examples:
->vim
+        Examples: >vim
+
+            " History for the current branch:
             :DiffviewFileHistory
+
+            " History for the current file:
             :DiffviewFileHistory %
+
+            " History for a specific file:
             :DiffviewFileHistory path/to/some/file.txt
+
+            " History for a specific directory:
             :DiffviewFileHistory path/to/some/directory
+
+            " History for multiple paths:
             :DiffviewFileHistory multiple/paths foo/bar baz/qux
+
+            " Compare history against a fixed base:
             :DiffviewFileHistory --base=HEAD~4
             :DiffviewFileHistory --base=LOCAL
+
+            " History for a specific rev range:
             :DiffviewFileHistory --range=origin..HEAD
             :DiffviewFileHistory --range=feat/some-branch
+
+            " Inspect diffs for Git stashes:
+            :DiffviewFileHistory -g --range=stash
+
+            " Trace the line evolution for the current visual selection:
             :'<,'>DiffviewFileHistory
 <
 
@@ -225,6 +259,9 @@ COMMANDS                                        *diffview-commands*
 
         --reflog
                 Include all reachable objects mentioned by reflogs.
+
+        -g, --walk-reflogs
+                Walk reflogs instead of the commit ancestry chain.
 
         --all   Include all refs.
 
@@ -344,7 +381,7 @@ COMMANDS                                        *diffview-commands*
                         current Diffview.
 
                                                 *:DiffviewLog*
-:DiffviewLog            Open the log.
+:DiffviewLog            Open the debug log.
 
 ==============================================================================
 
@@ -1538,6 +1575,9 @@ LogOptions                                      *diffview.git.LogOptions*
 
             {reflog} (boolean)
                 Include all reachable objects mentioned by reflogs.
+
+            {walk_reflogs} (boolean)
+                Walk reflogs instead of the commit ancestry chain.
 
             {all} (boolean)
                 Include all refs.
