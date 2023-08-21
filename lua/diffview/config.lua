@@ -257,6 +257,7 @@ M._config = M.defaults
 ---@field first_parent boolean
 ---@field show_pulls boolean
 ---@field reflog boolean
+---@field walk_reflogs boolean
 ---@field all boolean
 ---@field merges boolean
 ---@field no_merges boolean
@@ -299,6 +300,7 @@ M.log_option_defaults = {
     first_parent = false,
     show_pulls = false,
     reflog = false,
+    walk_reflogs = false,
     all = false,
     merges = false,
     no_merges = false,

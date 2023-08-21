@@ -81,6 +81,17 @@ from the PR branch.
 
 ![file history cherry pick demo](https://user-images.githubusercontent.com/2786478/229853402-f45280ee-f6e2-4325-8a39-ce25b9c5221e.png)
 
+## Inspecting Diffs for Stashes
+
+The latest Git stash is always stored in the reference `refs/stash`. We can
+find all the stashes by traversing the reflog for this reference. This can be
+achieved with the flag option `--walk-reflogs` (or it's short form `-g`). The
+following command will list all stashes in the file history panel:
+
+```vim
+:DiffviewFileHistory -g --range=stash
+```
+
 ## Committing
 
 Creating commits from within nvim is a solved problem, and as such diffview.nvim

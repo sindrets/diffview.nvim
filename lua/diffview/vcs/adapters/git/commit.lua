@@ -9,10 +9,13 @@ local M = {}
 
 
 ---@class GitCommit : Commit
+---@field reflog_selector? string
 local GitCommit = oop.create_class("GitCommit", Commit.__get())
 
 function GitCommit:init(opt)
   self:super(opt)
+
+  self.reflog_selector = opt.reflog_selector ~= "" and opt.reflog_selector or nil
 
   if opt.time_offset then
     self.time_offset = Commit.parse_time_offset(opt.time_offset)
