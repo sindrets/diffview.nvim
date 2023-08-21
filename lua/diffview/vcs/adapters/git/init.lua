@@ -1543,6 +1543,10 @@ GitAdapter.file_restore = async.wrap(function(self, path, kind, commit, callback
       utils.vec_join("checkout", commit or (kind == "staged" and "HEAD" or nil), "--", path),
       self.ctx.toplevel
     )
+
+    await(async.scheduler())
+    local bn = utils.find_file_buffer(abs_path)
+    if bn then vim.cmd(fmt("checktime %d", bn)) end
   end
 
   callback(true, undo)

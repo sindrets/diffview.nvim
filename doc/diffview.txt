@@ -1141,7 +1141,7 @@ restore_entry                                   *diffview-actions-restore_entry*
             entry's commit.
 
         NOTE: A command is echoed that shows how to undo the change. Check
-        |:messages| to see it again.
+        |:messages| or |:DiffviewLog| to see it again.
 
 scroll_view({distance})                         *diffview-actions-scroll_view*
         Contexts: `panel`
@@ -1375,7 +1375,8 @@ X                       Revert the selected file entry to the state from the
                         left side of the diff. This only works if the right
                         side of the diff is showing the local state of the
                         file. A command is echoed that shows how to undo the
-                        change. Check |:messages| to see it again.
+                        change. Check |:messages| or |:DiffviewLog| to see it
+                        again.
 
                                                 *diffview-maps-refresh_files*
 R                       Update the stats and entries in the file list.

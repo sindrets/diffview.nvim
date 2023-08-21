@@ -9,6 +9,7 @@ local utils = require("diffview.utils")
 local api = vim.api
 local await = async.await
 local fmt = string.format
+local logger = DiffviewGlobal.logger
 
 local M = {}
 
@@ -160,7 +161,10 @@ M.restore_file = async.void(function(adapter, path, kind, commit)
   end
 
   local rev_name = (commit and commit:sub(1, 11)) or (kind == "staged" and "HEAD" or "index")
-  utils.info(fmt("File restored from %s. %s", rev_name, undo and "Undo with " .. undo), true)
+  local msg = fmt("File restored from %s. %s", rev_name, undo and ("Undo with " .. undo) or "")
+
+  logger:info(msg)
+  utils.info(msg, true)
 end)
 
 --[[
