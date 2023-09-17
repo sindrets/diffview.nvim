@@ -1344,13 +1344,19 @@ function GitAdapter:symmetric_diff_revs(rev_arg)
     ))
   end
 
-  out, code, stderr = self:exec_sync({ "merge-base", r1, r2 }, self.ctx.toplevel)
+  out, code, stderr = self:exec_sync(
+    { "merge-base", r1, r2 },
+    { cwd = self.ctx.toplevel, fail_on_empty = true, retry = 2 }
+  )
   if code ~= 0 then
     return err()
   end
   local left_hash = out[1]:gsub("^%^", "")
 
-  out, code, stderr = self:exec_sync({ "rev-parse", "--revs-only", r2 }, self.ctx.toplevel)
+  out, code, stderr = self:exec_sync(
+    { "rev-parse", "--revs-only", r2 },
+    { cwd = self.ctx.toplevel, fail_on_empty = true, retry = 2 }
+  )
   if code ~= 0 then
     return err()
   end
@@ -1407,7 +1413,8 @@ function GitAdapter:parse_revs(rev_arg, opt)
     end
   else
     local rev_strings, code, stderr = self:exec_sync(
-      { "rev-parse", "--revs-only", rev_arg }, self.ctx.toplevel
+      { "rev-parse", "--revs-only", rev_arg },
+      { cwd = self.ctx.toplevel, fail_on_empty = true, retry = 2 }
     )
     if code ~= 0 then
       utils.err(utils.vec_join(
