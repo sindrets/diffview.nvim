@@ -567,6 +567,8 @@ function GitAdapter:stream_fh_data(state)
       "-P",
       "-c",
       "gc.auto=0",
+      "-c",
+      "core.quotePath=false",
       "log",
       "--pretty=format:%x00%n" .. GitAdapter.COMMIT_PRETTY_FMT,
       "--numstat",
@@ -644,6 +646,8 @@ function GitAdapter:stream_line_trace_data(state)
       "-P",
       "-c",
       "gc.auto=0",
+      "-c",
+      "core.quotePath=false",
       "log",
       "--color=never",
       "--no-ext-diff",
@@ -1026,6 +1030,8 @@ GitAdapter.fh_retry_commit = async.wrap(function(self, rev_arg, state, opt, call
       "-P",
       "-c",
       "gc.auto=0",
+      "-c",
+      "core.quotePath=false",
       "show",
       "--pretty=format:" .. GitAdapter.COMMIT_PRETTY_FMT,
       "--numstat",
@@ -1124,21 +1130,33 @@ function GitAdapter:parse_fh_data(data, commit, state)
   for i = 1, #data.numstat do
     local status, name, oldname
 
-    local namestat_fields = utils.str_split(data.namestat[i])
-    local num_parents = #namestat_fields[1]:match("^(:+)")
+    local line = data.namestat[i]
+    local num_parents = #(line:match("^(:+)"))
     local offset = (num_parents + 1) * 2 + 1
-    status = namestat_fields[offset]:match("^%a%a?")
+    local namestat_fields
 
-    if num_parents == 1 and namestat_fields[offset + 2] then
+    local j = 1
+    for idx in line:gmatch("%s+()") do
+      ---@cast idx integer
+      j = j + 1
+      if j == offset then
+        namestat_fields = utils.str_split(line:sub(idx), "\t")
+        break
+      end
+    end
+
+    status = namestat_fields[1]:match("^%a%a?")
+
+    if num_parents == 1 and namestat_fields[3] then
       -- Rename
-      oldname = namestat_fields[offset + 1]
-      name = namestat_fields[offset + 2]
+      oldname = namestat_fields[2]
+      name = namestat_fields[3]
 
       if state.single_file then
         state.old_path = oldname
       end
     else
-      name = namestat_fields[offset + 1]
+      name = namestat_fields[2]
     end
 
     local stats = {
@@ -1655,13 +1673,29 @@ GitAdapter.tracked_files = async.wrap(function(self, left, right, args, kind, op
 
   local namestat_job = Job({
     command = self:bin(),
-    args = utils.vec_join(self:args(), "diff", "--ignore-submodules", "--name-status", args),
+    args = utils.vec_join(
+      self:args(),
+      "-c",
+      "core.quotePath=false",
+      "diff",
+      "--ignore-submodules",
+      "--name-status",
+      args
+    ),
     cwd = self.ctx.toplevel,
     log_opt = log_opt,
   })
   local numstat_job = Job({
     command = self:bin(),
-    args = utils.vec_join(self:args(), "diff", "--ignore-submodules", "--numstat", args),
+    args = utils.vec_join(
+      self:args(),
+      "-c",
+      "core.quotePath=false",
+      "diff",
+      "--ignore-submodules",
+      "--numstat",
+      args
+    ),
     cwd = self.ctx.toplevel,
     log_opt = log_opt,
   })
@@ -1769,7 +1803,14 @@ end)
 GitAdapter.untracked_files = async.wrap(function(self, left, right, opt, callback)
   local job = Job({
     command = self:bin(),
-    args = utils.vec_join(self:args(), "ls-files", "--others", "--exclude-standard"),
+    args = utils.vec_join(
+      self:args(),
+      "-c",
+      "core.quotePath=false",
+      "ls-files",
+      "--others",
+      "--exclude-standard"
+    ),
     cwd = self.ctx.toplevel,
     log_opt = { label = "GitAdapter:untracked_files()", }
   })
