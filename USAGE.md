@@ -204,6 +204,40 @@ keymaps = {
 }
 ```
 
+### Use `vim.ui.input`
+
+This will popup a simple input box for your to enter the commit msg and commit
+
+```lua
+keymaps = {
+          file_panel = {
+            {
+              "n", "c",
+              function()
+                vim.ui.input({ prompt = "Commit msg: " }, function(msg)
+                  local Job = require("plenary.job")
+                  local stderr = {}
+                  Job:new({
+                    command = "git",
+                    args = { "commit", "-m", msg },
+                    cwd = ".",
+                    on_stderr = function(_, data)
+                      table.insert(stderr, data)
+                    end,
+                  }):sync()
+                  if #stderr == 0 then
+                    vim.api.nvim_command("tabclose")
+                  else
+                    vim.print(stderr[1])
+                  end
+                end)
+              end,
+              { desc = "git commit" },
+            },
+          },
+        }
+```
+
 ### Use `:!cmd`
 
 If you only ever write simple commit messages you could make use of `:h !cmd`:
