@@ -208,6 +208,9 @@ keymaps = {
 
 This will popup a simple input box for your to enter the commit msg and commit
 
+![show](https://github.com/LintaoAmons/diffview.nvim/assets/95092244/db0d2ed5-7f9c-436a-b627-0e8cc34ba48b)
+
+
 ```lua
 keymaps = {
           file_panel = {
