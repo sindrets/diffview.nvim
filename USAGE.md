@@ -204,42 +204,77 @@ keymaps = {
 }
 ```
 
-### Use `vim.ui.input`
+### Use `vim.ui.input()`
 
-This will popup a simple input box for your to enter the commit msg and commit
+This example shows how to use the Neovim builtin `vim.ui.input()` to create a
+simple input prompt, and create a new commit with the user's given message.
 
-![show](https://github.com/LintaoAmons/diffview.nvim/assets/95092244/db0d2ed5-7f9c-436a-b627-0e8cc34ba48b)
+![vim.ui.input() demo](https://user-images.githubusercontent.com/2786478/274230878-661a30d5-cc1d-4a34-b196-c4adf9e9f8c5.gif)
 
+For Neovim ≥ v0.10:
 
 ```lua
 keymaps = {
-          file_panel = {
-            {
-              "n", "c",
-              function()
-                vim.ui.input({ prompt = "Commit msg: " }, function(msg)
-                  local Job = require("plenary.job")
-                  local stderr = {}
-                  Job:new({
-                    command = "git",
-                    args = { "commit", "-m", msg },
-                    cwd = ".",
-                    on_stderr = function(_, data)
-                      table.insert(stderr, data)
-                    end,
-                  }):sync()
-                  if #stderr == 0 then
-                    vim.api.nvim_command("tabclose")
-                  else
-                    vim.print(stderr[1])
-                  end
-                end)
-              end,
-              { desc = "git commit" },
-            },
-          },
-        }
+  file_panel = {
+    {
+      "n", "cc",
+      function()
+        vim.ui.input({ prompt = "Commit message: " }, function(msg)
+          if not msg then return end
+          local results = vim.system({ "git", "commit", "-m", msg }, { text = true }):wait()
+
+          if results.code ~= 0 then
+            vim.notify(
+              "Commit failed with the message: \n"
+                .. vim.trim(results.stdout .. "\n" .. results.stderr),
+              vim.log.levels.ERROR,
+              { title = "Commit" }
+            )
+          else
+            vim.notify(results.stdout, vim.log.levels.INFO, { title = "Commit" })
+          end
+        end)
+      end,
+    },
+  },
+}
 ```
+
+<details>
+  <summary><b>For Neovim ≤ v0.10, use this function in place of <code>vim.system()</code></b></summary>
+
+```lua
+--- @class system.Results
+--- @field code integer
+--- @field stdout string
+--- @field stderr string
+
+--- @param cmd string|string[]
+--- @return system.Results
+local function system(cmd)
+  local results = {}
+
+  local function callback(_, data, event)
+    if event == "exit" then results.code = data
+    elseif event == "stdout" or event == "stderr" then
+      results[event] = table.concat(data, "\n")
+    end
+  end
+
+  vim.fn.jobwait({
+    vim.fn.jobstart(cmd, {
+      on_exit = callback,
+      on_stdout = callback,
+      on_stderr = callback,
+      stdout_buffered = true,
+      stderr_buffered = true,
+    })
+  })
+
+  return results
+end
+```
+</details>
 
 ### Use `:!cmd`
 
