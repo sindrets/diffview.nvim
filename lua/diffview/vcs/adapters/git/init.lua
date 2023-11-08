@@ -1487,6 +1487,8 @@ function GitAdapter:rev_to_args(left, right)
     return {}
   elseif left.type == RevType.COMMIT and right.type == RevType.STAGE then
     return { "--cached", left.commit }
+  elseif left.type == RevType.LOCAL and right.type == RevType.COMMIT then
+    return { ".." .. right.commit }
   else
     return { left.commit }
   end
