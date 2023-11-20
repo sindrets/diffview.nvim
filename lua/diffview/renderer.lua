@@ -508,6 +508,10 @@ function M.render(bufid, data)
     hl_data = { data.hl }
   end
 
+  if #lines > 0 and lines[#lines] == '' then
+    table.remove(lines)
+  end
+
   api.nvim_buf_set_lines(bufid, 0, -1, false, lines)
   api.nvim_buf_clear_namespace(bufid, data.namespace, 0, -1)
   for _, t in ipairs(hl_data) do
