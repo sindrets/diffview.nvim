@@ -1478,18 +1478,33 @@ end
 function GitAdapter:rev_to_args(left, right)
   assert(
     not (left.type == RevType.LOCAL and right.type == RevType.LOCAL),
-    "Can't diff LOCAL against LOCAL!"
+    "InvalidArgument :: Can't diff LOCAL against LOCAL!"
   )
 
   if left.type == RevType.COMMIT and right.type == RevType.COMMIT then
     return { left.commit .. ".." .. right.commit }
-  elseif left.type == RevType.STAGE and right.type == RevType.LOCAL then
-    return {}
+
   elseif left.type == RevType.COMMIT and right.type == RevType.STAGE then
     return { "--cached", left.commit }
-  else
-    return { left.commit }
+
+  elseif right.type == RevType.LOCAL then
+    if left.type == RevType.STAGE then
+      return {}
+    elseif left.type == RevType.COMMIT then
+      return { left.commit }
+    end
+
+  elseif left.type == RevType.LOCAL then
+    -- WARN: these require special handling when creating the diff file list.
+    -- I.e. the stats for 'additions' and 'deletions' need to be swapped.
+    if right.type == RevType.STAGE then
+      return { "--cached" }
+    elseif right.type == RevType.COMMIT then
+      return { right.commit }
+    end
   end
+
+  error(fmt("InvalidArgument :: Unsupported rev range: '%s..%s'!", left, right))
 end
 
 
@@ -1790,7 +1805,7 @@ GitAdapter.tracked_files = async.wrap(function(self, left, right, args, kind, op
   end
 
   for _, v in ipairs(data) do
-    table.insert(files, FileEntry.with_layout(opt.default_layout, {
+    local file = FileEntry.with_layout(opt.default_layout, {
       adapter = self,
       path = v.name,
       oldpath = v.oldname,
@@ -1801,7 +1816,17 @@ GitAdapter.tracked_files = async.wrap(function(self, left, right, args, kind, op
         a = left,
         b = right,
       }
-    }))
+    })
+
+    if left and left.type == RevType.LOCAL then
+      -- Special handling is required here. The rev range `LOCAL..{REV}` can't be
+      -- expressed in Git's rev syntax, but logically it should be the same as
+      -- just `{REV}`, but with the diff stats swapped (as we want the diff from
+      -- the perspective of LOCAL).
+      file.stats.additions, file.stats.deletions = file.stats.deletions, file.stats.additions
+    end
+
+    table.insert(files, file)
   end
 
   callback(nil, files, conflicts)
