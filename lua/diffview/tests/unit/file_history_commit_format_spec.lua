@@ -1,4 +1,5 @@
 local helpers = require("diffview.tests.helpers")
+local config = require("diffview.config")
 
 local eq, neq = helpers.eq, helpers.neq
 local formatters = require("diffview.scene.views.file_history.render").commit_formatters
@@ -146,6 +147,41 @@ describe("diffview.scenes.views.file_history.render.formatters", function()
     formatters.date(comp, { commit = { time = time, iso_date = iso } }, {})
     comp:ln()
     eq(" " .. iso, comp.lines[1])
+
+    comp:destroy()
+  end)
+
+  it("default config format", function()
+    --- @type RenderComponent
+    local comp = renderer.RenderComponent.create_static_component(nil)
+    local c = config.get_config()
+    local time = os.time({ year = 2023, month = 1, day = 1 })
+    local iso = os.date("%FT%TZ", time)
+    local entry = {
+      stats = { additions = 121, deletions = 101 },
+      status = "M",
+      commit = {
+        time = time,
+        iso_date = iso,
+        hash = "ba89b7310101",
+        subject = "fix #1",
+        author = "Dale Cooper",
+      },
+    }
+
+    local params = {
+      panel = { cur_item = { nil } },
+      max_num_files = 1,
+      max_len_stats = 7,
+    }
+
+    for _, f in ipairs(c.file_history_panel.commit_format) do
+      formatters[f](comp, entry, params)
+    end
+
+    comp:ln()
+    local expected = string.format("M | 121 101 | ba89b731 fix #1 Dale Cooper %s", iso)
+    eq(expected, table.concat(comp.lines, " "))
 
     comp:destroy()
   end)
