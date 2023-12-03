@@ -481,9 +481,9 @@ function M.extend_keymaps(...)
   end
 
   local merged = vim.tbl_extend("force", unpack(
-      vim.tbl_map(function(v)
-        return v.expanded
-      end, contexts)
+    vim.tbl_map(function(v)
+      return v.expanded
+    end, contexts)
   ))
 
   return vim.tbl_values(merged)
@@ -518,7 +518,7 @@ function M.setup(user_config)
         if not notified then
           utils.warn(
             ("'%s.{%s}' has been deprecated. See ':h diffview.changelog-136'.")
-            :format( panel_name, fmt_enum(old_win_config_spec, true))
+            :format(panel_name, fmt_enum(old_win_config_spec, true))
           )
           notified = true
         end
@@ -543,7 +543,7 @@ function M.setup(user_config)
     }
     for _, name in ipairs(top_options) do
       if user_log_options[name] ~= nil then
-        utils.warn( "Global config of 'file_panel.log_options' has been deprecated. See ':h diffview.changelog-271'.")
+        utils.warn("Global config of 'file_panel.log_options' has been deprecated. See ':h diffview.changelog-271'.")
       end
       break
     end
@@ -560,7 +560,7 @@ function M.setup(user_config)
       if user_log_options[name] ~= nil then
         utils.warn(
           ("'file_history_panel.log_options.{%s}' has been deprecated. See ':h diffview.changelog-151'.")
-          :format( fmt_enum(option_names, true))
+          :format(fmt_enum(option_names, true))
         )
         break
       end
@@ -593,7 +593,7 @@ function M.setup(user_config)
 
     for _, kind in ipairs(vim.tbl_keys(valid_layouts)) do
       if not vim.tbl_contains(valid_layouts[kind], view[kind].layout) then
-        utils.err( ("Invalid layout name '%s' for 'view.%s'! Must be one of (%s)."):format(
+        utils.err(("Invalid layout name '%s' for 'view.%s'! Must be one of (%s)."):format(
           view[kind].layout,
           kind,
           fmt_enum(valid_layouts[kind])
@@ -612,8 +612,8 @@ function M.setup(user_config)
         t[name]
       )
       for k, _ in pairs(t[name]) do
-        if t[name][k] == ""
-          then t[name][k] = nil
+        if t[name][k] == "" then
+          t[name][k] = nil
         end
       end
     end
@@ -621,7 +621,7 @@ function M.setup(user_config)
 
   for event, callback in pairs(M._config.hooks) do
     if type(callback) == "function" then
-      M.user_emitter:on(event, function(_, ...)
+      M.user_emitter:on(event, function (_, ...)
         callback(...)
       end)
     end

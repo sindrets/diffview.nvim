@@ -166,7 +166,9 @@ local function render_entries(panel, parent, entries, updating)
       local dels = tostring(entry.stats.deletions)
       local l = 7
       local w = l - (#adds + #dels)
-      if w < 1 then l = (#adds + #dels) - ((#adds + #dels) % 2) + 2 end
+      if w < 1 then
+        l = (#adds + #dels) - ((#adds + #dels) % 2) + 2
+      end
       max_len_stats = l > max_len_stats and l or max_len_stats
     end
   end
@@ -210,7 +212,7 @@ local function prepare_panel_cache(panel)
         pl:vim_fnamemodify(panel.adapter.ctx.toplevel, ":~"),
         panel:infer_width() - 6
       )
-      or pl:vim_fnamemodify(panel.adapter.ctx.toplevel, ":~")
+    or pl:vim_fnamemodify(panel.adapter.ctx.toplevel, ":~")
   c.args = table.concat(panel.log_options.single_file.path_args, " ")
 end
 
