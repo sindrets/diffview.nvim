@@ -344,7 +344,9 @@ M.log_option_defaults = {
 
 ---@return DiffviewConfig
 function M.get_config()
-  if not setup_done then M.setup() end
+  if not setup_done then
+    M.setup()
+  end
 
   return M._config
 end
@@ -366,7 +368,9 @@ function M.get_log_options(single_file, t, vcs)
     log_options = vim.tbl_extend("force", log_options, t)
 
     for k, _ in pairs(log_options) do
-      if t[k] == "" then log_options[k] = nil end
+      if t[k] == "" then
+        log_options[k] = nil
+      end
     end
   end
 
@@ -415,7 +419,9 @@ end
 
 function M.find_option_keymap(t)
   for _, mapping in ipairs(t) do
-    if mapping[3] and mapping[3] == actions.options then return mapping end
+    if mapping[3] and mapping[3] == actions.options then
+      return mapping
+    end
   end
 end
 
@@ -431,13 +437,9 @@ end
 ---@param no_quote? boolean
 ---@return string
 local function fmt_enum(values, no_quote)
-  return table.concat(
-    vim.tbl_map(
-      function(v) return (not no_quote and type(v) == "string") and ("'" .. v .. "'") or v end,
-      values
-    ),
-    "|"
-  )
+  return table.concat(vim.tbl_map(function(v)
+    return (not no_quote and type(v) == "string") and ("'" .. v .. "'") or v
+  end, values), "|")
 end
 
 ---@param ... table
@@ -449,7 +451,9 @@ function M.extend_keymaps(...)
 
   for i = 1, argc do
     local cur = argv[i]
-    if type(cur) == "table" then contexts[#contexts + 1] = { subject = cur, expanded = {} } end
+    if type(cur) == "table" then
+      contexts[#contexts + 1] = { subject = cur, expanded = {} }
+    end
   end
 
   for _, ctx in ipairs(contexts) do
@@ -467,13 +471,20 @@ function M.extend_keymaps(...)
 
     for _, map in ipairs(ctx.subject) do
       for _, mode in ipairs(type(map[1]) == "table" and map[1] or { map[1] }) do
-        ctx.expanded[mode .. " " .. map[2]] = utils.vec_join(mode, map[2], utils.vec_slice(map, 3))
+        ctx.expanded[mode .. " " .. map[2]] = utils.vec_join(
+          mode,
+          map[2],
+          utils.vec_slice(map, 3)
+        )
       end
     end
   end
 
-  local merged =
-    vim.tbl_extend("force", unpack(vim.tbl_map(function(v) return v.expanded end, contexts)))
+  local merged = vim.tbl_extend("force", unpack(
+      vim.tbl_map(function(v)
+        return v.expanded
+      end, contexts)
+  ))
 
   return vim.tbl_values(merged)
 end
@@ -481,7 +492,11 @@ end
 function M.setup(user_config)
   user_config = user_config or {}
 
-  M._config = vim.tbl_deep_extend("force", utils.tbl_deep_clone(M.defaults), user_config)
+  M._config = vim.tbl_deep_extend(
+    "force",
+    utils.tbl_deep_clone(M.defaults),
+    user_config
+  )
   ---@type EventEmitter
   M.user_emitter = EventEmitter()
 
@@ -502,10 +517,8 @@ function M.setup(user_config)
       if panel_config[option] ~= nil then
         if not notified then
           utils.warn(
-            ("'%s.{%s}' has been deprecated. See ':h diffview.changelog-136'."):format(
-              panel_name,
-              fmt_enum(old_win_config_spec, true)
-            )
+            ("'%s.{%s}' has been deprecated. See ':h diffview.changelog-136'.")
+            :format( panel_name, fmt_enum(old_win_config_spec, true))
           )
           notified = true
         end
@@ -530,9 +543,7 @@ function M.setup(user_config)
     }
     for _, name in ipairs(top_options) do
       if user_log_options[name] ~= nil then
-        utils.warn(
-          "Global config of 'file_panel.log_options' has been deprecated. See ':h diffview.changelog-271'."
-        )
+        utils.warn( "Global config of 'file_panel.log_options' has been deprecated. See ':h diffview.changelog-271'.")
       end
       break
     end
@@ -548,9 +559,8 @@ function M.setup(user_config)
     for _, name in ipairs(option_names) do
       if user_log_options[name] ~= nil then
         utils.warn(
-          ("'file_history_panel.log_options.{%s}' has been deprecated. See ':h diffview.changelog-151'."):format(
-            fmt_enum(option_names, true)
-          )
+          ("'file_history_panel.log_options.{%s}' has been deprecated. See ':h diffview.changelog-151'.")
+          :format( fmt_enum(option_names, true))
         )
         break
       end
@@ -559,7 +569,9 @@ function M.setup(user_config)
 
   --#endregion
 
-  if #M._config.git_cmd == 0 then M._config.git_cmd = M.defaults.git_cmd end
+  if #M._config.git_cmd == 0 then
+    M._config.git_cmd = M.defaults.git_cmd
+  end
 
   do
     -- Validate layouts
@@ -571,7 +583,7 @@ function M.setup(user_config)
       "diff3_vertical",
       "diff3_mixed",
       "diff4_mixed",
-      -1,
+      -1
     }
     local valid_layouts = {
       default = standard_layouts,
@@ -581,13 +593,11 @@ function M.setup(user_config)
 
     for _, kind in ipairs(vim.tbl_keys(valid_layouts)) do
       if not vim.tbl_contains(valid_layouts[kind], view[kind].layout) then
-        utils.err(
-          ("Invalid layout name '%s' for 'view.%s'! Must be one of (%s)."):format(
-            view[kind].layout,
-            kind,
-            fmt_enum(valid_layouts[kind])
-          )
-        )
+        utils.err( ("Invalid layout name '%s' for 'view.%s'! Must be one of (%s)."):format(
+          view[kind].layout,
+          kind,
+          fmt_enum(valid_layouts[kind])
+        ))
         view[kind].layout = M.defaults.view[kind].layout
       end
     end
@@ -596,16 +606,24 @@ function M.setup(user_config)
   for _, name in ipairs({ "single_file", "multi_file" }) do
     for _, vcs in ipairs({ "git", "hg" }) do
       local t = M._config.file_history_panel.log_options[vcs]
-      t[name] = vim.tbl_extend("force", M.log_option_defaults[vcs], t[name])
+      t[name] = vim.tbl_extend(
+        "force",
+        M.log_option_defaults[vcs],
+        t[name]
+      )
       for k, _ in pairs(t[name]) do
-        if t[name][k] == "" then t[name][k] = nil end
+        if t[name][k] == ""
+          then t[name][k] = nil
+        end
       end
     end
   end
 
   for event, callback in pairs(M._config.hooks) do
     if type(callback) == "function" then
-      M.user_emitter:on(event, function(_, ...) callback(...) end)
+      M.user_emitter:on(event, function(_, ...)
+        callback(...)
+      end)
     end
   end
 
@@ -622,8 +640,10 @@ function M.setup(user_config)
   -- Merge default and user keymaps
   for name, keymap in pairs(M._config.keymaps) do
     if type(name) == "string" and type(keymap) == "table" then
-      M._config.keymaps[name] =
-        M.extend_keymaps(keymap, utils.tbl_access(user_config, { "keymaps", name }) or {})
+      M._config.keymaps[name] = M.extend_keymaps(
+        keymap,
+        utils.tbl_access(user_config, { "keymaps", name }) or {}
+      )
     end
   end
 
@@ -632,7 +652,9 @@ function M.setup(user_config)
     if type(name) == "string" and type(keymaps) == "table" then
       for i = #keymaps, 1, -1 do
         local v = keymaps[i]
-        if type(v) == "table" and not v[3] then table.remove(keymaps, i) end
+        if type(v) == "table" and not v[3] then
+          table.remove(keymaps, i)
+        end
       end
     end
   end
