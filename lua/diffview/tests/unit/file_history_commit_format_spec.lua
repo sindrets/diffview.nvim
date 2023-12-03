@@ -148,7 +148,19 @@ describe("diffview.scenes.views.file_history.render.formatters", function()
     comp:ln()
     eq(" " .. iso, comp.lines[1])
 
+    comp:clear()
+    local tmp_diff_time = os.difftime
+    os.difftime = function()
+      return 1
+    end
+
+    formatters.date(comp, { commit = { time = time, iso_date = iso, rel_date = '1 day' } }, {})
+    comp:ln()
+    eq(" 1 day", comp.lines[1])
+
     comp:destroy()
+
+    os.difftime = tmp_diff_time
   end)
 
   it("default config format", function()
