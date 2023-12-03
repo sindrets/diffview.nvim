@@ -21,7 +21,7 @@ DEFAULT CONFIG                                  *diffview.defaults*
     },
     view = {
       -- Configure the layout and behavior of different types of views.
-      -- Available layouts: 
+      -- Available layouts:
       --  'diff1_plain'
       --    |'diff2_horizontal'
       --    |'diff2_vertical'
@@ -73,6 +73,16 @@ DEFAULT CONFIG                                  *diffview.defaults*
           single_file = {},
           multi_file = {},
         },
+      },
+      commit_format = {
+        'status',
+        'stats',
+        'hash',
+        'reflog',
+        'ref',
+        'subject',
+        'author',
+        'date',
       },
       win_config = {    -- See |diffview-config-win_config|
         position = "bottom",

@@ -10,6 +10,103 @@ local pl = utils.path
 
 local cache = setmetatable({}, { __mode = "k" })
 
+local formatters = {
+  ---@type fun(comp:RenderComponent, entry:LogEntry, params:table)
+  status = function(comp, entry, _)
+    if entry.status then
+      comp:add_text(entry.status, hl.get_git_hl(entry.status))
+    else
+      comp:add_text("-", "DiffviewNonText")
+    end
+  end,
+
+  ---@type fun(comp:RenderComponent, entry:LogEntry, params:table)
+  files = function(comp, entry, params)
+    if entry.single_file then return end
+
+    local s_num_files = tostring(params.max_num_files)
+
+    if entry.nulled then
+      comp:add_text(utils.str_center_pad("empty", #s_num_files + 7), "DiffviewFilePanelCounter")
+    else
+      comp:add_text(
+        fmt(
+          " %s file%s",
+          utils.str_left_pad(tostring(#entry.files), #s_num_files),
+          #entry.files > 1 and "s" or " "
+        ),
+        "DiffviewFilePanelCounter"
+      )
+    end
+  end,
+
+  ---@type fun(comp:RenderComponent, entry:LogEntry, params:table)
+  hash = function(comp, entry, _)
+    if entry.commit.hash then comp:add_text(" " .. entry.commit.hash:sub(1, 8), "DiffviewHash") end
+  end,
+
+  ---@type fun(comp:RenderComponent, entry:LogEntry, params:table)
+  stats = function(comp, entry, params)
+    if params.max_len_stats == -1 then return end
+
+    local adds = { "-", "DiffviewNonText" }
+    local dels = { "-", "DiffviewNonText" }
+
+    if entry.stats and entry.stats.additions then
+      adds = { tostring(entry.stats.additions), "DiffviewFilePanelInsertions" }
+    end
+
+    if entry.stats and entry.stats.deletions then
+      dels = { tostring(entry.stats.deletions), "DiffviewFilePanelDeletions" }
+    end
+
+    comp:add_text(" | ", "DiffviewNonText")
+    comp:add_text(unpack(adds))
+    comp:add_text(string.rep(" ", params.max_len_stats - (#adds[1] + #dels[1])))
+    comp:add_text(unpack(dels))
+    comp:add_text(" |", "DiffviewNonText")
+  end,
+
+  ---@type fun(comp:RenderComponent, entry:LogEntry, params:table)
+  reflog = function(comp, entry, _)
+    local reflog_selector = (entry.commit --[[@as GitCommit ]]).reflog_selector
+    if reflog_selector then
+      comp:add_text((" %s"):format(reflog_selector), "DiffviewReflogSelector")
+    end
+  end,
+
+  ---@type fun(comp:RenderComponent, entry:LogEntry, params:table)
+  ref = function(comp, entry, _)
+    if entry.commit.ref_names then
+      comp:add_text((" (%s)"):format(entry.commit.ref_names), "DiffviewReference")
+    end
+  end,
+
+  ---@type fun(comp:RenderComponent, entry:LogEntry, params:table)
+  subject = function(comp, entry, params)
+    local subject = utils.str_trunc(entry.commit.subject, 72)
+    if subject == "" then subject = "[empty message]" end
+    comp:add_text(
+      " " .. subject,
+      params.panel.cur_item[1] == entry and "DiffviewFilePanelSelected"
+      or "DiffviewFilePanelFileName"
+    )
+  end,
+
+  ---@type fun(comp:RenderComponent, entry:LogEntry, params:table)
+  author = function(comp, entry, _) comp:add_text(" " .. entry.commit.author) end,
+
+  ---@type fun(comp:RenderComponent, entry:LogEntry, params:table)
+  date = function(comp, entry, _)
+    -- 3 months
+    local date = (
+      os.difftime(os.time(), entry.commit.time) > 60 * 60 * 24 * 30 * 3 and entry.commit.iso_date
+      or entry.commit.rel_date
+    )
+    comp:add_text(" " .. date, "DiffviewFilePanelPath")
+  end,
+}
+
 ---@param comp RenderComponent
 ---@param files FileEntry[]
 local function render_files(comp, files)
@@ -88,79 +185,13 @@ local function render_entries(panel, parent, entries, updating)
       comp:add_text((entry.folded and c.signs.fold_closed or c.signs.fold_open) .. " ", "CursorLineNr")
     end
 
-    if entry.status then
-      comp:add_text(entry.status, hl.get_git_hl(entry.status))
-    else
-      comp:add_text("-", "DiffviewNonText")
-    end
-
-    if not entry.single_file then
-      local s_num_files = tostring(max_num_files)
-
-      if entry.nulled then
-        comp:add_text(utils.str_center_pad("empty", #s_num_files + 7), "DiffviewFilePanelCounter")
+    for format in c.file_history_panel.commit_format do
+      local fn = formatters[format]
+      if fn then
+        fn(comp, entry, { max_len_stats, max_num_files, panel })
       else
-        comp:add_text(
-          fmt(
-            " %s file%s",
-            utils.str_left_pad(tostring(#entry.files), #s_num_files),
-            #entry.files > 1 and "s" or " "
-          ),
-          "DiffviewFilePanelCounter"
-        )
+        logger:warn("[format] Unsopported commit format: " .. format)
       end
-    end
-
-    if max_len_stats ~= -1 then
-      local adds = { "-", "DiffviewNonText" }
-      local dels = { "-", "DiffviewNonText" }
-
-      if entry.stats and entry.stats.additions then
-        adds = { tostring(entry.stats.additions), "DiffviewFilePanelInsertions" }
-      end
-
-      if entry.stats and entry.stats.deletions then
-        dels = { tostring(entry.stats.deletions), "DiffviewFilePanelDeletions" }
-      end
-
-      comp:add_text(" | ", "DiffviewNonText")
-      comp:add_text(unpack(adds))
-      comp:add_text(string.rep(" ", max_len_stats - (#adds[1] + #dels[1])))
-      comp:add_text(unpack(dels))
-      comp:add_text(" |", "DiffviewNonText")
-    end
-
-    if entry.commit.hash then
-      comp:add_text(" " .. entry.commit.hash:sub(1, 8), "DiffviewHash")
-    end
-
-    if (entry.commit --[[@as GitCommit ]]).reflog_selector then
-      comp:add_text((" %s"):format((entry.commit --[[@as GitCommit ]]).reflog_selector), "DiffviewReflogSelector")
-    end
-
-    if entry.commit.ref_names then
-      comp:add_text((" (%s)"):format(entry.commit.ref_names), "DiffviewReference")
-    end
-
-    local subject = utils.str_trunc(entry.commit.subject, 72)
-
-    if subject == "" then
-      subject = "[empty message]"
-    end
-
-    comp:add_text(
-      " " .. subject,
-      panel.cur_item[1] == entry and "DiffviewFilePanelSelected" or "DiffviewFilePanelFileName"
-    )
-
-    if entry.commit then
-      -- 3 months
-      local date = (
-        os.difftime(os.time(), entry.commit.time) > 60 * 60 * 24 * 30 * 3
-          and entry.commit.iso_date
-          or entry.commit.rel_date
-      )
-      comp:add_text(" " .. entry.commit.author .. ", " .. date, "DiffviewFilePanelPath")
     end
 
     comp:ln()
@@ -186,6 +217,8 @@ local function prepare_panel_cache(panel)
 end
 
 return {
+  commit_formatters = formatters,
+
   ---@param panel FileHistoryPanel
   file_history_panel = function(panel)
     if not panel.render_data then
