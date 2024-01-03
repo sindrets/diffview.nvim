@@ -370,6 +370,9 @@ COMMANDS                                        *diffview-commands*
                                                 *:DiffviewClose*
 :DiffviewClose          Close the active Diffview.
 
+                                                :DiffviewToggle
+:DiffviewToggle         Toggles the Diffview open/close.
+
                                                 *:DiffviewToggleFiles*
 :DiffviewToggleFiles    Toggles the file panel.
 

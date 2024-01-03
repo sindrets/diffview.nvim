@@ -5,7 +5,6 @@ for any git rev.
 
 ![preview](https://user-images.githubusercontent.com/2786478/131269942-e34100dd-cbb9-48fe-af31-6e518ce06e9e.png)
 
-
 ## Introduction
 
 Vim's diff mode is pretty good, but there is no convenient way to quickly bring
@@ -31,7 +30,7 @@ Plug 'sindrets/diffview.nvim'
 
 ```lua
 -- Packer
-use "sindrets/diffview.nvim" 
+use "sindrets/diffview.nvim"
 ```
 
 ## Merge Tool
@@ -106,6 +105,8 @@ For information about additional `[options]`, visit the
 Additional commands for convenience:
 
 - `:DiffviewClose`: Close the current diffview. You can also use `:tabclose`.
+- `:DiffviewToggle`: Toggles the diffview open/close. Accepts the same args as
+  `:DiffviewOpen`.
 - `:DiffviewToggleFiles`: Toggle the file panel.
 - `:DiffviewFocusFiles`: Bring focus to the file panel.
 - `:DiffviewRefresh`: Update stats and entries in the file list of the current
@@ -149,7 +150,7 @@ Examples:
 ### Familiarize Yourself With `:h diff-mode`
 
 | :information_source: This plugin assumes you're familiar with all the features already provided by nvim's builtin diff-mode |
-|:-----------------------------------------|
+| :-------------------------------------------------------------------------------------------------------------------------- |
 
 These features include:
 
@@ -480,6 +481,7 @@ currently open in the view rather than the file under the cursor in the file
 panel.
 
 **For more details on how to set mappings for other modes, actions, and more see:**
+
 - `:h diffview-config-keymaps`
 - `:h diffview-actions`
 
