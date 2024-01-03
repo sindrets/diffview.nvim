@@ -157,6 +157,15 @@ function M.close(tabpage)
   end
 end
 
+function M.toggle(args)
+  local view = lib.get_current_view()
+  if view then
+    M.close()
+  else
+    M.open(args)
+  end
+end
+
 function M.completion(_, cmd_line, cur_pos)
   local ctx = arg_parser.scan(cmd_line, { cur_pos = cur_pos, allow_ex_range = true })
   local cmd = ctx.args[1]
@@ -169,21 +178,21 @@ end
 ---Create a temporary adapter to get relevant completions
 ---@return VCSAdapter?
 function M.get_adapter()
-    local cfile = pl:vim_expand("%")
-    local top_indicators = utils.vec_join(
-      vim.bo.buftype == ""
-          and pl:absolute(cfile)
-          or nil,
-      pl:realpath(".")
-    )
+  local cfile = pl:vim_expand("%")
+  local top_indicators = utils.vec_join(
+    vim.bo.buftype == ""
+    and pl:absolute(cfile)
+    or nil,
+    pl:realpath(".")
+  )
 
-    local err, adapter = vcs.get_adapter({ top_indicators = top_indicators })
+  local err, adapter = vcs.get_adapter({ top_indicators = top_indicators })
 
-    if err then
-      logger:warn("[completion] Failed to create adapter: " .. err)
-    end
+  if err then
+    logger:warn("[completion] Failed to create adapter: " .. err)
+  end
 
-    return adapter
+  return adapter
 end
 
 M.completers = {
