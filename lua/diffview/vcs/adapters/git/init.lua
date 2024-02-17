@@ -526,7 +526,9 @@ function GitAdapter:stream_fh_data(state)
 
       data = {}
     else
-      data[#data + 1] = line
+      if data then
+        data[#data + 1] = line
+      end
     end
   end
 
