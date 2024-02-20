@@ -34,6 +34,11 @@ Plug 'sindrets/diffview.nvim'
 use "sindrets/diffview.nvim" 
 ```
 
+```lua
+-- Lazy
+{ "sindrets/diffview.nvim" }
+```
+
 ## Merge Tool
 
 ![merge tool showcase](https://user-images.githubusercontent.com/2786478/188286293-13bbf0ab-3595-425d-ba4a-12f514c17eb6.png)
