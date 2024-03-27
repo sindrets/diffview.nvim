@@ -42,6 +42,7 @@ M.defaults = {
   use_icons = true,
   show_help_hints = true,
   watch_index = true,
+  delete_buffer_on_diff_exit = false,
   icons = {
     folder_closed = "",
     folder_open = "",
