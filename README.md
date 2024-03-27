@@ -188,6 +188,7 @@ require("diffview").setup({
   use_icons = true,         -- Requires nvim-web-devicons
   show_help_hints = true,   -- Show hints for how to open the help panel
   watch_index = true,       -- Update views and index buffers when the git index changes.
+  delete_buffer_on_diff_exit = false, -- Delete file buffers opened by diffview that were not opened
   icons = {                 -- Only applies when use_icons is true.
     folder_closed = "",
     folder_open = "",

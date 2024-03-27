@@ -39,6 +39,9 @@ function FileHistoryView:init(opt)
   self.valid = true
 end
 
+function FileHistoryView:pre_open()
+end
+
 function FileHistoryView:post_open()
   self.commit_log_panel = CommitLogPanel(self.adapter, {
     name = ("diffview://%s/log/%d/%s"):format(self.adapter.ctx.dir, self.tabpage, "commit_log"),

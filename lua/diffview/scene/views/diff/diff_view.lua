@@ -77,6 +77,11 @@ function DiffView:init(opt)
   self.attached_bufs = {}
   self.emitter:on("file_open_post", utils.bind(self.file_open_post, self))
   self.valid = true
+  self.buffers_pre_open = {}
+end
+
+function DiffView:pre_open()
+    self.buffers_pre_open = vim.api.nvim_list_bufs()
 end
 
 function DiffView:post_open()
@@ -170,6 +175,16 @@ end
 
 ---@override
 function DiffView:close()
+  if config.get_config().delete_buffer_on_diff_exit then
+    -- delete buffers that were opened by the view
+    local buffers_pre_close = vim.api.nvim_list_bufs()
+    for _, buf in ipairs(buffers_pre_close) do
+      if not vim.tbl_contains(self.buffers_pre_open, buf) then
+        vim.api.nvim_buf_delete(buf, { force = false})
+      end
+    end
+  end
+  
   if not self.closing:check() then
     self.closing:send()
 
