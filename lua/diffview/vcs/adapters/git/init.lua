@@ -525,7 +525,7 @@ function GitAdapter:stream_fh_data(state)
       end
 
       data = {}
-    else
+    elseif data then
       data[#data + 1] = line
     end
   end
@@ -604,7 +604,7 @@ function GitAdapter:stream_line_trace_data(state)
       end
 
       data = {}
-    else
+    elseif data then
       data[#data + 1] = line
     end
   end
