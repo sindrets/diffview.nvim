@@ -31,16 +31,8 @@ local function render_files(comp, files)
       local icon, icon_hl = hl.get_file_icon(file.basename, file.extension)
       comp:add_text(icon, icon_hl)
 
-      if #file.parent_path > 0 then
-        comp:add_text(file.parent_path .. "/", "DiffviewFilePanelPath")
-      end
-
-      comp:add_text(file.basename, file.active and "DiffviewFilePanelSelected" or "DiffviewFilePanelFileName")
-
       if file.stats then
-        comp:add_text(" " .. file.stats.additions, "DiffviewFilePanelInsertions")
-        comp:add_text(", ")
-        comp:add_text(tostring(file.stats.deletions), "DiffviewFilePanelDeletions")
+        comp:add_text(file.stats.fullstat, "DiffviewFilePanelStats")
       end
     end
 
