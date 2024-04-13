@@ -1906,6 +1906,7 @@ function GitAdapter:is_binary(path, rev)
   local cmd = { "-c", "submodule.recurse=false", "grep", "-I", "--name-only", "-e", "." }
   if rev.type == RevType.LOCAL then
     cmd[#cmd+1] = "--untracked"
+    cmd[#cmd+2] = "--no-exclude-standard"
   elseif rev.type == RevType.STAGE then
     cmd[#cmd+1] = "--cached"
   else
