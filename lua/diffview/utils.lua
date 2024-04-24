@@ -1344,6 +1344,8 @@ function M.merge_sort(t, comparator)
   split_merge(t, 1, #t, comparator)
 end
 
+M.islist = vim.fn.has('nvim-0.10') == 1 and vim.islist or vim.tbl_islist
+
 M.path_sep = path_sep
 
 --- @param t table
