@@ -98,7 +98,7 @@ function GitAdapter.run_bootstrap()
     return err(fmt("Configured `git_cmd` is not executable: '%s'", git_cmd[1]))
   end
 
-  local out = utils.job(vim.tbl_flatten({ git_cmd, "version" }))
+  local out = utils.job(utils.flatten({ git_cmd, "version" }))
   bs.version_string = out[1] and out[1]:match("git version (%S+)") or nil
 
   if not bs.version_string then
@@ -170,7 +170,7 @@ end
 ---@param path string
 ---@return string?
 local function get_toplevel(path)
-  local out, code = utils.job(vim.tbl_flatten({
+  local out, code = utils.job(utils.flatten({
     config.get_config().git_cmd,
     { "rev-parse", "--path-format=absolute", "--show-toplevel" },
   }), path)

@@ -1344,7 +1344,11 @@ function M.merge_sort(t, comparator)
   split_merge(t, 1, #t, comparator)
 end
 
-M.islist = vim.fn.has('nvim-0.10') == 1 and vim.islist or vim.tbl_islist
+M.islist = vim.fn.has("nvim-0.10") == 1 and vim.islist or vim.tbl_islist ---@diagnostic disable-line: deprecated
+
+M.flatten = vim.fn.has("nvim-0.10") == 1 and function(...)
+  return vim.iter(...):flatten():totable()
+end or vim.tbl_flatten ---@diagnostic disable-line: deprecated
 
 M.path_sep = path_sep
 
