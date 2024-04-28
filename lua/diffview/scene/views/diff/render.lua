@@ -169,7 +169,7 @@ return function(panel)
   -- sections.
   if #panel.files.working > 0 or not has_other_files then
     comp = panel.components.working.title.comp
-    comp:add_text("Changes ", "DiffviewFilePanelTitle")
+    comp:add_text("Changes ", "DiffviewFilePanelTitleWorking")
     comp:add_text("(" .. #panel.files.working .. ")", "DiffviewFilePanelCounter")
     comp:ln()
 
@@ -179,7 +179,7 @@ return function(panel)
 
   if #panel.files.staged > 0 then
     comp = panel.components.staged.title.comp
-    comp:add_text("Staged changes ", "DiffviewFilePanelTitle")
+    comp:add_text("Staged changes ", "DiffviewFilePanelTitleStaged")
     comp:add_text("(" .. #panel.files.staged .. ")", "DiffviewFilePanelCounter")
     comp:ln()
 
