@@ -199,7 +199,7 @@ end
 ---@return boolean
 function M.is_buf_in_use(bufnr, ignore)
   local ignore_map = ignore and utils.vec_slice(ignore) or {}
-  vim.tbl_add_reverse_lookup(ignore_map)
+  utils.add_reverse_lookup(ignore_map)
 
   for _, view in ipairs(M.views) do
     if view:instanceof(StandardView.__get()) then

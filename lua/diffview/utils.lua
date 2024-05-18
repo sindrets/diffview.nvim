@@ -1346,4 +1346,11 @@ end
 
 M.path_sep = path_sep
 
+--- @param t table
+--- @return table t
+function M.add_reverse_lookup(t)
+  for k, v in pairs(t) do t[v] = k end
+  return t
+end
+
 return M

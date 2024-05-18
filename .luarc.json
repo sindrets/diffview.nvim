@@ -5,5 +5,8 @@
         "cast-type-mismatch",
         "missing-fields"
     ],
-    "workspace.checkThirdParty": false
+    "workspace.checkThirdParty": false,
+    "workspace.library": [
+      "$VIMRUNTIME",
+    ]
 }
