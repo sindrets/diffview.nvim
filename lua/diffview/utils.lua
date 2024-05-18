@@ -9,6 +9,9 @@ local logger = DiffviewGlobal.logger
 
 local M = {}
 
+-- NOTE: This can be changed to `vim.islist` after Neovim 0.9 support is dropped
+M.islist = vim.fn.has('nvim-0.10') == 1 and vim.islist or vim.tbl_islist
+
 ---@class vector<T> : { [integer]: T }
 ---@alias falsy false|nil
 ---@alias truthy true|number|string|table|function|thread|userdata
@@ -544,6 +547,19 @@ function M.tbl_access(t, table_path)
   end
 
   return cur
+end
+
+---Modify `data` so every key is also a value and every value is also a key.
+---Note: This function both modifies `data` and returns it, for compatibility reasons.
+---@param data table<..., ...> Any data to reverse and append onto itself.
+---@return table<..., ...> # The final modified data.
+---
+function M.tbl_add_reverse_lookup(data)
+  for key, value in pairs(data) do
+    data[value] = key
+  end
+
+  return data
 end
 
 ---Deep extend a table, and also perform a union on all sub-tables.

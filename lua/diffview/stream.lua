@@ -33,7 +33,7 @@ end
 ---@param src table|function
 function Stream:create_src(src)
   if type(src) == "table" then
-    if vim.tbl_islist(src) then
+    if utils.islist(src) then
       local itr = ipairs(src)
 
       return function()

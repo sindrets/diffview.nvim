@@ -1,4 +1,6 @@
 local fmt = string.format
+local lazy = require("diffview.lazy")
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local M = {}
 
@@ -10,7 +12,7 @@ end
 ---@param t T
 ---@return T
 function M.enum(t)
-  vim.tbl_add_reverse_lookup(t)
+  utils.tbl_add_reverse_lookup(t)
   return t
 end
 
