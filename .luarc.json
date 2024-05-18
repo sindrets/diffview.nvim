@@ -5,8 +5,11 @@
         "cast-type-mismatch",
         "missing-fields"
     ],
+    "runtime.version": "LuaJIT",
     "workspace.checkThirdParty": false,
     "workspace.library": [
-      "$VIMRUNTIME",
+        "./lua",
+        "$VIMRUNTIME/lua",
+        ".dev/lua/nvim"
     ]
 }
