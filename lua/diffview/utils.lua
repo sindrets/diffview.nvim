@@ -1349,7 +1349,8 @@ M.path_sep = path_sep
 --- @param t table
 --- @return table t
 function M.add_reverse_lookup(t)
-  for k, v in pairs(t) do t[v] = k end
+  local keys = vim.tbl_keys(t)
+  for _, k in ipairs(keys) do t[t[k]] = k end
   return t
 end
 
