@@ -37,6 +37,7 @@ end
 M.defaults = {
   diff_binaries = false,
   enhanced_diff_hl = false,
+  gerrit_style_filesort = false,
   git_cmd = { "git" },
   hg_cmd = { "hg" },
   use_icons = true,
