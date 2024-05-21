@@ -1,3 +1,5 @@
+require("diffview.bootstrap")
+
 local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 

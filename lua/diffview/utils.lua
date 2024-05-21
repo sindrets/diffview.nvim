@@ -1,10 +1,8 @@
-local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 
 local Job = lazy.access("diffview.job", "Job") ---@type diffview.Job|LazyModule
 
 local api = vim.api
-local await = async.await
 local logger = DiffviewGlobal.logger
 
 local M = {}

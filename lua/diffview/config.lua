@@ -1,3 +1,5 @@
+require("diffview.bootstrap")
+
 ---@diagnostic disable: deprecated
 local EventEmitter = require("diffview.events").EventEmitter
 local actions = require("diffview.actions")
