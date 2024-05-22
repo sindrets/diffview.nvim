@@ -15,6 +15,8 @@ local pl = lazy.access(utils, "path") ---@type PathLib
 local api = vim.api
 local M = {}
 
+local HAS_NVIM_0_10 = vim.fn.has("nvim-0.10") == 1
+
 ---@alias git.FileDataProducer fun(kind: vcs.FileKind, path: string, pos: "left"|"right"): string[]
 
 ---@class CustomFolds
@@ -355,7 +357,11 @@ function File:attach_buffer(force, opt)
 
       -- Diagnostics
       if state.disable_diagnostics then
-        vim.diagnostic.disable(self.bufnr)
+        if HAS_NVIM_0_10 then
+          vim.diagnostic.enable(false, { bufnr = self.bufnr })
+        else
+          vim.diagnostic.disable(self.bufnr)
+        end
       end
 
       File.attached[self.bufnr] = state
@@ -382,7 +388,11 @@ function File:detach_buffer()
 
       -- Diagnostics
       if state.disable_diagnostics then
-        vim.diagnostic.enable(self.bufnr)
+        if HAS_NVIM_0_10 then
+          vim.diagnostic.enable(true, { bufnr = self.bufnr })
+        else
+          vim.diagnostic.enable(self.bufnr)
+        end
       end
 
       File.attached[self.bufnr] = nil
