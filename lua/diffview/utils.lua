@@ -1,9 +1,9 @@
 local lazy = require("diffview.lazy")
 
 local Job = lazy.access("diffview.job", "Job") ---@type diffview.Job|LazyModule
+local logger = lazy.access(_G, { "DiffviewGlobal", "logger" }) ---@type Logger
 
 local api = vim.api
-local logger = DiffviewGlobal.logger
 
 local M = {}
 
