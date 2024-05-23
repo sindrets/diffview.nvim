@@ -1462,12 +1462,19 @@ end
 ---@param head Rev
 ---@return Rev, Rev
 function GitAdapter:imply_local(left, right, head)
+  -- Special case when they both point to head: change only the right side in
+  -- order to still get a meaningful rev range.
+  if left.commit == head.commit and right.commit == head.commit then
+    return left, GitRev(RevType.LOCAL)
+  end
+
   if left.commit == head.commit then
     left = GitRev(RevType.LOCAL)
   end
   if right.commit == head.commit then
     right = GitRev(RevType.LOCAL)
   end
+
   return left, right
 end
 
