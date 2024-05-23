@@ -146,25 +146,26 @@ Examples:
 - `:DiffviewFileHistory --range=feat/example-branch`
 - `:'<,'>DiffviewFileHistory`
 
-### Familiarize Yourself With `:h diff-mode`
-
-| :information_source: This plugin assumes you're familiar with all the features already provided by nvim's builtin diff-mode |
-|:-----------------------------------------|
-
-These features include:
-
-- Jumping between hunks (`:h jumpto-diffs`).
-- Applying the changes of a diff hunk from any of the diffed buffers
-  (`:h copy-diffs`).
-- And more...
-
-Visit the help page for more info.
+> [!IMPORTANT]
+> ### Familiarize Yourself With `:h diff-mode`
+>
+> This plugin assumes you're familiar with all the features already provided by
+> nvim's builtin diff-mode. These features include:
+>
+> - Jumping between hunks (`:h jumpto-diffs`).
+> - Applying the changes of a diff hunk from any of the diffed buffers
+>   (`:h copy-diffs`).
+> - And more...
+>
+> Read the help page for more info.
 
 ---
 
 <br>
 
-#### :information_source: Additionally check out [USAGE](USAGE.md) for examples of some more specific use-cases
+> [!NOTE]
+> Additionally check out [USAGE](USAGE.md) for examples of some more specific
+> use-cases.
 
 <br>
 
