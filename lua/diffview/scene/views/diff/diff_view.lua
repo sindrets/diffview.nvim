@@ -344,6 +344,7 @@ DiffView.update_files = debounce.debounce_trailing(
     end
 
     local index_stat = pl:stat(pl:join(self.adapter.ctx.dir, "index"))
+    local last_winid = api.nvim_get_current_win()
 
     ---@type string[]?, FileDict
     local err, new_files = await(self:get_updated_files())
@@ -451,32 +452,10 @@ DiffView.update_files = debounce.debounce_trailing(
 
     FileEntry.update_index_stat(self.adapter, index_stat)
     self.files:update_file_trees()
-
-    local cur_winid = api.nvim_get_current_win()
-    local diffview_winid = self.cur_layout:get_main_win()
-    if api.nvim_win_is_valid(cur_winid) and cur_winid == diffview_winid then
-      self.rerender(self)
-    end
-
-    self.update_needed = false
-    perf:time()
-    logger:lvl(5):debug(perf)
-    logger:fmt_info(
-      "[%s] Completed update for %d files successfully (%.3f ms)",
-      self.class:name(),
-      self.files:len(),
-      perf.final_time
-    )
-    self.emitter:emit("files_updated", self.files)
-
-    callback()
-  end)
-)
-
-function DiffView:rerender()
     self.panel:update_components()
     self.panel:render()
     self.panel:redraw()
+    perf:lap("panel redrawn")
     self.panel:reconstrain_cursor()
 
     if utils.vec_indexof(self.panel:ordered_file_list(), self.panel.cur_file) == -1 then
@@ -493,7 +472,25 @@ function DiffView:rerender()
       end
     end
     self:set_file(self.panel.cur_file or self.panel:next_file(), false, not self.initialized)
-end
+
+    if api.nvim_win_is_valid(last_winid) then
+      api.nvim_set_current_win(last_winid)
+    end
+
+    self.update_needed = false
+    perf:time()
+    logger:lvl(5):debug(perf)
+    logger:fmt_info(
+      "[%s] Completed update for %d files successfully (%.3f ms)",
+      self.class:name(),
+      self.files:len(),
+      perf.final_time
+    )
+    self.emitter:emit("files_updated", self.files)
+
+    callback()
+  end)
+)
 
 ---Ensures there are files to load, and loads the null buffer otherwise.
 ---@return boolean

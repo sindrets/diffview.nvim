@@ -20,7 +20,6 @@ return function(view)
       end
 
       if view.ready then
-        view:rerender()
         view:update_files()
       end
     end,
