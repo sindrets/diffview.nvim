@@ -327,6 +327,12 @@ DiffView.update_files = debounce.debounce_trailing(
   async.wrap(function(self, callback)
     await(async.scheduler())
 
+    -- Never update unless the view is in focus
+    if self.tabpage ~= api.nvim_get_current_tabpage() then
+      callback({ "The update was cancelled." })
+      return
+    end
+
     ---@type PerfTimer
     local perf = PerfTimer("[DiffView] Status Update")
     self:ensure_layout()
@@ -344,16 +350,21 @@ DiffView.update_files = debounce.debounce_trailing(
     end
 
     local index_stat = pl:stat(pl:join(self.adapter.ctx.dir, "index"))
-    local last_winid = api.nvim_get_current_win()
 
     ---@type string[]?, FileDict
     local err, new_files = await(self:get_updated_files())
+    await(async.scheduler())
 
     if err then
       utils.err("Failed to update files in a diff view!", true)
       logger:error("[DiffView] Failed to update files!")
-      await(async.scheduler())
       callback(err)
+      return
+    end
+
+    -- Stop the update if the view is no longer in focus.
+    if self.tabpage ~= api.nvim_get_current_tabpage() then
+      callback({ "The update was cancelled." })
       return
     end
 
@@ -364,8 +375,6 @@ DiffView.update_files = debounce.debounce_trailing(
       { cur_files = self.files.working, new_files = new_files.working },
       { cur_files = self.files.staged, new_files = new_files.staged },
     }
-
-    await(async.scheduler())
 
     for _, v in ipairs(files) do
       -- We diff the old file list against the new file list in order to find
@@ -472,10 +481,6 @@ DiffView.update_files = debounce.debounce_trailing(
       end
     end
     self:set_file(self.panel.cur_file or self.panel:next_file(), false, not self.initialized)
-
-    if api.nvim_win_is_valid(last_winid) then
-      api.nvim_set_current_win(last_winid)
-    end
 
     self.update_needed = false
     perf:time()
