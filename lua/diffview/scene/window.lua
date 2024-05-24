@@ -159,10 +159,20 @@ Window.open_file = async.void(function(self)
     self:apply_file_winopts()
   end
 
+  local view = lib.get_current_view()
+  local disable_diagnostics = false
+
+  if self.file.kind == "conflicting" then
+    disable_diagnostics = conf.view.merge_tool.disable_diagnostics
+  elseif view and FileHistoryView.__get():ancestorof(view) then
+    disable_diagnostics = conf.view.file_history.disable_diagnostics
+  else
+    disable_diagnostics = conf.view.default.disable_diagnostics
+  end
+
   self.file:attach_buffer(false, {
     keymaps = config.get_layout_keymaps(self.parent),
-    disable_diagnostics = self.file.kind == "conflicting"
-    and conf.view.merge_tool.disable_diagnostics,
+    disable_diagnostics = disable_diagnostics,
   })
 
   if self:show_winbar_info() then

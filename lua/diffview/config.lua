@@ -56,6 +56,7 @@ M.defaults = {
   view = {
     default = {
       layout = "diff2_horizontal",
+      disable_diagnostics = false,
       winbar_info = false,
     },
     merge_tool = {
@@ -65,6 +66,7 @@ M.defaults = {
     },
     file_history = {
       layout = "diff2_horizontal",
+      disable_diagnostics = false,
       winbar_info = false,
     },
   },

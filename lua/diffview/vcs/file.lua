@@ -360,6 +360,7 @@ function File:attach_buffer(force, opt)
         if HAS_NVIM_0_10 then
           vim.diagnostic.enable(false, { bufnr = self.bufnr })
         else
+          ---@diagnostic disable-next-line: deprecated
           vim.diagnostic.disable(self.bufnr)
         end
       end
@@ -391,6 +392,7 @@ function File:detach_buffer()
         if HAS_NVIM_0_10 then
           vim.diagnostic.enable(true, { bufnr = self.bufnr })
         else
+          ---@diagnostic disable-next-line: param-type-mismatch
           vim.diagnostic.enable(self.bufnr)
         end
       end

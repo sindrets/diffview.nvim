@@ -21,7 +21,7 @@ DEFAULT CONFIG                                  *diffview.defaults*
     },
     view = {
       -- Configure the layout and behavior of different types of views.
-      -- Available layouts: 
+      -- Available layouts:
       --  'diff1_plain'
       --    |'diff2_horizontal'
       --    |'diff2_vertical'
@@ -33,17 +33,19 @@ DEFAULT CONFIG                                  *diffview.defaults*
       default = {
         -- Config for changed files, and staged files in diff views.
         layout = "diff2_horizontal",
+        disable_diagnostics = false,  -- Temporarily disable diagnostics for diff buffers while in the view.
         winbar_info = false,          -- See |diffview-config-view.x.winbar_info|
       },
       merge_tool = {
         -- Config for conflicted files in diff views during a merge or rebase.
         layout = "diff3_horizontal",
-        disable_diagnostics = true,   -- Temporarily disable diagnostics for conflict buffers while in the view.
+        disable_diagnostics = true,   -- Temporarily disable diagnostics for diff buffers while in the view.
         winbar_info = true,           -- See |diffview-config-view.x.winbar_info|
       },
       file_history = {
         -- Config for changed files in file history views.
         layout = "diff2_horizontal",
+        disable_diagnostics = false,  -- Temporarily disable diagnostics for diff buffers while in the view.
         winbar_info = false,          -- See |diffview-config-view.x.winbar_info|
       },
     },
