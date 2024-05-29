@@ -23,65 +23,44 @@ function M.now()
   return vim.loop.hrtime() / 1000000
 end
 
----Echo string with multiple lines.
 ---@param msg string|string[]
----@param hl? string Highlight group name.
 ---@param schedule? boolean Schedule the echo call.
-function M.echo_multiln(msg, hl, schedule)
+---@param level integer
+function M.notify(msg, level, schedule)
   if schedule then
-    vim.schedule(function() M.echo_multiln(msg, hl, false) end)
+    vim.schedule(function() M.notify(msg, level, false) end)
+    return
+  end
+  if type(msg) == "table" then
+    msg = table.concat(msg, "\n")
+  end
+  if msg == "" then
     return
   end
 
-  if type(msg) ~= "table" then msg = { msg } end
+  if level == vim.log.levels.ERROR then
+    logger:error(msg)
+  end
 
-  local text = table.concat(msg, "\n")
-  api.nvim_echo({ { text, hl } }, true, {})
+  vim.notify(msg, level, { title = "diffview.nvim" })
 end
 
 ---@param msg string|string[]
 ---@param schedule? boolean Schedule the echo call.
 function M.info(msg, schedule)
-  if type(msg) ~= "table" then
-    msg = { msg }
-  end
-  if not msg[1] or (msg[1] == "" and #msg == 1) then
-    return
-  end
-  msg = M.vec_slice(msg)
-  msg[1] = "[Diffview.nvim] " .. msg[1]
-  M.echo_multiln(msg, "DiagnosticInfo", schedule)
+  M.notify(msg, vim.log.levels.INFO, schedule)
 end
 
 ---@param msg string|string[]
 ---@param schedule? boolean Schedule the echo call.
 function M.warn(msg, schedule)
-  if type(msg) ~= "table" then
-    msg = { msg }
-  end
-  if not msg[1] or (msg[1] == "" and #msg == 1) then
-    return
-  end
-  msg = M.vec_slice(msg)
-  msg[1] = "[Diffview.nvim] " .. msg[1]
-  M.echo_multiln(msg, "WarningMsg", schedule)
+  M.notify(msg, vim.log.levels.WARN, schedule)
 end
 
 ---@param msg string|string[]
 ---@param schedule? boolean Schedule the echo call.
 function M.err(msg, schedule)
-  if type(msg) ~= "table" then
-    msg = { msg }
-  end
-  if not msg[1] or (msg[1] == "" and #msg == 1) then
-    return
-  end
-  msg = M.vec_slice(msg)
-
-  logger:error(table.concat(msg, "\n"))
-
-  msg[1] = "[Diffview.nvim] " .. msg[1]
-  M.echo_multiln(msg, "ErrorMsg", schedule)
+  M.notify(msg, vim.log.levels.ERROR, schedule)
 end
 
 ---Call the function `f`, ignoring most of the window and buffer related
