@@ -68,13 +68,13 @@ return function(view)
     select_first_entry = function()
       local files = view.panel:ordered_file_list()
       if files and #files > 0 then
-        view:set_file(files[1], true, true)
+        view:set_file(files[1], false, true)
       end
     end,
     select_last_entry = function()
       local files = view.panel:ordered_file_list()
       if files and #files > 0 then
-        view:set_file(files[#files], true, true)
+        view:set_file(files[#files], false, true)
       end
     end,
     select_next_entry = function()
