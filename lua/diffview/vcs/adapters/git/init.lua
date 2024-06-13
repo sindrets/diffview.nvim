@@ -425,9 +425,10 @@ end
 ---@param seek? integer
 ---@return string[] namestat
 ---@return string[] numstat
+---@return string[] fullstat
 ---@return integer data_end # First unprocessed data index. Marks the last index of stat data +1.
 local function structure_stat_data(data, seek)
-  local namestat, numstat = {}, {}
+  local namestat, numstat, fullstat = {}, {}, {}
   local i = seek or 1
 
   while data[i] do
@@ -436,13 +437,12 @@ local function structure_stat_data(data, seek)
     elseif data[i]:match("^[%d-]+\t[%d-]+\t") then
       numstat[#numstat + 1] = data[i]
     else
-      -- We have hit unrelated data
-      break
+      fullstat[#fullstat + 1] = data[i]
     end
     i = i + 1
   end
 
-  return namestat, numstat, i
+  return namestat, numstat, fullstat, i
 end
 
 ---@class GitAdapter.LogData
@@ -458,6 +458,7 @@ end
 ---@field subject string
 ---@field namestat string[]
 ---@field numstat string[]
+---@field fullstat string[]
 ---@field diff? diff.FileEntry[]
 ---@field valid boolean
 
@@ -482,9 +483,10 @@ local function structure_fh_data(stat_data, keep_diff)
     subject = stat_data[8] and stat_data[8]:sub(3) or "",
   }
 
-  local namestat, numstat = structure_stat_data(stat_data, 9)
+  local namestat, numstat, fullstat = structure_stat_data(stat_data, 9)
   ret.namestat = namestat
   ret.numstat = numstat
+  ret.fullstat = fullstat
 
   if keep_diff then
     ret.diff = vcs_utils.parse_diff(stat_data)
@@ -571,6 +573,7 @@ function GitAdapter:stream_fh_data(state)
       "core.quotePath=false",
       "log",
       "--pretty=format:%x00%n" .. GitAdapter.COMMIT_PRETTY_FMT,
+      "--stat",
       "--numstat",
       "--raw",
       state.prepared_log_opts.flags,
@@ -1034,6 +1037,7 @@ GitAdapter.fh_retry_commit = async.wrap(function(self, rev_arg, state, opt, call
       "core.quotePath=false",
       "show",
       "--pretty=format:" .. GitAdapter.COMMIT_PRETTY_FMT,
+      "--stat",
       "--numstat",
       "--raw",
       "--diff-merges=" .. state.log_options.diff_merges,
@@ -1162,6 +1166,7 @@ function GitAdapter:parse_fh_data(data, commit, state)
     local stats = {
       additions = tonumber(data.numstat[i]:match("^%d+")),
       deletions = tonumber(data.numstat[i]:match("^%d+%s+(%d+)")),
+      fullstat = data.fullstat[i],
     }
 
     if not stats.additions or not stats.deletions then
