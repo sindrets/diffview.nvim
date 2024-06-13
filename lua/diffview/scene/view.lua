@@ -38,6 +38,9 @@ function View:init_layout() oop.abstract_stub() end
 ---@abstract
 function View:post_open() oop.abstract_stub() end
 
+---@abstract
+function View:pre_open() oop.abstract_stub() end
+
 ---@diagnostic enable unused-local
 
 ---View constructor
@@ -62,6 +65,7 @@ function View:init(opt)
 end
 
 function View:open()
+  self:pre_open()
   vim.cmd("tab split")
   self.tabpage = api.nvim_get_current_tabpage()
   self:init_layout()
