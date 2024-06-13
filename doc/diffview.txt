@@ -1165,12 +1165,12 @@ select_entry                                    *diffview-actions-select_entry*
         multiple files, this will collapse or open the entry. In the option
         panel this will interact with the option under the cursor.
 
-select_next_entry                               *diffview-actions-select_next_entry*
+[count] select_next_entry                       *diffview-actions-select_next_entry*
         Contexts: `view`, `file_panel`, `file_history_panel`
 
         Select the entry following the subject.
 
-select_prev_entry                               *diffview-actions-select_prev_entry*
+[count] select_prev_entry                       *diffview-actions-select_prev_entry*
         Contexts: `view`, `file_panel`, `file_history_panel`
 
         Select the entry preceding the subject.
@@ -1184,6 +1184,16 @@ select_last_entry                               *diffview-actions-select_last_en
         Contexts: `view`, `file_panel`, `file_history_panel`
 
         Select the last entry.
+
+[count] select_next_commit                      *diffview-actions-select_next_commit*
+        Contexts: `file_history_view`, `file_history_panel`
+
+        Select the commit following the subject.
+
+[count] select_prev_commit                      *diffview-actions-select_prev_commit*
+        Contexts: `file_history_view`, `file_history_panel`
+
+        Select the commit preceding the subject.
 
 stage_all                                       *diffview-actions-stage_all*
         Contexts: `diff_view`, `file_panel`

@@ -71,6 +71,26 @@ return function(view)
         view:set_file(entry.files[#entry.files])
       end
     end,
+    select_next_commit = function()
+      local cur_entry = view.panel.cur_item[1]
+      if not cur_entry then return end
+      local entry_idx = utils.vec_indexof(view.panel.entries, cur_entry)
+      if entry_idx == -1 then return end
+
+      local next_idx = (entry_idx + vim.v.count1 - 1) % #view.panel.entries + 1
+      local next_entry = view.panel.entries[next_idx]
+      view:set_file(next_entry.files[1])
+    end,
+    select_prev_commit = function()
+      local cur_entry = view.panel.cur_item[1]
+      if not cur_entry then return end
+      local entry_idx = utils.vec_indexof(view.panel.entries, cur_entry)
+      if entry_idx == -1 then return end
+
+      local next_idx = (entry_idx - vim.v.count1 - 1) % #view.panel.entries + 1
+      local next_entry = view.panel.entries[next_idx]
+      view:set_file(next_entry.files[1])
+    end,
     next_entry = function()
       view.panel:highlight_next_file()
     end,

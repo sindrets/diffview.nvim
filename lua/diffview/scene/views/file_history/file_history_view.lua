@@ -170,8 +170,13 @@ FileHistoryView.set_file = async.void(function(self, file, focus)
   if self:file_safeguard() or not file then return end
 
   local entry = self.panel:find_entry(file)
+  local cur_entry = self.panel.cur_item[1]
 
   if entry then
+    if cur_entry and entry ~= cur_entry then
+      self.panel:set_entry_fold(cur_entry, false)
+    end
+
     self.panel:set_cur_item({ entry, file })
     self.panel:highlight_item(file)
     self.nulled = false
