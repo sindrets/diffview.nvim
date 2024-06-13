@@ -1175,6 +1175,16 @@ select_prev_entry                               *diffview-actions-select_prev_en
 
         Select the entry preceding the subject.
 
+select_first_entry                              *diffview-actions-select_first_entry*
+        Contexts: `view`, `file_panel`, `file_history_panel`
+
+        Select the first entry.
+
+select_last_entry                               *diffview-actions-select_last_entry*
+        Contexts: `view`, `file_panel`, `file_history_panel`
+
+        Select the last entry.
+
 stage_all                                       *diffview-actions-stage_all*
         Contexts: `diff_view`, `file_panel`
 

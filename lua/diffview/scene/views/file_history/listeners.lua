@@ -59,6 +59,18 @@ return function(view)
     select_prev_entry = function()
       view:prev_item()
     end,
+    select_first_entry = function()
+      local entry = view.panel.entries[1]
+      if entry and #entry.files > 0 then
+        view:set_file(entry.files[1])
+      end
+    end,
+    select_last_entry = function()
+      local entry = view.panel.entries[#view.panel.entries]
+      if entry and #entry.files > 0 then
+        view:set_file(entry.files[#entry.files])
+      end
+    end,
     next_entry = function()
       view.panel:highlight_next_file()
     end,
