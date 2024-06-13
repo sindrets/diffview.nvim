@@ -106,7 +106,8 @@ For information about additional `[options]`, visit the
 Additional commands for convenience:
 
 - `:DiffviewClose`: Close the current diffview. You can also use `:tabclose`.
-- `:DiffviewToggleFiles`: Toggle the file panel.
+- `:DiffviewToggleFiles`: Toggle the file panel. (See Tips and FAQ below for
+  "toggling" the diffview UI itself.)
 - `:DiffviewFocusFiles`: Bring focus to the file panel.
 - `:DiffviewRefresh`: Update stats and entries in the file list of the current
   Diffview.
@@ -524,5 +525,37 @@ git object database, and a command is echoed that shows how to undo the change.
 - **Q: How do I jump between hunks in the diff?**
   - A: Use `[c` and `]c`
   - `:h jumpto-diffs`
+- **Q: How do I toggle, i.e., show/hide the diffview UI?**
+
+  - A: The UI of diffview uses Neovim's built-in
+    [tabs](https://neovim.io/doc/user/tabpage.html) feature, so you can use
+    default neovim keybinds like `gt` and `gT` to switch between your current
+    buffer and diffview (and neogit). Commands such as `:tabnext`,
+    `:tabprevious`, and `:tabclose` work, too. Hence a "toggle" command like
+    the (non-existing) `DiffviewToggle`
+    [does not make sense](https://github.com/sindrets/diffview.nvim/issues/450).
+  - A: If you don't want to work with neovim tab's to show/hide diffview, you
+    can add a custom Lua function to your neovim configuration and assign it
+    to a keybind of your choice.
+
+        ```lua
+        my_diffview_toggle = function()
+          local lib = require("diffview.lib")
+          local view = lib.get_current_view()
+          if view then
+            -- Current tabpage is a Diffview; close it
+            vim.cmd.DiffviewClose()
+          else
+            -- No open Diffview exists: open a new one
+            vim.cmd.DiffviewOpen()
+          end
+        end
+
+        -- See `:help nvim_set_keymap()` for details.
+        vim.api.nvim_set_keymap(
+          "n",
+          "YOUR_KEY_OR_SEQUENCE_OF_KEYS",
+          "<cmd>lua my_diffview_toggle()<CR>", { noremap = true, silent = true })
+        ```
 
 <!-- vim: set tw=80 -->
