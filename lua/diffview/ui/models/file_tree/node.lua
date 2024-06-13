@@ -1,3 +1,4 @@
+local config = require("diffview.config")
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local M = {}
@@ -52,6 +53,15 @@ end
 ---@return boolean true if node a comes before node b
 function Node.comparator(a, b)
   if a:has_children() == b:has_children() then
+    if config.get_config().gerrit_style_filesort and not a:has_children() then
+      cpp_header_suffixes = {".h", ".hh", ".hxx", ".hpp"}
+      a_name, a_ext = a.name:match("(.+)(%..+)$")
+      b_name, b_ext = b.name:match("(.+)(%..+)$")
+      if a_name == b_name then
+        if vim.tbl_contains(cpp_header_suffixes, a_ext) then return true end
+        if vim.tbl_contains(cpp_header_suffixes, b_ext) then return false end
+      end
+    end
     return string.lower(a.name) < string.lower(b.name)
   else
     return a:has_children()
