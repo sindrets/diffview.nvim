@@ -100,6 +100,16 @@ M.defaults = {
         multi_file = {},
       },
     },
+    commit_format = {
+      'status',
+      'stats',
+      'hash',
+      'reflog',
+      'ref',
+      'subject',
+      'author',
+      'date',
+    },
     win_config = {
       position = "bottom",
       height = 16,
@@ -359,7 +369,7 @@ function M.get_log_options(single_file, t, vcs)
   local log_options
 
   if single_file then
-    log_options =  M._config.file_history_panel.log_options[vcs].single_file
+    log_options = M._config.file_history_panel.log_options[vcs].single_file
   else
     log_options = M._config.file_history_panel.log_options[vcs].multi_file
   end
@@ -510,7 +520,7 @@ function M.setup(user_config)
   local old_win_config_spec = { "position", "width", "height" }
   for _, panel_name in ipairs({ "file_panel", "file_history_panel" }) do
     local panel_config = M._config[panel_name]
-      ---@cast panel_config table
+    ---@cast panel_config table
     local notified = false
 
     for _, option in ipairs(old_win_config_spec) do

@@ -76,6 +76,16 @@ DEFAULT CONFIG                                  *diffview.defaults*
           multi_file = {},
         },
       },
+      commit_format = {
+        'status',
+        'stats',
+        'hash',
+        'reflog',
+        'ref',
+        'subject',
+        'author',
+        'date',
+      },
       win_config = {    -- See |diffview-config-win_config|
         position = "bottom",
         height = 16,
