@@ -635,6 +635,8 @@ local action_names = {
   "select_entry",
   "select_next_entry",
   "select_prev_entry",
+  "select_first_entry",
+  "select_last_entry",
   "stage_all",
   "toggle_files",
   "toggle_flatten_dirs",
