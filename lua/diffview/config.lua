@@ -255,6 +255,10 @@ M.defaults = {
       { "n", "q",     actions.close,  { desc = "Close help menu" } },
       { "n", "<esc>", actions.close,  { desc = "Close help menu" } },
     },
+    commit_log_panel = {
+      { "n", "q",     actions.close,  { desc = "Close commit log" } },
+      { "n", "<esc>", actions.close,  { desc = "Close commit log" } },
+    },
   },
 }
 -- stylua: ignore end
