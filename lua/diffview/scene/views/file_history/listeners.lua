@@ -71,6 +71,46 @@ return function(view)
         view:set_file(entry.files[#entry.files])
       end
     end,
+    select_next_commit = function()
+      local file = view:infer_cur_file()
+      if file then
+        local entry = view.panel:find_entry(file)
+        if entry then
+          local entry_idx = utils.vec_indexof(view.panel.entries, entry)
+          entry_idx = entry_idx + vim.v.count1
+          -- wrap around?
+          if entry_idx > #view.panel.entries then
+            entry_idx = math.fmod(entry_idx, #view.panel.entries)
+          end
+
+          local next_entry = view.panel.entries[entry_idx]
+          if next_entry and #next_entry.files > 0 then
+            view:set_file(next_entry.files[1])
+          end
+        end
+      end
+    end,
+    select_prev_commit = function()
+      local file = view:infer_cur_file()
+      if file then
+        local entry = view.panel:find_entry(file)
+        if entry then
+          local entry_idx = utils.vec_indexof(view.panel.entries, entry)
+          entry_idx = entry_idx - vim.v.count1
+          -- wrap around?
+          if entry_idx < 1 then
+            local abs_entry_idx = math.abs(entry_idx)
+            local rem_entry_idx = math.fmod(abs_entry_idx, #view.panel.entries)
+            entry_idx = #view.panel.entries - rem_entry_idx
+          end
+
+          local prev_entry = view.panel.entries[entry_idx]
+          if prev_entry and #prev_entry.files > 0 then
+            view:set_file(prev_entry.files[1])
+          end
+        end
+      end
+    end,
     next_entry = function()
       view.panel:highlight_next_file()
     end,

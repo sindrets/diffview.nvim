@@ -1185,6 +1185,16 @@ select_last_entry                               *diffview-actions-select_last_en
 
         Select the last entry.
 
+select_next_commit                              *diffview-actions-select_next_commit*
+        Contexts: `view`, `file_history_panel`
+
+        Select the commit preceding the subject.
+
+select_prev_commit                              *diffview-actions-select_prev_commit*
+        Contexts: `view`, `file_history_panel`
+
+        Select the commit preceding the subject.
+
 stage_all                                       *diffview-actions-stage_all*
         Contexts: `diff_view`, `file_panel`
 
