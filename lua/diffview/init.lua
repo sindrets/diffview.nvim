@@ -133,7 +133,6 @@ function M.open(args)
   end
 end
 
-
 ---@param range? { [1]: integer, [2]: integer }
 ---@param args string[]
 function M.file_history(range, args)

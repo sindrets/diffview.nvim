@@ -18,12 +18,12 @@ for any git rev.
 
 USAGE                                           *diffview-usage*
 
-Quick-start: `:DiffviewOpen` to open a Diffview that compares against the
+Quick-start: `:DiffviewOpen` or `:DiffviewToggle` to open a Diffview that compares against the
 index.
 
 You can have multiple Diffviews open, tracking different git revs. Each Diffview
-opens in its own tabpage. To close and dispose of a Diffview, call either
-`:DiffviewClose` or `:tabclose` while a Diffview is the current tabpage.
+opens in its own tabpage. To close and dispose of a Diffview, call
+`:DiffviewClose`, `:DiffviewToggle` or `:tabclose` while a Diffview is the current tabpage.
 Diffviews are automatically updated:
 
         • Every time you enter a Diffview
@@ -369,6 +369,13 @@ COMMANDS                                        *diffview-commands*
 
                                                 *:DiffviewClose*
 :DiffviewClose          Close the active Diffview.
+
+                                                *:DiffviewToggle*
+:DiffviewToggle [git-rev] [options] [ -- {paths...}]
+
+       Alias for `:DiffviewOpen` when the current tabpage is not a Diffview,
+       otherwise acts as an alias for `:DiffviewClose`. Accepts the same
+       arguments as `:DiffviewOpen`.
 
                                                 *:DiffviewToggleFiles*
 :DiffviewToggleFiles    Toggles the file panel.
