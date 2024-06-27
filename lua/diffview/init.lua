@@ -157,6 +157,16 @@ function M.close(tabpage)
   end
 end
 
+-- @param args string[]
+function M.toggle(args)
+  local view = lib.get_current_view()
+  if view then
+    M.close()
+  else
+    M.open(args)
+  end
+end
+
 function M.completion(_, cmd_line, cur_pos)
   local ctx = arg_parser.scan(cmd_line, { cur_pos = cur_pos, allow_ex_range = true })
   local cmd = ctx.args[1]
