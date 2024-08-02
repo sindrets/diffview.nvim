@@ -667,6 +667,11 @@ log_options                                     *diffview-config-log_options*
             {multi_file} (`LogOptions`)
                 See |diffview.git.LogOptions|.
 
+            {relative_date_cutoff_seconds} (integer)
+                Dates newer than this number of seconds ago will be displayed
+                as relative (eg "2 hours ago"), while older ones will be
+                displayed as full ISO dates (Fri Aug 2, ...).
+
 default_args                                    *diffview-config-default_args*
         Type: `table<string, string[]>`, Default: `{}`
 

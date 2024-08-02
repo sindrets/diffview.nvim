@@ -254,6 +254,7 @@ require("diffview").setup({
         single_file = {},
         multi_file = {},
       },
+      relative_date_cutoff_seconds = 60 * 60 * 24 * 30 * 3, -- 3 months
     },
     win_config = {    -- See |diffview-config-win_config|
       position = "bottom",

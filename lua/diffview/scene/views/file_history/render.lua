@@ -155,8 +155,10 @@ local function render_entries(panel, parent, entries, updating)
 
     if entry.commit then
       -- 3 months
+      local relative_date_cutoff_seconds =
+        config.get_config().file_history_panel.log_options.relative_date_cutoff_seconds or (60 * 60 * 24 * 30 * 3)
       local date = (
-        os.difftime(os.time(), entry.commit.time) > 60 * 60 * 24 * 30 * 3
+        os.difftime(os.time(), entry.commit.time) > relative_date_cutoff_seconds
           and entry.commit.iso_date
           or entry.commit.rel_date
       )
