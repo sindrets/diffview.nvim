@@ -267,11 +267,11 @@ end
 ---@param path string
 ---@param rev Rev?
 function GitAdapter:get_show_args(path, rev)
-  return utils.vec_join(self:args(), "show", fmt("%s:%s", rev and rev:object_name() or "", path))
+  return utils.vec_join(self:args(), "show", "--no-show-signature", fmt("%s:%s", rev and rev:object_name() or "", path))
 end
 
 function GitAdapter:get_log_args(args)
-  return utils.vec_join("log", "--first-parent", "--stat", args)
+  return utils.vec_join("log", "--no-show-signature", "--first-parent", "--stat", args)
 end
 
 function GitAdapter:get_dir(path)
@@ -311,14 +311,14 @@ function GitAdapter:get_merge_context()
   end
 
   local ret = {}
-  local out, code = self:exec_sync({ "show", "-s", "--pretty=format:%H%n%D", "HEAD", "--" }, self.ctx.toplevel)
+  local out, code = self:exec_sync({ "show", "-s", "--pretty=format:%H%n%D", "HEAD", "--no-show-signature", "--" }, self.ctx.toplevel)
 
   ret.ours = code ~= 0 and {} or {
     hash = out[1],
     ref_names = out[2],
   }
 
-  out, code = self:exec_sync({ "show", "-s", "--pretty=format:%H%n%D", their_head, "--" }, self.ctx.toplevel)
+  out, code = self:exec_sync({ "show", "-s", "--pretty=format:%H%n%D", their_head, "--no-show-signature", "--" }, self.ctx.toplevel)
 
   ret.theirs = code ~= 0 and {} or {
     hash = out[1],
@@ -330,7 +330,7 @@ function GitAdapter:get_merge_context()
 
   ret.base = {
     hash = out[1],
-    ref_names = self:exec_sync({ "show", "-s", "--pretty=format:%D", out[1] }, self.ctx.toplevel)[1],
+    ref_names = self:exec_sync({ "show", "-s", "--pretty=format:%D", out[1], "--no-show-signature" }, self.ctx.toplevel)[1],
   }
 
   return ret
@@ -570,6 +570,7 @@ function GitAdapter:stream_fh_data(state)
       "-c",
       "core.quotePath=false",
       "log",
+      "--no-show-signature",
       "--pretty=format:%x00%n" .. GitAdapter.COMMIT_PRETTY_FMT,
       "--numstat",
       "--raw",
@@ -649,6 +650,7 @@ function GitAdapter:stream_line_trace_data(state)
       "-c",
       "core.quotePath=false",
       "log",
+      "--no-show-signature",
       "--color=never",
       "--no-ext-diff",
       "--pretty=format:%x00%n" .. GitAdapter.COMMIT_PRETTY_FMT,
@@ -720,6 +722,7 @@ function GitAdapter:file_history_dry_run(log_opt)
   else
     cmd = utils.vec_join(
       "log",
+      "--no-show-signature",
       "--pretty=format:%H",
       "--name-status",
       options,
@@ -1036,6 +1039,7 @@ GitAdapter.fh_retry_commit = async.wrap(function(self, rev_arg, state, opt, call
       "--pretty=format:" .. GitAdapter.COMMIT_PRETTY_FMT,
       "--numstat",
       "--raw",
+      "--no-show-signature",
       "--diff-merges=" .. state.log_options.diff_merges,
       (state.single_file and state.log_options.follow) and "--follow" or nil,
       rev_arg,
