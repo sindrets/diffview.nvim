@@ -248,7 +248,7 @@ describe("diffview.path", function()
       local pl = PathLib({ os = "unix" })
 
       eq("/lorem/ipsum/dolor/foo", pl:expand("~/foo"))
-      eq("foo/EXPANDED_FOO/EXPANDED_BAR/baz", pl:expand("foo/$VAR_FOO/$VAR_BAR/baz"))
+      eq("foo/EXPANDED_FOO/EXPANDED_BAR/$baz", pl:expand("foo/$VAR_FOO/$VAR_BAR/$baz"))
     end)
   end)
 
