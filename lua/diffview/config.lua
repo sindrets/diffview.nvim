@@ -124,6 +124,8 @@ M.defaults = {
       -- tabpage is a Diffview.
       { "n", "<tab>",       actions.select_next_entry,              { desc = "Open the diff for the next file" } },
       { "n", "<s-tab>",     actions.select_prev_entry,              { desc = "Open the diff for the previous file" } },
+      { "n", "]k",          actions.select_next_entry_in_commit,    { desc = "Open the diff for the next file within commit" } },
+      { "n", "[k",          actions.select_prev_entry_in_commit,    { desc = "Open the diff for the previous file within commit" } },
       { "n", "[F",          actions.select_first_entry,             { desc = "Open the diff for the first file" } },
       { "n", "]F",          actions.select_last_entry,              { desc = "Open the diff for the last file" } },
       { "n", "gf",          actions.goto_file_edit,                 { desc = "Open the file in the previous tabpage" } },
@@ -236,6 +238,8 @@ M.defaults = {
       { "n", "<c-f>",         actions.scroll_view(0.25),           { desc = "Scroll the view down" } },
       { "n", "<tab>",         actions.select_next_entry,           { desc = "Open the diff for the next file" } },
       { "n", "<s-tab>",       actions.select_prev_entry,           { desc = "Open the diff for the previous file" } },
+      { "n", "]k",            actions.select_next_entry_in_commit, { desc = "Open the diff for the next file within commit" } },
+      { "n", "[k",            actions.select_prev_entry_in_commit, { desc = "Open the diff for the previous file within commit" } },
       { "n", "[F",            actions.select_first_entry,          { desc = "Open the diff for the first file" } },
       { "n", "]F",            actions.select_last_entry,           { desc = "Open the diff for the last file" } },
       { "n", "gf",            actions.goto_file_edit,              { desc = "Open the file in the previous tabpage" } },

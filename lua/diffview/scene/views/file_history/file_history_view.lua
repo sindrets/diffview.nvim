@@ -124,13 +124,13 @@ FileHistoryView._set_file = async.void(function(self, file)
   end
 end)
 
-function FileHistoryView:next_item()
+function FileHistoryView:next_item(cycle_in_commit)
   self:ensure_layout()
 
   if self:file_safeguard() then return end
 
   if self.panel:num_items() > 1 or self.nulled then
-    local cur = self.panel:next_file()
+    local cur = self.panel:next_file(cycle_in_commit)
 
     if cur then
       self.panel:highlight_item(cur)
@@ -142,13 +142,13 @@ function FileHistoryView:next_item()
   end
 end
 
-function FileHistoryView:prev_item()
+function FileHistoryView:prev_item(cycle_in_commit)
   self:ensure_layout()
 
   if self:file_safeguard() then return end
 
   if self.panel:num_items() > 1 or self.nulled then
-    local cur = self.panel:prev_file()
+    local cur = self.panel:prev_file(cycle_in_commit)
 
     if cur then
       self.panel:highlight_item(cur)

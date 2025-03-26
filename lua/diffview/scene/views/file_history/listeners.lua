@@ -59,6 +59,12 @@ return function(view)
     select_prev_entry = function()
       view:prev_item()
     end,
+    select_next_entry_in_commit = function()
+      view:next_item(true)
+    end,
+    select_prev_entry_in_commit = function()
+      view:prev_item(true)
+    end,
     select_first_entry = function()
       local entry = view.panel.entries[1]
       if entry and #entry.files > 0 then
