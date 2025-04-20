@@ -19,6 +19,10 @@ M.plugin_deps = {
     name = "nvim-web-devicons",
     optional = true,
   },
+  {
+    name = "mini.icons",
+    optional = true,
+  },
 }
 
 ---@param cmd string|string[]
