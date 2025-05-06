@@ -311,27 +311,36 @@ function GitAdapter:get_merge_context()
   end
 
   local ret = {}
-  local out, code = self:exec_sync({ "show", "-s", "--pretty=format:%H%n%D", "HEAD", "--" }, self.ctx.toplevel)
+  -- Use a common options table for exec_sync calls to ensure CWD is set and errors are not fatal.
+  local exec_opts = { cwd = self.ctx.toplevel, log_opt = { no_fail = true } }
 
-  ret.ours = code ~= 0 and {} or {
-    hash = out[1],
-    ref_names = out[2],
-  }
+  local ours_out, ours_code = self:exec_sync({ "show", "-s", "--pretty=format:%H%n%D", "HEAD", "--" }, exec_opts)
+  if ours_code ~= 0 or not ours_out or not ours_out[1] then
+    -- Failed to get info for HEAD, cannot proceed.
+    return
+  end
+  ret.ours = { hash = ours_out[1], ref_names = ours_out[2] }
 
-  out, code = self:exec_sync({ "show", "-s", "--pretty=format:%H%n%D", their_head, "--" }, self.ctx.toplevel)
+  local theirs_out, theirs_code = self:exec_sync({ "show", "-s", "--pretty=format:%H%n%D", their_head, "--" }, exec_opts)
+  if theirs_code ~= 0 or not theirs_out or not theirs_out[1] then
+    -- Failed to get info for their_head, cannot proceed.
+    return
+  end
+  ret.theirs = { hash = theirs_out[1], rev_names = theirs_out[2] } -- Note: field name is rev_names here
 
-  ret.theirs = code ~= 0 and {} or {
-    hash = out[1],
-    rev_names = out[2],
-  }
-
-  out, code = self:exec_sync({ "merge-base", "HEAD", their_head }, self.ctx.toplevel)
-  assert(code == 0)
-
-  ret.base = {
-    hash = out[1],
-    ref_names = self:exec_sync({ "show", "-s", "--pretty=format:%D", out[1] }, self.ctx.toplevel)[1],
-  }
+  local base_out, base_code = self:exec_sync({ "merge-base", "HEAD", their_head }, exec_opts)
+  if base_code ~= 0 or not base_out or not base_out[1] then
+    -- Failed to get merge-base. This can happen in --root rebases for initial commits.
+    -- Use the canonical empty tree SHA as the base in this case.
+    ret.base = { hash = self.Rev.NULL_TREE_SHA, ref_names = nil }
+  else
+    local merge_base_hash = vim.trim(base_out[1])
+    local base_ref_names_out, base_ref_names_code = self:exec_sync({ "show", "-s", "--pretty=format:%D", merge_base_hash, "--" }, exec_opts)
+    ret.base = {
+      hash = merge_base_hash,
+      ref_names = (base_ref_names_code == 0 and base_ref_names_out and base_ref_names_out[1]) or nil,
+    }
+  end
 
   return ret
 end
