@@ -329,5 +329,13 @@ return function(view)
       local dir = view.panel:get_dir_at_cursor()
       if dir then view.panel:toggle_item_fold(dir) end
     end,
+    select_next_commit = async.void(function()
+      local commit = await(view:get_newer_commit())
+      if commit then await(view:set_commit(commit)) end
+    end),
+    select_prev_commit = async.void(function()
+      local commit = await(view:get_older_commit())
+      if commit then await(view:set_commit(commit)) end
+    end),
   }
 end

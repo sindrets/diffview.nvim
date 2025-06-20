@@ -551,6 +551,193 @@ function DiffView:is_valid()
   return self.valid
 end
 
+---Helper function to navigate commit history
+---@param direction "next"|"prev" # Direction to navigate in commit history
+---@return string|nil # Commit hash or nil if none available
+DiffView._get_commit_in_direction = async.wrap(function(self, direction, callback)
+  if not self._commit_history then
+    -- Prevent race conditions by checking if we're already building
+    if self._building_commit_history then
+      callback(nil)
+      return
+    end
+
+    self._building_commit_history = true
+    local err = await(self:_build_commit_history())
+    self._building_commit_history = false
+
+    if err then
+      callback(nil)
+      return
+    end
+  end
+
+  local current_commit = self:_get_current_commit_hash()
+  if not current_commit then
+    callback(nil)
+    return
+  end
+
+  local current_idx = nil
+  for i, commit_hash in ipairs(self._commit_history) do
+    if commit_hash == current_commit then
+      current_idx = i
+      break
+    end
+  end
+
+  if not current_idx then
+    callback(nil)
+    return
+  end
+
+  if direction == "next" then
+    if current_idx >= #self._commit_history then
+      callback(nil)
+    else
+      callback(self._commit_history[current_idx + 1])
+    end
+  elseif direction == "prev" then
+    if current_idx <= 1 then
+      callback(nil)
+    else
+      callback(self._commit_history[current_idx - 1])
+    end
+  else
+    callback(nil)
+  end
+end)
+
+---Get the next commit in the commit history
+---@return string|nil # Next commit hash or nil if none available
+DiffView.get_older_commit = async.wrap(function(self, callback)
+  local result = await(self:_get_commit_in_direction("next"))
+  callback(result)
+end)
+
+---Get the previous commit in the commit history
+---@return string|nil # Previous commit hash or nil if none available
+DiffView.get_newer_commit = async.wrap(function(self, callback)
+  local result = await(self:_get_commit_in_direction("prev"))
+  callback(result)
+end)
+
+---Build commit history for navigation
+---@private
+---@return string|nil # Error message if failed
+DiffView._build_commit_history = async.wrap(function(self, callback)
+  local Job = require("diffview.job").Job
+
+  -- Build git log arguments based on the diff view context
+  local args = { "log", "--pretty=format:%H", "--no-merges", "--first-parent" }
+
+  -- Always use HEAD to get the full commit history for navigation
+  -- We need the complete history to navigate forward/backward through commits
+  table.insert(args, "HEAD")
+
+  -- Add path arguments if any
+  if self.path_args and #self.path_args > 0 then
+    table.insert(args, "--")
+    for _, path in ipairs(self.path_args) do
+      table.insert(args, path)
+    end
+  end
+
+  local job = Job({
+    command = "git",
+    args = args,
+    cwd = self.adapter.ctx.toplevel,
+  })
+
+  local ok = await(job)
+  if not ok then
+    callback("Failed to get commit history: " .. table.concat(job.stderr or {}, "\n"))
+    return
+  end
+
+  local raw_output = table.concat(job.stdout or {}, "\n")
+  self._commit_history = vim.split(raw_output, "\n", { trimempty = true })
+  callback(nil)
+end)
+
+---Get current commit hash being viewed
+---@private
+---@return string|nil
+function DiffView:_get_current_commit_hash()
+  if self.right.commit then
+    -- Handle both cases: commit object with .hash property, or commit being the hash itself
+    return type(self.right.commit) == "table" and self.right.commit.hash or self.right.commit
+  elseif self.left.commit then
+    -- Handle both cases: commit object with .hash property, or commit being the hash itself
+    return type(self.left.commit) == "table" and self.left.commit.hash or self.left.commit
+  end
+  return nil
+end
+
+---Set the current commit being viewed
+---@param commit_hash string
+DiffView.set_commit = async.void(function(self, commit_hash)
+  local RevType = require("diffview.vcs.rev").RevType
+  local Job = require("diffview.job").Job
+
+  -- Resolve the parent commit hash using git rev-parse
+  local parent_job = Job({
+    command = "git",
+    args = { "rev-parse", commit_hash .. "^" },
+    cwd = self.adapter.ctx.toplevel,
+  })
+
+  local ok = await(parent_job)
+  local new_left, new_right
+
+  if not ok or not parent_job.stdout or #parent_job.stdout == 0 then
+    -- Fallback: use the string reference if we can't resolve it
+    new_left = self.adapter.Rev(RevType.COMMIT, commit_hash .. "~1")
+    new_right = self.adapter.Rev(RevType.COMMIT, commit_hash)
+  else
+    -- Use the resolved parent commit hash
+    local parent_hash = vim.trim(parent_job.stdout[1])
+    new_left = self.adapter.Rev(RevType.COMMIT, parent_hash)
+    new_right = self.adapter.Rev(RevType.COMMIT, commit_hash)
+  end
+
+  -- Update the view's revisions
+  self.left = new_left
+  self.right = new_right
+
+  -- Update the panel's pretty name to reflect the new commit
+  -- For single commits, show the conventional git format: commit_hash^..commit_hash
+  local right_abbrev = new_right:abbrev()
+  self.panel.rev_pretty_name = right_abbrev .. "^.." .. right_abbrev
+
+  -- Update files and refresh the view
+  self:update_files()
+
+  -- Update panel to show current commit info and refresh diff content
+  vim.schedule(function()
+    self.panel:render()
+    self.panel:redraw()
+
+    -- If there's a currently selected file, update its revisions and refresh
+    -- This needs to be scheduled to avoid fast event context issues
+    if self.cur_entry then
+      -- Update the current entry's file revisions to match the new commit
+      if self.cur_entry.layout and self.cur_entry.layout.a and self.cur_entry.layout.b then
+        -- Dispose old buffers to prevent cached stale content
+        self.cur_entry.layout.a.file:dispose_buffer()
+        self.cur_entry.layout.b.file:dispose_buffer()
+
+        -- Update the file objects with new revisions
+        self.cur_entry.layout.a.file.rev = new_left
+        self.cur_entry.layout.b.file.rev = new_right
+
+        -- Force refresh by calling use_entry again
+        self:use_entry(self.cur_entry)
+      end
+    end
+  end)
+end)
+
 M.DiffView = DiffView
 
 return M
