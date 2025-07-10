@@ -1670,9 +1670,8 @@ function GitAdapter:show_untracked(opt)
   opt = opt or {}
 
   if opt.revs then
-    -- Never show untracked files when comparing against anything other than
-    -- the index
-    if not (opt.revs.left.type == RevType.STAGE and opt.revs.right.type == RevType.LOCAL) then
+    -- Show untracked files when comparing against the working tree (LOCAL)
+    if opt.revs.right.type ~= RevType.LOCAL then
       return false
     end
   end
