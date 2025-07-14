@@ -1268,6 +1268,7 @@ function GitAdapter:diffview_options(argo)
   local left, right = self:parse_revs(rev_arg, {
     cached = argo:get_flag({ "cached", "staged" }),
     imply_local = argo:get_flag("imply-local"),
+    merge_base = argo:get_flag("merge-base"),
   })
 
   if not (left and right) then
@@ -1445,10 +1446,26 @@ function GitAdapter:parse_revs(rev_arg, opt)
       end
     else
       local hash = rev_strings[1]:gsub("^%^", "")
-      left = GitRev(RevType.COMMIT, hash)
       if opt.cached then
+        left = GitRev(RevType.COMMIT, hash)
         right = GitRev(RevType.STAGE, 0)
       else
+        -- When comparing a single ref with working tree, optionally use merge-base
+        if opt.merge_base then
+          local merge_base_out, merge_base_code = self:exec_sync(
+            { "merge-base", "HEAD", hash },
+            { cwd = self.ctx.toplevel, fail_on_empty = true, retry = 2 }
+          )
+          if merge_base_code == 0 and #merge_base_out > 0 then
+            -- Use merge-base as the left side
+            left = GitRev(RevType.COMMIT, merge_base_out[1])
+          else
+            -- Fallback to the ref itself if merge-base fails
+            left = GitRev(RevType.COMMIT, hash)
+          end
+        else
+          left = GitRev(RevType.COMMIT, hash)
+        end
         right = GitRev(RevType.LOCAL)
       end
     end
@@ -2120,6 +2137,7 @@ function GitAdapter:init_completion()
   self.comp.open:put({ "u", "untracked-files" }, { "true", "normal", "all", "false", "no" })
   self.comp.open:put({ "cached", "staged" })
   self.comp.open:put({ "imply-local" })
+  self.comp.open:put({ "merge-base" })
   self.comp.open:put({ "C" }, function(_, arg_lead)
     return vim.fn.getcompletion(arg_lead, "dir")
   end)
