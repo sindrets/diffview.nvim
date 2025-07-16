@@ -83,6 +83,7 @@ M.defaults = {
     },
   },
   file_history_panel = {
+    max_len_commit_subject = 72,
     log_options = {
       ---@type ConfigLogOptions
       git = {

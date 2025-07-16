@@ -62,6 +62,7 @@ DEFAULT CONFIG                                  *diffview.defaults*
       },
     },
     file_history_panel = {
+      max_len_commit_subject = 72,
       log_options = {   -- See |diffview-config-log_options|
         git = {
           single_file = {

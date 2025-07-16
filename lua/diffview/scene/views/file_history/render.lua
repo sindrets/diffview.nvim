@@ -142,7 +142,7 @@ local function render_entries(panel, parent, entries, updating)
       comp:add_text((" (%s)"):format(entry.commit.ref_names), "DiffviewReference")
     end
 
-    local subject = utils.str_trunc(entry.commit.subject, 72)
+    local subject = utils.str_trunc(entry.commit.subject, c.file_history_panel.max_len_commit_subject)
 
     if subject == "" then
       subject = "[empty message]"
