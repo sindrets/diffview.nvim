@@ -42,6 +42,7 @@ local fstat_cache = {}
 ---@field merge_ctx vcs.MergeContext?
 ---@field active boolean
 ---@field opened boolean
+---@field selected boolean
 local FileEntry = oop.create_class("FileEntry")
 
 ---@class FileEntry.init.Opt
@@ -75,6 +76,7 @@ function FileEntry:init(opt)
   self.merge_ctx = opt.merge_ctx
   self.active = false
   self.opened = false
+  self.selected = false
 end
 
 function FileEntry:destroy()

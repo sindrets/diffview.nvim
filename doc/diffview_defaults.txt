@@ -148,6 +148,7 @@ DEFAULT CONFIG                                  *diffview.defaults*
         { "n", "o",              actions.select_entry,                   { desc = "Open the diff for the selected entry" } },
         { "n", "l",              actions.select_entry,                   { desc = "Open the diff for the selected entry" } },
         { "n", "<2-LeftMouse>",  actions.select_entry,                   { desc = "Open the diff for the selected entry" } },
+        { "n", "w",              actions.toggle_select_entry,            { desc = "Toggle file selection (for multi-file operations)" } },
         { "n", "-",              actions.toggle_stage_entry,             { desc = "Stage / unstage the selected entry" } },
         { "n", "s",              actions.toggle_stage_entry,             { desc = "Stage / unstage the selected entry" } },
         { "n", "S",              actions.stage_all,                      { desc = "Stage all entries" } },

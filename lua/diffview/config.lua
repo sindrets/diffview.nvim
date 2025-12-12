@@ -192,6 +192,7 @@ M.defaults = {
       { "n", "<c-f>",          actions.scroll_view(0.25),              { desc = "Scroll the view down" } },
       { "n", "<tab>",          actions.select_next_entry,              { desc = "Open the diff for the next file" } },
       { "n", "<s-tab>",        actions.select_prev_entry,              { desc = "Open the diff for the previous file" } },
+      { "n", "w",              actions.toggle_select_entry,            { desc = "Toggle file selection (for multi-file operations)" } },
       { "n", "[F",             actions.select_first_entry,             { desc = "Open the diff for the first file" } },
       { "n", "]F",             actions.select_last_entry,              { desc = "Open the diff for the last file" } },
       { "n", "gf",             actions.goto_file_edit,                 { desc = "Open the file in the previous tabpage" } },

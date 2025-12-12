@@ -12,6 +12,21 @@ local await = async.await
 
 ---@param view DiffView
 return function(view)
+  -- Helper function to get selected files or fall back to current file
+  local function get_target_files()
+    local selected_files = view.panel:get_selected_files()
+    if #selected_files > 0 then
+      return selected_files
+    end
+    
+    local item = view:infer_cur_file(true)
+    if item then
+      return { item }
+    end
+    
+    return {}
+  end
+
   return {
     tab_enter = function()
       local file = view.panel.cur_file
@@ -102,6 +117,20 @@ return function(view)
         end
       end
     end,
+    toggle_select_entry = function()
+      if view.panel:is_open() then
+        ---@type any
+        local item = view.panel:get_item_at_cursor()
+        if item and type(item.collapsed) ~= "boolean" then
+          ---@cast item FileEntry
+          view.panel:toggle_file_selection(item)
+          view.panel:render()
+          view.panel:redraw()
+          -- Move cursor to next file
+          view.panel:highlight_next_file()
+        end
+      end
+    end,
     focus_entry = function()
       if view.panel:is_open() then
         ---@type any
@@ -132,20 +161,51 @@ return function(view)
         return
       end
 
-      local item = view:infer_cur_file(true)
-      if item then
-        local success
-        if item.kind == "working" or item.kind == "conflicting" then
-          success = view.adapter:add_files({ item.path })
-        elseif item.kind == "staged" then
-          success = view.adapter:reset_files({ item.path })
-        end
+      local items_to_process = get_target_files()
+      if #items_to_process == 0 then
+        return
+      end
 
+      -- Process each item
+      local files_to_stage = {}
+      local files_to_unstage = {}
+      
+      for _, item in ipairs(items_to_process) do
+        -- Skip directories
+        if type(item.collapsed) ~= "boolean" then
+          ---@cast item FileEntry
+          if item.kind == "working" or item.kind == "conflicting" then
+            table.insert(files_to_stage, item.path)
+          elseif item.kind == "staged" then
+            table.insert(files_to_unstage, item.path)
+          end
+        end
+      end
+
+      -- Stage files
+      if #files_to_stage > 0 then
+        local success = view.adapter:add_files(files_to_stage)
         if not success then
-          utils.err(("Failed to stage/unstage file: '%s'"):format(item.path))
+          utils.err("Failed to stage files!")
           return
         end
+      end
 
+      -- Unstage files
+      if #files_to_unstage > 0 then
+        local success = view.adapter:reset_files(files_to_unstage)
+        if not success then
+          utils.err("Failed to unstage files!")
+          return
+        end
+      end
+
+      -- Clear selections after staging
+      view.panel:clear_selections()
+
+      -- Navigate to next file if only one item was processed
+      if #items_to_process == 1 then
+        local item = items_to_process[1]
         if type(item.collapsed) == "boolean" then
           ---@cast item DirData
           ---@type FileTree
@@ -180,14 +240,14 @@ return function(view)
           view.panel:set_cur_file(item)
           view:next_file()
         end
-
-        view:update_files(
-          vim.schedule_wrap(function()
-            view.panel:highlight_cur_file()
-          end)
-        )
-        view.emitter:emit(EventName.FILES_STAGED, view)
       end
+
+      view:update_files(
+        vim.schedule_wrap(function()
+          view.panel:highlight_cur_file()
+        end)
+      )
+      view.emitter:emit(EventName.FILES_STAGED, view)
     end,
     stage_all = function()
       local args = vim.tbl_map(function(file)
@@ -226,22 +286,45 @@ return function(view)
       end
 
       local commit
-
       if view.left.type ~= RevType.STAGE then
         commit = view.left.commit
       end
 
-      local file = view:infer_cur_file()
-      if not file then return end
-
-      local bufid = utils.find_file_buffer(file.path)
-
-      if bufid and vim.bo[bufid].modified then
-        utils.err("The file is open with unsaved changes! Aborting file restoration.")
+      local items_to_process = get_target_files()
+      if #items_to_process == 0 then
         return
       end
 
-      await(vcs_utils.restore_file(view.adapter, file.path, file.kind, commit))
+      -- Filter to only file entries (not directories)
+      local files_to_restore = {}
+      for _, item in ipairs(items_to_process) do
+        if type(item.collapsed) ~= "boolean" then
+          ---@cast item FileEntry
+          table.insert(files_to_restore, item)
+        end
+      end
+
+      if #files_to_restore == 0 then
+        return
+      end
+
+      -- Check for unsaved changes in any of the files
+      for _, file in ipairs(files_to_restore) do
+        local bufid = utils.find_file_buffer(file.path)
+        if bufid and vim.bo[bufid].modified then
+          utils.err(("File '%s' is open with unsaved changes! Aborting file restoration."):format(file.path))
+          return
+        end
+      end
+
+      -- Restore all files
+      for _, file in ipairs(files_to_restore) do
+        await(vcs_utils.restore_file(view.adapter, file.path, file.kind, commit))
+      end
+
+      -- Clear selections after restoring
+      view.panel:clear_selections()
+
       view:update_files()
     end),
     listing_style = function()

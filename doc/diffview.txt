@@ -91,6 +91,17 @@ COMMANDS                                        *diffview-commands*
         entries under "Staged changes" will have it on the right side). Once
         you write to an index buffer the index will be updated.
 
+        For operating on entire files, you can use the file panel with multi-
+        file selection. Press `w` on a file to toggle selection (marked with
+        ✓), then press `-` or `s` to stage/unstage, or `X` to restore/discard
+        all selected files at once. If no files are selected, operations will
+        work on the file under the cursor. After performing an operation, all
+        selections are automatically cleared. This is useful when you need to
+        operate on multiple files that are not consecutive in the list.
+
+        See also: |diffview-actions-toggle_select_entry|,
+        |diffview-actions-toggle_stage_entry|, |diffview-actions-restore_entry|
+
                                                 *diffview-merge-tool*
         If you call `:DiffviewOpen` during a merge or a rebase, the view will
         list the conflicted files in their own section. When opening a
@@ -1129,7 +1140,10 @@ restore_entry                                   *diffview-actions-restore_entry*
 
             Revert the selected file entry to the state from the left side of
             the diff. This only works if the right side of the diff is showing
-            the local state of the file.
+            the local state of the file. If multiple files are selected using
+            |diffview-actions-toggle_select_entry|, this will restore all
+            selected files at once. After restoring selected files, the
+            selection will be automatically cleared.
 
             NOTE: "Restoring" an untracked file will delete it from disk. It
             still gets backed up in the local git database, so it is
@@ -1200,6 +1214,17 @@ stage_all                                       *diffview-actions-stage_all*
 
         Stage all changes.
 
+toggle_select_entry                             *diffview-actions-toggle_select_entry*
+        Contexts: `file_panel`
+
+        Toggle file selection for multi-file operations. Selected files are
+        marked with a checkmark (✓) in the file panel. When multiple files are
+        selected, actions like |diffview-actions-toggle_stage_entry| and
+        |diffview-actions-restore_entry| will operate on all selected files at
+        once. After performing an operation, the selection is automatically
+        cleared. The cursor will automatically move to the next file entry
+        after toggling selection.
+
 toggle_files                                    *diffview-actions-toggle_files*
         Contexts: `view`, `file_panel`, `file_history_panel`
 
@@ -1219,7 +1244,10 @@ toggle_fold                                     *diffview-actions-toggle_fold*
 toggle_stage_entry                              *diffview-actions-toggle_stage_entry*
         Contexts: `diff_view`, `file_panel`
 
-        Stage / unstage the subject.
+        Stage / unstage the subject. If multiple files are selected using
+        |diffview-actions-toggle_select_entry|, this will stage/unstage all
+        selected files at once. After staging selected files, the selection
+        will be automatically cleared.
 
 unstage_all                                     *diffview-actions-unstage_all*
         Contexts: `diff_view`, `file_panel`
@@ -1381,8 +1409,15 @@ o                       Open the diff for the selected file entry.
 <CR>
 <2-LeftMouse>
 
+                                                *diffview-maps-toggle_select_entry*
+w                       Toggle file selection for multi-file operations. Selected
+                       files are marked with a checkmark (✓). When files are
+                       selected, operations like staging (-/s) and restoring (X)
+                       will apply to all selected files.
+
                                                 *diffview-maps-toggle_stage_entry*
--                       Stage/unstage the selected file entry.
+-                       Stage/unstage the selected file entry. If multiple files
+                       are selected, this will stage/unstage all selected files.
 
                                                 *diffview-maps-stage_all*
 S                       Stage all entries.
@@ -1391,12 +1426,12 @@ S                       Stage all entries.
 U                       Unstage all entries.
 
                                                 *diffview-maps-restore_entry*
-X                       Revert the selected file entry to the state from the
-                        left side of the diff. This only works if the right
-                        side of the diff is showing the local state of the
-                        file. A command is echoed that shows how to undo the
-                        change. Check |:messages| or |:DiffviewLog| to see it
-                        again.
+X                       Revert the selected file entry (or all selected files
+                        if multiple are selected) to the state from the left
+                        side of the diff. This only works if the right side of
+                        the diff is showing the local state of the file. A
+                        command is echoed that shows how to undo the change.
+                        Check |:messages| or |:DiffviewLog| to see it again.
 
                                                 *diffview-maps-refresh_files*
 R                       Update the stats and entries in the file list.
