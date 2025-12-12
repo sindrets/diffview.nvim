@@ -122,6 +122,14 @@ will have the index buffer on the left side, and the entries under "Staged
 changes" will have it on the right side). Once you write to an index buffer the
 index will be updated.
 
+For operating on entire files, you can use the file panel with multi-file
+selection. Press `w` on a file to toggle selection (marked with ✓), then press
+`-` or `s` to stage/unstage, or `X` to restore/discard all selected files at
+once. If no files are selected, operations will work on the file under the
+cursor. After performing an operation, all selections are automatically cleared.
+This is useful when you need to operate on multiple files that are not
+consecutive in the list.
+
 ### `:[range]DiffviewFileHistory [paths] [options]`
 
 Opens a new file history view that lists all commits that affected the given

@@ -22,6 +22,7 @@ local M = {}
 ---@field components CompStruct
 ---@field constrain_cursor function
 ---@field help_mapping string
+---@field selected_files table<FileEntry, boolean>
 local FilePanel = oop.create_class("FilePanel", Panel)
 
 FilePanel.winopts = vim.tbl_extend("force", Panel.winopts, {
@@ -58,6 +59,7 @@ function FilePanel:init(adapter, files, path_args, rev_pretty_name)
   self.rev_pretty_name = rev_pretty_name
   self.listing_style = conf.file_panel.listing_style
   self.tree_options = conf.file_panel.tree_options
+  self.selected_files = {}
 
   self:on_autocmd("BufNew", {
     callback = function()
@@ -398,6 +400,36 @@ end
 
 function FilePanel:render()
   require("diffview.scene.views.diff.render")(self)
+end
+
+---Toggle selection for a file entry
+---@param file FileEntry
+function FilePanel:toggle_file_selection(file)
+  if self.selected_files[file] then
+    self.selected_files[file] = nil
+    file.selected = false
+  else
+    self.selected_files[file] = true
+    file.selected = true
+  end
+end
+
+---Get all currently selected files as a list
+---@return FileEntry[]
+function FilePanel:get_selected_files()
+  local selected = {}
+  for file, _ in pairs(self.selected_files) do
+    table.insert(selected, file)
+  end
+  return selected
+end
+
+---Clear all file selections
+function FilePanel:clear_selections()
+  for file, _ in pairs(self.selected_files) do
+    file.selected = false
+  end
+  self.selected_files = {}
 end
 
 M.FilePanel = FilePanel

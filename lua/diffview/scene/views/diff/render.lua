@@ -17,6 +17,11 @@ local function render_file(comp, show_path, depth)
     comp:add_text(string.rep(" ", depth * 2 + 2))
   end
 
+  -- Add selection indicator
+  if file.selected then
+    comp:add_text("✓ ", "DiffviewFilePanelConflicts")
+  end
+
   local icon, icon_hl = hl.get_file_icon(file.basename, file.extension)
   comp:add_text(icon, icon_hl)
   comp:add_text(file.basename, file.active and "DiffviewFilePanelSelected" or "DiffviewFilePanelFileName")

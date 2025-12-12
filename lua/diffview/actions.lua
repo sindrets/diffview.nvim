@@ -643,6 +643,7 @@ local action_names = {
   "toggle_files",
   "toggle_flatten_dirs",
   "toggle_fold",
+  "toggle_select_entry",
   "toggle_stage_entry",
   "unstage_all",
 }
