@@ -51,7 +51,7 @@ end
 
 ---@param adapter VCSAdapter
 ---@param opt CommitLogPanelSpec
-function CommitLogPanel:init(adapter, opt)
+function CommitLogPanel:init(parent, adapter, opt)
   self:super({
     bufname = opt.name,
     config = opt.config or get_user_config().commit_log_panel.win_config,
@@ -65,6 +65,21 @@ function CommitLogPanel:init(adapter, opt)
       vim.bo[self.bufid].bufhidden = "wipe"
     end,
   })
+
+  local conf = get_user_config().keymaps
+  local default_opt = { silent = true, nowait = true, buffer = self.bufid }
+
+  for _, mapping in ipairs(conf.commit_log_panel) do
+    local map_opt = vim.tbl_extend("force", default_opt, mapping[4] or {}, { buffer = self.bufid })
+    vim.keymap.set(mapping[1], mapping[2], mapping[3], map_opt)
+  end
+
+  parent.emitter:on("close", function(e)
+    if self:is_focused() then
+      self:close()
+      e:stop_propagation()
+    end
+  end)
 end
 
 ---@param self CommitLogPanel
