@@ -44,17 +44,8 @@ end
 
 ---@override
 function StandardView:close()
-  self.closing:send()
   self.panel:destroy()
-
-  if self.tabpage and api.nvim_tabpage_is_valid(self.tabpage) then
-    DiffviewGlobal.emitter:emit("view_leave", self)
-
-    local pagenr = api.nvim_tabpage_get_number(self.tabpage)
-    vim.cmd("tabclose " .. pagenr)
-  end
-
-  DiffviewGlobal.emitter:emit("view_closed", self)
+  View.close(self)
 end
 
 ---@override

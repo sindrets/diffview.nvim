@@ -1,3 +1,5 @@
+require("diffview.bootstrap")
+
 local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 
@@ -633,6 +635,10 @@ local action_names = {
   "select_entry",
   "select_next_entry",
   "select_prev_entry",
+  "select_first_entry",
+  "select_last_entry",
+  "select_next_commit",
+  "select_prev_commit",
   "stage_all",
   "toggle_files",
   "toggle_flatten_dirs",

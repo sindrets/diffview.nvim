@@ -76,6 +76,10 @@ function View:close()
   if self.tabpage and api.nvim_tabpage_is_valid(self.tabpage) then
     DiffviewGlobal.emitter:emit("view_leave", self)
 
+    if #api.nvim_list_tabpages() == 1 then
+      vim.cmd("tabnew")
+    end
+
     local pagenr = api.nvim_tabpage_get_number(self.tabpage)
     vim.cmd("tabclose " .. pagenr)
   end

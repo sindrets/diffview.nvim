@@ -1,3 +1,5 @@
+require("diffview.bootstrap")
+
 ---@diagnostic disable: deprecated
 local EventEmitter = require("diffview.events").EventEmitter
 local actions = require("diffview.actions")
@@ -54,6 +56,7 @@ M.defaults = {
   view = {
     default = {
       layout = "diff2_horizontal",
+      disable_diagnostics = false,
       winbar_info = false,
     },
     merge_tool = {
@@ -63,6 +66,7 @@ M.defaults = {
     },
     file_history = {
       layout = "diff2_horizontal",
+      disable_diagnostics = false,
       winbar_info = false,
     },
   },
@@ -120,6 +124,8 @@ M.defaults = {
       -- tabpage is a Diffview.
       { "n", "<tab>",       actions.select_next_entry,              { desc = "Open the diff for the next file" } },
       { "n", "<s-tab>",     actions.select_prev_entry,              { desc = "Open the diff for the previous file" } },
+      { "n", "[F",          actions.select_first_entry,             { desc = "Open the diff for the first file" } },
+      { "n", "]F",          actions.select_last_entry,              { desc = "Open the diff for the last file" } },
       { "n", "gf",          actions.goto_file_edit,                 { desc = "Open the file in the previous tabpage" } },
       { "n", "<C-w><C-f>",  actions.goto_file_split,                { desc = "Open the file in a new split" } },
       { "n", "<C-w>gf",     actions.goto_file_tab,                  { desc = "Open the file in a new tabpage" } },
@@ -186,6 +192,8 @@ M.defaults = {
       { "n", "<c-f>",          actions.scroll_view(0.25),              { desc = "Scroll the view down" } },
       { "n", "<tab>",          actions.select_next_entry,              { desc = "Open the diff for the next file" } },
       { "n", "<s-tab>",        actions.select_prev_entry,              { desc = "Open the diff for the previous file" } },
+      { "n", "[F",             actions.select_first_entry,             { desc = "Open the diff for the first file" } },
+      { "n", "]F",             actions.select_last_entry,              { desc = "Open the diff for the last file" } },
       { "n", "gf",             actions.goto_file_edit,                 { desc = "Open the file in the previous tabpage" } },
       { "n", "<C-w><C-f>",     actions.goto_file_split,                { desc = "Open the file in a new split" } },
       { "n", "<C-w>gf",        actions.goto_file_tab,                  { desc = "Open the file in a new tabpage" } },
@@ -228,6 +236,8 @@ M.defaults = {
       { "n", "<c-f>",         actions.scroll_view(0.25),           { desc = "Scroll the view down" } },
       { "n", "<tab>",         actions.select_next_entry,           { desc = "Open the diff for the next file" } },
       { "n", "<s-tab>",       actions.select_prev_entry,           { desc = "Open the diff for the previous file" } },
+      { "n", "[F",            actions.select_first_entry,          { desc = "Open the diff for the first file" } },
+      { "n", "]F",            actions.select_last_entry,           { desc = "Open the diff for the last file" } },
       { "n", "gf",            actions.goto_file_edit,              { desc = "Open the file in the previous tabpage" } },
       { "n", "<C-w><C-f>",    actions.goto_file_split,             { desc = "Open the file in a new split" } },
       { "n", "<C-w>gf",       actions.goto_file_tab,               { desc = "Open the file in a new tabpage" } },
