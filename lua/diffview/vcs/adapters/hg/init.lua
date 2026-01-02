@@ -58,7 +58,7 @@ function HgAdapter.run_bootstrap()
     return err(fmt("Configured `hg_cmd` is not executable: '%s'", hg_cmd[1]))
   end
 
-  local out = utils.job(vim.tbl_flatten({ hg_cmd, "version" }))
+  local out = utils.job(utils.flatten({ hg_cmd, "version" }))
   local version = out[1] and out[1]:match("Mercurial .*%(version (%S*)%)") or nil
   if not version then
     return err("Could not get Mercurial version!")
@@ -127,7 +127,7 @@ end
 ---@param path string
 ---@return string?
 local function get_toplevel(path)
-  local out, code = utils.job(vim.tbl_flatten({config.get_config().hg_cmd, {"root"}}), path)
+  local out, code = utils.job(utils.flatten({config.get_config().hg_cmd, {"root"}}), path)
   if code ~= 0 then
     return nil
   end

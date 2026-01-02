@@ -146,25 +146,26 @@ Examples:
 - `:DiffviewFileHistory --range=feat/example-branch`
 - `:'<,'>DiffviewFileHistory`
 
-### Familiarize Yourself With `:h diff-mode`
-
-| :information_source: This plugin assumes you're familiar with all the features already provided by nvim's builtin diff-mode |
-|:-----------------------------------------|
-
-These features include:
-
-- Jumping between hunks (`:h jumpto-diffs`).
-- Applying the changes of a diff hunk from any of the diffed buffers
-  (`:h copy-diffs`).
-- And more...
-
-Visit the help page for more info.
+> [!IMPORTANT]
+> ### Familiarize Yourself With `:h diff-mode`
+>
+> This plugin assumes you're familiar with all the features already provided by
+> nvim's builtin diff-mode. These features include:
+>
+> - Jumping between hunks (`:h jumpto-diffs`).
+> - Applying the changes of a diff hunk from any of the diffed buffers
+>   (`:h copy-diffs`).
+> - And more...
+>
+> Read the help page for more info.
 
 ---
 
 <br>
 
-#### :information_source: Additionally check out [USAGE](USAGE.md) for examples of some more specific use-cases
+> [!NOTE]
+> Additionally check out [USAGE](USAGE.md) for examples of some more specific
+> use-cases.
 
 <br>
 
@@ -182,7 +183,7 @@ local actions = require("diffview.actions")
 
 require("diffview").setup({
   diff_binaries = false,    -- Show diffs for binaries
-  enhanced_diff_hl = false, -- See ':h diffview-config-enhanced_diff_hl'
+  enhanced_diff_hl = false, -- See |diffview-config-enhanced_diff_hl|
   git_cmd = { "git" },      -- The git executable followed by default args.
   hg_cmd = { "hg" },        -- The hg executable followed by default args.
   use_icons = true,         -- Requires nvim-web-devicons
@@ -207,22 +208,24 @@ require("diffview").setup({
     --    |'diff3_vertical'
     --    |'diff3_mixed'
     --    |'diff4_mixed'
-    -- For more info, see ':h diffview-config-view.x.layout'.
+    -- For more info, see |diffview-config-view.x.layout|.
     default = {
       -- Config for changed files, and staged files in diff views.
       layout = "diff2_horizontal",
-      winbar_info = false,          -- See ':h diffview-config-view.x.winbar_info'
+      disable_diagnostics = false,  -- Temporarily disable diagnostics for diff buffers while in the view.
+      winbar_info = false,          -- See |diffview-config-view.x.winbar_info|
     },
     merge_tool = {
       -- Config for conflicted files in diff views during a merge or rebase.
       layout = "diff3_horizontal",
-      disable_diagnostics = true,   -- Temporarily disable diagnostics for conflict buffers while in the view.
-      winbar_info = true,           -- See ':h diffview-config-view.x.winbar_info'
+      disable_diagnostics = true,   -- Temporarily disable diagnostics for diff buffers while in the view.
+      winbar_info = true,           -- See |diffview-config-view.x.winbar_info|
     },
     file_history = {
       -- Config for changed files in file history views.
       layout = "diff2_horizontal",
-      winbar_info = false,          -- See ':h diffview-config-view.x.winbar_info'
+      disable_diagnostics = false,  -- Temporarily disable diagnostics for diff buffers while in the view.
+      winbar_info = false,          -- See |diffview-config-view.x.winbar_info|
     },
   },
   file_panel = {
@@ -231,14 +234,14 @@ require("diffview").setup({
       flatten_dirs = true,              -- Flatten dirs that only contain one single dir
       folder_statuses = "only_folded",  -- One of 'never', 'only_folded' or 'always'.
     },
-    win_config = {                      -- See ':h diffview-config-win_config'
+    win_config = {                      -- See |diffview-config-win_config|
       position = "left",
       width = 35,
-      win_opts = {}
+      win_opts = {},
     },
   },
   file_history_panel = {
-    log_options = {   -- See ':h diffview-config-log_options'
+    log_options = {   -- See |diffview-config-log_options|
       git = {
         single_file = {
           diff_merges = "combined",
@@ -252,22 +255,20 @@ require("diffview").setup({
         multi_file = {},
       },
     },
-    win_config = {    -- See ':h diffview-config-win_config'
+    win_config = {    -- See |diffview-config-win_config|
       position = "bottom",
       height = 16,
-      win_opts = {}
+      win_opts = {},
     },
   },
   commit_log_panel = {
-    win_config = {   -- See ':h diffview-config-win_config'
-      win_opts = {},
-    }
+    win_config = {},  -- See |diffview-config-win_config|
   },
   default_args = {    -- Default args prepended to the arg-list for the listed commands
     DiffviewOpen = {},
     DiffviewFileHistory = {},
   },
-  hooks = {},         -- See ':h diffview-config-hooks'
+  hooks = {},         -- See |diffview-config-hooks|
   keymaps = {
     disable_defaults = false, -- Disable the default keymaps
     view = {
@@ -275,6 +276,8 @@ require("diffview").setup({
       -- tabpage is a Diffview.
       { "n", "<tab>",       actions.select_next_entry,              { desc = "Open the diff for the next file" } },
       { "n", "<s-tab>",     actions.select_prev_entry,              { desc = "Open the diff for the previous file" } },
+      { "n", "[F",          actions.select_first_entry,             { desc = "Open the diff for the first file" } },
+      { "n", "]F",          actions.select_last_entry,              { desc = "Open the diff for the last file" } },
       { "n", "gf",          actions.goto_file_edit,                 { desc = "Open the file in the previous tabpage" } },
       { "n", "<C-w><C-f>",  actions.goto_file_split,                { desc = "Open the file in a new split" } },
       { "n", "<C-w>gf",     actions.goto_file_tab,                  { desc = "Open the file in a new tabpage" } },
@@ -340,6 +343,8 @@ require("diffview").setup({
       { "n", "<c-f>",          actions.scroll_view(0.25),              { desc = "Scroll the view down" } },
       { "n", "<tab>",          actions.select_next_entry,              { desc = "Open the diff for the next file" } },
       { "n", "<s-tab>",        actions.select_prev_entry,              { desc = "Open the diff for the previous file" } },
+      { "n", "[F",             actions.select_first_entry,             { desc = "Open the diff for the first file" } },
+      { "n", "]F",             actions.select_last_entry,              { desc = "Open the diff for the last file" } },
       { "n", "gf",             actions.goto_file_edit,                 { desc = "Open the file in the previous tabpage" } },
       { "n", "<C-w><C-f>",     actions.goto_file_split,                { desc = "Open the file in a new split" } },
       { "n", "<C-w>gf",        actions.goto_file_tab,                  { desc = "Open the file in a new tabpage" } },
@@ -363,19 +368,27 @@ require("diffview").setup({
       { "n", "<C-A-d>",       actions.open_in_diffview,            { desc = "Open the entry under the cursor in a diffview" } },
       { "n", "y",             actions.copy_hash,                   { desc = "Copy the commit hash of the entry under the cursor" } },
       { "n", "L",             actions.open_commit_log,             { desc = "Show commit details" } },
+      { "n", "X",             actions.restore_entry,               { desc = "Restore file to the state from the selected entry" } },
+      { "n", "zo",            actions.open_fold,                   { desc = "Expand fold" } },
+      { "n", "zc",            actions.close_fold,                  { desc = "Collapse fold" } },
+      { "n", "h",             actions.close_fold,                  { desc = "Collapse fold" } },
+      { "n", "za",            actions.toggle_fold,                 { desc = "Toggle fold" } },
       { "n", "zR",            actions.open_all_folds,              { desc = "Expand all folds" } },
       { "n", "zM",            actions.close_all_folds,             { desc = "Collapse all folds" } },
       { "n", "j",             actions.next_entry,                  { desc = "Bring the cursor to the next file entry" } },
       { "n", "<down>",        actions.next_entry,                  { desc = "Bring the cursor to the next file entry" } },
-      { "n", "k",             actions.prev_entry,                  { desc = "Bring the cursor to the previous file entry." } },
-      { "n", "<up>",          actions.prev_entry,                  { desc = "Bring the cursor to the previous file entry." } },
-      { "n", "<cr>",          actions.select_entry,                { desc = "Open the diff for the selected entry." } },
-      { "n", "o",             actions.select_entry,                { desc = "Open the diff for the selected entry." } },
-      { "n", "<2-LeftMouse>", actions.select_entry,                { desc = "Open the diff for the selected entry." } },
+      { "n", "k",             actions.prev_entry,                  { desc = "Bring the cursor to the previous file entry" } },
+      { "n", "<up>",          actions.prev_entry,                  { desc = "Bring the cursor to the previous file entry" } },
+      { "n", "<cr>",          actions.select_entry,                { desc = "Open the diff for the selected entry" } },
+      { "n", "o",             actions.select_entry,                { desc = "Open the diff for the selected entry" } },
+      { "n", "l",             actions.select_entry,                { desc = "Open the diff for the selected entry" } },
+      { "n", "<2-LeftMouse>", actions.select_entry,                { desc = "Open the diff for the selected entry" } },
       { "n", "<c-b>",         actions.scroll_view(-0.25),          { desc = "Scroll the view up" } },
       { "n", "<c-f>",         actions.scroll_view(0.25),           { desc = "Scroll the view down" } },
       { "n", "<tab>",         actions.select_next_entry,           { desc = "Open the diff for the next file" } },
       { "n", "<s-tab>",       actions.select_prev_entry,           { desc = "Open the diff for the previous file" } },
+      { "n", "[F",            actions.select_first_entry,          { desc = "Open the diff for the first file" } },
+      { "n", "]F",            actions.select_last_entry,           { desc = "Open the diff for the last file" } },
       { "n", "gf",            actions.goto_file_edit,              { desc = "Open the file in the previous tabpage" } },
       { "n", "<C-w><C-f>",    actions.goto_file_split,             { desc = "Open the file in a new split" } },
       { "n", "<C-w>gf",       actions.goto_file_tab,               { desc = "Open the file in a new tabpage" } },

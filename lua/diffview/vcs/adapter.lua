@@ -154,7 +154,7 @@ end
 function VCSAdapter:exec_sync(args, cwd_or_opt)
   if not self.class.bootstrap.done then self.class.run_bootstrap() end
 
-  local cmd = vim.tbl_flatten({ self:get_command(), args })
+  local cmd = utils.flatten({ self:get_command(), args })
 
   if not self.class.bootstrap.ok then
     logger:error(

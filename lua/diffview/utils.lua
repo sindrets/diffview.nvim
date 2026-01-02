@@ -1,11 +1,9 @@
-local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 
 local Job = lazy.access("diffview.job", "Job") ---@type diffview.Job|LazyModule
+local logger = lazy.access(_G, { "DiffviewGlobal", "logger" }) ---@type Logger
 
 local api = vim.api
-local await = async.await
-local logger = DiffviewGlobal.logger
 
 local M = {}
 
@@ -25,65 +23,44 @@ function M.now()
   return vim.loop.hrtime() / 1000000
 end
 
----Echo string with multiple lines.
 ---@param msg string|string[]
----@param hl? string Highlight group name.
 ---@param schedule? boolean Schedule the echo call.
-function M.echo_multiln(msg, hl, schedule)
+---@param level integer
+function M.notify(msg, level, schedule)
   if schedule then
-    vim.schedule(function() M.echo_multiln(msg, hl, false) end)
+    vim.schedule(function() M.notify(msg, level, false) end)
+    return
+  end
+  if type(msg) == "table" then
+    msg = table.concat(msg, "\n")
+  end
+  if msg == "" then
     return
   end
 
-  if type(msg) ~= "table" then msg = { msg } end
+  if level == vim.log.levels.ERROR then
+    logger:error(msg)
+  end
 
-  local text = table.concat(msg, "\n")
-  api.nvim_echo({ { text, hl } }, true, {})
+  vim.notify(msg, level, { title = "diffview.nvim" })
 end
 
 ---@param msg string|string[]
 ---@param schedule? boolean Schedule the echo call.
 function M.info(msg, schedule)
-  if type(msg) ~= "table" then
-    msg = { msg }
-  end
-  if not msg[1] or (msg[1] == "" and #msg == 1) then
-    return
-  end
-  msg = M.vec_slice(msg)
-  msg[1] = "[Diffview.nvim] " .. msg[1]
-  M.echo_multiln(msg, "DiagnosticInfo", schedule)
+  M.notify(msg, vim.log.levels.INFO, schedule)
 end
 
 ---@param msg string|string[]
 ---@param schedule? boolean Schedule the echo call.
 function M.warn(msg, schedule)
-  if type(msg) ~= "table" then
-    msg = { msg }
-  end
-  if not msg[1] or (msg[1] == "" and #msg == 1) then
-    return
-  end
-  msg = M.vec_slice(msg)
-  msg[1] = "[Diffview.nvim] " .. msg[1]
-  M.echo_multiln(msg, "WarningMsg", schedule)
+  M.notify(msg, vim.log.levels.WARN, schedule)
 end
 
 ---@param msg string|string[]
 ---@param schedule? boolean Schedule the echo call.
 function M.err(msg, schedule)
-  if type(msg) ~= "table" then
-    msg = { msg }
-  end
-  if not msg[1] or (msg[1] == "" and #msg == 1) then
-    return
-  end
-  msg = M.vec_slice(msg)
-
-  logger:error(table.concat(msg, "\n"))
-
-  msg[1] = "[Diffview.nvim] " .. msg[1]
-  M.echo_multiln(msg, "ErrorMsg", schedule)
+  M.notify(msg, vim.log.levels.ERROR, schedule)
 end
 
 ---Call the function `f`, ignoring most of the window and buffer related
@@ -1344,6 +1321,40 @@ function M.merge_sort(t, comparator)
   split_merge(t, 1, #t, comparator)
 end
 
+--- @diagnostic disable-next-line: deprecated
+M.islist = vim.fn.has("nvim-0.10") == 1 and vim.islist or vim.tbl_islist
+
+--- @param t table
+--- @return any[]
+function M.flatten(t)
+  local result = {}
+
+  --- @param _t table<any,any>
+  local function recurse(_t)
+    local n = #_t
+    for i = 1, n do
+      local v = _t[i]
+      if type(v) == 'table' then
+        recurse(v)
+      elseif v then
+        table.insert(result, v)
+      end
+    end
+  end
+
+  recurse(t)
+
+  return result
+end
+
 M.path_sep = path_sep
+
+--- @param t table
+--- @return table t
+function M.add_reverse_lookup(t)
+  local keys = vim.tbl_keys(t)
+  for _, k in ipairs(keys) do t[t[k]] = k end
+  return t
+end
 
 return M

@@ -21,7 +21,7 @@ DEFAULT CONFIG                                  *diffview.defaults*
     },
     view = {
       -- Configure the layout and behavior of different types of views.
-      -- Available layouts: 
+      -- Available layouts:
       --  'diff1_plain'
       --    |'diff2_horizontal'
       --    |'diff2_vertical'
@@ -33,17 +33,19 @@ DEFAULT CONFIG                                  *diffview.defaults*
       default = {
         -- Config for changed files, and staged files in diff views.
         layout = "diff2_horizontal",
+        disable_diagnostics = false,  -- Temporarily disable diagnostics for diff buffers while in the view.
         winbar_info = false,          -- See |diffview-config-view.x.winbar_info|
       },
       merge_tool = {
         -- Config for conflicted files in diff views during a merge or rebase.
         layout = "diff3_horizontal",
-        disable_diagnostics = true,   -- Temporarily disable diagnostics for conflict buffers while in the view.
+        disable_diagnostics = true,   -- Temporarily disable diagnostics for diff buffers while in the view.
         winbar_info = true,           -- See |diffview-config-view.x.winbar_info|
       },
       file_history = {
         -- Config for changed files in file history views.
         layout = "diff2_horizontal",
+        disable_diagnostics = false,  -- Temporarily disable diagnostics for diff buffers while in the view.
         winbar_info = false,          -- See |diffview-config-view.x.winbar_info|
       },
     },
@@ -95,6 +97,8 @@ DEFAULT CONFIG                                  *diffview.defaults*
         -- tabpage is a Diffview.
         { "n", "<tab>",       actions.select_next_entry,              { desc = "Open the diff for the next file" } },
         { "n", "<s-tab>",     actions.select_prev_entry,              { desc = "Open the diff for the previous file" } },
+        { "n", "[F",          actions.select_first_entry,             { desc = "Open the diff for the first file" } },
+        { "n", "]F",          actions.select_last_entry,              { desc = "Open the diff for the last file" } },
         { "n", "gf",          actions.goto_file_edit,                 { desc = "Open the file in the previous tabpage" } },
         { "n", "<C-w><C-f>",  actions.goto_file_split,                { desc = "Open the file in a new split" } },
         { "n", "<C-w>gf",     actions.goto_file_tab,                  { desc = "Open the file in a new tabpage" } },
@@ -160,6 +164,8 @@ DEFAULT CONFIG                                  *diffview.defaults*
         { "n", "<c-f>",          actions.scroll_view(0.25),              { desc = "Scroll the view down" } },
         { "n", "<tab>",          actions.select_next_entry,              { desc = "Open the diff for the next file" } },
         { "n", "<s-tab>",        actions.select_prev_entry,              { desc = "Open the diff for the previous file" } },
+        { "n", "[F",             actions.select_first_entry,             { desc = "Open the diff for the first file" } },
+        { "n", "]F",             actions.select_last_entry,              { desc = "Open the diff for the last file" } },
         { "n", "gf",             actions.goto_file_edit,                 { desc = "Open the file in the previous tabpage" } },
         { "n", "<C-w><C-f>",     actions.goto_file_split,                { desc = "Open the file in a new split" } },
         { "n", "<C-w>gf",        actions.goto_file_tab,                  { desc = "Open the file in a new tabpage" } },
@@ -184,9 +190,7 @@ DEFAULT CONFIG                                  *diffview.defaults*
         { "n", "y",             actions.copy_hash,                   { desc = "Copy the commit hash of the entry under the cursor" } },
         { "n", "L",             actions.open_commit_log,             { desc = "Show commit details" } },
         { "n", "X",             actions.restore_entry,               { desc = "Restore file to the state from the selected entry" } },
-        { "n", "zr",            actions.open_fold,                   { desc = "Expand fold" } },
         { "n", "zo",            actions.open_fold,                   { desc = "Expand fold" } },
-        { "n", "zm",            actions.close_fold,                  { desc = "Collapse fold" } },
         { "n", "zc",            actions.close_fold,                  { desc = "Collapse fold" } },
         { "n", "h",             actions.close_fold,                  { desc = "Collapse fold" } },
         { "n", "za",            actions.toggle_fold,                 { desc = "Toggle fold" } },
@@ -204,6 +208,8 @@ DEFAULT CONFIG                                  *diffview.defaults*
         { "n", "<c-f>",         actions.scroll_view(0.25),           { desc = "Scroll the view down" } },
         { "n", "<tab>",         actions.select_next_entry,           { desc = "Open the diff for the next file" } },
         { "n", "<s-tab>",       actions.select_prev_entry,           { desc = "Open the diff for the previous file" } },
+        { "n", "[F",            actions.select_first_entry,          { desc = "Open the diff for the first file" } },
+        { "n", "]F",            actions.select_last_entry,           { desc = "Open the diff for the last file" } },
         { "n", "gf",            actions.goto_file_edit,              { desc = "Open the file in the previous tabpage" } },
         { "n", "<C-w><C-f>",    actions.goto_file_split,             { desc = "Open the file in a new split" } },
         { "n", "<C-w>gf",       actions.goto_file_tab,               { desc = "Open the file in a new tabpage" } },

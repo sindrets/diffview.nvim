@@ -98,7 +98,7 @@ function GitAdapter.run_bootstrap()
     return err(fmt("Configured `git_cmd` is not executable: '%s'", git_cmd[1]))
   end
 
-  local out = utils.job(vim.tbl_flatten({ git_cmd, "version" }))
+  local out = utils.job(utils.flatten({ git_cmd, "version" }))
   bs.version_string = out[1] and out[1]:match("git version (%S+)") or nil
 
   if not bs.version_string then
@@ -170,7 +170,7 @@ end
 ---@param path string
 ---@return string?
 local function get_toplevel(path)
-  local out, code = utils.job(vim.tbl_flatten({
+  local out, code = utils.job(utils.flatten({
     config.get_config().git_cmd,
     { "rev-parse", "--path-format=absolute", "--show-toplevel" },
   }), path)
@@ -1462,12 +1462,19 @@ end
 ---@param head Rev
 ---@return Rev, Rev
 function GitAdapter:imply_local(left, right, head)
+  -- Special case when they both point to head: change only the right side in
+  -- order to still get a meaningful rev range.
+  if left.commit == head.commit and right.commit == head.commit then
+    return left, GitRev(RevType.LOCAL)
+  end
+
   if left.commit == head.commit then
     left = GitRev(RevType.LOCAL)
   end
   if right.commit == head.commit then
     right = GitRev(RevType.LOCAL)
   end
+
   return left, right
 end
 
@@ -1906,6 +1913,7 @@ function GitAdapter:is_binary(path, rev)
   local cmd = { "-c", "submodule.recurse=false", "grep", "-I", "--name-only", "-e", "." }
   if rev.type == RevType.LOCAL then
     cmd[#cmd+1] = "--untracked"
+    cmd[#cmd+1] = "--no-exclude-standard"
   elseif rev.type == RevType.STAGE then
     cmd[#cmd+1] = "--cached"
   else

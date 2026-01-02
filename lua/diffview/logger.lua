@@ -174,7 +174,7 @@ function Logger.dstring(object)
 
     if mt and mt.__tostring then
       return tostring(object)
-    elseif vim.tbl_islist(object) then
+    elseif utils.islist(object) then
       if #object == 0 then return "[]" end
       local s = ""
 

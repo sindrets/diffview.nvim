@@ -217,7 +217,7 @@ end
 
 ---@return string[]
 function MultiJob:stdout()
-  return vim.tbl_flatten(
+  return utils.flatten(
     ---@param value diffview.Job
     vim.tbl_map(function(value)
       return value.stdout
@@ -227,7 +227,7 @@ end
 
 ---@return string[]
 function MultiJob:stderr()
-  return vim.tbl_flatten(
+  return utils.flatten(
     ---@param value diffview.Job
     vim.tbl_map(function(value)
       return value.stderr

@@ -442,7 +442,7 @@ view.x.layout                                   *diffview-config-view.x.layout*
                 | "diff4_mixed"
                 | -1
 <
-        Default: (see example config above)
+        Default: (see defaults)
 
         This determines the layout used for diffs in the various different
         views. Some of the layouts are only applicable to certain types of
@@ -550,17 +550,17 @@ view.x.layout                                   *diffview-config-view.x.layout*
                 └──────────────┘
 
 view.x.winbar_info                              *diffview-config-view.x.winbar_info*
-        Type: `boolean`, Default: (see example config above)
+        Type: `boolean`, Default: (see defaults)
 
         Use the 'winbar' to show contextual info about the different versions
         of a file in a diff.
 
-                                                *diffview-config-view.merge_tool.disable_diagnostics*
-view.merge_tool.disable_diagnostics
-        Type: `boolean`, Default: `true`
+                                                *diffview-config-view.x.disable_diagnostics*
+view.x.disable_diagnostics
+        Type: `boolean`, Default: (see defaults)
 
-        Temporarily disable diagnostics for conflict buffers while in a
-        diff_view. The diagnostics are enabled again when leaving or closing
+        Temporarily disable diagnostics for diff buffers while in a view. The
+        diagnostics are automatically enabled again when leaving or closing
         the view's tab page.
 
 win_config                                      *diffview-config-win_config*
@@ -652,7 +652,7 @@ win_config                                      *diffview-config-win_config*
 
 
 log_options                                     *diffview-config-log_options*
-        Type: `table`, Default: (see example config above)
+        Type: `table`, Default: (see defaults)
 
         This table allows you to control the default options that are passed
         to git-log in order to produce the file history. The table is divided
@@ -789,7 +789,7 @@ hooks                                           *diffview-config-hooks*
 <
 
 keymaps                                         *diffview-config-keymaps*
-        Type: `table`, Default: (see example config above)
+        Type: `table`, Default: (see defaults)
 
         The keymaps config is structured as a table with sub-tables for
         various different contexts where mappings can be declared. In these
@@ -1165,15 +1165,35 @@ select_entry                                    *diffview-actions-select_entry*
         multiple files, this will collapse or open the entry. In the option
         panel this will interact with the option under the cursor.
 
-select_next_entry                               *diffview-actions-select_next_entry*
+[count] select_next_entry                       *diffview-actions-select_next_entry*
         Contexts: `view`, `file_panel`, `file_history_panel`
 
         Select the entry following the subject.
 
-select_prev_entry                               *diffview-actions-select_prev_entry*
+[count] select_prev_entry                       *diffview-actions-select_prev_entry*
         Contexts: `view`, `file_panel`, `file_history_panel`
 
         Select the entry preceding the subject.
+
+select_first_entry                              *diffview-actions-select_first_entry*
+        Contexts: `view`, `file_panel`, `file_history_panel`
+
+        Select the first entry.
+
+select_last_entry                               *diffview-actions-select_last_entry*
+        Contexts: `view`, `file_panel`, `file_history_panel`
+
+        Select the last entry.
+
+[count] select_next_commit                      *diffview-actions-select_next_commit*
+        Contexts: `file_history_view`, `file_history_panel`
+
+        Select the commit following the subject.
+
+[count] select_prev_commit                      *diffview-actions-select_prev_commit*
+        Contexts: `file_history_view`, `file_history_panel`
+
+        Select the commit preceding the subject.
 
 stage_all                                       *diffview-actions-stage_all*
         Contexts: `diff_view`, `file_panel`
