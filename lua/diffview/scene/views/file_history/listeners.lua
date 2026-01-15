@@ -208,7 +208,7 @@ return function(view)
       if view.panel:is_focused() then
         local item = view.panel:get_item_at_cursor()
         if item then
-          vim.fn.setreg("+", item.commit.hash)
+          vim.fn.setreg('"', item.commit.hash)
           utils.info(string.format("Copied '%s' to the clipboard.", item.commit.hash))
         end
       end
