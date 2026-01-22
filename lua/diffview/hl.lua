@@ -403,6 +403,13 @@ function M.get_git_hl(status)
   return git_status_hl_map[status]
 end
 
+
+--- @param status string
+--- @return string
+function M.get_status_icon(status)
+  return config._config.status_icons[status] or status
+end
+
 function M.get_colors()
   return {
     white = M.get_fg("Normal") or "White",
