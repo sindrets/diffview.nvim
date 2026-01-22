@@ -14,6 +14,19 @@ DEFAULT CONFIG                                  *diffview.defaults*
       folder_closed = "",
       folder_open = "",
     },
+    status_icons = {
+      ["A"] = "A", -- added
+      ["?"] = "?", -- untracked
+      ["M"] = "M", -- modified
+      ["R"] = "R", -- renamed
+      ["C"] = "C", -- copied
+      ["T"] = "T", -- file type change
+      ["U"] = "U", -- updated but unmerged
+      ["X"] = "X",
+      ["D"] = "D", -- deleted
+      ["B"] = "B",
+      ["!"] = "!", -- untracked
+    },
     signs = {
       fold_closed = "",
       fold_open = "",

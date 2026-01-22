@@ -11,7 +11,7 @@ local function render_file(comp, show_path, depth)
   ---@type FileEntry
   local file = comp.context
 
-  comp:add_text(file.status .. " ", hl.get_git_hl(file.status))
+  comp:add_text(hl.get_status_icon(file.status) .. " ", hl.get_git_hl(file.status))
 
   if depth then
     comp:add_text(string.rep(" ", depth * 2 + 2))
@@ -91,7 +91,7 @@ local function render_file_tree_recurse(depth, comp)
   local ctx = comp.context --[[@as DirData ]]
 
   dir:add_text(
-    get_dir_status_text(ctx, conf.file_panel.tree_options) .. " ",
+    hl.get_status_icon(get_dir_status_text(ctx, conf.file_panel.tree_options)) .. " ",
     hl.get_git_hl(ctx.status)
   )
   dir:add_text(string.rep(" ", depth * 2))

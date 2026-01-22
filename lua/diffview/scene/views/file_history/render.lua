@@ -23,7 +23,7 @@ local function render_files(comp, files)
       )
     else
       if file.status then
-        comp:add_text(file.status .. " ", hl.get_git_hl(file.status))
+        comp:add_text(hl.get_status_icon(file.status) .. " ", hl.get_git_hl(file.status))
       else
         comp:add_text("-" .. " ", "DiffviewNonText")
       end
@@ -89,7 +89,7 @@ local function render_entries(panel, parent, entries, updating)
     end
 
     if entry.status then
-      comp:add_text(entry.status, hl.get_git_hl(entry.status))
+      comp:add_text(hl.get_status_icon(entry.status), hl.get_git_hl(entry.status))
     else
       comp:add_text("-", "DiffviewNonText")
     end
