@@ -81,7 +81,7 @@ function HelpPanel:apply_cmd()
   local row, _ = unpack(vim.api.nvim_win_get_cursor(0))
   local comp = self.components.comp:get_comp_on_line(row)
 
-  if comp then
+  if comp and comp.context then
     local mapping = comp.context.mapping
     local last_winid = vim.fn.win_getid(vim.fn.winnr("#"))
 

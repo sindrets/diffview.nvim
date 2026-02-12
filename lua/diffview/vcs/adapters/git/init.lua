@@ -23,7 +23,7 @@ local await, pawait = async.await, async.pawait
 local fmt = string.format
 local logger = DiffviewGlobal.logger
 local pl = lazy.access(utils, "path") ---@type PathLib
-local uv = vim.loop
+local uv = vim.uv
 
 local M = {}
 
@@ -247,7 +247,7 @@ function GitAdapter:init(opt)
   opt = opt or {}
   self:super(opt)
 
-  local cwd = opt.cpath or vim.loop.cwd()
+  local cwd = opt.cpath or uv.cwd()
 
   self.ctx = {
     toplevel = opt.toplevel,
@@ -267,11 +267,11 @@ end
 ---@param path string
 ---@param rev Rev?
 function GitAdapter:get_show_args(path, rev)
-  return utils.vec_join(self:args(), "show", fmt("%s:%s", rev and rev:object_name() or "", path))
+  return utils.vec_join(self:args(), "show", "--no-show-signature", fmt("%s:%s", rev and rev:object_name() or "", path))
 end
 
 function GitAdapter:get_log_args(args)
-  return utils.vec_join("log", "--first-parent", "--stat", args)
+  return utils.vec_join("log", "--no-show-signature", "--first-parent", "--stat", args)
 end
 
 function GitAdapter:get_dir(path)
@@ -311,14 +311,14 @@ function GitAdapter:get_merge_context()
   end
 
   local ret = {}
-  local out, code = self:exec_sync({ "show", "-s", "--pretty=format:%H%n%D", "HEAD", "--" }, self.ctx.toplevel)
+  local out, code = self:exec_sync({ "show", "-s", "--no-show-signature", "--pretty=format:%H%n%D", "HEAD", "--" }, self.ctx.toplevel)
 
   ret.ours = code ~= 0 and {} or {
     hash = out[1],
     ref_names = out[2],
   }
 
-  out, code = self:exec_sync({ "show", "-s", "--pretty=format:%H%n%D", their_head, "--" }, self.ctx.toplevel)
+  out, code = self:exec_sync({ "show", "-s", "--no-show-signature", "--pretty=format:%H%n%D", their_head, "--" }, self.ctx.toplevel)
 
   ret.theirs = code ~= 0 and {} or {
     hash = out[1],
@@ -326,12 +326,16 @@ function GitAdapter:get_merge_context()
   }
 
   out, code = self:exec_sync({ "merge-base", "HEAD", their_head }, self.ctx.toplevel)
-  assert(code == 0)
-
-  ret.base = {
-    hash = out[1],
-    ref_names = self:exec_sync({ "show", "-s", "--pretty=format:%D", out[1] }, self.ctx.toplevel)[1],
-  }
+  if code ~= 0 then
+    -- merge-base can fail during --root rebases for initial commits.
+    -- Use the canonical empty tree SHA as the base.
+    ret.base = { hash = self.Rev.NULL_TREE_SHA, ref_names = nil }
+  else
+    ret.base = {
+      hash = out[1],
+      ref_names = self:exec_sync({ "show", "-s", "--no-show-signature", "--pretty=format:%D", out[1] }, self.ctx.toplevel)[1],
+    }
+  end
 
   return ret
 end
@@ -570,7 +574,12 @@ function GitAdapter:stream_fh_data(state)
       "-c",
       "core.quotePath=false",
       "log",
+      "--no-show-signature",
       "--pretty=format:%x00%n" .. GitAdapter.COMMIT_PRETTY_FMT,
+      (function()
+        local t = config.get_config().rename_threshold
+        return t and ("-M" .. t .. "%") or nil
+      end)(),
       "--numstat",
       "--raw",
       state.prepared_log_opts.flags,
@@ -649,6 +658,7 @@ function GitAdapter:stream_line_trace_data(state)
       "-c",
       "core.quotePath=false",
       "log",
+      "--no-show-signature",
       "--color=never",
       "--no-ext-diff",
       "--pretty=format:%x00%n" .. GitAdapter.COMMIT_PRETTY_FMT,
@@ -720,6 +730,7 @@ function GitAdapter:file_history_dry_run(log_opt)
   else
     cmd = utils.vec_join(
       "log",
+      "--no-show-signature",
       "--pretty=format:%H",
       "--name-status",
       options,
@@ -1033,6 +1044,7 @@ GitAdapter.fh_retry_commit = async.wrap(function(self, rev_arg, state, opt, call
       "-c",
       "core.quotePath=false",
       "show",
+      "--no-show-signature",
       "--pretty=format:" .. GitAdapter.COMMIT_PRETTY_FMT,
       "--numstat",
       "--raw",
@@ -1268,6 +1280,7 @@ function GitAdapter:diffview_options(argo)
   local left, right = self:parse_revs(rev_arg, {
     cached = argo:get_flag({ "cached", "staged" }),
     imply_local = argo:get_flag("imply-local"),
+    merge_base = argo:get_flag("merge-base"),
   })
 
   if not (left and right) then
@@ -1287,6 +1300,7 @@ function GitAdapter:diffview_options(argo)
     selected_file = argo:get_flag("selected-file", { no_empty = true, expand = true })
       or (vim.bo.buftype == "" and pl:vim_expand("%:p"))
       or nil,
+    selected_row = tonumber(argo:get_flag("selected-row", { no_empty = true })),
   }
 
   return {left = left, right = right, options = options}
@@ -1306,6 +1320,113 @@ function GitAdapter:head_rev()
   local s = vim.trim(out[1]):gsub("^%^", "")
 
   return GitRev(RevType.COMMIT, s, true)
+end
+
+---Get the current branch name.
+---@return string? branch_name The branch name, or nil if detached HEAD.
+function GitAdapter:get_branch_name()
+  local out, code = self:exec_sync(
+    { "symbolic-ref", "--short", "HEAD" },
+    { cwd = self.ctx.toplevel, silent = true }
+  )
+
+  if code == 0 and out[1] then
+    return vim.trim(out[1])
+  end
+
+  return nil
+end
+
+---Get the default branch name (main, master, etc.).
+---@return string? branch_name The default branch name.
+function GitAdapter:get_default_branch()
+  -- Try to get from origin/HEAD symbolic reference.
+  local out, code = self:exec_sync(
+    { "symbolic-ref", "refs/remotes/origin/HEAD" },
+    { cwd = self.ctx.toplevel, silent = true }
+  )
+
+  if code == 0 and out[1] then
+    local ref = vim.trim(out[1])
+    -- Extract branch name from "refs/remotes/origin/main".
+    local branch = ref:match("refs/remotes/origin/(.+)$")
+    if branch then
+      return branch
+    end
+  end
+
+  -- Fall back to checking if main or master exist.
+  for _, branch in ipairs({ "main", "master" }) do
+    local _, code_check = self:exec_sync(
+      { "rev-parse", "--verify", branch },
+      { cwd = self.ctx.toplevel, silent = true }
+    )
+    if code_check == 0 then
+      return branch
+    end
+  end
+
+  return nil
+end
+
+---Get the remote URL for origin.
+---@param remote? string The remote name (default: "origin").
+---@return string? url The remote URL.
+function GitAdapter:get_remote_url(remote)
+  remote = remote or "origin"
+  local out, code = self:exec_sync(
+    { "remote", "get-url", remote },
+    { cwd = self.ctx.toplevel, silent = true }
+  )
+
+  if code == 0 and out[1] then
+    return vim.trim(out[1])
+  end
+
+  return nil
+end
+
+---Construct a web URL for viewing a commit in the browser.
+---Supports GitHub, GitLab, and Bitbucket.
+---@param commit_hash string The commit hash.
+---@return string? url The web URL, or nil if the hosting service is not recognized.
+function GitAdapter:get_commit_url(commit_hash)
+  local remote_url = self:get_remote_url()
+  if not remote_url then return nil end
+
+  -- Normalize the URL to extract host and repo path.
+  local host, repo
+
+  -- Handle SSH URLs: git@github.com:user/repo.git
+  local ssh_host, ssh_repo = remote_url:match("^git@([^:]+):(.+)$")
+  if ssh_host and ssh_repo then
+    host = ssh_host
+    repo = ssh_repo
+  else
+    -- Handle HTTPS URLs: https://github.com/user/repo.git
+    local https_host, https_repo = remote_url:match("^https?://([^/]+)/(.+)$")
+    if https_host and https_repo then
+      host = https_host
+      repo = https_repo
+    end
+  end
+
+  if not host or not repo then return nil end
+
+  -- Remove .git suffix if present.
+  repo = repo:gsub("%.git$", "")
+
+  -- Construct URL based on hosting service.
+  if host:match("github") then
+    return fmt("https://%s/%s/commit/%s", host, repo, commit_hash)
+  elseif host:match("gitlab") then
+    return fmt("https://%s/%s/-/commit/%s", host, repo, commit_hash)
+  elseif host:match("bitbucket") then
+    return fmt("https://%s/%s/commits/%s", host, repo, commit_hash)
+  else
+    -- Generic format (works for many Git hosting services).
+    return fmt("https://%s/%s/commit/%s", host, repo, commit_hash)
+  end
 end
 
 ---@param path string
@@ -1445,10 +1566,25 @@ function GitAdapter:parse_revs(rev_arg, opt)
       end
     else
       local hash = rev_strings[1]:gsub("^%^", "")
-      left = GitRev(RevType.COMMIT, hash)
       if opt.cached then
+        left = GitRev(RevType.COMMIT, hash)
         right = GitRev(RevType.STAGE, 0)
       else
+        -- When comparing a single ref with working tree, optionally use merge-base.
+        if opt.merge_base then
+          local merge_base_out, merge_base_code = self:exec_sync(
+            { "merge-base", "HEAD", hash },
+            { cwd = self.ctx.toplevel, fail_on_empty = true, retry = 2 }
+          )
+          if merge_base_code == 0 and #merge_base_out > 0 then
+            left = GitRev(RevType.COMMIT, merge_base_out[1])
+          else
+            -- Fallback to the ref itself if merge-base fails.
+            left = GitRev(RevType.COMMIT, hash)
+          end
+        else
+          left = GitRev(RevType.COMMIT, hash)
+        end
         right = GitRev(RevType.LOCAL)
       end
     end
@@ -1670,8 +1806,8 @@ function GitAdapter:show_untracked(opt)
   opt = opt or {}
 
   if opt.revs then
-    -- Never show untracked files when comparing against anything other than
-    -- the index
+    -- Show untracked files only when comparing index (STAGE) vs working tree (LOCAL).
+    -- Don't show untracked when comparing a commit to working tree.
     if not (opt.revs.left.type == RevType.STAGE and opt.revs.right.type == RevType.LOCAL) then
       return false
     end
@@ -1699,6 +1835,8 @@ GitAdapter.tracked_files = async.wrap(function(self, left, right, args, kind, op
   ---@type FileEntry[]
   local conflicts = {}
   local log_opt = { label = "GitAdapter:tracked_files()" }
+  local rename_threshold = config.get_config().rename_threshold
+  local rename_flag = rename_threshold and ("-M" .. rename_threshold .. "%") or nil
 
   local namestat_job = Job({
     command = self:bin(),
@@ -1707,6 +1845,7 @@ GitAdapter.tracked_files = async.wrap(function(self, left, right, args, kind, op
       "-c",
       "core.quotePath=false",
       "diff",
+      rename_flag,
       "--ignore-submodules",
       "--name-status",
       args
@@ -1721,6 +1860,7 @@ GitAdapter.tracked_files = async.wrap(function(self, left, right, args, kind, op
       "-c",
       "core.quotePath=false",
       "diff",
+      rename_flag,
       "--ignore-submodules",
       "--numstat",
       args
@@ -2120,12 +2260,14 @@ function GitAdapter:init_completion()
   self.comp.open:put({ "u", "untracked-files" }, { "true", "normal", "all", "false", "no" })
   self.comp.open:put({ "cached", "staged" })
   self.comp.open:put({ "imply-local" })
+  self.comp.open:put({ "merge-base" })
   self.comp.open:put({ "C" }, function(_, arg_lead)
     return vim.fn.getcompletion(arg_lead, "dir")
   end)
   self.comp.open:put({ "selected-file" }, function (_, arg_lead)
     return vim.fn.getcompletion(arg_lead, "file")
   end)
+  self.comp.open:put({ "selected-row" })
 
   self.comp.file_history:put({ "base" }, function(_, arg_lead)
     return utils.vec_join("LOCAL", self:rev_candidates(arg_lead))

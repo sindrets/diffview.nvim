@@ -41,12 +41,33 @@ M.defaults = {
   enhanced_diff_hl = false,
   git_cmd = { "git" },
   hg_cmd = { "hg" },
+  rename_threshold = nil, -- Similarity threshold for rename detection (e.g. 40 for 40%). Nil uses git default (50%).
   use_icons = true,
   show_help_hints = true,
   watch_index = true,
+  hide_merge_artifacts = false, -- Hide merge artifact files (*.orig, *.BACKUP.*, etc.)
+  auto_close_on_empty = false, -- Automatically close diffview when the last file is staged/resolved.
+  -- Override diffopt settings while diffview is open. Restored on close.
+  -- Keys: algorithm, context, indent_heuristic, iwhite, iwhiteall, iwhiteeol, iblank, icase.
+  -- Example: { algorithm = "histogram", indent_heuristic = true }
+  diffopt = {},
+  clean_up_buffers = false, -- Delete file buffers created by diffview on close (only buffers not open before diffview).
   icons = {
     folder_closed = "",
     folder_open = "",
+  },
+  status_icons = {
+    ["A"] = "A",  -- Added
+    ["?"] = "?",  -- Untracked
+    ["M"] = "M",  -- Modified
+    ["R"] = "R",  -- Renamed
+    ["C"] = "C",  -- Copied
+    ["T"] = "T",  -- Type changed
+    ["U"] = "U",  -- Unmerged
+    ["X"] = "X",  -- Unknown
+    ["D"] = "D",  -- Deleted
+    ["B"] = "B",  -- Broken
+    ["!"] = "!",  -- Ignored
   },
   signs = {
     fold_closed = "",
@@ -69,9 +90,15 @@ M.defaults = {
       disable_diagnostics = false,
       winbar_info = false,
     },
+    -- Layouts to cycle through with `cycle_layout` action.
+    cycle_layouts = {
+      default = { "diff2_horizontal", "diff2_vertical" },
+      merge_tool = { "diff3_horizontal", "diff3_vertical", "diff3_mixed", "diff4_mixed", "diff1_plain" },
+    },
   },
   file_panel = {
     listing_style = "tree",
+    sort_file = nil, -- Custom file comparator: function(a_name, b_name, a_data, b_data) -> boolean
     tree_options = {
       flatten_dirs = true,
       folder_statuses = "only_folded"
@@ -81,8 +108,15 @@ M.defaults = {
       width = 35,
       win_opts = {}
     },
+    show = true, -- Show the file panel by default when opening Diffview.
+    always_show_sections = false, -- Always show Changes and Staged changes sections even when empty.
+    show_branch_name = false, -- Show branch name in the file panel header.
   },
   file_history_panel = {
+    stat_style = "number", -- "number" (e.g. "5, 3"), "bar" (e.g. "| 8 +++++---"), or "both".
+    -- Ordered list of components to show for each commit entry.
+    -- Available: "status", "files", "stats", "hash", "reflog", "ref", "subject", "author", "date"
+    commit_format = { "status", "files", "stats", "hash", "reflog", "ref", "subject", "author", "date" },
     log_options = {
       ---@type ConfigLogOptions
       git = {
@@ -105,6 +139,8 @@ M.defaults = {
       height = 16,
       win_opts = {}
     },
+    commit_subject_max_length = 72, -- Max length for commit subject display.
+    date_format = "auto", -- Date format: "auto" (relative for recent, ISO for old), "relative", or "iso".
   },
   commit_log_panel = {
     win_config = {
@@ -129,9 +165,11 @@ M.defaults = {
       { "n", "gf",          actions.goto_file_edit,                 { desc = "Open the file in the previous tabpage" } },
       { "n", "<C-w><C-f>",  actions.goto_file_split,                { desc = "Open the file in a new split" } },
       { "n", "<C-w>gf",     actions.goto_file_tab,                  { desc = "Open the file in a new tabpage" } },
+      { "n", "gx",          actions.open_file_external,             { desc = "Open the file with default system application" } },
+      { "n", "<C-w>T",      actions.open_in_new_tab,                { desc = "Open diffview in a new tab" } },
       { "n", "<leader>e",   actions.focus_files,                    { desc = "Bring focus to the file panel" } },
-      { "n", "<leader>b",   actions.toggle_files,                   { desc = "Toggle the file panel." } },
-      { "n", "g<C-x>",      actions.cycle_layout,                   { desc = "Cycle through available layouts." } },
+      { "n", "<leader>b",   actions.toggle_files,                   { desc = "Toggle the file panel" } },
+      { "n", "g<C-x>",      actions.cycle_layout,                   { desc = "Cycle through available layouts" } },
       { "n", "[x",          actions.prev_conflict,                  { desc = "In the merge-tool: jump to the previous conflict" } },
       { "n", "]x",          actions.next_conflict,                  { desc = "In the merge-tool: jump to the next conflict" } },
       { "n", "<leader>co",  actions.conflict_choose("ours"),        { desc = "Choose the OURS version of a conflict" } },
@@ -197,6 +235,8 @@ M.defaults = {
       { "n", "gf",             actions.goto_file_edit,                 { desc = "Open the file in the previous tabpage" } },
       { "n", "<C-w><C-f>",     actions.goto_file_split,                { desc = "Open the file in a new split" } },
       { "n", "<C-w>gf",        actions.goto_file_tab,                  { desc = "Open the file in a new tabpage" } },
+      { "n", "gx",             actions.open_file_external,             { desc = "Open the file with default system application" } },
+      { "n", "<C-w>T",        actions.open_in_new_tab,                { desc = "Open diffview in a new tab" } },
       { "n", "i",              actions.listing_style,                  { desc = "Toggle between 'list' and 'tree' views" } },
       { "n", "f",              actions.toggle_flatten_dirs,            { desc = "Flatten empty subdirectories in tree listing style" } },
       { "n", "R",              actions.refresh_files,                  { desc = "Update stats and entries in the file list" } },
@@ -215,6 +255,7 @@ M.defaults = {
     file_history_panel = {
       { "n", "g!",            actions.options,                     { desc = "Open the option panel" } },
       { "n", "<C-A-d>",       actions.open_in_diffview,            { desc = "Open the entry under the cursor in a diffview" } },
+      { "n", "H",             actions.diff_against_head,           { desc = "Open a diffview comparing HEAD with the commit under the cursor" } },
       { "n", "y",             actions.copy_hash,                   { desc = "Copy the commit hash of the entry under the cursor" } },
       { "n", "L",             actions.open_commit_log,             { desc = "Show commit details" } },
       { "n", "X",             actions.restore_entry,               { desc = "Restore file to the state from the selected entry" } },
@@ -241,6 +282,7 @@ M.defaults = {
       { "n", "gf",            actions.goto_file_edit,              { desc = "Open the file in the previous tabpage" } },
       { "n", "<C-w><C-f>",    actions.goto_file_split,             { desc = "Open the file in a new split" } },
       { "n", "<C-w>gf",       actions.goto_file_tab,               { desc = "Open the file in a new tabpage" } },
+      { "n", "gx",            actions.open_file_external,          { desc = "Open the file with default system application" } },
       { "n", "<leader>e",     actions.focus_files,                 { desc = "Bring focus to the file panel" } },
       { "n", "<leader>b",     actions.toggle_files,                { desc = "Toggle the file panel" } },
       { "n", "g<C-x>",        actions.cycle_layout,                { desc = "Cycle available layouts" } },
@@ -254,6 +296,10 @@ M.defaults = {
     help_panel = {
       { "n", "q",     actions.close,  { desc = "Close help menu" } },
       { "n", "<esc>", actions.close,  { desc = "Close help menu" } },
+    },
+    commit_log_panel = {
+      { "n", "q",     actions.close,  { desc = "Close commit log" } },
+      { "n", "<esc>", actions.close,  { desc = "Close commit log" } },
     },
   },
 }
@@ -576,7 +622,7 @@ function M.setup(user_config)
   do
     -- Validate layouts
     local view = M._config.view
-    local standard_layouts = { "diff2_horizontal", "diff2_vertical", -1 }
+    local standard_layouts = { "diff1_plain", "diff2_horizontal", "diff2_vertical", -1 }
     local merge_layuots = {
       "diff1_plain",
       "diff3_horizontal",

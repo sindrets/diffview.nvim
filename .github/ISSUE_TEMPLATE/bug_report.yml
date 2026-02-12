@@ -127,7 +127,7 @@ body:
         })
 
         vim.opt.termguicolors = true
-        vim.cmd("colorscheme " .. (vim.fn.has("nvim-0.8") == 1 and "habamax" or "slate"))
+        vim.cmd("colorscheme habamax")
 
         -- ############################################################################
         -- ### ADD INIT.LUA SETTINGS THAT ARE _NECESSARY_ FOR REPRODUCING THE ISSUE ###

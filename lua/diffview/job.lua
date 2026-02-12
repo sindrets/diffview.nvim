@@ -8,7 +8,7 @@ local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local await = async.await
 local fmt = string.format
 local logger = DiffviewGlobal.logger
-local uv = vim.loop
+local uv = vim.uv
 
 local M = {}
 
@@ -49,7 +49,10 @@ local M = {}
 local Job = oop.create_class("Job", async.Waitable)
 
 local function prepare_env(env)
-  local ret = {}
+  -- Always set GIT_OPTIONAL_LOCKS=0 to avoid lock contention when multiple
+  -- git operations run concurrently. This prevents slowdowns when staging
+  -- files while other plugins also make git calls.
+  local ret = { "GIT_OPTIONAL_LOCKS=0" }
 
   for k, v in pairs(env) do
     table.insert(ret, k .. "=" .. v)

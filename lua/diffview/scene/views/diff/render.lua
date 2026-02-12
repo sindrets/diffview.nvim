@@ -11,7 +11,7 @@ local function render_file(comp, show_path, depth)
   ---@type FileEntry
   local file = comp.context
 
-  comp:add_text(file.status .. " ", hl.get_git_hl(file.status))
+  comp:add_text(hl.get_status_icon(file.status) .. " ", hl.get_git_hl(file.status))
 
   if depth then
     comp:add_text(string.rep(" ", depth * 2 + 2))
@@ -91,20 +91,25 @@ local function render_file_tree_recurse(depth, comp)
   local ctx = comp.context --[[@as DirData ]]
 
   dir:add_text(
-    get_dir_status_text(ctx, conf.file_panel.tree_options) .. " ",
+    hl.get_status_icon(get_dir_status_text(ctx, conf.file_panel.tree_options)) .. " ",
     hl.get_git_hl(ctx.status)
   )
   dir:add_text(string.rep(" ", depth * 2))
   dir:add_text(ctx.collapsed and conf.signs.fold_closed or conf.signs.fold_open, "DiffviewNonText")
 
-  if conf.use_icons then
-    dir:add_text(
-      " " .. (ctx.collapsed and conf.icons.folder_closed or conf.icons.folder_open) .. " ",
-      "DiffviewFolderSign"
-    )
-  end
+  -- Always show folder icons since they're user-configurable and don't require
+  -- an icon provider like file-type icons do (#579).
+  dir:add_text(
+    " " .. (ctx.collapsed and conf.icons.folder_closed or conf.icons.folder_open) .. " ",
+    "DiffviewFolderSign"
+  )
 
-  dir:add_text(ctx.name, "DiffviewFolderName")
+  dir:add_text(ctx.name .. "/", "DiffviewFolderName")
+  -- Show file count when folder is collapsed.
+  if ctx.collapsed and ctx._node then
+    local file_count = #ctx._node:leaves()
+    dir:add_text(" (" .. file_count .. ")", "DiffviewDim1")
+  end
   dir:ln()
 
   if not ctx.collapsed then
@@ -147,10 +152,23 @@ return function(panel)
     "DiffviewFilePanelRootPath"
   )
 
+  if conf.file_panel.show_branch_name then
+    local branch_name = panel.adapter:get_branch_name()
+    if branch_name then
+      comp:add_text("Branch: ", "DiffviewFilePanelPath")
+      comp:add_line(branch_name, "DiffviewFilePanelTitle")
+    end
+  end
+
   if conf.show_help_hints and panel.help_mapping then
     comp:add_text("Help: ", "DiffviewFilePanelPath")
     comp:add_line(panel.help_mapping, "DiffviewFilePanelCounter")
     comp:add_line()
+  end
+
+  if panel.is_loading then
+    comp:add_line("  Fetching changes...", "DiffviewDim1")
+    return
   end
 
   if #panel.files.conflicting > 0 then
@@ -164,26 +182,38 @@ return function(panel)
   end
 
   local has_other_files = #panel.files.conflicting > 0 or #panel.files.staged > 0
+  local always_show = conf.file_panel.always_show_sections
 
   -- Don't show the 'Changes' section if it's empty and we have other visible
-  -- sections.
-  if #panel.files.working > 0 or not has_other_files then
+  -- sections (unless always_show_sections is enabled).
+  if #panel.files.working > 0 or not has_other_files or always_show then
     comp = panel.components.working.title.comp
     comp:add_text("Changes ", "DiffviewFilePanelTitle")
     comp:add_text("(" .. #panel.files.working .. ")", "DiffviewFilePanelCounter")
     comp:ln()
 
-    render_files(panel.listing_style, panel.components.working.files.comp)
+    -- Show friendly message when working tree is clean.
+    if #panel.files.working == 0 and not has_other_files then
+      panel.components.working.files.comp:add_line("  Working tree clean", "DiffviewDim1")
+    elseif #panel.files.working == 0 then
+      panel.components.working.files.comp:add_line("  (empty)", "DiffviewDim1")
+    else
+      render_files(panel.listing_style, panel.components.working.files.comp)
+    end
     panel.components.working.margin.comp:add_line()
   end
 
-  if #panel.files.staged > 0 then
+  if #panel.files.staged > 0 or always_show then
     comp = panel.components.staged.title.comp
     comp:add_text("Staged changes ", "DiffviewFilePanelTitle")
     comp:add_text("(" .. #panel.files.staged .. ")", "DiffviewFilePanelCounter")
     comp:ln()
 
-    render_files(panel.listing_style, panel.components.staged.files.comp)
+    if #panel.files.staged == 0 then
+      panel.components.staged.files.comp:add_line("  (empty)", "DiffviewDim1")
+    else
+      render_files(panel.listing_style, panel.components.staged.files.comp)
+    end
     panel.components.staged.margin.comp:add_line()
   end
 

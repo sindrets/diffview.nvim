@@ -41,9 +41,19 @@ function FileDict:__index(k)
 end
 
 function FileDict:update_file_trees()
+  -- Save collapsed state from existing trees before recreating them.
+  local conflicting_state = self.conflicting_tree and self.conflicting_tree:get_collapsed_state() or {}
+  local working_state = self.working_tree and self.working_tree:get_collapsed_state() or {}
+  local staged_state = self.staged_tree and self.staged_tree:get_collapsed_state() or {}
+
   self.conflicting_tree = FileTree(self.conflicting)
   self.working_tree = FileTree(self.working)
   self.staged_tree = FileTree(self.staged)
+
+  -- Restore collapsed state to the new trees.
+  self.conflicting_tree:set_collapsed_state(conflicting_state)
+  self.working_tree:set_collapsed_state(working_state)
+  self.staged_tree:set_collapsed_state(staged_state)
 end
 
 function FileDict:len()

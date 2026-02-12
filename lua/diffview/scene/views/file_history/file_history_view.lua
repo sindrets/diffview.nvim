@@ -7,8 +7,10 @@ local EventName = lazy.access("diffview.events", "EventName") ---@type EventName
 local FileHistoryPanel = lazy.access("diffview.scene.views.file_history.file_history_panel", "FileHistoryPanel") ---@type FileHistoryPanel|LazyModule
 local JobStatus = lazy.access("diffview.vcs.utils", "JobStatus") ---@type JobStatus|LazyModule
 local LogEntry = lazy.access("diffview.vcs.log_entry", "LogEntry") ---@type LogEntry|LazyModule
+local File = lazy.access("diffview.vcs.file", "File") ---@type vcs.File|LazyModule
 local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
 local config = lazy.require("diffview.config") ---@module "diffview.config"
+local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
 local await = async.await
@@ -40,7 +42,7 @@ function FileHistoryView:init(opt)
 end
 
 function FileHistoryView:post_open()
-  self.commit_log_panel = CommitLogPanel(self.adapter, {
+  self.commit_log_panel = CommitLogPanel(self, self.adapter, {
     name = ("diffview://%s/log/%d/%s"):format(self.adapter.ctx.dir, self.tabpage, "commit_log"),
   })
 
@@ -70,6 +72,27 @@ function FileHistoryView:close()
 
     for _, entry in ipairs(self.panel.entries or {}) do
       entry:destroy()
+    end
+
+    -- Clean up LOCAL buffers created by diffview that the user didn't have open before.
+    if config.get_config().clean_up_buffers then
+      for bufnr, _ in pairs(File.created_bufs) do
+        if api.nvim_buf_is_valid(bufnr) and not vim.bo[bufnr].modified then
+          local dominated = true
+          for _, winid in ipairs(utils.win_find_buf(bufnr, 0)) do
+            if api.nvim_win_get_tabpage(winid) ~= self.tabpage then
+              dominated = false
+              break
+            end
+          end
+
+          if dominated then
+            pcall(api.nvim_buf_delete, bufnr, { force = false })
+          end
+        end
+
+        File.created_bufs[bufnr] = nil
+      end
     end
 
     self.commit_log_panel:destroy()

@@ -61,7 +61,8 @@ function StandardView:init_layout()
     api.nvim_win_close(curwin, false)
   end
 
-  self.panel:focus()
+  local show_panel = config.get_config().file_panel.show
+  self.panel:focus(not show_panel)
   self.emitter:emit("post_layout")
 end
 

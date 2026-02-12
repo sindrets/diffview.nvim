@@ -20,7 +20,7 @@ end)
 
 ---@return number # Current time (ms)
 function M.now()
-  return vim.loop.hrtime() / 1000000
+  return vim.uv.hrtime() / 1000000
 end
 
 ---@param msg string|string[]
@@ -337,6 +337,10 @@ end
 ---correctly with Option:set(), Option:append(), Option:prepend(), and
 ---Option:remove() (seemingly for legacy reasons).
 ---WARN: This map is incomplete!
+local function get_option_info(name)
+  return api.nvim_get_option_info2(name, {})
+end
+
 local list_like_options = {
   winhighlight = true,
   listchars = true,
@@ -365,7 +369,7 @@ function M.set_local(winids, option_map, opt)
     api.nvim_win_call(id, function()
       for option, value in pairs(option_map) do
         local o = opt
-        local fullname = api.nvim_get_option_info(option).name
+        local fullname = get_option_info(option).name
         local is_list_like = list_like_options[fullname]
         local cur_value = vim.o[fullname]
 
@@ -835,6 +839,19 @@ function M.vec_push(t, ...)
 
   for i = 1, select("#", ...) do
     t[#t + 1] = args[i]
+  end
+
+  return t
+end
+
+---Append all elements from another table to the end of a vector.
+---Unlike vec_push with unpack(), this handles large tables safely.
+---@param t vector
+---@param other table
+---@return vector t
+function M.vec_extend(t, other)
+  for i = 1, #other do
+    t[#t + 1] = other[i]
   end
 
   return t
@@ -1321,8 +1338,7 @@ function M.merge_sort(t, comparator)
   split_merge(t, 1, #t, comparator)
 end
 
---- @diagnostic disable-next-line: deprecated
-M.islist = vim.fn.has("nvim-0.10") == 1 and vim.islist or vim.tbl_islist
+M.islist = vim.islist
 
 --- @param t table
 --- @return any[]

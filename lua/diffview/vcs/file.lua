@@ -15,7 +15,6 @@ local pl = lazy.access(utils, "path") ---@type PathLib
 local api = vim.api
 local M = {}
 
-local HAS_NVIM_0_10 = vim.fn.has("nvim-0.10") == 1
 
 ---@alias git.FileDataProducer fun(kind: vcs.FileKind, path: string, pos: "left"|"right"): string[]
 
@@ -52,6 +51,10 @@ File.attached = {}
 ---@type table<string, table<string, integer>>
 File.index_bufmap = {}
 
+---Tracks LOCAL buffers that were newly created by diffview (not pre-existing).
+---@type table<integer, boolean>
+File.created_bufs = {}
+
 ---@static
 File.bufopts = {
   buftype = "nowrite",
@@ -87,13 +90,19 @@ function File:init(opt)
     foldmethod = "diff",
     scrollopt = { "ver", "hor", "jump" },
     foldcolumn = "1",
-    foldlevel = 0,
+    -- Use high foldlevel to keep folds open by default. This prevents issues
+    -- with plugins like vim-markdown that create section folds which would
+    -- otherwise collapse and hide diff content.
+    foldlevel = 99,
     foldenable = true,
+    -- Use prepend method so diffview's highlights take precedence but don't
+    -- clobber user's additional winhl customizations (#515).
     winhl = {
       "DiffAdd:DiffviewDiffAdd",
       "DiffDelete:DiffviewDiffDelete",
       "DiffChange:DiffviewDiffChange",
       "DiffText:DiffviewDiffText",
+      opt = { method = "prepend" },
     },
   }
 
@@ -167,6 +176,9 @@ function File:_create_local_buffer()
     end)
 
     api.nvim_win_close(winid, true)
+
+    -- Track this buffer as created by diffview so it can be cleaned up on close.
+    File.created_bufs[self.bufnr] = true
   else
     -- NOTE: LSP servers might load buffers in the background and unlist
     -- them. Explicitly set the buffer as listed when loading it here.
@@ -280,7 +292,7 @@ File.create_buffer = async.wrap(function(self, callback)
   end
 
   for option, value in pairs(bufopts) do
-    api.nvim_buf_set_option(self.bufnr, option, value)
+    vim.bo[self.bufnr][option] = value
   end
 
   local last_modifiable = vim.bo[self.bufnr].modifiable
@@ -291,6 +303,12 @@ File.create_buffer = async.wrap(function(self, callback)
   api.nvim_buf_call(self.bufnr, function()
     vim.cmd("filetype detect")
   end)
+
+  -- Disable context plugins that interfere with scrollbind alignment.
+  -- Note: nvim-treesitter-context does NOT check this variable by default;
+  -- users must configure `on_attach` callback to check it. context.vim does.
+  vim.b[self.bufnr].ts_context_disable = true
+  vim.b[self.bufnr].context_enabled = false
 
   vim.bo[self.bufnr].modifiable = last_modifiable
   vim.bo[self.bufnr].modified = last_modified
@@ -329,7 +347,40 @@ end
 
 ---@class vcs.File.AttachState
 ---@field keymaps table
+---@field saved_keymaps table<string, table> Original buffer keymaps saved before overwriting.
 ---@field disable_diagnostics boolean
+
+---Save any existing buffer-local keymap for the given mode and lhs before
+---diffview overwrites it, so we can restore it on detach.
+---@param bufnr integer
+---@param saved table<string, table>
+---@param mode string
+---@param lhs string
+local function save_existing_keymap(bufnr, saved, mode, lhs)
+  local key = mode .. " " .. lhs
+  if saved[key] then return end
+
+  local buf_maps = api.nvim_buf_get_keymap(bufnr, mode)
+  for _, km in ipairs(buf_maps) do
+    if km.lhs == lhs then
+      saved[key] = {
+        mode = mode,
+        lhs = lhs,
+        rhs = km.rhs or "",
+        callback = km.callback,
+        opts = {
+          buffer = bufnr,
+          desc = km.desc,
+          silent = km.silent == 1 or km.silent == true,
+          noremap = km.noremap == 1 or km.noremap == true,
+          nowait = km.nowait == 1 or km.nowait == true,
+          expr = km.expr == 1 or km.expr == true,
+        },
+      }
+      return
+    end
+  end
+end
 
 ---@param force? boolean
 ---@param opt? vcs.File.AttachState
@@ -348,21 +399,29 @@ function File:attach_buffer(force, opt)
 
       -- Keymaps
       state.keymaps = config.extend_keymaps(conf.keymaps.view, state.keymaps)
+      state.saved_keymaps = state.saved_keymaps or {}
       local default_map_opt = { silent = true, nowait = true, buffer = self.bufnr }
 
       for _, mapping in ipairs(state.keymaps) do
+        local modes = type(mapping[1]) == "table" and mapping[1] or { mapping[1] }
+        for _, mode in ipairs(modes) do
+          save_existing_keymap(self.bufnr, state.saved_keymaps, mode, mapping[2])
+        end
         local map_opt = vim.tbl_extend("force", default_map_opt, mapping[4] or {}, { buffer = self.bufnr })
         vim.keymap.set(mapping[1], mapping[2], mapping[3], map_opt)
       end
 
       -- Diagnostics
       if state.disable_diagnostics then
-        if HAS_NVIM_0_10 then
-          vim.diagnostic.enable(false, { bufnr = self.bufnr })
-        else
-          ---@diagnostic disable-next-line: deprecated
-          vim.diagnostic.disable(self.bufnr)
-        end
+        vim.diagnostic.enable(false, { bufnr = self.bufnr })
+      end
+
+      -- Inlay hints: Always disable for non-LOCAL buffers to prevent
+      -- "Invalid 'col': out of range" errors. Inlay hint positions are
+      -- computed for the current file version, which may differ from the
+      -- revision shown in the diff buffer.
+      if self.rev and self.rev.type ~= RevType.LOCAL then
+        pcall(vim.lsp.inlay_hint.enable, false, { bufnr = self.bufnr })
       end
 
       File.attached[self.bufnr] = state
@@ -375,7 +434,7 @@ function File:detach_buffer()
     local state = File.attached[self.bufnr]
 
     if state then
-      -- Keymaps
+      -- Keymaps: remove diffview's mappings.
       for lhs, mapping in pairs(state.keymaps) do
         if type(lhs) == "number" then
           local modes = type(mapping[1]) == "table" and mapping[1] or { mapping[1] }
@@ -387,14 +446,24 @@ function File:detach_buffer()
         end
       end
 
+      -- Restore original buffer keymaps that were saved before attach.
+      if state.saved_keymaps then
+        for _, km in pairs(state.saved_keymaps) do
+          local rhs = km.callback or km.rhs
+          if rhs and api.nvim_buf_is_valid(self.bufnr) then
+            pcall(vim.keymap.set, km.mode, km.lhs, rhs, km.opts)
+          end
+        end
+      end
+
       -- Diagnostics
       if state.disable_diagnostics then
-        if HAS_NVIM_0_10 then
-          vim.diagnostic.enable(true, { bufnr = self.bufnr })
-        else
-          ---@diagnostic disable-next-line: param-type-mismatch
-          vim.diagnostic.enable(self.bufnr)
-        end
+        vim.diagnostic.enable(true, { bufnr = self.bufnr })
+      end
+
+      -- Re-enable inlay hints for non-LOCAL buffers (if they were disabled).
+      if self.rev and self.rev.type ~= RevType.LOCAL then
+        pcall(vim.lsp.inlay_hint.enable, true, { bufnr = self.bufnr })
       end
 
       File.attached[self.bufnr] = nil
@@ -432,7 +501,7 @@ function File._get_null_buffer()
   if not api.nvim_buf_is_loaded(File.NULL_FILE.bufnr or -1) then
     local bn = api.nvim_create_buf(false, false)
     for option, value in pairs(File.bufopts) do
-      api.nvim_buf_set_option(bn, option, value)
+      vim.bo[bn][option] = value
     end
 
     local bufname = "diffview://null"
@@ -469,6 +538,19 @@ File.NULL_FILE = File({
   binary = false,
   nulled = true,
   rev = GitRev.new_null_tree(),
+  -- Explicitly disable diff-related window options for the null buffer.
+  -- This prevents scrollbind/cursorbind from persisting after closing diffview.
+  winopts = {
+    diff = false,
+    scrollbind = false,
+    cursorbind = false,
+    foldmethod = "manual",
+    scrollopt = {},
+    foldcolumn = "0",
+    foldlevel = 99,
+    foldenable = false,
+    winhl = {},
+  },
 })
 
 M.File = File

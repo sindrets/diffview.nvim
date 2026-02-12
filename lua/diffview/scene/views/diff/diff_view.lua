@@ -16,6 +16,7 @@ local config = lazy.require("diffview.config") ---@module "diffview.config"
 local debounce = lazy.require("diffview.debounce") ---@module "diffview.debounce"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local vcs_utils = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
+local File = lazy.access("diffview.vcs.file", "File") ---@type vcs.File|LazyModule
 local GitAdapter = lazy.access("diffview.vcs.adapters.git", "GitAdapter") ---@type GitAdapter|LazyModule
 
 local api = vim.api
@@ -29,6 +30,7 @@ local M = {}
 ---@class DiffViewOptions
 ---@field show_untracked? boolean
 ---@field selected_file? string Path to the preferred initially selected file.
+---@field selected_row? integer Row to position the cursor on after opening the selected file.
 
 ---@class DiffView : StandardView
 ---@operator call : DiffView
@@ -58,6 +60,7 @@ function DiffView:init(opt)
   self.left = opt.left
   self.right = opt.right
   self.initialized = false
+  self.is_loading = true
   self.options = opt.options or {}
   self.options.selected_file = self.options.selected_file
     and pl:chain(self.options.selected_file)
@@ -82,12 +85,12 @@ end
 function DiffView:post_open()
   vim.cmd("redraw")
 
-  self.commit_log_panel = CommitLogPanel(self.adapter, {
+  self.commit_log_panel = CommitLogPanel(self, self.adapter, {
     name = fmt("diffview://%s/log/%d/%s", self.adapter.ctx.dir, self.tabpage, "commit_log"),
   })
 
   if config.get_config().watch_index and self.adapter:instanceof(GitAdapter.__get()) then
-    self.watcher = vim.loop.new_fs_poll()
+    self.watcher = vim.uv.new_fs_poll()
     self.watcher:start(
       self.adapter.ctx.dir .. "/index",
       1000,
@@ -180,6 +183,28 @@ function DiffView:close()
 
     for _, file in self.files:iter() do
       file:destroy()
+    end
+
+    -- Clean up LOCAL buffers created by diffview that the user didn't have open before.
+    if config.get_config().clean_up_buffers then
+      for bufnr, _ in pairs(File.created_bufs) do
+        if api.nvim_buf_is_valid(bufnr) and not vim.bo[bufnr].modified then
+          -- Only delete if not displayed in a window outside this tabpage.
+          local dominated = true
+          for _, winid in ipairs(utils.win_find_buf(bufnr, 0)) do
+            if api.nvim_win_get_tabpage(winid) ~= self.tabpage then
+              dominated = false
+              break
+            end
+          end
+
+          if dominated then
+            pcall(api.nvim_buf_delete, bufnr, { force = false })
+          end
+        end
+
+        File.created_bufs[bufnr] = nil
+      end
     end
 
     self.commit_log_panel:destroy()
@@ -325,10 +350,16 @@ DiffView.update_files = debounce.debounce_trailing(
   ---@param self DiffView
   ---@param callback fun(err?: string[])
   async.wrap(function(self, callback)
+    -- Never update if the view is closing (prevents coroutine failure from race conditions).
+    if self.closing:check() then
+      callback({ "The update was cancelled." })
+      return
+    end
+
     await(async.scheduler())
 
     -- Never update unless the view is in focus
-    if self.tabpage ~= api.nvim_get_current_tabpage() then
+    if self.closing:check() or self.tabpage ~= api.nvim_get_current_tabpage() then
       callback({ "The update was cancelled." })
       return
     end
@@ -362,8 +393,8 @@ DiffView.update_files = debounce.debounce_trailing(
       return
     end
 
-    -- Stop the update if the view is no longer in focus.
-    if self.tabpage ~= api.nvim_get_current_tabpage() then
+    -- Stop the update if the view is closing or no longer in focus.
+    if self.closing:check() or self.tabpage ~= api.nvim_get_current_tabpage() then
       callback({ "The update was cancelled." })
       return
     end
@@ -394,55 +425,75 @@ DiffView.update_files = debounce.debounce_trailing(
       for _, opr in ipairs(script) do
         if opr == EditToken.NOOP then
           -- Update status and stats
-          local a_stats = v.cur_files[ai].stats
-          local b_stats = v.new_files[bi].stats
+          -- Guard against nil entries that can occur during async race conditions (#395).
+          local cur_file = v.cur_files[ai]
+          local new_file = v.new_files[bi]
 
-          if a_stats then
-            v.cur_files[ai].stats = vim.tbl_extend("force", a_stats, b_stats or {})
-          else
-            v.cur_files[ai].stats = v.new_files[bi].stats
-          end
+          if cur_file and new_file then
+            local a_stats = cur_file.stats
+            local b_stats = new_file.stats
 
-          v.cur_files[ai].status = v.new_files[bi].status
-          v.cur_files[ai]:validate_stage_buffers(index_stat)
+            if a_stats then
+              cur_file.stats = vim.tbl_extend("force", a_stats, b_stats or {})
+            else
+              cur_file.stats = new_file.stats
+            end
 
-          if new_head then
-            v.cur_files[ai]:update_heads(new_head)
+            cur_file.status = new_file.status
+            cur_file:validate_stage_buffers(index_stat)
+
+            if new_head then
+              cur_file:update_heads(new_head)
+            end
           end
 
           ai = ai + 1
           bi = bi + 1
 
         elseif opr == EditToken.DELETE then
-          if self.panel.cur_file == v.cur_files[ai] then
-            local file_list = self.panel:ordered_file_list()
-            if file_list[1] == self.panel.cur_file then
-              self.panel:set_cur_file(nil)
-            else
-              self.panel:set_cur_file(self.panel:prev_file())
+          local cur_file = v.cur_files[ai]
+          if cur_file then
+            if self.panel.cur_file == cur_file then
+              local file_list = self.panel:ordered_file_list()
+              if file_list[1] == self.panel.cur_file then
+                self.panel:set_cur_file(nil)
+              else
+                self.panel:set_cur_file(self.panel:prev_file())
+              end
             end
+
+            cur_file:destroy()
+            table.remove(v.cur_files, ai)
           end
 
-          v.cur_files[ai]:destroy()
-          table.remove(v.cur_files, ai)
-
         elseif opr == EditToken.INSERT then
-          table.insert(v.cur_files, ai, v.new_files[bi])
-          ai = ai + 1
+          local new_file = v.new_files[bi]
+          if new_file then
+            table.insert(v.cur_files, ai, new_file)
+            ai = ai + 1
+          end
           bi = bi + 1
 
         elseif opr == EditToken.REPLACE then
-          if self.panel.cur_file == v.cur_files[ai] then
-            local file_list = self.panel:ordered_file_list()
-            if file_list[1] == self.panel.cur_file then
-              self.panel:set_cur_file(nil)
-            else
-              self.panel:set_cur_file(self.panel:prev_file())
+          local cur_file = v.cur_files[ai]
+          local new_file = v.new_files[bi]
+
+          if cur_file then
+            if self.panel.cur_file == cur_file then
+              local file_list = self.panel:ordered_file_list()
+              if file_list[1] == self.panel.cur_file then
+                self.panel:set_cur_file(nil)
+              else
+                self.panel:set_cur_file(self.panel:prev_file())
+              end
             end
+
+            cur_file:destroy()
           end
 
-          v.cur_files[ai]:destroy()
-          v.cur_files[ai] = v.new_files[bi]
+          if new_file then
+            v.cur_files[ai] = new_file
+          end
           ai = ai + 1
           bi = bi + 1
         end
@@ -480,7 +531,26 @@ DiffView.update_files = debounce.debounce_trailing(
         end
       end
     end
+
+    -- Clear loading state and re-render panel before set_file, so highlight_file
+    -- can find the file components (the previous render returned early due to is_loading).
+    self.is_loading = false
+    self.panel.is_loading = false
+    self.panel:render()
+    self.panel:redraw()
+
     self:set_file(self.panel.cur_file or self.panel:next_file(), false, not self.initialized)
+
+    -- Position cursor at the requested row on first open.
+    if not self.initialized and self.options.selected_row then
+      local win = self.cur_layout:get_main_win()
+      if win and api.nvim_win_is_valid(win.id) then
+        local buf = api.nvim_win_get_buf(win.id)
+        local line_count = api.nvim_buf_line_count(buf)
+        local row = math.min(self.options.selected_row, line_count)
+        pcall(api.nvim_win_set_cursor, win.id, { math.max(1, row), 0 })
+      end
+    end
 
     self.update_needed = false
     perf:time()

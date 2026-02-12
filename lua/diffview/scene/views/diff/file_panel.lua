@@ -58,6 +58,7 @@ function FilePanel:init(adapter, files, path_args, rev_pretty_name)
   self.rev_pretty_name = rev_pretty_name
   self.listing_style = conf.file_panel.listing_style
   self.tree_options = conf.file_panel.tree_options
+  self.is_loading = true
 
   self:on_autocmd("BufNew", {
     callback = function()

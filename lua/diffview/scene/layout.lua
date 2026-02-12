@@ -74,6 +74,9 @@ end
 
 ---@param self Layout
 Layout.create_post = async.void(function(self)
+  -- Immediately load null buffers to prevent flashing the pivot buffer content
+  -- while waiting for async file loading (#509).
+  self:open_null()
   await(self:open_files())
   vim.opt.equalalways = self.state.save_equalalways
 end)
@@ -305,7 +308,9 @@ function Layout:sync_scroll()
   end
 
   -- Cursor will sometimes move +- the value of 'scrolloff'
-  api.nvim_win_set_cursor(target.id, cursor)
+  if target ~= nil then
+      api.nvim_win_set_cursor(target.id, cursor)
+  end
 end
 
 M.Layout = Layout

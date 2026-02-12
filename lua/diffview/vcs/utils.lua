@@ -11,7 +11,46 @@ local await = async.await
 local fmt = string.format
 local logger = DiffviewGlobal.logger
 
+local config = require("diffview.config")
+
 local M = {}
+
+-- Patterns for merge artifact files.
+local merge_artifact_patterns = {
+  "%.orig$",
+  "%.BACKUP%.",
+  "%.BASE%.",
+  "%.LOCAL%.",
+  "%.REMOTE%.",
+}
+
+---Check if a file path matches a merge artifact pattern.
+---@param path string
+---@return boolean
+function M.is_merge_artifact(path)
+  for _, pattern in ipairs(merge_artifact_patterns) do
+    if path:match(pattern) then
+      return true
+    end
+  end
+  return false
+end
+
+---Filter out merge artifacts from a file list if configured.
+---@param files FileEntry[]
+---@return FileEntry[]
+function M.filter_merge_artifacts(files)
+  if not config.get_config().hide_merge_artifacts then
+    return files
+  end
+  local result = {}
+  for _, file in ipairs(files) do
+    if not M.is_merge_artifact(file.path) then
+      result[#result + 1] = file
+    end
+  end
+  return result
+end
 
 ---@enum JobStatus
 local JobStatus = oop.enum({
@@ -139,6 +178,11 @@ M.diff_file_list = async.wrap(function(adapter, left, right, path_args, dv_opt, 
     callback(utils.vec_join(unpack(errors)), nil)
     return
   end
+
+  -- Filter out merge artifacts if configured.
+  files:set_working(M.filter_merge_artifacts(files.working))
+  files:set_conflicting(M.filter_merge_artifacts(files.conflicting))
+  files:set_staged(M.filter_merge_artifacts(files.staged))
 
   files:update_file_trees()
   callback(nil, files)

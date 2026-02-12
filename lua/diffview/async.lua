@@ -2,7 +2,7 @@ local ffi = require("diffview.ffi")
 local oop = require("diffview.oop")
 
 local fmt = string.format
-local uv = vim.loop
+local uv = vim.uv
 
 local DEFAULT_ERROR = "Unkown error."
 

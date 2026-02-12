@@ -10,7 +10,7 @@ local config = lazy.require("diffview.config") ---@module "diffview.config"
 local diffview = lazy.require("diffview") ---@module "diffview"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
-local uv = vim.loop
+local uv = vim.uv
 
 local function err(msg)
   msg = msg:gsub("'", "''")
@@ -24,11 +24,8 @@ _G.DiffviewGlobal = {
   bootstrap_ok = false,
 }
 
-if vim.fn.has("nvim-0.7") ~= 1 then
-  err(
-    "Minimum required version is Neovim 0.7.0! Cannot continue."
-    .. " (See ':h diffview.changelog-137')"
-  )
+if vim.fn.has("nvim-0.10") ~= 1 then
+  err("Minimum required version is Neovim 0.10.0! Cannot continue.")
   return false
 end
 

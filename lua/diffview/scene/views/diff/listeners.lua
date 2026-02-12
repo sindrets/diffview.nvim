@@ -4,6 +4,8 @@ local lazy = require("diffview.lazy")
 local EventName = lazy.access("diffview.events", "EventName") ---@type EventName|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local actions = lazy.require("diffview.actions") ---@module "diffview.actions"
+local config = lazy.require("diffview.config") ---@module "diffview.config"
+local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local vcs_utils = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
 
@@ -19,12 +21,28 @@ return function(view)
         view:set_file(file, false, true)
       end
 
+      -- Restore panel cursor position.
+      if view.panel_cursor and view.panel:is_open() then
+        local winid = view.panel:get_winid()
+        if winid and api.nvim_win_is_valid(winid) then
+          pcall(api.nvim_win_set_cursor, winid, view.panel_cursor)
+        end
+      end
+
       if view.ready then
         view:update_files()
       end
     end,
     tab_leave = function()
       local file = view.panel.cur_file
+
+      -- Save panel cursor position.
+      if view.panel:is_open() then
+        local winid = view.panel:get_winid()
+        if winid and api.nvim_win_is_valid(winid) then
+          view.panel_cursor = api.nvim_win_get_cursor(winid)
+        end
+      end
 
       if file then
         file.layout:detach_files()
@@ -48,8 +66,11 @@ return function(view)
 
         if view.cur_entry and view.cur_entry.kind == "conflicting" then
           actions.next_conflict()
-          vim.cmd("norm! zz")
+        else
+          -- Jump to first diff hunk for regular files.
+          pcall(vim.cmd, "norm! ]c")
         end
+        vim.cmd("norm! zz")
       end)
 
       view.cur_layout:sync_scroll()
@@ -184,6 +205,13 @@ return function(view)
         view:update_files(
           vim.schedule_wrap(function()
             view.panel:highlight_cur_file()
+            -- Auto-close if all working/conflicting files have been staged.
+            if config.get_config().auto_close_on_empty then
+              if #view.files.working == 0 and #view.files.conflicting == 0 then
+                view:close()
+                lib.dispose_view(view)
+              end
+            end
           end)
         )
         view.emitter:emit(EventName.FILES_STAGED, view)
@@ -204,6 +232,13 @@ return function(view)
 
         view:update_files(function()
           view.panel:highlight_cur_file()
+          -- Auto-close if all working/conflicting files have been staged.
+          if config.get_config().auto_close_on_empty then
+            if #view.files.working == 0 and #view.files.conflicting == 0 then
+              view:close()
+              lib.dispose_view(view)
+            end
+          end
         end)
         view.emitter:emit(EventName.FILES_STAGED, view)
       end
@@ -231,17 +266,47 @@ return function(view)
         commit = view.left.commit
       end
 
-      local file = view:infer_cur_file()
-      if not file then return end
+      local item = view:infer_cur_file(true)
+      if not item then return end
 
-      local bufid = utils.find_file_buffer(file.path)
+      -- Check if item is a directory.
+      if type(item.collapsed) == "boolean" then
+        ---@cast item DirData
+        local node = item._node
+        if not node then return end
 
-      if bufid and vim.bo[bufid].modified then
-        utils.err("The file is open with unsaved changes! Aborting file restoration.")
-        return
+        -- Get all files under this directory.
+        local leaves = node:leaves()
+        local restored_count = 0
+        for _, leaf in ipairs(leaves) do
+          local file = leaf.data
+          if file and file.path then
+            local bufid = utils.find_file_buffer(file.path)
+            if bufid and vim.bo[bufid].modified then
+              utils.warn(("Skipping '%s': file has unsaved changes."):format(file.path))
+            else
+              await(vcs_utils.restore_file(view.adapter, file.path, file.kind, commit))
+              restored_count = restored_count + 1
+            end
+          end
+        end
+
+        if restored_count > 0 then
+          utils.info(("Restored %d file(s)."):format(restored_count))
+        end
+      else
+        -- Single file restore.
+        local file = item
+        local bufid = utils.find_file_buffer(file.path)
+
+        if bufid and vim.bo[bufid].modified then
+          utils.err("The file is open with unsaved changes! Aborting file restoration.")
+          return
+        end
+
+        await(vcs_utils.restore_file(view.adapter, file.path, file.kind, commit))
       end
 
-      await(vcs_utils.restore_file(view.adapter, file.path, file.kind, commit))
       view:update_files()
     end),
     listing_style = function()
@@ -259,6 +324,18 @@ return function(view)
       view.panel:update_components()
       view.panel:render()
       view.panel:redraw()
+    end,
+    toggle_untracked = function()
+      -- Only applicable to working tree comparisons.
+      if not (view.left.type == RevType.STAGE and view.right.type == RevType.LOCAL) then
+        utils.info("Toggle untracked is only available when comparing staged vs working tree.")
+        return
+      end
+
+      view.options.show_untracked = not view.options.show_untracked
+      local state = view.options.show_untracked and "shown" or "hidden"
+      utils.info(("Untracked files: %s"):format(state))
+      view:update_files()
     end,
     focus_files = function()
       view.panel:focus()

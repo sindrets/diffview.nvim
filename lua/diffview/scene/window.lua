@@ -17,8 +17,6 @@ local logger = DiffviewGlobal.logger
 
 local M = {}
 
-local HAS_NVIM_0_8 = vim.fn.has("nvim-0.8") == 1
-
 ---@class Window : diffview.Object
 ---@field id integer
 ---@field file vcs.File
@@ -146,6 +144,17 @@ Window.open_file = async.void(function(self)
 
   self.emitter:emit("pre_open")
 
+  -- Disable context plugins BEFORE the buffer enters the window.
+  -- This must happen before BufWinEnter fires, when context plugins decide to show.
+  -- Save original state for restoration later (only for LOCAL files that we'll restore).
+  if not self.file._context_state_saved then
+    self.file._orig_ts_context_disable = vim.b[self.file.bufnr].ts_context_disable
+    self.file._orig_context_enabled = vim.b[self.file.bufnr].context_enabled
+    self.file._context_state_saved = true
+  end
+  vim.b[self.file.bufnr].ts_context_disable = true  -- nvim-treesitter-context
+  vim.b[self.file.bufnr].context_enabled = false    -- context.vim
+
   local conf = config.get_config()
   api.nvim_win_set_buf(self.id, self.file.bufnr)
 
@@ -192,7 +201,7 @@ end)
 
 ---@return boolean
 function Window:show_winbar_info()
-  if self.file and self.file.winbar and HAS_NVIM_0_8 then
+  if self.file and self.file.winbar then
     local conf = config.get_config()
     local view = lib.get_current_view()
 
@@ -222,8 +231,16 @@ function Window:open_null()
 end
 
 function Window:detach_file()
-  if self.file and self.file:is_valid() then
-    self.file:detach_buffer()
+  if self.file then
+    -- Restore context plugin state for local files.
+    if self.file._context_state_saved and self.file:is_valid() then
+      vim.b[self.file.bufnr].ts_context_disable = self.file._orig_ts_context_disable
+      vim.b[self.file.bufnr].context_enabled = self.file._orig_context_enabled
+    end
+
+    if self.file:is_valid() then
+      self.file:detach_buffer()
+    end
   end
 end
 
@@ -241,15 +258,24 @@ function Window:_is_file_in_use()
   return false
 end
 
+-- Options that are global-only and cannot be accessed via vim.wo.
+local global_only_opts = {
+  scrollopt = true,
+}
+
 function Window:_save_winopts()
   if Window.winopt_store[self.file.bufnr] then return end
 
   Window.winopt_store[self.file.bufnr] = {}
-  api.nvim_win_call(self.id, function()
-    for option, _ in pairs(self.file.winopts) do
+  for option, _ in pairs(self.file.winopts) do
+    if global_only_opts[option] then
+      -- Global options: save from vim.o.
       Window.winopt_store[self.file.bufnr][option] = vim.o[option]
+    else
+      -- Window-local options: save from vim.wo to get actual window values.
+      Window.winopt_store[self.file.bufnr][option] = vim.wo[self.id][option]
     end
-  end)
+  end
 end
 
 function Window:_restore_winopts()
@@ -262,9 +288,7 @@ function Window:_restore_winopts()
       local winid = utils.temp_win(self.file.bufnr)
       utils.set_local(winid, Window.winopt_store[self.file.bufnr])
 
-      if HAS_NVIM_0_8 then
-        vim.wo[winid].winbar = nil
-      end
+      vim.wo[winid].winbar = nil
 
       api.nvim_win_close(winid, true)
     end)
@@ -312,17 +336,28 @@ function Window:use_winopts(opts)
   end)
 end
 
+---Maximum number of custom folds to create. Creating too many folds can freeze
+---the UI, especially when transitioning from diff foldmethod to manual.
+Window.MAX_CUSTOM_FOLDS = 100
+
 function Window:apply_custom_folds()
   if self.file.custom_folds
     and not self:is_nulled()
     and vim.wo[self.id].foldmethod == "manual"
   then
+    local folds = self.file.custom_folds
+    local fold_count = #folds
+
+    if fold_count > Window.MAX_CUSTOM_FOLDS then
+      -- Skip fold creation to prevent UI freeze with many folds.
+      return
+    end
+
     api.nvim_win_call(self.id, function()
       pcall(vim.cmd, "norm! zE") -- Delete all folds in the window
 
-      for _, fold in ipairs(self.file.custom_folds) do
-        vim.cmd(fmt("%d,%dfold", fold[1], fold[2]))
-        -- print(fmt("%d,%dfold", fold[1], fold[2]))
+      for _, fold in ipairs(folds) do
+        pcall(vim.cmd, fmt("%d,%dfold", fold[1], fold[2]))
       end
     end)
   end

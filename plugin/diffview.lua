@@ -24,6 +24,10 @@ command("DiffviewOpen", function(ctx)
   diffview.open(arg_parser.scan(ctx.args).args)
 end, { nargs = "*", complete = completion })
 
+command("DiffviewToggle", function(ctx)
+  diffview.toggle(arg_parser.scan(ctx.args).args)
+end, { nargs = "*", complete = completion })
+
 command("DiffviewFileHistory", function(ctx)
   local range
 

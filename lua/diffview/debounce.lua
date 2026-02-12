@@ -2,7 +2,7 @@ local async = require("diffview.async")
 local utils = require("diffview.utils")
 
 local await = async.await
-local uv = vim.loop
+local uv = vim.uv
 
 local M = {}
 
@@ -85,7 +85,10 @@ function M.debounce_trailing(ms, rush_first, fn)
       if args then
         local a = args
         args = nil
-        fn(utils.tbl_unpack(a))
+        -- Use vim.schedule to avoid E5560 when fn accesses nvim APIs.
+        vim.schedule(function()
+          fn(utils.tbl_unpack(a))
+        end)
       end
     end)
   end)
@@ -142,11 +145,14 @@ function M.throttle_trailing(ms, rush_first, fn)
       if args then
         local a = args
         args = nil
-        if rush_first then
-          throttled_fn(utils.tbl_unpack(a))
-        else
-          fn(utils.tbl_unpack(a))
-        end
+        -- Use vim.schedule to avoid E5560 when fn accesses nvim APIs.
+        vim.schedule(function()
+          if rush_first then
+            throttled_fn(utils.tbl_unpack(a))
+          else
+            fn(utils.tbl_unpack(a))
+          end
+        end)
       end
     end)
   end)
@@ -211,10 +217,13 @@ function M.set_interval(func, delay)
   }
 
   timer:start(delay, delay, function()
-    local should_close = func()
-    if type(should_close) == "boolean" and should_close then
-      ret.close()
-    end
+    -- Use vim.schedule to avoid E5560 when func accesses nvim APIs.
+    vim.schedule(function()
+      local should_close = func()
+      if type(should_close) == "boolean" and should_close then
+        ret.close()
+      end
+    end)
   end)
 
   return ret
@@ -235,8 +244,11 @@ function M.set_timeout(func, delay)
   }
 
   timer:start(delay, 0, function()
-    func()
-    ret.close()
+    -- Use vim.schedule to avoid E5560 when func accesses nvim APIs.
+    vim.schedule(function()
+      func()
+      ret.close()
+    end)
   end)
 
   return ret

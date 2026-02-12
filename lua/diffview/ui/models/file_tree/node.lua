@@ -1,3 +1,4 @@
+local config = require("diffview.config")
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 local M = {}
@@ -46,16 +47,28 @@ function Node:has_children()
 end
 
 ---Compare against another node alphabetically and case-insensitive by node names.
----Directory nodes come before file nodes.
+---Directory nodes come before file nodes. If a custom `file_panel.sort_file`
+---comparator is configured, it is used for file-to-file comparisons.
 ---@param a Node
 ---@param b Node
 ---@return boolean true if node a comes before node b
 function Node.comparator(a, b)
-  if a:has_children() == b:has_children() then
-    return string.lower(a.name) < string.lower(b.name)
-  else
-    return a:has_children()
+  local a_dir = a:has_children()
+  local b_dir = b:has_children()
+
+  if a_dir ~= b_dir then
+    return a_dir
   end
+
+  -- For file nodes, use custom comparator if configured.
+  if not a_dir then
+    local sort_file = config.get_config().file_panel.sort_file
+    if sort_file and type(sort_file) == "function" then
+      return sort_file(a.name, b.name, a.data, b.data)
+    end
+  end
+
+  return string.lower(a.name) < string.lower(b.name)
 end
 
 function Node:sort()

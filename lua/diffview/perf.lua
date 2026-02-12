@@ -1,7 +1,7 @@
 local oop = require("diffview.oop")
 local utils = require("diffview.utils")
 
-local uv = vim.loop
+local uv = vim.uv
 
 local M = {}
 

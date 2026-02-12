@@ -2,6 +2,7 @@ local async = require("diffview.async")
 local lazy = require("diffview.lazy")
 
 local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
+local File = lazy.access("diffview.vcs.file", "File") ---@type vcs.File|LazyModule
 local FileEntry = lazy.access("diffview.scene.file_entry", "FileEntry") ---@type FileEntry|LazyModule
 local FilePanel = lazy.access("diffview.scene.views.diff.file_panel", "FilePanel") ---@type FilePanel|LazyModule
 local Rev = lazy.access("diffview.vcs.adapters.git.rev", "GitRev") ---@type GitRev|LazyModule
@@ -150,7 +151,32 @@ function CDiffView:create_file_entries(files)
           },
         }))
       else
-        table.insert(entries[v.kind], FileEntry.with_layout(CDiffView.get_default_layout(), {
+        local layout_class = CDiffView.get_default_layout()
+
+        local function create_file(rev, symbol)
+          local nulled
+          if symbol == "a" then
+            nulled = file_data.left_null
+          elseif symbol == "b" then
+            nulled = file_data.right_null
+          end
+          -- Fall back to layout's should_null if left_null/right_null not specified.
+          if nulled == nil then
+            local ok, res = pcall(layout_class.should_null, rev, file_data.status, symbol)
+            nulled = ok and res or false
+          end
+
+          return File({
+            adapter = self.adapter,
+            path = symbol == "a" and file_data.oldpath or file_data.path,
+            kind = v.kind,
+            get_data = self.get_file_data,
+            rev = rev,
+            nulled = nulled,
+          })
+        end
+
+        table.insert(entries[v.kind], FileEntry({
           adapter = self.adapter,
           path = file_data.path,
           oldpath = file_data.oldpath,
@@ -161,8 +187,10 @@ function CDiffView:create_file_entries(files)
             a = v.left,
             b = v.right,
           },
-          get_data = self.get_file_data,
-          --FIXME: left_null, right_null
+          layout = layout_class({
+            a = create_file(v.left, "a"),
+            b = create_file(v.right, "b"),
+          }),
         }))
       end
 

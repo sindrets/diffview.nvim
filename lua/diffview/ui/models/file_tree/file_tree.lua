@@ -112,6 +112,7 @@ function FileTree:create_comp_schema(data)
 
     ---@type DirData
     local dir_data = node.data
+    dir_data._node = node
 
     if data.flatten_dirs then
       while #node.children == 1 and node.children[1]:has_children() do
@@ -148,6 +149,58 @@ function FileTree:create_comp_schema(data)
   end
 
   return schema
+end
+
+---Get the collapsed state of all directories as a map from path to collapsed boolean.
+---@return table<string, boolean>
+function FileTree:get_collapsed_state()
+  local state = {}
+
+  local function recurse(node)
+    if not node:has_children() then
+      return
+    end
+
+    ---@type DirData
+    local dir_data = node.data
+    if dir_data and dir_data.path then
+      state[dir_data.path] = dir_data.collapsed
+    end
+
+    for _, child in ipairs(node.children) do
+      recurse(child)
+    end
+  end
+
+  for _, node in ipairs(self.root.children) do
+    recurse(node)
+  end
+
+  return state
+end
+
+---Restore the collapsed state of directories from a saved state map.
+---@param state table<string, boolean>
+function FileTree:set_collapsed_state(state)
+  local function recurse(node)
+    if not node:has_children() then
+      return
+    end
+
+    ---@type DirData
+    local dir_data = node.data
+    if dir_data and dir_data.path and state[dir_data.path] ~= nil then
+      dir_data.collapsed = state[dir_data.path]
+    end
+
+    for _, child in ipairs(node.children) do
+      recurse(child)
+    end
+  end
+
+  for _, node in ipairs(self.root.children) do
+    recurse(node)
+  end
 end
 
 M.FileTree = FileTree

@@ -22,7 +22,7 @@ local await, pawait = async.await, async.pawait
 local fmt = string.format
 local logger = DiffviewGlobal.logger
 local pl = lazy.access(utils, "path") ---@type PathLib
-local uv = vim.loop
+local uv = vim.uv
 
 local M = {}
 
@@ -829,6 +829,7 @@ function HgAdapter:diffview_options(argo)
     selected_file = argo:get_flag("selected-file", { no_empty = true, expand = true })
         or (vim.bo.buftype == "" and pl:vim_expand("%:p"))
         or nil,
+    selected_row = tonumber(argo:get_flag("selected-row", { no_empty = true })),
   }
 
   return {left = left, right = right, options = options}
@@ -859,6 +860,28 @@ function HgAdapter:head_rev()
   local s = vim.trim(out[1]):gsub("^%^", "")
 
   return HgRev(RevType.COMMIT, s, true)
+end
+
+---Get the current branch name.
+---@return string? branch_name The branch name, or nil if not available.
+function HgAdapter:get_branch_name()
+  local out, code = self:exec_sync(
+    { "branch" },
+    { cwd = self.ctx.toplevel, silent = true }
+  )
+
+  if code == 0 and out[1] then
+    return vim.trim(out[1])
+  end
+
+  return nil
+end
+
+---Get the default branch name.
+---@return string branch_name The default branch name ("default" for Mercurial).
+function HgAdapter:get_default_branch()
+  -- Mercurial's default branch is always "default".
+  return "default"
 end
 
 function HgAdapter:rev_to_args(left, right)

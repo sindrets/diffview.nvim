@@ -1,5 +1,8 @@
 local lazy = require("diffview.lazy")
 
+-- Ensure bootstrap has run before accessing DiffviewGlobal.
+require("diffview.bootstrap")
+
 local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
 local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView") ---@type FileHistoryView|LazyModule
 local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
@@ -15,6 +18,23 @@ local M = {}
 
 ---@type View[]
 M.views = {}
+
+---Find an existing DiffView matching the given parameters.
+---@param adapter VCSAdapter
+---@param rev_arg string?
+---@param path_args string[]
+---@return DiffView?
+function M.find_existing_view(adapter, rev_arg, path_args)
+  for _, view in ipairs(M.views) do
+    if DiffView.__get():ancestorof(view)
+        and view.adapter.ctx.toplevel == adapter.ctx.toplevel
+        and view.rev_arg == rev_arg
+        and vim.deep_equal(view.path_args or {}, path_args or {}) then
+      return view
+    end
+  end
+  return nil
+end
 
 function M.diffview_open(args)
   local default_args = config.get_config().default_args.DiffviewOpen
@@ -39,6 +59,14 @@ function M.diffview_open(args)
   end
 
   ---@cast adapter -?
+
+  -- Check for existing view with matching parameters.
+  local existing = M.find_existing_view(adapter, rev_arg, adapter.ctx.path_args)
+  if existing and existing.tabpage and api.nvim_tabpage_is_valid(existing.tabpage) then
+    api.nvim_set_current_tabpage(existing.tabpage)
+    logger:debug("Switched to existing DiffView")
+    return existing
+  end
 
   local opts = adapter:diffview_options(argo)
 

@@ -6,7 +6,9 @@ local lazy = require("diffview.lazy")
 local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
 local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView") ---@type FileHistoryView|LazyModule
 local HelpPanel = lazy.access("diffview.ui.panels.help_panel", "HelpPanel") ---@type HelpPanel|LazyModule
+local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
+local config = lazy.require("diffview.config") ---@module "diffview.config"
 local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local vcs_utils = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
@@ -162,6 +164,89 @@ function M.goto_file_tab()
       utils.set_cursor(0, unpack(cursor))
     end
   end
+end
+
+---Open the current file with the system default application.
+function M.open_file_external()
+  local file = prepare_goto_file()
+
+  if file then
+    local cmd
+    if vim.fn.has("mac") == 1 then
+      cmd = { "open", file.absolute_path }
+    elseif vim.fn.has("unix") == 1 then
+      cmd = { "xdg-open", file.absolute_path }
+    elseif vim.fn.has("win32") == 1 then
+      cmd = { "cmd", "/c", "start", "", file.absolute_path }
+    else
+      utils.err("Unsupported platform for opening files externally.")
+      return
+    end
+
+    vim.fn.jobstart(cmd, { detach = true })
+  end
+end
+
+---Open the current diffview in a new tab with the same revision.
+function M.open_in_new_tab()
+  local view = lib.get_current_view()
+
+  if not view then
+    return
+  end
+
+  -- Only works for DiffView (not FileHistoryView).
+  if not DiffView.__get():ancestorof(view) then
+    utils.info("This action only works in a diff view.")
+    return
+  end
+
+  local new_view = DiffView({
+    adapter = view.adapter,
+    rev_arg = view.rev_arg,
+    left = view.left,
+    right = view.right,
+    path_args = view.path_args,
+    options = view.options or {},
+  })
+
+  lib.add_view(new_view)
+  new_view:open()
+end
+
+---Open a diffview comparing the default branch against working tree.
+---The default branch is detected automatically (main, master, or from origin/HEAD).
+function M.diff_against_default_branch()
+  local view = lib.get_current_view()
+  local adapter
+
+  if view then
+    adapter = view.adapter
+  else
+    -- Get an adapter for the current working directory.
+    local err
+    err, adapter = require("diffview.vcs").get_adapter()
+    if err or not adapter then
+      utils.err("Failed to get VCS adapter: " .. (err or "unknown error"))
+      return
+    end
+  end
+
+  local default_branch = adapter:get_default_branch()
+  if not default_branch then
+    utils.err("Could not detect default branch (main/master). Please specify manually.")
+    return
+  end
+
+  local new_view = DiffView({
+    adapter = adapter,
+    rev_arg = default_branch,
+    left = adapter.Rev(RevType.COMMIT, default_branch),
+    right = adapter.Rev(RevType.LOCAL),
+  })
+
+  lib.add_view(new_view)
+  new_view:open()
 end
 
 ---@class diffview.ConflictCount
@@ -489,19 +574,41 @@ function M.diffput(target)
   end
 end
 
+---@type table<string, Layout>
+local layout_name_map = {
+  diff1_plain = Diff1,
+  diff2_horizontal = Diff2Hor,
+  diff2_vertical = Diff2Ver,
+  diff3_horizontal = Diff3Hor,
+  diff3_vertical = Diff3Ver,
+  diff3_mixed = Diff3Mixed,
+  diff4_mixed = Diff4Mixed,
+}
+
 function M.cycle_layout()
+  local conf = config.get_config()
+  local cycle_config = conf.view.cycle_layouts or {}
+
+  -- Convert layout names to layout classes.
+  local function resolve_layouts(names)
+    local result = {}
+    for _, name in ipairs(names or {}) do
+      local layout_class = layout_name_map[name]
+      if layout_class then
+        result[#result + 1] = layout_class.__get()
+      end
+    end
+    return result
+  end
+
+  -- Use config or fall back to defaults.
   local layout_cycles = {
-    standard = {
-      Diff2Hor.__get(),
-      Diff2Ver.__get(),
-    },
-    merge_tool = {
-      Diff3Hor.__get(),
-      Diff3Ver.__get(),
-      Diff3Mixed.__get(),
-      Diff4Mixed.__get(),
-      Diff1.__get(),
-    }
+    standard = #(cycle_config.default or {}) > 0
+        and resolve_layouts(cycle_config.default)
+        or { Diff2Hor.__get(), Diff2Ver.__get() },
+    merge_tool = #(cycle_config.merge_tool or {}) > 0
+        and resolve_layouts(cycle_config.merge_tool)
+        or { Diff3Hor.__get(), Diff3Ver.__get(), Diff3Mixed.__get(), Diff4Mixed.__get(), Diff1.__get() },
   }
 
   local view = lib.get_current_view()
@@ -551,6 +658,63 @@ function M.cycle_layout()
     main = view.cur_layout:get_main_win()
 
     if was_focused then main:focus() end
+  end
+end
+
+---Set a specific layout for the current view.
+---@param layout_name string One of: diff1_plain, diff2_horizontal, diff2_vertical, diff3_horizontal, diff3_vertical, diff3_mixed, diff4_mixed
+function M.set_layout(layout_name)
+  return function()
+    local layout_class = layout_name_map[layout_name]
+    if not layout_class then
+      utils.err(("Unknown layout: '%s'. See ':h diffview-config-view.x.layout' for valid layouts."):format(layout_name))
+      return
+    end
+
+    local view = lib.get_current_view()
+    if not view then return end
+
+    local files, cur_file
+
+    if view:instanceof(FileHistoryView.__get()) then
+      ---@cast view FileHistoryView
+      files = view.panel:list_files()
+      cur_file = view:cur_file()
+    elseif view:instanceof(DiffView.__get()) then
+      ---@cast view DiffView
+      cur_file = view.cur_entry
+      if cur_file then
+        files = cur_file.kind == "conflicting"
+            and view.files.conflicting
+            or utils.vec_join(view.panel.files.working, view.panel.files.staged)
+      end
+    else
+      return
+    end
+
+    if not files then return end
+
+    local target_layout = layout_class.__get()
+
+    for _, entry in ipairs(files) do
+      entry:convert_layout(target_layout)
+    end
+
+    if cur_file then
+      local main = view.cur_layout:get_main_win()
+      local pos = api.nvim_win_get_cursor(main.id)
+      local was_focused = view.cur_layout:is_focused()
+
+      cur_file.layout.emitter:once("files_opened", function()
+        utils.set_cursor(main.id, unpack(pos))
+        if not was_focused then view.cur_layout:sync_scroll() end
+      end)
+
+      view:set_file(cur_file, false)
+      main = view.cur_layout:get_main_win()
+
+      if was_focused then main:focus() end
+    end
   end
 end
 
@@ -620,16 +784,20 @@ local action_names = {
   "close_all_folds",
   "close_fold",
   "copy_hash",
+  "diff_against_head",
   "focus_entry",
   "focus_files",
   "listing_style",
   "next_entry",
+  "next_entry_in_commit",
   "open_all_folds",
+  "open_commit_in_browser",
   "open_commit_log",
   "open_fold",
   "open_in_diffview",
   "options",
   "prev_entry",
+  "prev_entry_in_commit",
   "refresh_files",
   "restore_entry",
   "select_entry",
@@ -644,6 +812,7 @@ local action_names = {
   "toggle_flatten_dirs",
   "toggle_fold",
   "toggle_stage_entry",
+  "toggle_untracked",
   "unstage_all",
 }
 

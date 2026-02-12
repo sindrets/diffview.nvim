@@ -7,12 +7,27 @@ DEFAULT CONFIG                                  *diffview.defaults*
     enhanced_diff_hl = false, -- See |diffview-config-enhanced_diff_hl|
     git_cmd = { "git" },      -- The git executable followed by default args.
     hg_cmd = { "hg" },        -- The hg executable followed by default args.
-    use_icons = true,         -- Requires nvim-web-devicons
+    use_icons = true,         -- Requires nvim-web-devicons or mini.icons
     show_help_hints = true,   -- Show hints for how to open the help panel
     watch_index = true,       -- Update views and index buffers when the git index changes.
+    hide_merge_artifacts = false, -- Hide merge artifact files (*.orig, *.BACKUP.*, *.BASE.*, *.LOCAL.*, *.REMOTE.*)
+    auto_close_on_empty = false, -- Close diffview when the last file is staged/resolved
     icons = {                 -- Only applies when use_icons is true.
       folder_closed = "",
       folder_open = "",
+    },
+    status_icons = {          -- Configure icons for git status letters.
+      ["A"] = "A",            -- Added
+      ["?"] = "?",            -- Untracked
+      ["M"] = "M",            -- Modified
+      ["R"] = "R",            -- Renamed
+      ["C"] = "C",            -- Copied
+      ["T"] = "T",            -- Type changed
+      ["U"] = "U",            -- Unmerged
+      ["X"] = "X",            -- Unknown
+      ["D"] = "D",            -- Deleted
+      ["B"] = "B",            -- Broken
+      ["!"] = "!",            -- Ignored
     },
     signs = {
       fold_closed = "",
@@ -60,6 +75,7 @@ DEFAULT CONFIG                                  *diffview.defaults*
         width = 35,
         win_opts = {},
       },
+      show = true,                        -- Show the file panel when opening Diffview.
     },
     file_history_panel = {
       log_options = {   -- See |diffview-config-log_options|
@@ -81,6 +97,7 @@ DEFAULT CONFIG                                  *diffview.defaults*
         height = 16,
         win_opts = {},
       },
+      date_format = "auto", -- Date format: "auto" | "relative" | "iso"
     },
     commit_log_panel = {
       win_config = {},  -- See |diffview-config-win_config|

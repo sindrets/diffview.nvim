@@ -4,7 +4,7 @@ local config = lazy.require("diffview.config") ---@module "diffview.config"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
-local web_devicons
+local web_devicons, mini_icons
 local icon_cache = {}
 
 local M = {}
@@ -40,10 +40,10 @@ local M = {}
 ---@field bold boolean
 ---@field italic boolean
 ---@field underline boolean
----@field underlineline boolean
+---@field underdouble boolean
 ---@field undercurl boolean
----@field underdash boolean
----@field underdot boolean
+---@field underdashed boolean
+---@field underdotted boolean
 ---@field strikethrough boolean
 ---@field standout boolean
 ---@field reverse boolean
@@ -51,9 +51,6 @@ local M = {}
 ---@field default boolean
 
 ---@alias hl.HlAttrValue integer|boolean
-
-local HAS_NVIM_0_8 = vim.fn.has("nvim-0.8") == 1
-local HAS_NVIM_0_9 = vim.fn.has("nvim-0.9") == 1
 
 ---@enum HlAttribute
 M.HlAttribute = {
@@ -66,10 +63,10 @@ M.HlAttribute = {
   bold = 7,
   italic = 8,
   underline = 9,
-  underlineline = 10,
+  underdouble = 10,
   undercurl = 11,
-  underdash = 12,
-  underdot = 13,
+  underdashed = 12,
+  underdotted = 13,
   strikethrough = 14,
   standout = 15,
   reverse = 16,
@@ -80,39 +77,14 @@ local style_attrs = {
   "bold",
   "italic",
   "underline",
-  "underlineline",
+  "underdouble",
   "undercurl",
-  "underdash",
-  "underdot",
+  "underdashed",
+  "underdotted",
   "strikethrough",
   "standout",
   "reverse",
 }
-
--- NOTE: Some atrtibutes have been renamed in v0.8.0
-if HAS_NVIM_0_8 then
-  M.HlAttribute.underdashed = M.HlAttribute.underdash
-  M.HlAttribute.underdash = nil
-
-  M.HlAttribute.underdotted = M.HlAttribute.underdot
-  M.HlAttribute.underdot = nil
-
-  M.HlAttribute.underdouble = M.HlAttribute.underlineline
-  M.HlAttribute.underlineline = nil
-
-  style_attrs = {
-    "bold",
-    "italic",
-    "underline",
-    "underdouble",
-    "undercurl",
-    "underdashed",
-    "underdotted",
-    "strikethrough",
-    "standout",
-    "reverse",
-  }
-end
 
 utils.add_reverse_lookup(M.HlAttribute)
 utils.add_reverse_lookup(style_attrs)
@@ -125,31 +97,16 @@ function M.get_hl(name, no_trans)
   local hl
 
   if no_trans then
-    if HAS_NVIM_0_9 then
-      hl = api.nvim_get_hl(0, { name = name, link = true })
-    else
-      hl = api.nvim__get_hl_defs(0)[name]
-    end
+    hl = api.nvim_get_hl(0, { name = name, link = true })
   else
     local id = api.nvim_get_hl_id_by_name(name)
 
     if id then
-      if HAS_NVIM_0_9 then
-        hl = api.nvim_get_hl(0, { id = id, link = false })
-      else
-        hl = api.nvim_get_hl_by_id(id, true)
-      end
+      hl = api.nvim_get_hl(0, { id = id, link = false })
     end
   end
 
   if hl then
-    if not HAS_NVIM_0_9 then
-      -- Handle renames
-      if hl.foreground then hl.fg = hl.foreground; hl.foreground = nil end
-      if hl.background then hl.bg = hl.background; hl.background = nil end
-      if hl.special then hl.sp = hl.special; hl.special = nil end
-    end
-
     if hl.fg then hl.x_fg = string.format("#%06x", hl.fg) end
     if hl.bg then hl.x_bg = string.format("#%06x", hl.bg) end
     if hl.sp then hl.x_sp = string.format("#%06x", hl.sp) end
@@ -274,25 +231,7 @@ function M.hi(groups, opt)
       end
     end
 
-    if not HAS_NVIM_0_9 and def_spec.link then
-      -- Pre 0.9 `nvim_set_hl()` could not set other attributes in combination
-      -- with `link`. Furthermore, setting non-link attributes would clear the
-      -- link, but this does *not* happen if you set the other attributes first
-      -- (???). However, if the value of `link` is `-1`, the group will be
-      -- cleared regardless (?????).
-      local link = def_spec.link
-      def_spec.link = nil
-
-      if not def_spec.default then
-        api.nvim_set_hl(0, group, def_spec)
-      end
-
-      if link ~= -1 then
-        api.nvim_set_hl(0, group, { link = link, default = def_spec.default })
-      end
-    else
-      api.nvim_set_hl(0, group, def_spec)
-    end
+    api.nvim_set_hl(0, group, def_spec)
   end
 end
 
@@ -313,13 +252,7 @@ function M.hi_link(from, to, opt)
 
   for _, f in ipairs(from) do
     if opt.clear then
-      if not HAS_NVIM_0_9 then
-        -- Pre 0.9 `nvim_set_hl()` did not clear other attributes when `link` was set.
-        api.nvim_set_hl(0, f, {})
-      end
-
       api.nvim_set_hl(0, f, { default = opt.default, link = to })
-
     else
       -- When `clear` is not set; use our `hi()` function such that other
       -- attributes are not affected.
@@ -349,14 +282,19 @@ end
 function M.get_file_icon(name, ext, render_data, line_idx, offset)
   if not config.get_config().use_icons then return "" end
 
-  if not web_devicons then
+  if not (web_devicons or mini_icons) then
     local ok
     ok, web_devicons = pcall(require, "nvim-web-devicons")
 
     if not ok then
+      ok, mini_icons = pcall(require, "mini.icons")
+      web_devicons = nil
+    end
+
+    if not ok then
       config.get_config().use_icons = false
       utils.warn(
-        "nvim-web-devicons is required to use file icons! "
+        "nvim-web-devicons or mini.icons is required to use file icons! "
           .. "Set `use_icons = false` in your config to stop seeing this message."
       )
 
@@ -369,8 +307,11 @@ function M.get_file_icon(name, ext, render_data, line_idx, offset)
 
   if icon_cache[icon_key] then
     icon, hl = unpack(icon_cache[icon_key])
-  else
+  elseif web_devicons then
     icon, hl = web_devicons.get_icon(name, ext, { default = true })
+    icon_cache[icon_key] = { icon, hl }
+  else
+    icon, hl = mini_icons.get("file", name)
     icon_cache[icon_key] = { icon, hl }
   end
 
@@ -403,6 +344,13 @@ function M.get_git_hl(status)
   return git_status_hl_map[status]
 end
 
+---Get the configured status icon for a git status letter.
+---@param status string Git status letter (e.g., "M", "A", "D").
+---@return string
+function M.get_status_icon(status)
+  return config.get_config().status_icons[status] or status
+end
+
 function M.get_colors()
   return {
     white = M.get_fg("Normal") or "White",
@@ -423,7 +371,7 @@ function M.get_hl_groups()
   return {
     FilePanelTitle = { fg = M.get_fg("Label") or colors.blue, style = "bold" },
     FilePanelCounter = { fg = M.get_fg("Identifier") or colors.purple, style = "bold" },
-    FilePanelFileName = { fg = M.get_fg("Normal") or colors.white },
+    -- FilePanelFileName is linked to Normal in hl_links.
     Dim1 = { fg = M.get_fg("Comment") or colors.white },
     Primary = { fg = M.get_fg("Function") or "Purple" },
     Secondary = { fg = M.get_fg("String") or "Orange" },
@@ -462,6 +410,8 @@ M.hl_links = {
   StatusDeleted = "diffRemoved",
   StatusBroken = "diffRemoved",
   StatusIgnored = "Comment",
+  CommitRemoteRef = "Function",
+  CommitLocalOnly = "WarningMsg",
   DiffAdd = "DiffAdd",
   DiffDelete = "DiffDelete",
   DiffChange = "DiffChange",
@@ -482,6 +432,13 @@ function M.update_diff_hl()
 end
 
 function M.setup()
+  -- Ensure diff highlights are defined by loading the diff syntax if needed.
+  -- Some colorschemes don't set diffAdded/diffRemoved/diffChanged until the
+  -- diff filetype is encountered.
+  if vim.fn.hlexists("diffAdded") == 0 then
+    vim.cmd("runtime! syntax/diff.vim")
+  end
+
   for name, v in pairs(M.get_hl_groups()) do
     v = vim.tbl_extend("force", v, { default = true })
     M.hi("Diffview" .. name, v)

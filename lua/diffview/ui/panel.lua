@@ -269,7 +269,17 @@ function Panel:open()
   local config = self:get_config()
 
   if config.type == "split" then
-    local split_dir = vim.tbl_contains({ "top", "left" }, config.position) and "aboveleft" or "belowright"
+    -- Resolve "auto" position based on vim's splitright/splitbelow options.
+    local position = config.position
+    if position == "auto" then
+      if self.state.form == "row" then
+        position = vim.o.splitbelow and "bottom" or "top"
+      else
+        position = vim.o.splitright and "right" or "left"
+      end
+    end
+
+    local split_dir = vim.tbl_contains({ "top", "left" }, position) and "aboveleft" or "belowright"
     local split_cmd = self.state.form == "row" and "sp" or "vsp"
     local rel_winid = config.relative == "win"
       and api.nvim_win_is_valid(config.win or -1)
@@ -282,7 +292,7 @@ function Panel:open()
       api.nvim_win_set_buf(self.winid, self.bufid)
 
       if config.relative == "editor" then
-        local dir = ({ left = "H", bottom = "J", top = "K", right = "L" })[config.position]
+        local dir = ({ left = "H", bottom = "J", top = "K", right = "L" })[position]
         vim.cmd("wincmd " .. dir)
         vim.cmd("wincmd =")
       end
@@ -353,7 +363,7 @@ function Panel:init_buffer()
   local bn = api.nvim_create_buf(false, false)
 
   for k, v in pairs(self.class.bufopts) do
-    api.nvim_buf_set_option(bn, k, v)
+    vim.bo[bn][k] = v
   end
 
   local bufname

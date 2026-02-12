@@ -6,7 +6,7 @@ local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local await = async.await
 local fmt = string.format
-local uv = vim.loop
+local uv = vim.uv
 
 local M = {}
 
@@ -295,8 +295,8 @@ function PathLib:expand(path)
 
   for i = idx, #segments do
     local env_var = segments[i]:match("^%$(%S+)$")
-    if env_var then
-      segments[i] = uv.os_getenv(env_var) or env_var
+    if env_var and uv.os_getenv(env_var) ~= nil then
+      segments[i] = uv.os_getenv(env_var)
     end
   end
 

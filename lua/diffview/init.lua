@@ -25,15 +25,8 @@ function M.init()
   -- Fix the strange behavior that "<afile>" expands non-files
   -- as file name in some cases.
   --
-  -- Ref:
-  --  * sindrets/diffview.nvim#369
-  --  * neovim/neovim#23943
   local function get_tabnr(state)
-    if vim.fn.has("nvim-0.9.2") ~= 1 then
-      return tonumber(state.match)
-    else
-      return tonumber(state.file)
-    end
+    return tonumber(state.file)
   end
 
   local au = api.nvim_create_autocmd
@@ -128,7 +121,7 @@ end
 ---@param args string[]
 function M.open(args)
   local view = lib.diffview_open(args)
-  if view then
+  if view and not (view.tabpage and api.nvim_tabpage_is_valid(view.tabpage)) then
     view:open()
   end
 end
@@ -154,6 +147,16 @@ function M.close(tabpage)
   if view then
     view:close()
     lib.dispose_view(view)
+  end
+end
+
+---@param args string[]
+function M.toggle(args)
+  local view = lib.get_current_view()
+  if view then
+    M.close()
+  else
+    M.open(args)
   end
 end
 
@@ -203,21 +206,21 @@ M.completers = {
 
     if ctx.argidx > ctx.divideridx then
       if adapter then
-        utils.vec_push(candidates, unpack(adapter:path_candidates(ctx.arg_lead)))
+        utils.vec_extend(candidates, adapter:path_candidates(ctx.arg_lead))
       else
-        utils.vec_push(candidates, unpack(vim.fn.getcompletion(ctx.arg_lead, "file", 0)))
+        utils.vec_extend(candidates, vim.fn.getcompletion(ctx.arg_lead, "file", 0))
       end
     elseif adapter then
       if not has_rev_arg and ctx.arg_lead:sub(1, 1) ~= "-" then
-        utils.vec_push(candidates, unpack(adapter.comp.open:get_all_names()))
-        utils.vec_push(candidates, unpack(adapter:rev_candidates(ctx.arg_lead, {
+        utils.vec_extend(candidates, adapter.comp.open:get_all_names())
+        utils.vec_extend(candidates, adapter:rev_candidates(ctx.arg_lead, {
           accept_range = true,
-        })))
+        }))
       else
-        utils.vec_push(candidates, unpack(
+        utils.vec_extend(candidates,
           adapter.comp.open:get_completion(ctx.arg_lead)
           or adapter.comp.open:get_all_names()
-        ))
+        )
       end
     end
 
@@ -229,13 +232,13 @@ M.completers = {
     local candidates = {}
 
     if adapter then
-      utils.vec_push(candidates, unpack(
+      utils.vec_extend(candidates,
         adapter.comp.file_history:get_completion(ctx.arg_lead)
         or adapter.comp.file_history:get_all_names()
-      ))
-      utils.vec_push(candidates, unpack(adapter:path_candidates(ctx.arg_lead)))
+      )
+      utils.vec_extend(candidates, adapter:path_candidates(ctx.arg_lead))
     else
-      utils.vec_push(candidates, unpack(vim.fn.getcompletion(ctx.arg_lead, "file", 0)))
+      utils.vec_extend(candidates, vim.fn.getcompletion(ctx.arg_lead, "file", 0))
     end
 
     return candidates

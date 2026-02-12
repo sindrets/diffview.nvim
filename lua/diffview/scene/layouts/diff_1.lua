@@ -156,12 +156,26 @@ function Diff1:to_diff4(layout)
   })
 end
 
----FIXME
 ---@override
 ---@param rev Rev
 ---@param status string Git status symbol.
 ---@param sym Diff1.WindowSymbol
 function Diff1.should_null(rev, status, sym)
+  assert(sym == "b")
+
+  if rev.type == RevType.LOCAL then
+    -- Deleted files have no LOCAL content.
+    return status == "D"
+
+  elseif rev.type == RevType.COMMIT then
+    -- Deleted files have no content on the newer side.
+    return status == "D"
+
+  elseif rev.type == RevType.STAGE then
+    -- Deleted files have no staged content.
+    return status == "D"
+  end
+
   return false
 end
 
