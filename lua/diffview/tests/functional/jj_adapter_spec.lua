@@ -207,4 +207,160 @@ describe("diffview.vcs.adapters.jj", function()
       eq({ "--from", "left_hash" }, args)
     end)
   end)
+
+  -- ------------------------------------------------------------------
+  -- Integration tests: require jj
+  -- ------------------------------------------------------------------
+  describe("tracked_files", function()
+    local async = require("diffview.async")
+    local Diff2 = require("diffview.scene.layouts.diff_2").Diff2
+    local await = async.await
+
+    local function jj_available()
+      return vim.fn.executable("jj") == 1
+    end
+
+    local function run(cmd, cwd)
+      local res = vim.system(cmd, { cwd = cwd, text = true }):wait()
+      assert.equals(0, res.code, (table.concat(cmd, " ") .. "\n" .. (res.stderr or "")))
+      return vim.trim(res.stdout or "")
+    end
+
+    local function create_jj_repo()
+      local repo = vim.fn.tempname()
+      vim.fn.mkdir(repo, "p")
+
+      run({ "jj", "git", "init" }, repo)
+      run({ "jj", "config", "set", "--repo", "user.name", "Test" }, repo)
+      run({ "jj", "config", "set", "--repo", "user.email", "test@test.com" }, repo)
+
+      return {
+        dir = repo,
+        jj = function(args)
+          local cmd = { "jj" }
+          vim.list_extend(cmd, args)
+          return run(cmd, repo)
+        end,
+        write = function(relpath, content)
+          local dir = vim.fn.fnamemodify(repo .. "/" .. relpath, ":h")
+          vim.fn.mkdir(dir, "p")
+          local f = assert(io.open(repo .. "/" .. relpath, "w"))
+          f:write(content)
+          f:close()
+        end,
+        adapter = function()
+          JjAdapter.bootstrap.done = true
+          JjAdapter.bootstrap.ok = true
+          return JjAdapter({
+            toplevel = repo,
+            path_args = {},
+          })
+        end,
+        cleanup = function()
+          pcall(vim.fn.delete, repo, "rf")
+        end,
+      }
+    end
+
+    local repo
+
+    before_each(function()
+      if not jj_available() then
+        pending("jj not installed")
+        return
+      end
+      repo = create_jj_repo()
+    end)
+
+    after_each(function()
+      if repo then repo.cleanup() end
+    end)
+
+    it("lists modified, added, and deleted files", helpers.async_test(function()
+      if not jj_available() then pending("jj not installed") return end
+
+      -- Initial commit with two files.
+      repo.write("src/main.lua", 'print("v1")\n')
+      repo.write("src/utils.lua", "local M = {}\nreturn M\n")
+      repo.jj({ "describe", "-m", "initial" })
+      repo.jj({ "new" })
+
+      -- Modify one, delete one, add one.
+      repo.write("src/main.lua", 'print("v2")\n')
+      os.remove(repo.dir .. "/src/utils.lua")
+      repo.write("src/new.lua", "new\n")
+
+      local adapter = repo.adapter()
+      local left = adapter.Rev(RevType.COMMIT, run({ "jj", "show", "-T", "commit_id", "@-", "--no-patch" }, repo.dir))
+      local right = adapter.Rev(RevType.LOCAL)
+      local args = adapter:rev_to_args(left, right)
+
+      local err, files = await(adapter:tracked_files(
+        left, right, args, "working",
+        { default_layout = Diff2, merge_layout = Diff2 }
+      ))
+
+      assert.is_nil(err)
+
+      local by_name = {}
+      for _, file in ipairs(files) do
+        local name = file.path:match("[^/]+$")
+        by_name[name] = file
+      end
+
+      assert.is_not_nil(by_name["main.lua"], "main.lua should appear (modified)")
+      assert.equals("M", by_name["main.lua"].status)
+
+      assert.is_not_nil(by_name["new.lua"], "new.lua should appear (added)")
+      assert.equals("A", by_name["new.lua"].status)
+
+      assert.is_not_nil(by_name["utils.lua"], "utils.lua should appear (deleted)")
+      assert.equals("D", by_name["utils.lua"].status)
+    end))
+
+    it("shows file content at a revision without errors", helpers.async_test(function()
+      if not jj_available() then pending("jj not installed") return end
+
+      repo.write("hello.txt", "hello world\n")
+      repo.jj({ "describe", "-m", "add hello" })
+
+      local adapter = repo.adapter()
+      local commit_id = run({ "jj", "show", "-T", "commit_id", "@", "--no-patch" }, repo.dir)
+      local rev = adapter.Rev(RevType.COMMIT, commit_id)
+
+      local err, content = await(adapter:show("hello.txt", rev))
+
+      assert.is_nil(err)
+      assert.is_not_nil(content)
+      assert.equals("hello world", vim.trim(table.concat(content, "\n")))
+    end))
+
+    it("paths do not contain revision specifiers", helpers.async_test(function()
+      if not jj_available() then pending("jj not installed") return end
+
+      repo.write("file.lua", "content\n")
+      repo.jj({ "describe", "-m", "add file" })
+      repo.jj({ "new" })
+      repo.write("file.lua", "updated\n")
+
+      local adapter = repo.adapter()
+      local left = adapter.Rev(RevType.COMMIT, run({ "jj", "show", "-T", "commit_id", "@-", "--no-patch" }, repo.dir))
+      local right = adapter.Rev(RevType.LOCAL)
+      local args = adapter:rev_to_args(left, right)
+
+      local err, files = await(adapter:tracked_files(
+        left, right, args, "working",
+        { default_layout = Diff2, merge_layout = Diff2 }
+      ))
+
+      assert.is_nil(err)
+      assert.is_true(#files > 0)
+
+      for _, file in ipairs(files) do
+        -- Jujutsu paths should never contain revision specifiers.
+        assert.is_nil(file.path:match("@"), ("path %q contains @"):format(file.path))
+        assert.is_nil(file.path:match("#%d+"), ("path %q contains #rev"):format(file.path))
+      end
+    end))
+  end)
 end)
