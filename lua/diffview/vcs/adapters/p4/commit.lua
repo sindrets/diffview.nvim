@@ -57,9 +57,13 @@ local function parse_describe_output(output_lines)
             elseif line:match("^Differences ...$") then
                 reading_files = false
                 reading_diff = true
-            elseif line == "" then -- End of file list section
+            elseif line ~= "" then
+                -- A non-empty, non-matching line ends the file section.
                 reading_files = false
             end
+            -- Blank lines inside the file section are expected (p4 describe
+            -- inserts one between "Affected files ..." and the first entry)
+            -- and should be skipped rather than ending the section.
         -- elseif reading_diff then
             -- Diff parsing is handled separately if needed, `p4 describe -du` gives unified diff
         end

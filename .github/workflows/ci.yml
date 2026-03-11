@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  P4_VERSION: r24.2
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -22,5 +25,24 @@ jobs:
           neovim: true
           version: ${{ matrix.neovim }}
 
+      - name: Cache Perforce binaries
+        id: cache-p4
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/bin/p4*
+          key: p4-linux-x86_64-${{ env.P4_VERSION }}
+
+      - name: Install Perforce CLI and server
+        if: steps.cache-p4.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.local/bin
+          curl -sL "https://cdist2.perforce.com/perforce/${{ env.P4_VERSION }}/bin.linux26x86_64/p4" \
+            -o ~/.local/bin/p4
+          curl -sL "https://cdist2.perforce.com/perforce/${{ env.P4_VERSION }}/bin.linux26x86_64/p4d" \
+            -o ~/.local/bin/p4d
+          chmod +x ~/.local/bin/p4 ~/.local/bin/p4d
+
       - name: Run tests
-        run: make test
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          make test

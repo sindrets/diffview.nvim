@@ -21,7 +21,7 @@ Supported VCS (at least one required):
 - **Mercurial** ≥ 5.4.0
 - **Sapling** (any version; detected automatically via the Mercurial adapter)
 - **Jujutsu** ≥ 0.38.0 (`:DiffviewOpen` only; file history is not yet supported)
-- **Perforce** (any version with the `p4` CLI; experimental)
+- **Perforce** ≥ 2019.1 with the `p4` CLI (experimental)
 
 ## Installation
 
@@ -98,8 +98,8 @@ Examples:
   `preferred_adapter = "jj"` to use the Jujutsu adapter.
 - **Sapling** is detected automatically through the Mercurial adapter. Use
   `hg_cmd` to configure the executable (e.g. `hg_cmd = { "sl" }`).
-- **Perforce** support is experimental. Requires `P4PORT`, `P4USER`,
-  `P4CLIENT`.
+- **Perforce** support is experimental. Requires the `p4` CLI ≥ 2019.1
+  and the environment variables `P4PORT`, `P4USER`, `P4CLIENT`.
 
 For full command documentation, see `:h diffview-commands`.
 
