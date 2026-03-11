@@ -8,6 +8,7 @@ on:
 
 env:
   P4_VERSION: r24.2
+  JJ_VERSION: "0.39.0"
 
 jobs:
   test:
@@ -25,22 +26,32 @@ jobs:
           neovim: true
           version: ${{ matrix.neovim }}
 
-      - name: Cache Perforce binaries
-        id: cache-p4
+      - name: Cache VCS tool binaries
+        id: cache-vcs
         uses: actions/cache@v4
         with:
-          path: ~/.local/bin/p4*
-          key: p4-linux-x86_64-${{ env.P4_VERSION }}
+          path: ~/.local/bin
+          key: vcs-tools-linux-x86_64-p4-${{ env.P4_VERSION }}-jj-${{ env.JJ_VERSION }}
 
-      - name: Install Perforce CLI and server
-        if: steps.cache-p4.outputs.cache-hit != 'true'
+      - name: Install VCS tools
+        if: steps.cache-vcs.outputs.cache-hit != 'true'
         run: |
           mkdir -p ~/.local/bin
+
+          # Perforce
           curl -sL "https://cdist2.perforce.com/perforce/${{ env.P4_VERSION }}/bin.linux26x86_64/p4" \
             -o ~/.local/bin/p4
           curl -sL "https://cdist2.perforce.com/perforce/${{ env.P4_VERSION }}/bin.linux26x86_64/p4d" \
             -o ~/.local/bin/p4d
           chmod +x ~/.local/bin/p4 ~/.local/bin/p4d
+
+          # Jujutsu
+          curl -sL "https://github.com/jj-vcs/jj/releases/download/v${{ env.JJ_VERSION }}/jj-v${{ env.JJ_VERSION }}-x86_64-unknown-linux-musl.tar.gz" \
+            | tar xz -C ~/.local/bin ./jj
+          chmod +x ~/.local/bin/jj
+
+      - name: Install Mercurial
+        run: pip install mercurial
 
       - name: Run tests
         run: |
