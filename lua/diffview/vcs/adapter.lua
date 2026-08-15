@@ -277,6 +277,61 @@ function VCSAdapter:reset_files(paths)
   oop.abstract_stub()
 end
 
+---Produce the raw unified diff patch for a single file.
+---@param path string
+---@param opt? table
+---@return string[]? lines
+function VCSAdapter:file_patch(path, opt)
+  oop.abstract_stub()
+end
+
+---Apply a patch.
+---@param patch string
+---@param opt? table
+---@return boolean ok
+---@return string[] stderr
+function VCSAdapter:apply_patch(patch, opt)
+  oop.abstract_stub()
+end
+
+---Whether this adapter supports staging changes at a granularity finer than a
+---whole file.
+---@return boolean
+function VCSAdapter:supports_partial_staging()
+  return false
+end
+
+---Write the given content into the index for a path.
+---@param path string
+---@param content string[]
+---@return boolean ok
+---@return string[] stderr
+function VCSAdapter:stage_content(path, content)
+  oop.abstract_stub()
+end
+
+---Whether this adapter can commit staged changes.
+---@return boolean
+function VCSAdapter:supports_committing()
+  return false
+end
+
+---Check whether there is anything staged.
+---@return boolean
+function VCSAdapter:has_staged_changes()
+  return false
+end
+
+---Commit the staged changes.
+---@param msg string
+---@param opt? table
+---@return boolean ok
+---@return string[] stdout
+---@return string[] stderr
+function VCSAdapter:commit(msg, opt)
+  oop.abstract_stub()
+end
+
 ---@param argo ArgObject
 ---@return {left: string, right: string, options: string[]}
 function VCSAdapter:diffview_options(argo)

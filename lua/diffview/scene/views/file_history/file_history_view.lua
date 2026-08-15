@@ -40,6 +40,8 @@ function FileHistoryView:init(opt)
 end
 
 function FileHistoryView:post_open()
+  require("diffview.scene.views.standard.diff_options").enter(self)
+
   self.commit_log_panel = CommitLogPanel(self.adapter, {
     name = ("diffview://%s/log/%d/%s"):format(self.adapter.ctx.dir, self.tabpage, "commit_log"),
   })
@@ -67,6 +69,7 @@ end
 function FileHistoryView:close()
   if not self.closing:check() then
     self.closing:send()
+    require("diffview.scene.views.standard.diff_options").restore(self)
 
     for _, entry in ipairs(self.panel.entries or {}) do
       entry:destroy()

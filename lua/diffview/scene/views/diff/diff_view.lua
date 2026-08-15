@@ -81,6 +81,7 @@ end
 
 function DiffView:post_open()
   vim.cmd("redraw")
+  require("diffview.scene.views.standard.diff_options").enter(self)
 
   self.commit_log_panel = CommitLogPanel(self.adapter, {
     name = fmt("diffview://%s/log/%d/%s", self.adapter.ctx.dir, self.tabpage, "commit_log"),
@@ -172,6 +173,7 @@ end
 function DiffView:close()
   if not self.closing:check() then
     self.closing:send()
+    require("diffview.scene.views.standard.diff_options").restore(self)
 
     if self.watcher then
       self.watcher:stop()

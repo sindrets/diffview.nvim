@@ -3,11 +3,15 @@ local oop = require("diffview.oop")
 
 local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1") ---@type Diff1|LazyModule
 local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2") ---@type Diff2|LazyModule
+local Unified = lazy.access("diffview.scene.layouts.unified", "Unified") ---@type Unified|LazyModule
 local File = lazy.access("diffview.vcs.file", "File") ---@type vcs.File|LazyModule
+local Rev = lazy.access("diffview.vcs.rev", "Rev") ---@type Rev|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
+local unified = lazy.require("diffview.vcs.unified") ---@module "diffview.vcs.unified"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
+local fmt = string.format
 local pl = lazy.access(utils, "path") ---@type PathLib
 
 local M = {}
@@ -104,12 +108,140 @@ function FileEntry:set_active(flag)
   end
 end
 
+---Create the file that backs the unified view of this entry. Its content is
+---produced on demand, and is the whole file with the removed lines spliced
+---back in - see |diffview.vcs.unified|.
+---@return vcs.File
+function FileEntry:create_unified_file()
+  local cached = self.kind == "staged"
+  local file
+
+  file = File({
+    adapter = self.adapter,
+    path = self.path,
+    kind = self.kind,
+    commit = self.commit,
+    rev = Rev(RevType.CUSTOM),
+    nulled = false,
+    get_data = function()
+      local data = unified.build(self.adapter, self.path, {
+        cached = cached,
+        untracked = self.status == "?",
+        absolute_path = self.absolute_path,
+      })
+
+      file.unified_data = data
+
+      if not data then
+        file.custom_folds = nil
+        return { "" }
+      end
+
+      local folds = { type = "unified" }
+      for i, fold in ipairs(data.folds) do folds[i] = fold end
+      file.custom_folds = folds
+
+      return data.lines
+    end,
+    winopts = {
+      diff = false,
+      scrollbind = false,
+      cursorbind = false,
+      foldmethod = "manual",
+      foldcolumn = "1",
+      foldlevel = 0,
+      foldenable = true,
+      winhl = {
+        "DiffAdd:DiffviewDiffAdd",
+        "DiffDelete:DiffviewDiffDelete",
+        "DiffChange:DiffviewDiffChange",
+        "DiffText:DiffviewDiffText",
+      },
+    },
+  }) --[[@as vcs.File ]]
+
+  -- Writing the inline buffer writes the new side of the diff: the working
+  -- tree for unstaged changes, the index for staged ones. The removed lines
+  -- are dropped - they aren't part of the file.
+  file.write_handler = function(f)
+    local data = f.unified_data
+
+    if not data then return end
+
+    if data.has_gap then
+      utils.err(
+        "This inline diff is too large to be shown in full, so it can't be written back. "
+        .. "Use the side-by-side layout to edit this file."
+      )
+      return
+    end
+
+    local content = unified.new_side_content(f.bufnr)
+
+    if cached then
+      local ok, stderr = self.adapter:stage_content(self.path, content)
+
+      if not ok then
+        utils.err(utils.vec_join(fmt("Failed to stage '%s'!", self.path), stderr), true)
+        return
+      end
+    else
+      local target = utils.find_file_buffer(self.absolute_path)
+
+      if target and vim.bo[target].modified then
+        utils.err(fmt(
+          "'%s' is open with unsaved changes! Write or discard those first.",
+          self.path
+        ))
+        return
+      end
+
+      if vim.fn.writefile(content, self.absolute_path) ~= 0 then
+        utils.err(fmt("Failed to write '%s'!", self.path))
+        return
+      end
+
+      -- Pull the new content into any buffer that has the file open.
+      if target then vim.cmd(fmt("checktime %d", target)) end
+    end
+
+    vim.bo[f.bufnr].modified = false
+    self:reload_unified()
+
+    api.nvim_exec_autocmds("BufWritePost", {
+      pattern = api.nvim_buf_get_name(f.bufnr),
+    })
+
+    utils.info(fmt(
+      "Wrote %d lines to %s.",
+      #content,
+      cached and ("the index for '" .. self.path .. "'") or ("'" .. self.path .. "'")
+    ))
+  end
+
+  file.unified = true
+  -- The content is generated: there's nothing to probe for binary-ness.
+  file.binary = false
+  file.custom_context = cached and "[unified:staged]" or "[unified]"
+  file.winbar = (" INLINE DIFF - %s%s"):format(self.path, cached and " (staged)" or "")
+
+  return file
+end
+
 ---@param target_layout Layout
 function FileEntry:convert_layout(target_layout)
+  local from_unified = self.layout:instanceof(Unified.__get())
+
+  if target_layout == Unified.__get() then
+    self.layout = target_layout({ b = self:create_unified_file() })
+    return
+  end
+
   local get_data
 
   for _, file in ipairs(self.layout:files()) do
-    if file.get_data then
+    -- The unified file produces content for a layout that no longer applies.
+    if file.get_data and not file.unified then
       get_data = file.get_data
       break
     end
@@ -127,13 +259,73 @@ function FileEntry:convert_layout(target_layout)
     }) --[[@as vcs.File ]]
   end
 
+  ---@param symbol string
+  ---@return vcs.File?
+  local function reuse(symbol)
+    if from_unified then return nil end
+    return utils.tbl_access(self.layout, symbol .. ".file")
+  end
+
   self.layout = target_layout({
-    a = utils.tbl_access(self.layout, "a.file") or create_file(self.revs.a, "a"),
-    b = utils.tbl_access(self.layout, "b.file") or create_file(self.revs.b, "b"),
-    c = utils.tbl_access(self.layout, "c.file") or create_file(self.revs.c, "c"),
-    d = utils.tbl_access(self.layout, "d.file") or create_file(self.revs.d, "d"),
+    a = reuse("a") or create_file(self.revs.a, "a"),
+    b = reuse("b") or create_file(self.revs.b, "b"),
+    c = reuse("c") or create_file(self.revs.c, "c"),
+    d = reuse("d") or create_file(self.revs.d, "d"),
   })
   self:update_merge_context()
+end
+
+---Rebuild the content of the unified view, if that's the current layout.
+function FileEntry:refresh_unified()
+  if not self.layout:instanceof(Unified.__get()) then return end
+
+  local file = self.layout:get_main_win().file
+  if file then file:dispose_buffer() end
+end
+
+---Regenerate the content of the inline buffer in place, keeping the window on
+---it. Used after the buffer has been written.
+function FileEntry:reload_unified()
+  if not self.layout:instanceof(Unified.__get()) then return end
+
+  local file = self.layout:get_main_win().file
+
+  if not (file and file.get_data and file:is_valid()) then return end
+
+  -- NOTE: the entry's layout only carries the files - the windows that are
+  -- actually on screen belong to the view's layout, so find them by buffer.
+  local winid = vim.fn.win_findbuf(file.bufnr)[1]
+  local cursor = winid and api.nvim_win_get_cursor(winid) or nil
+
+  local lines = file.get_data()
+
+  local was_modifiable = vim.bo[file.bufnr].modifiable
+  vim.bo[file.bufnr].modifiable = true
+  api.nvim_buf_set_lines(file.bufnr, 0, -1, false, lines)
+  vim.bo[file.bufnr].modifiable = was_modifiable
+  vim.bo[file.bufnr].modified = false
+
+  unified.apply_highlights(file.bufnr, file.unified_data)
+
+  if not winid then return end
+
+  -- Replacing the content drops the folds: rebuild them.
+  api.nvim_win_call(winid, function()
+    if vim.wo.foldmethod == "manual" then
+      pcall(vim.cmd, "norm! zE")
+
+      for _, fold in ipairs(file.custom_folds or {}) do
+        pcall(vim.cmd, fmt("%d,%dfold", fold[1], fold[2]))
+      end
+    end
+  end)
+
+  if cursor then
+    pcall(api.nvim_win_set_cursor, winid, {
+      math.min(cursor[1], api.nvim_buf_line_count(file.bufnr)),
+      cursor[2],
+    })
+  end
 end
 
 ---@param stat? table

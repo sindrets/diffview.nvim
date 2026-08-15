@@ -20,6 +20,7 @@ local Diff3Ver = lazy.access("diffview.scene.layouts.diff_3_ver", "Diff3Ver") --
 local Diff3Mixed = lazy.access("diffview.scene.layouts.diff_3_mixed", "Diff3Mixed") ---@type Diff3Mixed|LazyModule
 local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4") ---@type Diff4|LazyModule
 local Diff4Mixed = lazy.access("diffview.scene.layouts.diff_4_mixed", "Diff4Mixed") ---@type Diff4Mixed|LazyModule
+local Unified = lazy.access("diffview.scene.layouts.unified", "Unified") ---@type Unified|LazyModule
 
 local api = vim.api
 local await = async.await
@@ -72,10 +73,47 @@ local function prepare_goto_file()
   end
 end
 
+---Find a window in the given tabpage that already displays the given file.
+---@param tabpage integer
+---@param path string Absolute path.
+---@return integer? winid
+local function find_win_with_file(tabpage, path)
+  for _, winid in ipairs(api.nvim_tabpage_list_wins(tabpage)) do
+    local name = api.nvim_buf_get_name(api.nvim_win_get_buf(winid))
+
+    if name ~= "" and pl:absolute(name) == path then
+      return winid
+    end
+  end
+end
+
+---Jump to a window that already has the file open, rather than opening a
+---second view of it.
+---@param file FileEntry
+---@param cursor? integer[]
+---@return boolean # The file was already open, and is now focused.
+local function focus_open_file(file, cursor)
+  local target_tab = lib.get_prev_non_view_tabpage()
+  if not target_tab then return false end
+
+  local winid = find_win_with_file(target_tab, file.absolute_path)
+  if not winid then return false end
+
+  api.nvim_set_current_tabpage(target_tab)
+  file.layout:restore_winopts()
+  api.nvim_set_current_win(winid)
+
+  if cursor then utils.set_cursor(winid, unpack(cursor)) end
+
+  return true
+end
+
 function M.goto_file()
   local file, cursor = prepare_goto_file()
 
   if file then
+    if focus_open_file(file, cursor) then return end
+
     local target_tab = lib.get_prev_non_view_tabpage()
 
     if target_tab then
@@ -103,6 +141,8 @@ function M.goto_file_edit()
   local file, cursor = prepare_goto_file()
 
   if file then
+    if focus_open_file(file, cursor) then return end
+
     local target_tab = lib.get_prev_non_view_tabpage()
 
     if target_tab then
@@ -489,11 +529,14 @@ function M.diffput(target)
   end
 end
 
-function M.cycle_layout()
-  local layout_cycles = {
+---The layouts that can be reached with |diffview-actions-cycle_layout|.
+---@return { standard: Layout[], merge_tool: Layout[] }
+local function layout_cycles()
+  return {
     standard = {
       Diff2Hor.__get(),
       Diff2Ver.__get(),
+      Unified.__get(),
     },
     merge_tool = {
       Diff3Hor.__get(),
@@ -501,35 +544,111 @@ function M.cycle_layout()
       Diff3Mixed.__get(),
       Diff4Mixed.__get(),
       Diff1.__get(),
-    }
+    },
   }
+end
 
+---Collect the entries of the current view whose layout can be changed.
+---@return StandardView?
+---@return FileEntry[]?
+---@return FileEntry? cur_file
+---@return Layout[]? cycle
+local function layout_targets()
   local view = lib.get_current_view()
 
   if not view then return end
 
-  local layouts, files, cur_file
+  local cycles = layout_cycles()
 
   if view:instanceof(FileHistoryView.__get()) then
     ---@cast view FileHistoryView
-    layouts = layout_cycles.standard
-    files = view.panel:list_files()
-    cur_file = view:cur_file()
+    return view, view.panel:list_files(), view:cur_file(), cycles.standard
+
   elseif view:instanceof(DiffView.__get()) then
     ---@cast view DiffView
-    cur_file = view.cur_entry
+    local cur_file = view.cur_entry
 
-    if cur_file then
-      layouts = cur_file.kind == "conflicting"
-          and layout_cycles.merge_tool
-          or layout_cycles.standard
-      files = cur_file.kind == "conflicting"
-          and view.files.conflicting
-          or utils.vec_join(view.panel.files.working, view.panel.files.staged)
-    end
-  else
+    if not cur_file then return end
+
+    local conflicting = cur_file.kind == "conflicting"
+
+    return view,
+      conflicting and view.files.conflicting
+        or utils.vec_join(view.panel.files.working, view.panel.files.staged),
+      cur_file,
+      conflicting and cycles.merge_tool or cycles.standard
+  end
+end
+
+---Re-open the current entry after its layout was changed.
+---@param view StandardView
+---@param cur_file FileEntry
+local function reopen_after_layout_change(view, cur_file)
+  local main = view.cur_layout:get_main_win()
+  local pos = api.nvim_win_get_cursor(main.id)
+  local was_focused = view.cur_layout:is_focused()
+
+  cur_file.layout.emitter:once("files_opened", function()
+    pcall(utils.set_cursor, main.id, unpack(pos))
+    if not was_focused then view.cur_layout:sync_scroll() end
+  end)
+
+  view:set_file(cur_file, false)
+  main = view.cur_layout:get_main_win()
+
+  if was_focused then main:focus() end
+end
+
+---Switch every entry of the current view to the given layout.
+---@param layout Layout # (class)
+---@return boolean # The layout was changed.
+local function set_layout(layout)
+  local view, files, cur_file = layout_targets()
+
+  if not (view and files and cur_file) then return false end
+  if cur_file.layout.class == layout then return false end
+
+  for _, entry in ipairs(files) do
+    entry:convert_layout(layout)
+  end
+
+  reopen_after_layout_change(view, cur_file)
+
+  return true
+end
+
+---Toggle between the inline (unified) diff and the configured side-by-side
+---layout. This is the equivalent of VSCode's inline view toggle.
+function M.toggle_inline_diff()
+  local view, _, cur_file = layout_targets()
+
+  if not (view and cur_file) then return end
+
+  if cur_file.kind == "conflicting" then
+    utils.info("The inline diff is not available for conflicted files.")
     return
   end
+
+  if cur_file.layout.class == Unified.__get() then
+    local default = view:instanceof(FileHistoryView.__get())
+        and FileHistoryView.__get().get_default_layout()
+        or DiffView.__get().get_default_layout()
+
+    -- Never toggle back into the layout we're already in.
+    if default == Unified.__get() then default = Diff2Hor.__get() end
+
+    set_layout(default)
+    utils.info("Inline diff disabled.")
+  else
+    set_layout(Unified.__get())
+    utils.info("Inline diff enabled.")
+  end
+end
+
+function M.cycle_layout()
+  local view, files, cur_file, layouts = layout_targets()
+
+  if not (view and files and cur_file and layouts) then return end
 
   for _, entry in ipairs(files) do
     local cur_layout = entry.layout
@@ -537,21 +656,7 @@ function M.cycle_layout()
     entry:convert_layout(next_layout)
   end
 
-  if cur_file then
-    local main = view.cur_layout:get_main_win()
-    local pos = api.nvim_win_get_cursor(main.id)
-    local was_focused = view.cur_layout:is_focused()
-
-    cur_file.layout.emitter:once("files_opened", function()
-      utils.set_cursor(main.id, unpack(pos))
-      if not was_focused then view.cur_layout:sync_scroll() end
-    end)
-
-    view:set_file(cur_file, false)
-    main = view.cur_layout:get_main_win()
-
-    if was_focused then main:focus() end
-  end
+  reopen_after_layout_change(view, cur_file)
 end
 
 ---@param keymap_groups string|string[]
@@ -616,10 +721,21 @@ do
 end
 
 local action_names = {
+  "amend_commit",
   "close",
   "close_all_folds",
   "close_fold",
+  "commit",
+  "copy_file_path",
   "copy_hash",
+  "filter_files",
+  "next_change",
+  "prev_change",
+  "restore_hunk",
+  "stage_hunk",
+  "toggle_ignore_whitespace",
+  "toggle_unchanged_regions",
+  "unstage_hunk",
   "focus_entry",
   "focus_files",
   "listing_style",

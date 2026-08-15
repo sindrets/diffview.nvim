@@ -44,6 +44,9 @@ local HAS_NVIM_0_10 = vim.fn.has("nvim-0.10") == 1
 ---@field winbar string?
 ---@field winopts WindowOptions
 ---@field custom_folds? CustomFolds
+---@field custom_context? string Buffer name segment for `RevType.CUSTOM` files.
+---@field write_handler? fun(file: vcs.File) Makes a generated buffer writable.
+---@field unified_data? unified.Data Set on the file backing a unified layout.
 local File = oop.create_class("vcs.File")
 
 ---@type table<integer, vcs.File.AttachState>
@@ -233,7 +236,7 @@ File.create_buffer = async.wrap(function(self, callback)
   elseif self.rev.type == RevType.STAGE then
     context = fmt(":%d:", self.rev.stage)
   elseif self.rev.type == RevType.CUSTOM then
-    context = "[custom]"
+    context = self.custom_context or "[custom]"
   end
 
   local fullname = pl:join("diffview://", self.adapter.ctx.dir, context, self.path)
@@ -263,7 +266,19 @@ File.create_buffer = async.wrap(function(self, callback)
   end
   local bufopts = vim.deepcopy(File.bufopts)
 
-  if self.rev.type == RevType.STAGE and self.rev.stage == 0 then
+  if self.write_handler then
+    -- A generated buffer that can be written back to whatever it represents.
+    bufopts.modifiable = true
+    bufopts.buftype = "acwrite"
+    bufopts.undolevels = nil
+
+    api.nvim_create_autocmd("BufWriteCmd", {
+      buffer = self.bufnr,
+      nested = true,
+      callback = function() self.write_handler(self) end,
+    })
+
+  elseif self.rev.type == RevType.STAGE and self.rev.stage == 0 then
     self.blob_hash = self.adapter:file_blob_hash(self.path)
     bufopts.modifiable = true
     bufopts.buftype = nil

@@ -2,9 +2,12 @@ local config = require("diffview.config")
 local oop = require("diffview.oop")
 local renderer = require("diffview.renderer")
 local utils = require("diffview.utils")
+local FileTree = require("diffview.ui.models.file_tree.file_tree").FileTree
 local Panel = require("diffview.ui.panel").Panel
 local api = vim.api
 local M = {}
+
+local selected_ns = api.nvim_create_namespace("diffview_panel_selected")
 
 ---@class TreeOptions
 ---@field flatten_dirs boolean
@@ -18,6 +21,8 @@ local M = {}
 ---@field cur_file FileEntry
 ---@field listing_style "list"|"tree"
 ---@field tree_options TreeOptions
+---@field filter string? Only list files whose path contains this string.
+---@field visible FilePanel.VisibleFiles The file sets that are currently listed.
 ---@field render_data RenderData
 ---@field components CompStruct
 ---@field constrain_cursor function
@@ -58,6 +63,7 @@ function FilePanel:init(adapter, files, path_args, rev_pretty_name)
   self.rev_pretty_name = rev_pretty_name
   self.listing_style = conf.file_panel.listing_style
   self.tree_options = conf.file_panel.tree_options
+  self:update_visible()
 
   self:on_autocmd("BufNew", {
     callback = function()
@@ -70,6 +76,41 @@ end
 function FilePanel:open()
   FilePanel.super_class.open(self)
   vim.cmd("wincmd =")
+end
+
+---Highlight the whole line of the entry that's currently open in the view, so
+---it stays identifiable while the cursor moves around the panel.
+function FilePanel:mark_cur_file()
+  if not self:buf_loaded() then return end
+
+  api.nvim_buf_clear_namespace(self.bufid, selected_ns, 0, -1)
+
+  if not (self.cur_file and self.components) then return end
+
+  local row
+
+  self.components.comp:deep_some(function(comp)
+    -- A component with no height is inside a collapsed directory.
+    if comp.name == "file" and comp.context == self.cur_file and comp.lend > comp.lstart then
+      row = comp.lstart
+      return true
+    end
+
+    return false
+  end)
+
+  if not row then return end
+
+  pcall(api.nvim_buf_set_extmark, self.bufid, selected_ns, row, 0, {
+    line_hl_group = "DiffviewFilePanelSelectedLine",
+    priority = 50,
+  })
+end
+
+---@override
+function FilePanel:redraw()
+  FilePanel.super_class.redraw(self)
+  self:mark_cur_file()
 end
 
 function FilePanel:setup_buffer()
@@ -85,31 +126,104 @@ function FilePanel:setup_buffer()
   if help_keymap then self.help_mapping = help_keymap[2] end
 end
 
+---@class FilePanel.VisibleFiles
+---@field conflicting FileEntry[]
+---@field working FileEntry[]
+---@field staged FileEntry[]
+---@field conflicting_tree FileTree
+---@field working_tree FileTree
+---@field staged_tree FileTree
+
+---@param files FileEntry[]
+---@return FileEntry[]
+function FilePanel:apply_filter(files)
+  if not self.filter then return files end
+
+  local needle = self.filter:lower()
+
+  return vim.tbl_filter(function(file)
+    return file.path:lower():find(needle, 1, true) ~= nil
+  end, files) --[[@as vector ]]
+end
+
+---Recompute the file sets that are currently listed in the panel. Without an
+---active filter these are just the view's file sets.
+function FilePanel:update_visible()
+  if not self.filter then
+    self.visible = {
+      conflicting = self.files.conflicting,
+      working = self.files.working,
+      staged = self.files.staged,
+      conflicting_tree = self.files.conflicting_tree,
+      working_tree = self.files.working_tree,
+      staged_tree = self.files.staged_tree,
+    }
+
+    return
+  end
+
+  local conflicting = self:apply_filter(self.files.conflicting)
+  local working = self:apply_filter(self.files.working)
+  local staged = self:apply_filter(self.files.staged)
+
+  self.visible = {
+    conflicting = conflicting,
+    working = working,
+    staged = staged,
+    conflicting_tree = FileTree(conflicting),
+    working_tree = FileTree(working),
+    staged_tree = FileTree(staged),
+  }
+end
+
+---Only list the files whose path contains the given string. Pass `nil` to
+---clear the filter.
+---@param filter string?
+function FilePanel:set_filter(filter)
+  if filter then
+    filter = vim.trim(filter)
+    if filter == "" then filter = nil end
+  end
+
+  self.filter = filter
+  self:update_components()
+  self:render()
+  self:redraw()
+  self:reconstrain_cursor()
+end
+
+---@return integer
+function FilePanel:num_visible()
+  return #self.visible.conflicting + #self.visible.working + #self.visible.staged
+end
+
 function FilePanel:update_components()
   local conflicting_files
   local working_files
   local staged_files
+
+  self:update_visible()
 
   if self.listing_style == "list" then
     conflicting_files = { name = "files" }
     working_files = { name = "files" }
     staged_files = { name = "files" }
 
-    for _, file in ipairs(self.files.conflicting) do
+    for _, file in ipairs(self.visible.conflicting) do
       table.insert(conflicting_files, {
         name = "file",
         context = file,
       })
     end
 
-    for _, file in ipairs(self.files.working) do
+    for _, file in ipairs(self.visible.working) do
       table.insert(working_files, {
         name = "file",
         context = file,
       })
     end
 
-    for _, file in ipairs(self.files.staged) do
+    for _, file in ipairs(self.visible.staged) do
       table.insert(staged_files, {
         name = "file",
         context = file,
@@ -117,27 +231,27 @@ function FilePanel:update_components()
     end
 
   elseif self.listing_style == "tree" then
-    self.files.conflicting_tree:update_statuses()
-    self.files.working_tree:update_statuses()
-    self.files.staged_tree:update_statuses()
+    self.visible.conflicting_tree:update_statuses()
+    self.visible.working_tree:update_statuses()
+    self.visible.staged_tree:update_statuses()
 
     conflicting_files = utils.tbl_merge(
       { name = "files" },
-      self.files.conflicting_tree:create_comp_schema({
+      self.visible.conflicting_tree:create_comp_schema({
         flatten_dirs = self.tree_options.flatten_dirs,
       })
     )
 
     working_files = utils.tbl_merge(
       { name = "files" },
-      self.files.working_tree:create_comp_schema({
+      self.visible.working_tree:create_comp_schema({
         flatten_dirs = self.tree_options.flatten_dirs,
       })
     )
 
     staged_files = utils.tbl_merge(
       { name = "files" },
-      self.files.staged_tree:create_comp_schema({
+      self.visible.staged_tree:create_comp_schema({
         flatten_dirs = self.tree_options.flatten_dirs,
       })
     )
@@ -181,18 +295,16 @@ end
 ---@return FileEntry[]
 function FilePanel:ordered_file_list()
   if self.listing_style == "list" then
-    local list = {}
-
-    for _, file in self.files:iter() do
-      list[#list + 1] = file
-    end
-
-    return list
+    return utils.vec_join(
+      self.visible.conflicting,
+      self.visible.working,
+      self.visible.staged
+    )
   else
     local nodes = utils.vec_join(
-      self.files.conflicting_tree.root:leaves(),
-      self.files.working_tree.root:leaves(),
-      self.files.staged_tree.root:leaves()
+      self.visible.conflicting_tree.root:leaves(),
+      self.visible.working_tree.root:leaves(),
+      self.visible.staged_tree.root:leaves()
     )
 
     return vim.tbl_map(function(node)
@@ -214,7 +326,9 @@ end
 
 function FilePanel:prev_file()
   local files = self:ordered_file_list()
-  if not self.cur_file and self.files:len() > 0 then
+  if #files == 0 then return end
+
+  if not self.cur_file then
     self:set_cur_file(files[1])
     return self.cur_file
   end
@@ -228,7 +342,9 @@ end
 
 function FilePanel:next_file()
   local files = self:ordered_file_list()
-  if not self.cur_file and self.files:len() > 0 then
+  if #files == 0 then return end
+
+  if not self.cur_file then
     self:set_cur_file(files[1])
     return self.cur_file
   end
@@ -338,7 +454,7 @@ function FilePanel:highlight_cur_file()
 end
 
 function FilePanel:highlight_prev_file()
-  if not (self:is_open() and self:buf_loaded()) or self.files:len() == 0 then
+  if not (self:is_open() and self:buf_loaded()) or self:num_visible() == 0 then
     return
   end
 
@@ -351,7 +467,7 @@ function FilePanel:highlight_prev_file()
 end
 
 function FilePanel:highlight_next_file()
-  if not (self:is_open() and self:buf_loaded()) or self.files:len() == 0 then
+  if not (self:is_open() and self:buf_loaded()) or self:num_visible() == 0 then
     return
   end
 
@@ -363,7 +479,7 @@ function FilePanel:highlight_next_file()
 end
 
 function FilePanel:reconstrain_cursor()
-  if not (self:is_open() and self:buf_loaded()) or self.files:len() == 0 then
+  if not (self:is_open() and self:buf_loaded()) or self:num_visible() == 0 then
     return
   end
 

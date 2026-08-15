@@ -1,5 +1,5 @@
 .PHONY: all
-all: dev test
+all: dev test ui-test
 
 TEST_PATH := $(if $(TEST_PATH),$(TEST_PATH),lua/diffview/tests/)
 export TEST_PATH
@@ -14,6 +14,19 @@ export TEST_PATH
 test:
 	nvim --headless -i NONE -n -u scripts/test_init.lua -c \
 		"PlenaryBustedDirectory $(TEST_PATH) { minimal_init = './scripts/test_init.lua' }"
+
+# Usage:
+# 	Run all the UI tests:
+# 	$ make ui-test
+#
+# 	Run the UI tests whose name contains a given string:
+# 	$ UI_TEST=commit make ui-test
+#
+# These drive a real Neovim in a terminal buffer, and assert on what it renders
+# and on the state of the fixture repo.
+.PHONY: ui-test
+ui-test:
+	nvim -l scripts/ui_test.lua $(UI_TEST)
 
 .PHONY: dev
 dev: .dev/lua/nvim

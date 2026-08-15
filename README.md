@@ -34,6 +34,95 @@ Plug 'sindrets/diffview.nvim'
 use "sindrets/diffview.nvim" 
 ```
 
+## Staging Hunks
+
+Changes can be moved in and out of the index without leaving the diff. With the
+cursor on a hunk in either version of the file:
+
+| Mapping        | Action                                                    |
+| -------------- | --------------------------------------------------------- |
+| `<leader>hs`   | Stage the hunk under the cursor                            |
+| `<leader>hu`   | Unstage the hunk under the cursor (from a staged entry)    |
+| `<leader>hr`   | Discard the hunk under the cursor in the working tree      |
+
+All three also work from visual mode, where they only apply to the selected
+lines. This works in a diff between the index and the working tree - i.e.
+`:DiffviewOpen` without any revs - which is the diff whose changes can be moved
+into the index.
+
+Untracked files are recorded in the index first (`git add --intent-to-add`), so
+that their content can be staged hunk by hunk too.
+
+To commit what you have staged, press `cc` in the file panel (`ca` to amend).
+This opens a commit message editor below the view: write the message, then
+either press `<C-c><C-c>` or write the buffer to create the commit. `q` aborts.
+
+For more info, see:
+
+- `:h diffview-partial-staging`
+- `:h diffview-actions-stage_hunk`
+- `:h diffview-actions-commit`
+
+## Inline Diff
+
+`<leader>di` collapses the side-by-side diff into a single window: the file as
+it looks after the change, with the removed lines spliced back in where they
+used to be. This is the equivalent of VSCode's inline view, and it's the one to
+reach for on a narrow terminal or a long-line file.
+
+```
+    line 1
+  - line 2
+  + line 2 CHANGED
+    line 3
+  +--  9 lines: line 6 ⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯
+    line 15
+```
+
+Because the buffer stays close to the real file, syntax highlighting keeps
+working, and the parts of a line that actually changed get their own highlight.
+The unchanged regions are folded away.
+
+Everything else works as usual: `<leader>hs` and friends stage the change under
+the cursor, `]c` / `[c` walk between changes, and `g<C-x>` cycles through
+side-by-side → stacked → inline. To always start out inline:
+
+```lua
+require("diffview").setup({ view = { default = { layout = "unified" } } })
+```
+
+For more info, see `:h diffview-layout-unified`.
+
+## Editing In The Diff
+
+The diff buffers are editable wherever it makes sense — you don't have to leave
+the view to fix something:
+
+| Buffer | Editing it | Writing it |
+| ------ | ---------- | ---------- |
+| Working tree side | yes — it's the real file buffer | saves the file |
+| Index side | yes | stages that content |
+| Inline diff | yes | saves the working tree, or stages for a staged entry |
+| A commit | no | — history doesn't change |
+
+In the inline view the removed lines are shown but aren't part of the file, so
+they're dropped when you write. They're tracked as you edit, so inserting or
+deleting lines around them keeps everything lined up. After a write the view
+re-renders against the new content.
+
+See `:h diffview-editing`.
+
+## Navigating and Filtering
+
+| Mapping      | Context     | Action                                              |
+| ------------ | ----------- | --------------------------------------------------- |
+| `]c` / `[c`  | anywhere    | Jump to the next / previous change. Unlike the built-in motions these roll over into the next / previous file |
+| `/`          | file panel  | Only list the files whose path matches a string      |
+| `gy`         | anywhere    | Copy the path of the current file                    |
+| `<leader>dw` | anywhere    | Toggle whether whitespace changes are ignored        |
+| `<leader>du` | anywhere    | Toggle whether unchanged regions are folded away     |
+| `<leader>di` | anywhere    | Toggle the inline (unified) diff                     |
+
 ## Merge Tool
 
 ![merge tool showcase](https://user-images.githubusercontent.com/2786478/188286293-13bbf0ab-3595-425d-ba4a-12f514c17eb6.png)
@@ -116,11 +205,15 @@ files with `<tab>` and `<s-tab>` (see configuration to change the key bindings).
 
 #### Staging
 
-You can stage individual hunks by editing any buffer that represents the index
-(after running `:DiffviewOpen` with no `[git-rev]` the entries under "Changes"
-will have the index buffer on the left side, and the entries under "Staged
-changes" will have it on the right side). Once you write to an index buffer the
-index will be updated.
+Whole files are staged and unstaged with `-` (or `s`) from the file panel, and
+individual hunks with `<leader>hs` / `<leader>hu` from the diff itself - see
+[Staging Hunks](#staging-hunks).
+
+You can also stage arbitrary changes by editing any buffer that represents the
+index (after running `:DiffviewOpen` with no `[git-rev]` the entries under
+"Changes" will have the index buffer on the left side, and the entries under
+"Staged changes" will have it on the right side). Once you write to an index
+buffer the index will be updated.
 
 ### `:[range]DiffviewFileHistory [paths] [options]`
 
@@ -197,6 +290,13 @@ require("diffview").setup({
     fold_closed = "",
     fold_open = "",
     done = "✓",
+  },
+  -- Values that are applied to 'diffopt' for as long as a view is open. The
+  -- previous value is restored when the last view is closed. Set an entry to
+  -- `false` to leave that part of 'diffopt' alone.
+  diffopt = {
+    algorithm = "histogram", -- Lines up changed lines the way other modern diff viewers do.
+    linematch = 60,          -- Max size of a change block to align line by line. Needs nvim >= 0.9.
   },
   view = {
     -- Configure the layout and behavior of different types of views.
@@ -278,6 +378,15 @@ require("diffview").setup({
       { "n", "<s-tab>",     actions.select_prev_entry,              { desc = "Open the diff for the previous file" } },
       { "n", "[F",          actions.select_first_entry,             { desc = "Open the diff for the first file" } },
       { "n", "]F",          actions.select_last_entry,              { desc = "Open the diff for the last file" } },
+      { "n", "]c",          actions.next_change,                    { desc = "Jump to the next change in the view" } },
+      { "n", "[c",          actions.prev_change,                    { desc = "Jump to the previous change in the view" } },
+      { { "n", "x" }, "<leader>hs", actions.stage_hunk,             { desc = "Stage the hunk under the cursor, or the selected lines" } },
+      { { "n", "x" }, "<leader>hu", actions.unstage_hunk,           { desc = "Unstage the hunk under the cursor, or the selected lines" } },
+      { { "n", "x" }, "<leader>hr", actions.restore_hunk,           { desc = "Discard the hunk under the cursor, or the selected lines" } },
+      { "n", "<leader>dw",  actions.toggle_ignore_whitespace,       { desc = "Toggle whether whitespace changes are ignored" } },
+      { "n", "<leader>du",  actions.toggle_unchanged_regions,       { desc = "Toggle whether unchanged regions are hidden" } },
+      { "n", "<leader>di",  actions.toggle_inline_diff,             { desc = "Toggle the inline (unified) diff" } },
+      { "n", "gy",          actions.copy_file_path,                 { desc = "Copy the path of the current file" } },
       { "n", "gf",          actions.goto_file_edit,                 { desc = "Open the file in the previous tabpage" } },
       { "n", "<C-w><C-f>",  actions.goto_file_split,                { desc = "Open the file in a new split" } },
       { "n", "<C-w>gf",     actions.goto_file_tab,                  { desc = "Open the file in a new tabpage" } },
@@ -332,6 +441,15 @@ require("diffview").setup({
       { "n", "S",              actions.stage_all,                      { desc = "Stage all entries" } },
       { "n", "U",              actions.unstage_all,                    { desc = "Unstage all entries" } },
       { "n", "X",              actions.restore_entry,                  { desc = "Restore entry to the state on the left side" } },
+      { "n", "cc",             actions.commit,                         { desc = "Commit the staged changes" } },
+      { "n", "ca",             actions.amend_commit,                   { desc = "Amend the last commit" } },
+      { "n", "/",              actions.filter_files,                   { desc = "Only list files whose path matches a pattern" } },
+      { "n", "gy",             actions.copy_file_path,                 { desc = "Copy the path of the entry under the cursor" } },
+      { "n", "]c",             actions.next_change,                    { desc = "Jump to the next change in the view" } },
+      { "n", "[c",             actions.prev_change,                    { desc = "Jump to the previous change in the view" } },
+      { "n", "<leader>dw",     actions.toggle_ignore_whitespace,       { desc = "Toggle whether whitespace changes are ignored" } },
+      { "n", "<leader>du",     actions.toggle_unchanged_regions,       { desc = "Toggle whether unchanged regions are hidden" } },
+      { "n", "<leader>di",     actions.toggle_inline_diff,             { desc = "Toggle the inline (unified) diff" } },
       { "n", "L",              actions.open_commit_log,                { desc = "Open the commit log panel" } },
       { "n", "zo",             actions.open_fold,                      { desc = "Expand fold" } },
       { "n", "h",              actions.close_fold,                     { desc = "Collapse fold" } },
@@ -367,6 +485,12 @@ require("diffview").setup({
       { "n", "g!",            actions.options,                     { desc = "Open the option panel" } },
       { "n", "<C-A-d>",       actions.open_in_diffview,            { desc = "Open the entry under the cursor in a diffview" } },
       { "n", "y",             actions.copy_hash,                   { desc = "Copy the commit hash of the entry under the cursor" } },
+      { "n", "gy",            actions.copy_file_path,              { desc = "Copy the path of the entry under the cursor" } },
+      { "n", "]c",            actions.next_change,                 { desc = "Jump to the next change in the view" } },
+      { "n", "[c",            actions.prev_change,                 { desc = "Jump to the previous change in the view" } },
+      { "n", "<leader>dw",    actions.toggle_ignore_whitespace,    { desc = "Toggle whether whitespace changes are ignored" } },
+      { "n", "<leader>du",    actions.toggle_unchanged_regions,    { desc = "Toggle whether unchanged regions are hidden" } },
+      { "n", "<leader>di",    actions.toggle_inline_diff,          { desc = "Toggle the inline (unified) diff" } },
       { "n", "L",             actions.open_commit_log,             { desc = "Show commit details" } },
       { "n", "X",             actions.restore_entry,               { desc = "Restore file to the state from the selected entry" } },
       { "n", "zo",            actions.open_fold,                   { desc = "Expand fold" } },
@@ -522,7 +646,20 @@ git object database, and a command is echoed that shows how to undo the change.
   - Note: whether or not the diagonal lines will line up nicely will depend on
     your terminal emulator. The terminal used in the screenshots is Kitty.
 - **Q: How do I jump between hunks in the diff?**
-  - A: Use `[c` and `]c`
-  - `:h jumpto-diffs`
+  - A: Use `[c` and `]c`. In a Diffview these continue into the next / previous
+    file once there are no more changes in the current one.
+  - `:h jumpto-diffs`, `:h diffview-actions-next_change`
+- **Q: How do I change the highlight of the file that's open in the view?**
+  - A: The whole line of the open entry is highlighted with
+    `DiffviewFilePanelSelectedLine`, which links to `Visual` by default (so it
+    follows your colorscheme, and stays distinct from the cursor line). Relink
+    or override it to taste:
+    - `vim.api.nvim_set_hl(0, "DiffviewFilePanelSelectedLine", { link = "CursorLine" })`
+  - The file *name* of that entry also uses `DiffviewFilePanelSelected`
+    (linked to `Type`).
+- **Q: How do I stage just a part of a file?**
+  - A: Put the cursor on the hunk and press `<leader>hs`, or select the lines
+    in visual mode first.
+  - `:h diffview-partial-staging`
 
 <!-- vim: set tw=80 -->

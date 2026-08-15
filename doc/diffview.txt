@@ -84,12 +84,33 @@ COMMANDS                                        *diffview-commands*
             :DiffviewOpen -uno
 <
 
+                                                *diffview-editing*
+        The diff buffers are editable wherever that makes sense. A buffer is
+        writable when it represents something that can actually change:
+
+          • The working tree version of a file. This is the real file buffer:
+            editing and writing it saves the file, exactly like editing it
+            outside of the view.
+          • The index version of a file. Writing it stages that content.
+          • The inline diff (|diffview-layout-unified|). It represents the new
+            side of the diff, so writing it saves the working tree - or stages,
+            for an entry under "Staged changes". The removed lines shown in it
+            are not part of the file, and are dropped on write. They are
+            tracked as you edit, so lines you insert or delete around them move
+            them along.
+
+        Buffers that show a commit are always read-only: history doesn't
+        change.
+
                                                 *diffview-staging*
         You can stage individual hunks by editing any buffer that represents
         the index (after running `:DiffviewOpen` with no [git-rev] the entries
         under "Changes" will have the index buffer on the left side, and the
         entries under "Staged changes" will have it on the right side). Once
         you write to an index buffer the index will be updated.
+
+        See also |diffview-partial-staging| for staging a hunk at a time
+        without editing anything.
 
                                                 *diffview-merge-tool*
         If you call `:DiffviewOpen` during a merge or a rebase, the view will
@@ -393,6 +414,35 @@ EXAMPLE CONFIGURATION WITH DEFAULT SETTINGS: |diffview.defaults|
 
 
 
+diffopt                                         *diffview-config-diffopt*
+        Type: `table`, Default: >lua
+            {
+              algorithm = "histogram",
+              linematch = 60,
+            }
+<
+        Values that are applied to 'diffopt' for as long as any view is open.
+        Because 'diffopt' is a global option, the value you had before is saved
+        when the first view is opened, and restored when the last one is
+        closed. Any flag you have set that isn't listed here is kept.
+
+        Set an entry to `false` to leave that part of 'diffopt' alone.
+
+        {algorithm} (`string|false`)
+            The diff algorithm to use. `'histogram'` tends to produce diffs
+            that are easier to read than the default algorithm.
+
+        {linematch} (`integer|false`)
+            The maximum size of a change block for which the individual lines
+            are aligned with each other. This is what makes it possible to see
+            *what* changed within a line, rather than just which lines changed.
+            Requires Nvim >= 0.9, and is ignored on older versions.
+
+        NOTE: Both of these require the internal diff library, so `internal` is
+        added to 'diffopt' whenever either of them is set.
+
+        See also: |diffview-actions-toggle_ignore_whitespace|
+
 enhanced_diff_hl                                *diffview-config-enhanced_diff_hl*
         Type: `boolean`, Default: `false`
 
@@ -434,6 +484,7 @@ hg_cmd                                          *diffview-config-hg_cmd*
 view.x.layout                                   *diffview-config-view.x.layout*
         Type: >
             "diff1_plain"
+                | "unified"
                 | "diff2_horizontal"
                 | "diff2_vertical"
                 | "diff3_horizontal"
@@ -468,6 +519,34 @@ view.x.layout                                   *diffview-config-view.x.layout*
               • D: BASE (common ancestor)
 
                                                 *diffview-layouts*
+            {unified}                           *diffview-layout-unified*
+                Available for: diff_view, file_history_view
+
+                The inline diff: a single window showing the file as it looks
+                after the change, with the removed lines spliced back in where
+                they used to be. Added and removed lines are highlighted, and
+                so are the parts of a line that actually changed.
+
+                Because the buffer stays close to the real file, syntax
+                highlighting keeps working - which is what makes this readable
+                compared to a plain patch. The unchanged parts of the file are
+                folded away.
+
+                Everything that works in the side-by-side layouts works here
+                too: |diffview-actions-stage_hunk| and its siblings operate on
+                the change under the cursor, and |diffview-actions-next_change|
+                walks between them.
+
+                Toggle it with |diffview-actions-toggle_inline_diff|.
+
+                ┌──────────────┐
+                │              │
+                │              │
+                │      B       │
+                │              │
+                │              │
+                └──────────────┘
+
             {diff1_plain}
                 Available for: merge_tool
 
@@ -925,6 +1004,13 @@ Actions ~
                                                 *diffview-available-actions*
 Available Actions ~
 
+amend_commit                                    *diffview-actions-amend_commit*
+        Contexts: `diff_view`, `file_panel`
+
+        Like |diffview-actions-commit|, but amend the previous commit. The
+        commit message editor is pre-filled with the message of the commit
+        that's being amended.
+
 close                                           *diffview-actions-close*
         Contexts: `view`, `panel`
 
@@ -939,6 +1025,14 @@ close_fold                                      *diffview-actions-close_fold*
         Contexts: `file_panel`, `file_history_panel`
 
         Collapse the fold of the subject.
+
+commit                                          *diffview-actions-commit*
+        Contexts: `diff_view`, `file_panel`
+
+        Commit the staged changes. This opens a commit message editor in a
+        split below the view. Write the message, then either press
+        `<C-c><C-c>` or write the buffer (`:w`) to create the commit. Press `q`
+        to abort. An empty message aborts the commit.
 
 conflict_choose({version})                      *diffview-actions-conflict_choose*
         Contexts: `merge_tool`
@@ -983,6 +1077,13 @@ conflict_choose_all({version})                  *diffview-actions-conflict_choos
             >>>>>>> (End of conflict)
 <
 
+copy_file_path                                  *diffview-actions-copy_file_path*
+        Contexts: `view`, `panel`
+
+        Copy the path of the current file - relative to the repo root - to the
+        unnamed register, and to the `+` register when a clipboard provider is
+        available.
+
 copy_hash                                       *diffview-actions-copy_hash*
         Contexts: `file_history_panel`
 
@@ -997,6 +1098,13 @@ diffget({target})                               *diffview-actions-diffget*
             {target} `'ours'|'theirs'|'base'|'local'`
                 See |diffview-conflict-versions| to tell what windows
                 correspond with what version of the file.
+
+filter_files                                    *diffview-actions-filter_files*
+        Contexts: `diff_view`, `file_panel`
+
+        Prompt for a string, and only list the files whose path contains it.
+        The active filter is shown in the file panel header. Submitting an
+        empty string clears the filter again.
 
 focus_entry                                     *diffview-actions-focus_entry*
         Contexts: `file_panel`, `file_history_panel`
@@ -1019,12 +1127,16 @@ goto_file                                       *diffview-actions-goto_file*
         tabpage. See |diffview-file-inference| for details on how the
         file target is determined.
 
+        If the target tabpage already has a window open for the file, that
+        window is focused instead of creating a second view of the same file.
+
 goto_file_edit                                  *diffview-actions-goto_file_edit*
         Contexts: `view`, `panel`
 
         Like |diffview-actions-goto_file| except after changing tabpage,
         instead of creating a new split, it will just open the file in the
-        last accessed window.
+        last accessed window. A window that already has the file open is
+        focused instead.
 
 goto_file_split                                 *diffview-actions-goto_file_split*
         Contexts: `view`, `panel`
@@ -1062,6 +1174,14 @@ listing_style                                   *diffview-actions-listing_style*
 
         Cycle through the available listing styles. The currently available
         styles are: file tree and flat list.
+
+[count] next_change                             *diffview-actions-next_change*
+        Contexts: `view`, `panel`
+
+        Move the cursor to the next change in the view. Unlike |]c|, this is
+        not limited to the current file: when there are no more changes below
+        the cursor, the next file entry is opened, and the cursor is placed on
+        its first change.
 
 next_conflict                                   *diffview-actions-next_conflict*
         Contexts: `diff_view`, `file_panel`
@@ -1103,6 +1223,12 @@ options                                         *diffview-actions-options*
 
         Open the option panel for the subject.
 
+[count] prev_change                             *diffview-actions-prev_change*
+        Contexts: `view`, `panel`
+
+        Move the cursor to the previous change in the view. Rolls over into the
+        previous file entry. See |diffview-actions-next_change|.
+
 prev_conflict                                   *diffview-actions-prev_conflict*
         Contexts: `diff_view`, `file_panel`
 
@@ -1142,6 +1268,20 @@ restore_entry                                   *diffview-actions-restore_entry*
 
         NOTE: A command is echoed that shows how to undo the change. Check
         |:messages| or |:DiffviewLog| to see it again.
+
+restore_hunk                                    *diffview-actions-restore_hunk*
+        Contexts: `diff_view`
+        Modes: `n`, `x`
+
+        Discard the hunk under the cursor in the working tree. In visual mode:
+        discard only the selected lines.
+
+        This is only possible in a diff between the index and the working tree
+        (see |diffview-actions-stage_hunk|), and only for changes that have not
+        been staged. To discard staged changes: unstage them first, or use
+        |diffview-actions-restore_entry| for the whole file.
+
+        WARNING: The discarded changes are not recoverable.
 
 scroll_view({distance})                         *diffview-actions-scroll_view*
         Contexts: `panel`
@@ -1200,6 +1340,33 @@ stage_all                                       *diffview-actions-stage_all*
 
         Stage all changes.
 
+                                                *diffview-partial-staging*
+stage_hunk                                      *diffview-actions-stage_hunk*
+        Contexts: `diff_view`
+        Modes: `n`, `x`
+
+        Stage the hunk under the cursor. In visual mode: stage only the
+        selected lines.
+
+        The cursor has to be in one of the diff windows: the hunk is
+        determined from the line the cursor is on, in either version of the
+        file. This only works in a diff between the index and the working tree
+        - i.e. `:DiffviewOpen` without any revs - because that is the only
+        diff whose changes can be moved into the index.
+
+        Untracked files are recorded in the index first (`git add
+        --intent-to-add`), so that their content can be staged hunk by hunk as
+        well.
+
+        A line that is changed rather than purely added or removed is staged
+        together with the line it replaces, so that the file never ends up with
+        both versions of the same line. Where a block of lines is replaced by a
+        different number of lines, the surplus lines follow the last line of
+        the block.
+
+        NOTE: The buffer for the file must not have unsaved changes: the diff
+        is taken against the file as it exists on disk.
+
 toggle_files                                    *diffview-actions-toggle_files*
         Contexts: `view`, `file_panel`, `file_history_panel`
 
@@ -1216,15 +1383,53 @@ toggle_fold                                     *diffview-actions-toggle_fold*
 
         Collapse / expand the fold of the subject.
 
+toggle_ignore_whitespace                        *diffview-actions-toggle_ignore_whitespace*
+        Contexts: `view`, `panel`
+
+        Toggle whether whitespace-only changes are shown in the diff. This
+        works by adding `iwhiteall` and `iblank` to 'diffopt', which is a
+        global option: the original value is restored when the view is closed.
+
+toggle_inline_diff                              *diffview-actions-toggle_inline_diff*
+        Contexts: `view`, `panel`
+
+        Toggle between the inline diff and the side-by-side layout - the
+        equivalent of VSCode's inline view toggle. See
+        |diffview-layout-unified|.
+
+        The layout applies to every file in the view, and stays in effect while
+        you move between them. To always start out inline, set
+        |diffview-config-view.x.layout| to `'unified'`.
+
+        Not available for conflicted files: use the merge tool layouts instead.
+
 toggle_stage_entry                              *diffview-actions-toggle_stage_entry*
         Contexts: `diff_view`, `file_panel`
 
         Stage / unstage the subject.
 
+toggle_unchanged_regions                        *diffview-actions-toggle_unchanged_regions*
+        Contexts: `view`, `panel`
+
+        Toggle whether the parts of the file that didn't change are folded
+        away. They are folded by default. The setting sticks for as long as the
+        view is open, also when switching between files.
+
 unstage_all                                     *diffview-actions-unstage_all*
         Contexts: `diff_view`, `file_panel`
 
         Unstage all changes.
+
+unstage_hunk                                    *diffview-actions-unstage_hunk*
+        Contexts: `diff_view`
+        Modes: `n`, `x`
+
+        Remove the hunk under the cursor from the index. In visual mode: remove
+        only the selected lines. The working tree is left untouched.
+
+        The cursor has to be in one of the diff windows of a *staged* entry.
+        See |diffview-actions-stage_hunk| for the details that apply to partial
+        staging in general.
 
 view_windo({cmd})                               *diffview-actions-view_windo*
         Contexts: `view`, `panel`

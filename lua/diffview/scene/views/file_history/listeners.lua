@@ -3,6 +3,8 @@ local lazy = require("diffview.lazy")
 
 local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
 local JobStatus = lazy.access("diffview.vcs.utils", "JobStatus") ---@type JobStatus|LazyModule
+local diff_options = lazy.require("diffview.scene.views.standard.diff_options") ---@module "diffview.scene.views.standard.diff_options"
+local navigation = lazy.require("diffview.scene.views.standard.navigation") ---@module "diffview.scene.views.standard.navigation"
 local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local vcs_utils = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
@@ -34,6 +36,31 @@ return function(view)
     file_open_new = function(_, entry)
       utils.set_cursor(view.cur_layout:get_main_win().id, 1, 0)
       view.cur_layout:sync_scroll()
+    end,
+    file_open_post = function()
+      -- Keep the display options of the view when switching entries.
+      diff_options.apply(view)
+    end,
+    next_change = function()
+      navigation.goto_change(view, 1)
+    end,
+    prev_change = function()
+      navigation.goto_change(view, -1)
+    end,
+    toggle_ignore_whitespace = function()
+      diff_options.toggle_ignore_whitespace(view)
+    end,
+    toggle_unchanged_regions = function()
+      diff_options.toggle_unchanged(view)
+    end,
+    copy_file_path = function()
+      local file = view:infer_cur_file()
+      if not file then return end
+
+      vim.fn.setreg('"', file.path)
+      if vim.fn.has("clipboard") == 1 then vim.fn.setreg("+", file.path) end
+
+      utils.info(("Copied path: '%s'"):format(file.path))
     end,
     open_in_diffview = function()
       local file = view:infer_cur_file()

@@ -5,6 +5,59 @@ CHANGELOG
 
 NOTE: This changelog only encompasses breaking changes.
 
+                                                *diffview.changelog-partial-staging*
+
+Partial staging was added, along with a handful of new default mappings and a
+new config option. The changes that might get in the way of an existing setup:
+
+`'diffopt'` is now modified while a view is open ~
+
+    Diffview now applies |diffview-config-diffopt| to 'diffopt' for as long as
+    any view is open, and restores your value once the last one is closed. By
+    default this adds `internal`, `algorithm:histogram`, and `linematch:60`,
+    which changes how the diffs are lined up. To keep your own value: >lua
+
+        require("diffview").setup({
+          diffopt = { algorithm = false, linematch = false },
+        })
+<
+`]c` and `[c` are now mapped ~
+
+    These are mapped to |diffview-actions-next_change| and
+    |diffview-actions-prev_change| in the diff windows and in the panels. They
+    behave like the built-in motions within a file, but continue into the next
+    / previous file entry instead of stopping at the end of the current one.
+
+`/` in the file panel now filters the file list ~
+
+    It's mapped to |diffview-actions-filter_files| rather than starting a
+    search. Use `:/` to search the panel buffer, or unmap it: >lua
+
+        require("diffview").setup({
+          keymaps = {
+            file_panel = { { "n", "/", false } },
+          },
+        })
+<
+`g<C-x>` cycles through one more layout ~
+
+    A regular diff now cycles through side-by-side, stacked, and the inline
+    diff (|diffview-layout-unified|), rather than just the first two. The
+    inline diff can also be toggled directly with `<leader>di`, or made the
+    default with: >lua
+
+        require("diffview").setup({
+          view = { default = { layout = "unified" } },
+        })
+<
+New mappings in the file panel ~
+
+    `cc` and `ca` now commit / amend (|diffview-actions-commit|), and `gy`
+    copies the path of the entry under the cursor. In the diff windows,
+    `<leader>hs`, `<leader>hu` and `<leader>hr` stage, unstage and discard the
+    hunk under the cursor, and `<leader>dw` / `<leader>du` toggle the display
+    options.
+
                                                 *diffview.changelog-271*
 
 PR: https://github.com/sindrets/diffview.nvim/pull/271

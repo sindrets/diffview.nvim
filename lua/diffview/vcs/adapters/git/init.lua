@@ -1653,6 +1653,158 @@ function GitAdapter:stage_index_file(file)
   return ret
 end
 
+---@return boolean
+function GitAdapter:supports_partial_staging()
+  return true
+end
+
+---@class GitAdapter.file_patch.Opt
+---@field cached? boolean Diff the index against `HEAD` instead of the working tree against the index.
+---@field context? integer Number of context lines. Defaults to 3.
+---@field rev? string Diff against the given rev rather than the index.
+
+---Produce the raw unified diff patch for a single file.
+---@param path string
+---@param opt? GitAdapter.file_patch.Opt
+---@return string[]? lines
+function GitAdapter:file_patch(path, opt)
+  opt = opt or {}
+
+  local out, code = self:exec_sync(
+    utils.vec_join(
+      "-c", "core.quotePath=false",
+      "diff",
+      "--no-color",
+      "--no-ext-diff",
+      "--ignore-submodules",
+      fmt("--unified=%d", opt.context or 3),
+      opt.cached and "--cached" or nil,
+      opt.rev or nil,
+      "--",
+      path
+    ),
+    { cwd = self.ctx.toplevel, log_opt = { label = "GitAdapter:file_patch()" } }
+  )
+
+  if code ~= 0 then return end
+
+  return out
+end
+
+---@class GitAdapter.apply_patch.Opt
+---@field cached? boolean Apply the patch to the index rather than the working tree.
+---@field reverse? boolean Apply the patch in reverse.
+
+---Apply a patch through `git apply`.
+---@param patch string
+---@param opt? GitAdapter.apply_patch.Opt
+---@return boolean ok
+---@return string[] stderr
+function GitAdapter:apply_patch(patch, opt)
+  opt = opt or {}
+
+  local _, code, stderr = self:exec_sync(
+    utils.vec_join(
+      "apply",
+      "--whitespace=nowarn",
+      opt.cached and "--cached" or nil,
+      opt.reverse and "--reverse" or nil,
+      "-"
+    ),
+    {
+      cwd = self.ctx.toplevel,
+      writer = patch,
+      silent = true,
+      log_opt = { label = "GitAdapter:apply_patch()" },
+    }
+  )
+
+  return code == 0, stderr or {}
+end
+
+---Write the given content into the index for a path.
+---@param path string
+---@param content string[]
+---@return boolean ok
+---@return string[] stderr
+function GitAdapter:stage_content(path, content)
+  local temp = vim.fn.tempname()
+  vim.fn.writefile(content, temp)
+
+  local out, code, stderr = self:exec_sync(
+    { "--literal-pathspecs", "hash-object", "-w", "--", pl:convert(temp) },
+    self.ctx.toplevel
+  )
+
+  vim.fn.delete(temp)
+
+  if code ~= 0 then return false, stderr or {} end
+
+  local blob_hash = out[1]
+
+  out = self:exec_sync({ "ls-files", "--stage", path }, self.ctx.toplevel)
+  local mode = (out[1] or ""):match("^(%d+)")
+
+  if not mode then
+    mode = vim.fn.executable(pl:join(self.ctx.toplevel, path)) == 1 and "100755" or "100644"
+  end
+
+  _, code, stderr = self:exec_sync({ "update-index", "--index-info" }, {
+    cwd = self.ctx.toplevel,
+    writer = fmt("%s %s 0\t%s", mode, blob_hash, path),
+  })
+
+  return code == 0, stderr or {}
+end
+
+---@return boolean
+function GitAdapter:supports_committing()
+  return true
+end
+
+---Check whether there is anything staged in the index.
+---@return boolean
+function GitAdapter:has_staged_changes()
+  local _, code = self:exec_sync(
+    { "diff", "--cached", "--quiet", "--ignore-submodules" },
+    { cwd = self.ctx.toplevel, silent = true }
+  )
+
+  -- `--quiet` implies `--exit-code`: 1 means there were differences.
+  return code == 1
+end
+
+---@class GitAdapter.commit.Opt
+---@field amend? boolean
+
+---Commit the staged changes.
+---@param msg string
+---@param opt? GitAdapter.commit.Opt
+---@return boolean ok
+---@return string[] stdout
+---@return string[] stderr
+function GitAdapter:commit(msg, opt)
+  opt = opt or {}
+
+  local out, code, stderr = self:exec_sync(
+    utils.vec_join(
+      "commit",
+      "--cleanup=strip",
+      opt.amend and "--amend" or nil,
+      "--file",
+      "-"
+    ),
+    {
+      cwd = self.ctx.toplevel,
+      writer = msg,
+      silent = true,
+      log_opt = { label = "GitAdapter:commit()" },
+    }
+  )
+
+  return code == 0, out or {}, stderr or {}
+end
+
 function GitAdapter:reset_files(paths)
   local _, code = self:exec_sync(utils.vec_join("reset", "--", paths), self.ctx.toplevel)
   return code == 0

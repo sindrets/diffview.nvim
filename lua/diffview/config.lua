@@ -15,6 +15,7 @@ local Diff3Mixed = lazy.access("diffview.scene.layouts.diff_3_mixed", "Diff3Mixe
 local Diff3Ver = lazy.access("diffview.scene.layouts.diff_3_ver", "Diff3Ver") ---@type Diff3Hor|LazyModule
 local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4") ---@type Diff4|LazyModule
 local Diff4Mixed = lazy.access("diffview.scene.layouts.diff_4_mixed", "Diff4Mixed") ---@type Diff4Mixed|LazyModule
+local Unified = lazy.access("diffview.scene.layouts.unified", "Unified") ---@type Unified|LazyModule
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local M = {}
@@ -52,6 +53,13 @@ M.defaults = {
     fold_closed = "",
     fold_open = "",
     done = "✓",
+  },
+  -- Values that are applied to 'diffopt' for as long as a view is open. The
+  -- previous value is restored when the last view is closed. Set an entry to
+  -- `false` to leave that part of 'diffopt' alone.
+  diffopt = {
+    algorithm = "histogram", -- Lines up changed lines the way other modern diff viewers do.
+    linematch = 60,          -- Max size of a change block to align line by line. Needs nvim >= 0.9.
   },
   view = {
     default = {
@@ -126,6 +134,15 @@ M.defaults = {
       { "n", "<s-tab>",     actions.select_prev_entry,              { desc = "Open the diff for the previous file" } },
       { "n", "[F",          actions.select_first_entry,             { desc = "Open the diff for the first file" } },
       { "n", "]F",          actions.select_last_entry,              { desc = "Open the diff for the last file" } },
+      { "n", "]c",          actions.next_change,                    { desc = "Jump to the next change in the view" } },
+      { "n", "[c",          actions.prev_change,                    { desc = "Jump to the previous change in the view" } },
+      { { "n", "x" }, "<leader>hs", actions.stage_hunk,             { desc = "Stage the hunk under the cursor, or the selected lines" } },
+      { { "n", "x" }, "<leader>hu", actions.unstage_hunk,           { desc = "Unstage the hunk under the cursor, or the selected lines" } },
+      { { "n", "x" }, "<leader>hr", actions.restore_hunk,           { desc = "Discard the hunk under the cursor, or the selected lines" } },
+      { "n", "<leader>dw",  actions.toggle_ignore_whitespace,       { desc = "Toggle whether whitespace changes are ignored" } },
+      { "n", "<leader>du",  actions.toggle_unchanged_regions,       { desc = "Toggle whether unchanged regions are hidden" } },
+      { "n", "<leader>di",  actions.toggle_inline_diff,             { desc = "Toggle the inline (unified) diff" } },
+      { "n", "gy",          actions.copy_file_path,                 { desc = "Copy the path of the current file" } },
       { "n", "gf",          actions.goto_file_edit,                 { desc = "Open the file in the previous tabpage" } },
       { "n", "<C-w><C-f>",  actions.goto_file_split,                { desc = "Open the file in a new split" } },
       { "n", "<C-w>gf",     actions.goto_file_tab,                  { desc = "Open the file in a new tabpage" } },
@@ -181,6 +198,15 @@ M.defaults = {
       { "n", "S",              actions.stage_all,                      { desc = "Stage all entries" } },
       { "n", "U",              actions.unstage_all,                    { desc = "Unstage all entries" } },
       { "n", "X",              actions.restore_entry,                  { desc = "Restore entry to the state on the left side" } },
+      { "n", "cc",             actions.commit,                         { desc = "Commit the staged changes" } },
+      { "n", "ca",             actions.amend_commit,                   { desc = "Amend the last commit" } },
+      { "n", "/",              actions.filter_files,                   { desc = "Only list files whose path matches a pattern" } },
+      { "n", "gy",             actions.copy_file_path,                 { desc = "Copy the path of the entry under the cursor" } },
+      { "n", "]c",             actions.next_change,                    { desc = "Jump to the next change in the view" } },
+      { "n", "[c",             actions.prev_change,                    { desc = "Jump to the previous change in the view" } },
+      { "n", "<leader>dw",     actions.toggle_ignore_whitespace,       { desc = "Toggle whether whitespace changes are ignored" } },
+      { "n", "<leader>du",     actions.toggle_unchanged_regions,       { desc = "Toggle whether unchanged regions are hidden" } },
+      { "n", "<leader>di",     actions.toggle_inline_diff,             { desc = "Toggle the inline (unified) diff" } },
       { "n", "L",              actions.open_commit_log,                { desc = "Open the commit log panel" } },
       { "n", "zo",             actions.open_fold,                      { desc = "Expand fold" } },
       { "n", "h",              actions.close_fold,                     { desc = "Collapse fold" } },
@@ -216,6 +242,12 @@ M.defaults = {
       { "n", "g!",            actions.options,                     { desc = "Open the option panel" } },
       { "n", "<C-A-d>",       actions.open_in_diffview,            { desc = "Open the entry under the cursor in a diffview" } },
       { "n", "y",             actions.copy_hash,                   { desc = "Copy the commit hash of the entry under the cursor" } },
+      { "n", "gy",            actions.copy_file_path,              { desc = "Copy the path of the entry under the cursor" } },
+      { "n", "]c",            actions.next_change,                 { desc = "Jump to the next change in the view" } },
+      { "n", "[c",            actions.prev_change,                 { desc = "Jump to the previous change in the view" } },
+      { "n", "<leader>dw",    actions.toggle_ignore_whitespace,    { desc = "Toggle whether whitespace changes are ignored" } },
+      { "n", "<leader>du",    actions.toggle_unchanged_regions,    { desc = "Toggle whether unchanged regions are hidden" } },
+      { "n", "<leader>di",    actions.toggle_inline_diff,          { desc = "Toggle the inline (unified) diff" } },
       { "n", "L",             actions.open_commit_log,             { desc = "Show commit details" } },
       { "n", "X",             actions.restore_entry,               { desc = "Restore file to the state from the selected entry" } },
       { "n", "zo",            actions.open_fold,                   { desc = "Expand fold" } },
@@ -378,6 +410,7 @@ function M.get_log_options(single_file, t, vcs)
 end
 
 ---@alias LayoutName "diff1_plain"
+---       | "unified"
 ---       | "diff2_horizontal"
 ---       | "diff2_vertical"
 ---       | "diff3_horizontal"
@@ -387,6 +420,7 @@ end
 
 local layout_map = {
   diff1_plain = Diff1,
+  unified = Unified,
   diff2_horizontal = Diff2Hor,
   diff2_vertical = Diff2Ver,
   diff3_horizontal = Diff3Hor,
@@ -406,7 +440,10 @@ end
 ---@param layout Layout
 ---@return table?
 function M.get_layout_keymaps(layout)
-  if layout:instanceof(Diff1.__get()) then
+  if layout:instanceof(Unified.__get()) then
+    -- The unified layout is a single window, like `diff1`.
+    return M._config.keymaps.diff1
+  elseif layout:instanceof(Diff1.__get()) then
     return M._config.keymaps.diff1
   elseif layout:instanceof(Diff2.__get()) then
     return M._config.keymaps.diff2
@@ -576,7 +613,7 @@ function M.setup(user_config)
   do
     -- Validate layouts
     local view = M._config.view
-    local standard_layouts = { "diff2_horizontal", "diff2_vertical", -1 }
+    local standard_layouts = { "diff2_horizontal", "diff2_vertical", "unified", -1 }
     local merge_layuots = {
       "diff1_plain",
       "diff3_horizontal",

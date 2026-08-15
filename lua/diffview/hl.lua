@@ -442,6 +442,10 @@ M.hl_links = {
   FilePanelRootPath = "DiffviewFilePanelTitle",
   FilePanelFileName = "Normal",
   FilePanelSelected = "Type",
+  -- The whole line of the entry that's currently open in the view. Linked to
+  -- 'Visual' so that it reads as a selection in any colorscheme, and stays
+  -- distinct from the cursor line.
+  FilePanelSelectedLine = "Visual",
   FilePanelPath = "Comment",
   FilePanelInsertions = "diffAdded",
   FilePanelDeletions = "diffRemoved",

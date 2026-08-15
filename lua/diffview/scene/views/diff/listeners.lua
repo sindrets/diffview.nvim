@@ -4,6 +4,10 @@ local lazy = require("diffview.lazy")
 local EventName = lazy.access("diffview.events", "EventName") ---@type EventName|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local actions = lazy.require("diffview.actions") ---@module "diffview.actions"
+local commit_editor = lazy.require("diffview.ui.commit_editor") ---@module "diffview.ui.commit_editor"
+local diff_options = lazy.require("diffview.scene.views.standard.diff_options") ---@module "diffview.scene.views.standard.diff_options"
+local navigation = lazy.require("diffview.scene.views.standard.navigation") ---@module "diffview.scene.views.standard.navigation"
+local staging = lazy.require("diffview.scene.views.diff.staging") ---@module "diffview.scene.views.diff.staging"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local vcs_utils = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
 
@@ -54,9 +58,71 @@ return function(view)
 
       view.cur_layout:sync_scroll()
     end,
+    file_open_post = function()
+      -- Keep the display options of the view when switching entries.
+      diff_options.apply(view)
+    end,
     ---@diagnostic disable-next-line: unused-local
     files_updated = function(_, files)
       view.initialized = true
+    end,
+    stage_hunk = function()
+      staging.apply(view, { kind = "stage", range = staging.get_range() })
+    end,
+    unstage_hunk = function()
+      staging.apply(view, { kind = "unstage", range = staging.get_range() })
+    end,
+    restore_hunk = function()
+      staging.apply(view, { kind = "restore", range = staging.get_range() })
+    end,
+    next_change = function()
+      navigation.goto_change(view, 1)
+    end,
+    prev_change = function()
+      navigation.goto_change(view, -1)
+    end,
+    toggle_ignore_whitespace = function()
+      diff_options.toggle_ignore_whitespace(view)
+    end,
+    toggle_unchanged_regions = function()
+      diff_options.toggle_unchanged(view)
+    end,
+    filter_files = function()
+      vim.ui.input(
+        { prompt = "Filter files (empty to clear): ", default = view.panel.filter or "" },
+        function(input)
+          if input == nil then return end
+          view.panel:set_filter(input)
+          view.panel:highlight_cur_file()
+        end
+      )
+    end,
+    copy_file_path = function()
+      local item = view:infer_cur_file(true)
+      if not item then return end
+
+      local path = item.path
+      vim.fn.setreg('"', path)
+      if vim.fn.has("clipboard") == 1 then vim.fn.setreg("+", path) end
+
+      utils.info(("Copied path: '%s'"):format(path))
+    end,
+    commit = function()
+      commit_editor.open({
+        adapter = view.adapter,
+        on_done = function(committed)
+          if committed then view:update_files() end
+        end,
+      })
+    end,
+    amend_commit = function()
+      commit_editor.open({
+        adapter = view.adapter,
+        amend = true,
+        on_done = function(committed)
+          if committed then view:update_files() end
+        end,
+      })
     end,
     close = function()
       if view.panel:is_focused() then

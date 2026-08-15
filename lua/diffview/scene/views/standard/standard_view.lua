@@ -5,6 +5,7 @@ local Diff1 = lazy.access("diffview.scene.layouts.diff_1", "Diff1") ---@type Dif
 local Diff2 = lazy.access("diffview.scene.layouts.diff_2", "Diff2") ---@type Diff2|LazyModule
 local Diff3 = lazy.access("diffview.scene.layouts.diff_3", "Diff3") ---@type Diff3|LazyModule
 local Diff4 = lazy.access("diffview.scene.layouts.diff_4", "Diff4") ---@type Diff4|LazyModule
+local Unified = lazy.access("diffview.scene.layouts.unified", "Unified") ---@type Unified|LazyModule
 local Panel = lazy.access("diffview.ui.panel", "Panel") ---@type Panel|LazyModule
 local View = lazy.access("diffview.scene.view", "View") ---@type View|LazyModule
 local config = lazy.require("diffview.config") ---@module "diffview.config"
@@ -33,6 +34,7 @@ function StandardView:init(opt)
   self.panel = opt.panel or Panel()
   self.layouts = opt.layouts or {}
   self.winopts = opt.winopts or {
+    unified = { b = {} },
     diff1 = { a = {} },
     diff2 = { a = {}, b = {} },
     diff3 = { a = {}, b = {}, c = {} },
@@ -125,7 +127,9 @@ end
 StandardView.use_entry = async.void(function(self, entry)
   local layout_key
 
-  if entry.layout:instanceof(Diff1.__get()) then
+  if entry.layout:instanceof(Unified.__get()) then
+    layout_key = "unified"
+  elseif entry.layout:instanceof(Diff1.__get()) then
     layout_key = "diff1"
   elseif entry.layout:instanceof(Diff2.__get()) then
     layout_key = "diff2"

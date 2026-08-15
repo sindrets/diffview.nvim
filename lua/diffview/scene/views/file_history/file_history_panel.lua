@@ -18,6 +18,8 @@ local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local api = vim.api
 local await = async.await
 local fmt = string.format
+
+local selected_ns = api.nvim_create_namespace("diffview_panel_selected")
 local logger = DiffviewGlobal.logger
 
 local M = {}
@@ -318,6 +320,51 @@ end
 
 ---Get the log or file entry under the cursor.
 ---@return (LogEntry|FileEntry)?
+---Highlight the whole line of the file that's currently open in the view. Falls
+---back to the commit line when its entry is collapsed.
+function FileHistoryPanel:mark_cur_file()
+  if not self:buf_loaded() then return end
+
+  api.nvim_buf_clear_namespace(self.bufid, selected_ns, 0, -1)
+
+  local entry = self.cur_item and self.cur_item[1]
+  local file = self.cur_item and self.cur_item[2]
+
+  if not (entry and self.components) then return end
+
+  local row
+
+  self.components.comp:deep_some(function(comp)
+    if comp.name ~= "entry" or comp.context ~= entry then return false end
+
+    -- Entry components hold a `commit` and a `files` component. Within the
+    -- latter, each file occupies exactly one line.
+    local files_comp = comp.components[2]
+    local idx = file and utils.vec_indexof(entry.files, file) or -1
+
+    if files_comp and idx > 0 and files_comp.lend > files_comp.lstart then
+      row = files_comp.lstart + idx - 1
+    else
+      row = comp.lstart
+    end
+
+    return true
+  end)
+
+  if not row then return end
+
+  pcall(api.nvim_buf_set_extmark, self.bufid, selected_ns, row, 0, {
+    line_hl_group = "DiffviewFilePanelSelectedLine",
+    priority = 50,
+  })
+end
+
+---@override
+function FileHistoryPanel:redraw()
+  FileHistoryPanel.super_class.redraw(self)
+  self:mark_cur_file()
+end
+
 function FileHistoryPanel:get_item_at_cursor()
   if not self:is_open() and self:buf_loaded() then return end
 

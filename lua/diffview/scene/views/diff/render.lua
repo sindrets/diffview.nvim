@@ -150,37 +150,51 @@ return function(panel)
   if conf.show_help_hints and panel.help_mapping then
     comp:add_text("Help: ", "DiffviewFilePanelPath")
     comp:add_line(panel.help_mapping, "DiffviewFilePanelCounter")
+  end
+
+  if panel.filter then
+    comp:add_text("Filter: ", "DiffviewFilePanelPath")
+    comp:add_text(pl:truncate(panel.filter, width - 10), "DiffviewFilePanelCounter")
+
+    if panel:num_visible() == 0 then
+      comp:add_text(" (no matches)", "DiffviewFilePanelConflicts")
+    end
+
+    comp:ln()
+  end
+
+  if (conf.show_help_hints and panel.help_mapping) or panel.filter then
     comp:add_line()
   end
 
-  if #panel.files.conflicting > 0 then
+  if #panel.visible.conflicting > 0 then
     comp = panel.components.conflicting.title.comp
     comp:add_text("Conflicts ", "DiffviewFilePanelTitle")
-    comp:add_text("(" .. #panel.files.conflicting .. ")", "DiffviewFilePanelCounter")
+    comp:add_text("(" .. #panel.visible.conflicting .. ")", "DiffviewFilePanelCounter")
     comp:ln()
 
     render_files(panel.listing_style, panel.components.conflicting.files.comp)
     panel.components.conflicting.margin.comp:add_line()
   end
 
-  local has_other_files = #panel.files.conflicting > 0 or #panel.files.staged > 0
+  local has_other_files = #panel.visible.conflicting > 0 or #panel.visible.staged > 0
 
   -- Don't show the 'Changes' section if it's empty and we have other visible
   -- sections.
-  if #panel.files.working > 0 or not has_other_files then
+  if #panel.visible.working > 0 or not has_other_files then
     comp = panel.components.working.title.comp
     comp:add_text("Changes ", "DiffviewFilePanelTitle")
-    comp:add_text("(" .. #panel.files.working .. ")", "DiffviewFilePanelCounter")
+    comp:add_text("(" .. #panel.visible.working .. ")", "DiffviewFilePanelCounter")
     comp:ln()
 
     render_files(panel.listing_style, panel.components.working.files.comp)
     panel.components.working.margin.comp:add_line()
   end
 
-  if #panel.files.staged > 0 then
+  if #panel.visible.staged > 0 then
     comp = panel.components.staged.title.comp
     comp:add_text("Staged changes ", "DiffviewFilePanelTitle")
-    comp:add_text("(" .. #panel.files.staged .. ")", "DiffviewFilePanelCounter")
+    comp:add_text("(" .. #panel.visible.staged .. ")", "DiffviewFilePanelCounter")
     comp:ln()
 
     render_files(panel.listing_style, panel.components.staged.files.comp)
