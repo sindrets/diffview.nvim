@@ -203,21 +203,22 @@ M.completers = {
 
     if ctx.argidx > ctx.divideridx then
       if adapter then
-        utils.vec_push(candidates, unpack(adapter:path_candidates(ctx.arg_lead)))
+        vim.list_extend(candidates, adapter:path_candidates(ctx.arg_lead))
       else
-        utils.vec_push(candidates, unpack(vim.fn.getcompletion(ctx.arg_lead, "file", 0)))
+        vim.list_extend(candidates, vim.fn.getcompletion(ctx.arg_lead, "file", 0))
       end
     elseif adapter then
       if not has_rev_arg and ctx.arg_lead:sub(1, 1) ~= "-" then
-        utils.vec_push(candidates, unpack(adapter.comp.open:get_all_names()))
-        utils.vec_push(candidates, unpack(adapter:rev_candidates(ctx.arg_lead, {
+        vim.list_extend(candidates, adapter.comp.open:get_all_names())
+        vim.list_extend(candidates, adapter:rev_candidates(ctx.arg_lead, {
           accept_range = true,
-        })))
+        }))
       else
-        utils.vec_push(candidates, unpack(
+        vim.list_extend(
+          candidates,
           adapter.comp.open:get_completion(ctx.arg_lead)
-          or adapter.comp.open:get_all_names()
-        ))
+            or adapter.comp.open:get_all_names()
+        )
       end
     end
 
@@ -229,13 +230,14 @@ M.completers = {
     local candidates = {}
 
     if adapter then
-      utils.vec_push(candidates, unpack(
+      vim.list_extend(
+        candidates,
         adapter.comp.file_history:get_completion(ctx.arg_lead)
-        or adapter.comp.file_history:get_all_names()
-      ))
-      utils.vec_push(candidates, unpack(adapter:path_candidates(ctx.arg_lead)))
+          or adapter.comp.file_history:get_all_names()
+      )
+      vim.list_extend(candidates, adapter:path_candidates(ctx.arg_lead))
     else
-      utils.vec_push(candidates, unpack(vim.fn.getcompletion(ctx.arg_lead, "file", 0)))
+      vim.list_extend(candidates, vim.fn.getcompletion(ctx.arg_lead, "file", 0))
     end
 
     return candidates
